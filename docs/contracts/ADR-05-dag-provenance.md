@@ -36,7 +36,8 @@ Prima di ogni uso numerico, il file si legge per intero in un buffer (dimensione
 |---|---|---|
 | Digest o dimensione diversi dal record | `integrity` | `input.digest_mismatch` |
 | File assente | `io` | `input.missing` |
-| Lettura incompleta | `io` | `input.short_read` |
+| Dimensione del file cambiata rispetto a `fstat` (cresciuto, o fine file prima del previsto) | `integrity` | `input.size_changed` |
+| Lettura che restituisce meno byte senza cambio di dimensione | `io` | `input.short_read` |
 
 L'errore ferma solo i nodi che dipendono da quell'input; i rami indipendenti proseguono (T-M2B-09).
 
@@ -46,7 +47,7 @@ L'errore ferma solo i nodi che dipendono da quell'input; i rami indipendenti pro
 
 | Campo | Tipo | Note |
 |---|---|---|
-| `operator_id` | `std::string` | Es. `fits.decode`, `calib.light`. |
+| `operator_id` | `std::string` | Es. `fits.decode`, `calib.light`. Per `fits.decode`, `fits_read_options` (offset CFA dichiarati) e i valori applicati con `declare_metadata` sono parametri del nodo ed entrano nella sua chiave. |
 | `algorithm_version` | `uint32_t` | Cambia quando cambia il contratto numerico. |
 | `serialization_version` | `uint32_t` | Cambia quando cambia la serializzazione dei parametri. |
 | `params` | JSON canonico | RFC 8785 (JCS). NaN e ±Inf rifiutati (`invalid_input`, `dag.param_nonfinite`). Interi oltre 2^53 come stringhe. |
@@ -104,6 +105,7 @@ Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita re
 | T-M2B-10 | Provenance completa per un job riuscito e per uno fermato. |
 | T-M2B-11 | Versione di schema esclusa dalla chiave. |
 | T-M2B-12 | Ogni categoria al confine: exit 2 (3 per `cancelled`), job marcato, prenotazioni rilasciate. |
+| T-M2B-13 | `fits.decode`: cambiare `fits_read_options` o un valore `declare_metadata` cambia `node_key`; stessi parametri, stessa chiave. Da implementare in M2.b. |
 
 ## Fuori da M2
 

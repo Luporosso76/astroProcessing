@@ -1,6 +1,6 @@
 # M2.f: build, test e fixture
 
-Stato: **PARZIALE**. 28 ottobre 2026. Ambiente: Linux 7.0.0-38-generic x86_64, GCC 15.2.0, CMake 3.x di distribuzione, Ninja, ccache con cache in `tmp/cache/ccache`.
+Stato: **DONE** (generatori di fixture consegnati con M2.a). 28 ottobre 2026. Ambiente: Linux 7.0.0-38-generic x86_64, GCC 15.2.0, CMake 3.x di distribuzione, Ninja, ccache con cache in `tmp/cache/ccache`.
 
 ## Eseguito
 
@@ -11,9 +11,9 @@ Stato: **PARZIALE**. 28 ottobre 2026. Ambiente: Linux 7.0.0-38-generic x86_64, G
 - Inventario licenze: `docs/licenses.md`, tutte compatibili con GPL-3.0-or-later.
 - Dato reale: `docs/datasets/PUB-LFC-01.md`, Zenodo 10.5281/zenodo.3254683, CC BY 4.0, MD5 pubblicato verificato, SHA-256 di 24 FITS registrati.
 
-## Mancante
+## Completamento
 
-Generatori di fixture `FIX-SYN-FITS-01` (light, dark, flat, dark-flat, bias con GT nota), da scrivere sui tipi di M2.a. T-M2F-02 (`strace` sul workflow M2.e) arriva con M2.e.
+Generatori `FIX-SYN-FITS-01` in `tests/fixtures/syn_fits.hpp`, verificati in `docs/evidence/M2-a.md`. T-M2F-02 (`strace` sul workflow M2.e) si esegue con M2.e.
 
 ## Limiti
 

@@ -10,8 +10,22 @@ target_link_libraries(test_deps PRIVATE
   PkgConfig::FFTW3 PkgConfig::FFTW3F GTest::gtest_main)
 gtest_discover_tests(test_deps)
 
+foreach(t test_error test_image test_fits)
+  add_executable(${t} ${t}.cpp)
+  target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main)
+  target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+  target_compile_definitions(${t} PRIVATE
+    ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+    ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+  gtest_discover_tests(${t})
+endforeach()
+target_link_libraries(test_fits PRIVATE OpenSSL::Crypto)
+
 add_test(NAME T-M2F-01.offline
   COMMAND ${PROJECT_SOURCE_DIR}/tools/check_offline.sh
     $<TARGET_FILE:astrocore>
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_build_info.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_deps.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_deps.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_error.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_image.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_fits.dir)

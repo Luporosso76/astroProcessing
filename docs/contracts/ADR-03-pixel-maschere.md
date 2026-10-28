@@ -40,7 +40,7 @@ M2.a legge, conserva e riscrive tutti e quattro i layout con roundtrip bit-esatt
 
 Bit 9–15 riservati: un bit riservato acceso in lettura produce `invalid_input`.
 
-Immagine letta da file: i campioni restano quelli del file, anche sui pixel marcati, perché il roundtrip è bit-esatto. La maschera è l'HDU `INVALID`, se presente, più `source_nonfinite` su ogni campione non finito.
+Immagine letta da file: i campioni restano quelli del file, anche sui pixel marcati, perché il roundtrip è bit-esatto. La maschera è l'HDU `INVALID`, se presente, letto verbatim: i bit scritti dal prodotto tornano identici. `source_nonfinite` si aggiunge solo su un campione non finito i cui bit letti dal file sono 0. `source_flagged` è per maschere esterne al prodotto e non viene mai aggiunto dal lettore.
 
 Invarianti verificati in ogni immagine prodotta da un operatore:
 
@@ -56,7 +56,11 @@ Un pixel invalido non riceve mai epsilon, zero o interpolazione.
 
 `header_cards`: tutte le card a 80 caratteri, in ordine, verbatim. Le card non interpretate restano qui e sono elencate in `uninterpreted_keywords` (F-IO-01).
 
-Un valore `declared` per un campo già presente nell'header con valore diverso produce `incompatible`, codice `metadata.declared_conflict`.
+Un valore `declared` per un campo già presente nell'header con valore diverso produce `incompatible`, codice `metadata.declared_conflict`. L'origine (`header` o `declared`) è provenienza e vive nella provenance di ADR-05, non nel FITS: lo scrittore scrive ogni valore presente (anche `declared`) nella sua keyword; la rilettura lo restituisce con origine `header`. L'identità dei roundtrip (T-M2A-09) confronta valori, layout, maschere e varianza, non l'origine.
+
+Keyword interpretate: `EXPTIME`, `GAIN`, `EGAIN`, `OFFSET`, `CCD-TEMP`, `SATURATE`, `PEDESTAL` (reali), `FILTER`, `INSTRUME`, `IMAGETYP`, `READOUTM`, `ROWORDER` (stringhe), `XORGSUBF`, `YORGSUBF` (interi), `BUNIT` (`adu`, `electron`, `dimensionless`, senza distinzione di maiuscole; altro valore: `unsupported`, `fits.bunit`), `LINEAR` (logico: `T` = `linear`), `XBINNING`, `YBINNING`, `BAYERPAT`, `XBAYROFF`, `YBAYROFF`, `CTYPE3 = 'RGB'` (con `planes == 3`). Il tipo della card è verificato, nessuna coercizione (`EXPTIME = T` o `'60'`: `invalid_input`, `fits.keyword_value`). Una keyword interpretata duplicata è `invalid_input`, `fits.duplicate_keyword`; una stringa interpretata che prosegue su card `CONTINUE` è `unsupported`, `fits.continue`. Lo scrittore aggiunge in coda le card dei campi presenti nell'immagine e assenti da `header_cards`, poi rilegge l'header scritto: un campo in conflitto con `header_cards` è `invalid_input`, `fits.header_inconsistent`.
+
+Offset CFA: `XBAYROFF`/`YBAYROFF` si riferiscono ai dati come memorizzati. La richiesta di lettura può dichiararli (`fits_read_options`, origine `declared`); dichiarati e presenti nell'header con valore diverso: `incompatible`, `metadata.declared_conflict`. `BAYERPAT` senza offset né header né dichiarati: `metadata_missing`, `fits.bayer_offset_missing`. Offset dichiarati per un'immagine non CFA: `invalid_input`, `fits.declared_offset_unused`. `ROWORDER` si registra senza trasformare i dati.
 
 ## Lettore e scrittore FITS
 
@@ -67,9 +71,9 @@ Lettura dal buffer in memoria già sottoposto a digest (ADR-05), con `fits_open_
 | 8 con `BSCALE = 1` e `BZERO` ∈ {0, −128}; 16 con `BSCALE = 1` e `BZERO` ∈ {0, 32768}; -32 | `f32` | Conversione esatta: byte senza segno e con segno, int16 e uint16. |
 | 8, 16 con altro `BZERO`/`BSCALE`; 32, 64, -64 | `f64` | Per BITPIX 64, un intero con modulo > 2^53 produce `unsupported`. |
 
-`source_encoding` conserva `bitpix`, `bzero`, `bscale`. Riscrivere con lo stesso encoding riproduce byte per byte la data unit: per i casi interi la riconversione arrotonda all'intero più vicino e il test verifica l'identità (T-M2A-02).
+`source_encoding` conserva `bitpix`, `bzero`, `bscale` e `naxis` (1, 2 o 3 come dichiarato; `NAXIS3 = 1` resta `NAXIS = 3`). Ogni campione deve essere invertibile esattamente con `r = round((v − bzero)/bscale)`, `r·bscale + bzero == v`: in lettura, altrimenti `unsupported`, `fits.scaling_not_exact`; in scrittura, un valore non rappresentabile esattamente è `numeric`, `fits.precision_loss`, fuori range `fits.value_out_of_range`, non finito in encoding intero `fits.nonfinite_in_integer_encoding`. `BITPIX 64` richiede `BSCALE = 1`, `BZERO = 0` (`unsupported`, `fits.int64_scaling`), modulo ≤ 2^53 (`fits.int64_range`); BITPIX −32/−64 richiedono scala identità (`fits.float_scaling`); `BLANK` in immagine intera: `unsupported`, `fits.blank`. Riscrivere con lo stesso encoding riproduce byte per byte la data unit: per i casi interi la riconversione arrotonda all'intero più vicino e il test verifica l'identità (T-M2A-02).
 
-HDU in uscita: primaria con i campioni; `EXTNAME = 'INVALID'` (BITPIX 16, `BZERO = 32768`); `EXTNAME = 'VARIANCE'` se presente. La rilettura ricostruisce `image` identica (T-M2A-09).
+HDU in uscita: primaria con i campioni; `EXTNAME = 'INVALID'` (BITPIX 16, `BZERO = 32768`) solo se almeno un bit è acceso; `EXTNAME = 'VARIANCE'` se presente (stesso BITPIX float dei campioni, scala identità: altrimenti `invalid_input`, `fits.extension_encoding`). Geometria diversa dal primario: `fits.extension_geometry`. Bit riservato in `INVALID`: `invalid_input`, `fits.invalid_reserved_bits`. La rilettura ricostruisce `image` identica (T-M2A-09).
 
 ### Limiti (NFR-SEC-01)
 
@@ -87,6 +91,7 @@ Costanti in `astro::fits_limits`, coerenti fra loro: `max_file_bytes` copre i ca
 
 Preflight, prima di leggere il file per intero e prima di ogni allocazione:
 
+0. Il budget si controlla due volte: dopo il preflight dal file, e di nuovo da `decode_fits` sul buffer effettivamente letto (che può differire dal file pianificato).
 1. `open` in sola lettura, `fstat` sullo stesso fd: file non regolare: `invalid_input`, `fits.not_regular`; dimensione oltre `max_file_bytes`: `limit_exceeded`, `fits.max_file_bytes`;
 2. lettura con `pread` dei soli blocchi di header (al più `max_hdus · max_header_cards · 80` byte) e controllo di NAXIS, assi, piani, campioni, HDU e card;
 3. picco = dimensione del file + campioni · `sizeof(type)` + maschera (2 byte per campione) + varianza, se l'HDU esiste. Il picco entra nel `job_plan` di ADR-06 e si prenota prima della lettura; oltre il budget: `budget`, `sched.job_exceeds_budget`;
@@ -104,6 +109,14 @@ Oltre un limite: `limit_exceeded`, codice `fits.<nome_limite>`, nessuna allocazi
 | `CHECKSUM` o `DATASUM` presente e non corrispondente | `integrity` | `fits.checksum` |
 | `BAYERPAT` con valore non riconosciuto | `unsupported` | `fits.bayer_pattern` |
 | Immagine dichiarata CFA senza pattern | `metadata_missing` | `fits.bayer_pattern_missing` |
+| Keyword strutturale duplicata, `PCOUNT`/`GCOUNT` negativi, BITPIX non valido, assi non positivi | `invalid_input` | `fits.malformed` |
+| CFITSIO e la scansione dell'header leggono HDU diversi | `invalid_input` | `fits.structure_mismatch` |
+| Estensione di tipo non immagine, `PCOUNT`/`GCOUNT` non standard | `unsupported` | `fits.hdu_kind` |
+| Estensione immagine con `EXTNAME` diverso da `INVALID`/`VARIANCE` | `unsupported` | `fits.extension_kind` |
+| Pattern CFA con `planes > 1`; offset CFA diverso da 0 e 1 | `invalid_input` | `fits.cfa_planes`, `fits.bayer_offset` |
+| Errore CFITSIO in scrittura (dati già validati) | `io` | `fits.cfitsio_status` |
+
+Codici di validazione dell'immagine (`validate_image`, scrittore): `image.geometry`, `image.size_overflow` (`limit_exceeded`), `image.samples_size`, `image.alignment`, `image.mask_size`, `image.variance_size`, `image.layout`, `image.cfa_planes`, `image.cfa_offset`, `image.mask_reserved_bits`; scrittore: `fits.encoding`, `fits.card_length`, `fits.card_structural`, `fits.card_value`.
 
 Lo scrittore produce solo un buffer in memoria; nessuna sua API accetta un percorso. Il buffer arriva su disco solo con la scrittura atomica di [ADR-04](ADR-04-persistenza.md#scrittura-atomica) o con l'export, che applicano i controlli su destinazione, symlink e input registrati.
 
