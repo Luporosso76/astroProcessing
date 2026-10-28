@@ -1,6 +1,6 @@
 # Registro ADR
 
-Registro compatto delle 17 decisioni architetturali del piano. Il testo normativo, le opzioni e le evidenze richieste stanno in `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md` §20; qui c'è solo lo stato. Nessuno stack è scelto. Lo stato di avanzamento è in `docs/progress.md`.
+Registro compatto delle 17 decisioni architetturali del piano. Il testo normativo, le opzioni e le evidenze richieste stanno in `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md` §20; qui c'è solo lo stato. Stack scelto in [ADR-M1-stack](ADR-M1-stack.md). Lo stato di avanzamento è in `docs/progress.md`.
 
 ## Stato
 
@@ -12,13 +12,13 @@ Le decisioni D-19, D-20 e D-21 non aggiungono ADR. Si riflettono in ADR-09 (deco
 
 | ID | Tema | Gate | Stato |
 |---|---|---|---|
-| ADR-01 | Linguaggio e componenti del core | M1 | Nessuno scelto: candidati C++20/23, Rust, Python con core nativo e C#/.NET, tutti da misurare |
-| ADR-02 | GUI e comunicazione con il core | M1 | Nessuna scelta: Qt Widgets, QML, GTK4 e Avalonia da confrontare su viewer, licenza, accessibilità, colore, IME, packaging |
+| ADR-01 | Linguaggio e componenti del core | M1 | **Deciso**: C++20, un solo linguaggio ([ADR-M1-stack](ADR-M1-stack.md)) |
+| ADR-02 | GUI e comunicazione con il core | M1, conferma M4.a | **Provvisorio**: Qt 6 Widgets, confronto con QML al gate M4.a ([ADR-M1-stack](ADR-M1-stack.md)) |
 | ADR-03 | Modello pixel, precisione e maschere | M2 ingresso; estensioni M3 | Proposto: immagine tipizzata, f32 candidato, maschera distinta da invalidità e alpha |
-| ADR-04 | Persistenza del progetto | M2 ingresso | Proposto: SQLite sola autorità, cache derivata, scrittura atomica, schema ignoto in sola lettura |
+| ADR-04 | Persistenza del progetto | M2 ingresso, verifica M2.c | **Deciso**: SQLite autorità, JSON per manifest; migrazione e recovery al gate M2.c |
 | ADR-05 | DAG, cache e invalidazione | M2 ingresso | Proposto: DAG immutabile, hash di contenuto, token di generazione |
-| ADR-06 | RAM, scheduler e spill | M2 ingresso | Proposto: pool con prenotazioni, code bounded, spill, stop con errore se il budget non basta |
-| ADR-07 | CPU, SIMD e GPU | M1, M7 | Proposto: CPU primaria, dispatch SIMD nel preflight, GPU facoltativa senza sostituzioni |
+| ADR-06 | RAM, scheduler e spill | M2 ingresso, verifica M2.d | **Vincoli fissati**: prenotazioni, spill dichiarato nel preflight, stop senza riduzione; protocollo completo al gate M2.d |
+| ADR-07 | CPU, SIMD e GPU | M1, M7 | **`.a` deciso**: CPU di riferimento, SIMD nel preflight, nessuna GPU fino a M7 |
 | ADR-08 | Import RAW, FITS e XISF | M2 ingresso; estensioni M3 | Proposto: librerie mature con licenze verificate, contratto del decoder esplicito |
 | ADR-09 | Calibrazione, registrazione, stacking e deconvoluzione P0 | Minimo M2 ingresso; operatori M3 ingresso | Proposto: casi delle sezioni 8 e 9, ground truth, una sola formulazione P0 |
 | ADR-10 | Colore, WCS e maschere | M3, M4 | Proposto: separare lineare e display, propagare maschere e covarianza, WCS non certifica il colore |
@@ -32,7 +32,7 @@ Le decisioni D-19, D-20 e D-21 non aggiungono ADR. Si riflettono in ADR-09 (deco
 
 ## Licenza del prodotto
 
-Resta una decisione riservata al proprietario e non è fissata da nessun ADR. ADR-12 prepara il confronto, non sceglie. Nessuna licenza viene dichiarata prima della decisione registrata.
+Orientamento del proprietario (D-02, 28 ottobre 2026): il prodotto può essere GPL; dipendenze GPL/LGPL compatibili ammesse. Il file `LICENSE` si emette con ADR-12 prima della prima release.
 
 ## Quando un ADR cambia stato
 

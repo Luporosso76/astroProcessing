@@ -16,6 +16,14 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 - Decisioni tecniche delegate: linguaggio, GUI, formati interni, SQLite/JSON, strumenti, algoritmi, dataset leciti, metodi di benchmark, packaging Linux, budget, organizzazione del codice. Si decidono dopo le evidenze richieste; nessuna preferenza sostituisce una misura. Nessuna funzione P0 mancante chiude un gate; una P1 non si promuove né si elimina in silenzio.
 - I gate automatici (scienza, regressione, sicurezza, licenze, correttezza numerica, prestazioni, compatibilità, DoD) si verificano senza chiedere pareri. Se falliscono, si corregge e si ripete.
 - Si blocca solo il ramo colpito da: M10, release commerciale, licenza del codice con effetto irreversibile, costo a pagamento non autorizzato, credenziale mancante, modifica distruttiva fuori progetto, permesso reale della piattaforma assente. Causa ed effetto vanno registrati; i rami indipendenti proseguono.
+- Licenza (D-02, proprietario, 28 ottobre 2026): il prodotto può essere GPL. Dipendenze GPL/LGPL compatibili (FFTW, Qt) sono ammesse. L'emissione del file `LICENSE` si registra in ADR-12.
+
+## Ritmo di lavoro
+
+- Un record di evidenza per unità o spike, aggiornato fino alla chiusura; non un record per ogni tentativo, mock o ricevuta.
+- Un errore di sviluppo si indaga e si corregge nello stesso turno, poi si riesegue. Nessun turno di ammissione, preflight cerimoniale, ricevuta di PID o autenticazione di hash per i tentativi intermedi.
+- Gli harness degli spike restano minimi: lanciano, misurano, confrontano con l'oracle. Un guard dell'harness che impedisce la misura è un difetto dell'harness, non un esito della prova.
+- Restano invariati: verità di riferimento indipendente, tolleranze derivate prima della misura, iniezione di guasti sui percorsi del prodotto, review indipendente sul diff.
 
 ## Git
 
@@ -42,6 +50,10 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 
 - Proposta primaria allo specialista competente. Review indipendente sul diff o sul testo effettivo, mai sull'auto-riassunto dell'autore. Nessuna auto-approvazione.
 - Non si sceglie il modello più costoso per default. Costi e token si riportano solo se esposti dal runtime.
+- Modelli per competenza (proprietario, 28 ottobre 2026): Haiku 5.5 per ricognizione e compiti meccanici, Sonnet 5.5 per codice, test e documentazione ordinari, Opus per coordinamento, architettura e decisioni, Fable 5 solo per casi estremamente complessi. Il modello si passa esplicitamente alla delega.
+- Codex non si usa. Gemini (via `agy`) solo per testi e ricerche complesse, mai sul codice. La review indipendente la fa un agente Claude diverso dall'autore.
+- Di norma tenere al massimo due deleghe contemporanee. Passare soltanto percorsi, delta e gate necessari; riusare le sessioni pertinenti senza rileggere piani già verificati, così da contenere contesto e consumo.
+- Dopo un errore terminale di quota, verificare gli artefatti e registrare se il lavoro è partito prima di riprenderlo. Non ripetere alla cieca la chiamata né dichiarare attiva una delega già terminata. Non correggere manualmente la configurazione dei modelli per aggirare l'errore.
 - Metadati agente: modello dichiarato dal runtime, percorsi e conteggi di righe letti. Nessuna attestazione inventata.
 
 ## Documenti

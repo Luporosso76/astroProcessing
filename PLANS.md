@@ -43,4 +43,5 @@ Regole per scrivere e chiudere i piani di lavoro. Lo stato vive in `docs/progres
 
 ## Piani attivi
 
-- `plans/M0-M1.md`: chiusura M0 e spike M1.a–f. È il piano corrente.
+- `plans/M2.md`: fondamenta e prima slice scientifica. È il piano corrente.
+- `plans/M0-M1.md` e `plans/M1-*.md`: chiusi con `docs/decisions/ADR-M1-stack.md`; storici.
