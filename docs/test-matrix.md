@@ -32,3 +32,17 @@ Stato: **seed pianificato. Nessun test qui è stato eseguito.** Una riga `PIANIF
 ## Versioni e licenze
 
 Le tre famiglie Linux sono candidate da §16.2, non versioni fissate né misure. Prima della prova si congelano release supportata, kernel, glibc, desktop, sessione nativa, renderer e driver; ogni combinazione ha un esito distinto. La macchina di sviluppo non dimostra il supporto delle altre configurazioni. Ogni dipendenza e ogni dataset pubblico entra nell'inventario con versione, hash e licenza prima dell'adozione; nessun `LICENSE` di prodotto è emesso. Il SBOM si costruisce sui componenti realmente usati, non su un elenco previsto.
+
+## M2: ID di lavoro dai contratti
+
+Definiti in `docs/contracts/`; stato per unità, non per singolo test. Un ID si dichiara eseguito solo nel record di evidenza dell'unità.
+
+| ID | Contratto | Unità | Stato |
+|---|---|---|---|
+| T-M2A-01…13 | ADR-03 | M2.a | PIANIFICATO |
+| T-M2B-01…12 | ADR-05 | M2.b | PIANIFICATO |
+| T-M2C-01…25 | ADR-04 | M2.c | PIANIFICATO |
+| T-M2D-01…15 | ADR-06 | M2.d | PIANIFICATO |
+| T-M2E-01…27 | ADR-16, ADR-17 | M2.e | PIANIFICATO |
+| T-M2F-01 | ADR-13 | M2.f | ESEGUITO, PASS (`docs/evidence/M2-f.md`) |
+| T-M2F-02 | ADR-13 | M2.e | PIANIFICATO |

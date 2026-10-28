@@ -1,0 +1,110 @@
+# Contratto ADR-05.a: DAG, generazione e provenance
+
+Stadio: ADR-05.a, DAG minimo (registro riga 3394). Piano §7.4 (righe 710-736), F-PRJ-03, F-PRJ-07, NFR-FBK-01. Unità: M2.b; integrazione durevole in M2.c ([ADR-04](ADR-04-persistenza.md)). Hash: SHA-256 via OpenSSL EVP, chunk 1 MiB ([ADR-M1-stack](../decisions/ADR-M1-stack.md)).
+
+## Modello d'errore comune
+
+Vale per tutti i contratti di `docs/contracts/`.
+
+```cpp
+namespace astro {
+enum class error_category {
+  invalid_input, limit_exceeded, metadata_missing, incompatible, unsupported,
+  numeric, io, integrity, schema, graph, stale_generation, budget,
+  cancelled, resume_mismatch, security,
+};
+class stop_error : public std::exception {
+  error_category category; std::string code; std::string message;
+  std::vector<std::pair<std::string, std::string>> context;
+};
+}
+```
+
+- `code` è stabile, `<modulo>.<condizione>` in `snake_case`; i test asseriscono categoria e codice.
+- Si lancia al punto di rilevazione. Un `catch` intermedio può solo aggiungere contesto e rilanciare la stessa categoria. Nessun `catch` prosegue.
+- Il confine (CLI, runner dei job) cattura, scrive la provenance dell'arresto, marca il job `failed` o `cancelled`, rilascia le prenotazioni ed esce con codice **2**; per la categoria `cancelled` il codice è **3**, così un annullamento si distingue da un guasto.
+- Una violazione di invariante interno è un bug: `ASTRO_ASSERT` chiama `std::abort`. Non è una categoria.
+- Nessuna categoria attiva un percorso alternativo (NC-21). T-FBK-01 lo verifica tracciando le chiamate.
+
+## Identità degli input
+
+`content_digest`: `sha256` (32 byte, esadecimale minuscolo in testo) più `size_bytes` (`uint64_t`). Percorso e mtime non sono identità.
+
+Prima di ogni uso numerico, il file si legge per intero in un buffer (dimensione prenotata in ADR-06, limiti di ADR-03). Digest e dimensione si calcolano su quel buffer e si confrontano col record di `inputs`. Il decode usa lo stesso buffer: il digest è legato ai byte effettivamente usati. Stato in sessione: `unverified` fino a questo controllo.
+
+| Condizione | Categoria | Codice |
+|---|---|---|
+| Digest o dimensione diversi dal record | `integrity` | `input.digest_mismatch` |
+| File assente | `io` | `input.missing` |
+| Lettura incompleta | `io` | `input.short_read` |
+
+L'errore ferma solo i nodi che dipendono da quell'input; i rami indipendenti proseguono (T-M2B-09).
+
+## Nodo
+
+`astro::node_spec`, immutabile dopo la costruzione (nessun setter):
+
+| Campo | Tipo | Note |
+|---|---|---|
+| `operator_id` | `std::string` | Es. `fits.decode`, `calib.light`. |
+| `algorithm_version` | `uint32_t` | Cambia quando cambia il contratto numerico. |
+| `serialization_version` | `uint32_t` | Cambia quando cambia la serializzazione dei parametri. |
+| `params` | JSON canonico | RFC 8785 (JCS). NaN e ±Inf rifiutati (`invalid_input`, `dag.param_nonfinite`). Interi oltre 2^53 come stringhe. |
+| `inputs` | vettore ordinato di (`input_name`, `node_key` o `content_digest`) | L'ordine è parte dell'identità. |
+| `precision` | `sample_type` di calcolo | ADR-03. |
+| `backend` | `std::string` | Backend fissato nel preflight, es. `cpu_scalar`. |
+| `seed` | `std::optional<uint64_t>` | `nullopt` se il risultato non dipende da rumore simulato. |
+
+`node_key` = SHA-256 di `"astro.node.v1\n"` concatenato al JCS dell'oggetto con tutti i campi sopra. Un input file entra come `"input:<sha256>:<size>"`. I metadati rilevanti entrano attraverso il digest del file o i parametri dichiarati; la maschera viaggia con l'immagine del nodo padre.
+
+Conseguenze verificate:
+
+- cambiare un campo cambia `node_key` (T-M2B-03);
+- il cambio si propaga ai discendenti perché la loro chiave include quella del padre; un nodo a monte non toccato conserva la chiave e la cache (T-M2B-04);
+- `PRAGMA user_version` del database non entra nella chiave (T-M2B-11);
+- il backend eseguito deve coincidere con `backend`; se differisce: `ASTRO_ASSERT`, perché nessun codice M2 può cambiarlo.
+
+Un arco che crea un ciclo produce `graph`, `dag.cycle`, alla costruzione e alla pubblicazione (T-M2B-05). Un padre assente produce `graph`, `dag.missing_parent`.
+
+## Generazione e freschezza
+
+Ogni risultato pubblicabile ha uno slot (tabella `slots` di ADR-04) con `current_generation` (`uint64_t`, monotono) e `target_node_key`, la chiave della ricetta corrente.
+
+- Avvio del job, in una transazione: `current_generation += 1`, il job riceve quel valore.
+- Pubblicazione, in una transazione: se `current_generation` è ancora quella del job, lo slot punta al nuovo artefatto. Altrimenti `stale_generation`, `dag.stale_publish`: l'artefatto resta come cache del suo `node_key` ma non diventa corrente (T-M2B-06).
+- Lettura: `slot_view` con `artifact` (`std::optional`) e `freshness` ∈ {`current`, `stale`, `missing`}. `stale` quando il `node_key` dell'artefatto differisce da `target_node_key`; `missing` se l'artefatto manca o ha `present = 0`. Un risultato `stale` non si restituisce mai con `freshness = current`. Undo e redo cambiano `target_node_key` e incrementano la generazione ([ADR-04](ADR-04-persistenza.md#snapshot-undo-e-redo-f-prj-04)).
+
+## Provenance
+
+`provenance_record`, serializzato in JSON canonico e scritto come artefatto con il protocollo atomico. Uno per ogni job, riuscito o fermato:
+
+- tutti i campi di `node_spec`, `node_key`, digest degli input;
+- versione del prodotto (commit Git della build) e versioni di CFITSIO, SQLite, OpenSSL;
+- generazione del job e stato finale;
+- ledger delle correzioni applicate e omesse ([ADR-16](ADR-16-stati-master.md)) e modello di varianza ([ADR-17](ADR-17-varianza.md)), per i nodi di calibrazione;
+- avvisi;
+- digest degli output, solo se `completed`;
+- arresto: categoria, codice, messaggio, contesto (provenance dell'arresto, NFR-FBK-01).
+
+Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita resta 2 (3 per `cancelled`); non si scrive provenance altrove.
+
+## Test
+
+| ID | Clausola |
+|---|---|
+| T-M2B-01 | SHA-256 sui vettori NIST e su file a chunk multipli e non multipli di 1 MiB. |
+| T-M2B-02 | JCS: ordine delle chiavi, numeri, escape; NaN rifiutato. |
+| T-M2B-03 | Ogni campo di `node_spec` cambia la chiave. |
+| T-M2B-04 | DAG a diamante: cambio di un parametro rinnova solo il nodo e i discendenti. |
+| T-M2B-05 | Ciclo e padre assente rifiutati. |
+| T-M2B-06 | Due job sullo stesso slot, il vecchio finisce dopo: pubblicazione rifiutata, slot `current` sul nuovo. |
+| T-M2B-07 | Stesso size e mtime, contenuto diverso: rilevato prima dell'uso. |
+| T-M2B-08 | File modificato dopo l'import: `integrity`, nessun decode. |
+| T-M2B-09 | Input mancante: fermo solo il ramo dipendente. |
+| T-M2B-10 | Provenance completa per un job riuscito e per uno fermato. |
+| T-M2B-11 | Versione di schema esclusa dalla chiave. |
+| T-M2B-12 | Ogni categoria al confine: exit 2 (3 per `cancelled`), job marcato, prenotazioni rilasciate. |
+
+## Fuori da M2
+
+Ruleset e cache di ricerca (ADR-05.b); snapshot immutabili degli input; digest parziali per l'esplorazione; distinzione fra controllo di regressione e validazione indipendente; verifica di completezza per configurazione (§11.11).

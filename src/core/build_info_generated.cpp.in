@@ -1,0 +1,12 @@
+#include "astro/build_info.hpp"
+
+namespace astro::detail {
+extern const char* const kProjectVersion;
+const char* const kProjectVersion = "@PROJECT_VERSION@";
+extern const char* const kCompiler;
+const char* const kCompiler = "@ASTRO_COMPILER@";
+extern const char* const kBuildFlags;
+const char* const kBuildFlags = "@ASTRO_BUILD_FLAGS@";
+extern const char* const kBuildType;
+const char* const kBuildType = "@CMAKE_BUILD_TYPE@";
+}

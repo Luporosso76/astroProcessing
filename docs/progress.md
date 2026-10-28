@@ -4,12 +4,13 @@ Ultimo aggiornamento: 28 ottobre 2026. Unica fonte dello stato corrente; risulta
 
 ## Ora
 
-- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`). Nessun codice di prodotto ancora scritto.
+- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g DONE (`docs/evidence/M2-g.md`), M2.f PARZIALE (`docs/evidence/M2-f.md`: build, test 13/13 con sanitizer, offline, licenze, dato reale PUB-LFC-01; mancano i generatori di fixture).
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
 - D-19/D-20 approvate P0. D-21: preferenza per pack inclusi, subordinata alle verifiche di licenza.
-- Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: `1bf3352`.
+- Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: `1dd08e4`.
+- Codex e Gemini 4 Argon non disponibili; Gemini Flash via `agy` solo per testi e lingue (`AGENTS.md`).
 
 ## Evidenze principali
 
@@ -27,12 +28,13 @@ I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) rest
 
 ## Prossima unità
 
-M2.g: contratti minimi in `docs/contracts/` (ADR-03, 04, 05, 06, 16, 17, solo le parti usate da M2). Poi M2.f: scheletro CMake con preset `dev` (ASan+UBSan) e `release`, GoogleTest, generatori di fixture sintetiche, inventario licenze, scelta di un FITS pubblico reale con licenza verificata per il gate M2.
+M2.a: immagine tipizzata e FITS da memoria via CFITSIO secondo `docs/contracts/ADR-03-pixel-maschere.md`, test T-M2A-*. Insieme, i generatori `FIX-SYN-FITS-01` che completano M2.f. Poi M2.b–e nell'ordine di `plans/M2.md`.
 
 ## Limiti aperti
 
 - Gate M4.a: latenza pan/zoom, accessibilità, IME, colore ICC, confronto con QML.
 - Gate M2.d: protocollo M1.d completo (40 GiB logici, spill fisico, page cache contabilizzata).
 - Gate M2.c: migrazione, backup e schema ignoto in SQLite.
+- Nessun dataset CFA reale ridistribuibile trovato: debayer M3.d senza dato reale per ora.
 - Cataloghi: Gaia e ESA Tycho2 solo uso non commerciale; APASS senza grant di redistribuzione dimostrato. Nessun pack adottato.
 - M10 non autorizzato. CodeGraph/Graphify: indici assenti, non creati.
