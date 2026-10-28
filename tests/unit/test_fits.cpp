@@ -925,6 +925,19 @@ TEST(Fits, REVIEW_int64_extremes_stop_without_undefined_behaviour) {
   EXPECT_NO_THROW(decode(int_image(64, {}, {1ull << 53, static_cast<std::uint64_t>(-(std::int64_t{1} << 53))})));
 }
 
+TEST(Fits, REVIEW_nonconforming_keyword_field_is_malformed) {
+  auto shifted = [](std::string c) { return " " + c.substr(0, 79); };
+  const std::vector<std::string> cards = {
+      shifted(fx::card_real("BZERO", 5.0)),
+      fx::card_real("bzero", 5.0),
+      fx::card_real("EXP TIME", 1.0),
+  };
+  for (const std::string& c : cards) {
+    SCOPED_TRACE(c.substr(0, 8));
+    EXPECT_STOP(decode(fx::build_fits({raw_image(16, {2, 2}, {c})})), error_category::invalid_input, "fits.malformed");
+  }
+}
+
 TEST(Fits, REVIEW_duplicate_structural_keywords_are_malformed) {
   const std::vector<std::vector<std::string>> cases = {
       {fx::card_real("BZERO", 0.0), fx::card_real("BZERO", 32768.0)},

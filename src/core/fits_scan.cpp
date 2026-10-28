@@ -30,9 +30,21 @@ std::string upper(std::string s) {
   return s;
 }
 
+// Il campo keyword è allineato a sinistra e contiene solo A-Z, 0-9, '-', '_' (FITS 4.0 §4.1.2.1):
+// uno spazio iniziale o una minuscola farebbero leggere la card in modo diverso a CFITSIO.
+std::string keyword_field(std::string_view card) {
+  std::string_view field = card.substr(0, std::min<std::size_t>(8, card.size()));
+  while (!field.empty() && field.back() == ' ') field.remove_suffix(1);
+  for (char c : field) {
+    const bool legal = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+    if (!legal) malformed("keyword non conforme", {{"card", std::string(card.substr(0, 8))}});
+  }
+  return std::string(field);
+}
+
 parsed_card parse_card(const std::string& card) {
   parsed_card p;
-  p.key = trim(std::string_view(card).substr(0, 8));
+  p.key = keyword_field(card);
   p.has_value = card.size() >= 10 && card[8] == '=' && card[9] == ' ';
   if (!p.has_value) return p;
   std::size_t i = 10;
