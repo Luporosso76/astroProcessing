@@ -45,6 +45,7 @@ class fits_input {
  private:
   friend fits_input open_fits_input(const std::string& path);
   friend fits_plan plan_fits(const fits_input& input);
+  friend std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_t budget_bytes);
   friend std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t budget_bytes);
   fits_input(int fd, std::uint64_t size) noexcept : fd_(fd), size_(size) {}
 
@@ -60,6 +61,10 @@ fits_plan plan_fits(const fits_input& input);
 
 // Piano sul file in memoria (stessi limiti).
 fits_plan plan_fits(std::span<const std::uint8_t> bytes);
+
+// Legge l'intero file senza analizzarne l'header (per verificare il digest prima di interpretarlo). Dimensione oltre
+// budget_bytes: budget sched.job_exceeds_budget. Dimensione letta diversa da quella di fstat: integrity input.size_changed.
+std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_t budget_bytes);
 
 // Prenota il picco contro budget_bytes (budget: sched.job_exceeds_budget), poi legge l'intero file.
 // Dimensione letta diversa da quella di fstat: integrity input.size_changed.

@@ -525,11 +525,10 @@ fits_plan plan_fits(std::span<const std::uint8_t> bytes) {
   return analyse(bytes.size(), memory_reader(bytes)).plan;
 }
 
-std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t budget_bytes) {
-  const fits_plan plan = plan_fits(input);
-  if (plan.peak_bytes > budget_bytes) {
-    fail(error_category::budget, "sched.job_exceeds_budget", "picco di memoria oltre il budget",
-         {{"picco", std::to_string(plan.peak_bytes)}, {"budget", std::to_string(budget_bytes)}});
+std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_t budget_bytes) {
+  if (input.size_ > budget_bytes) {
+    fail(error_category::budget, "sched.job_exceeds_budget", "dimensione del file oltre il budget",
+         {{"dimensione", std::to_string(input.size_)}, {"budget", std::to_string(budget_bytes)}});
   }
   std::vector<std::uint8_t> buffer(static_cast<std::size_t>(input.size_));
   pread_exact(input.fd_, 0, buffer.data(), buffer.size(), input.size_);
@@ -544,6 +543,15 @@ std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t
          {{"atteso", std::to_string(buffer.size())}});
   }
   return buffer;
+}
+
+std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t budget_bytes) {
+  const fits_plan plan = plan_fits(input);
+  if (plan.peak_bytes > budget_bytes) {
+    fail(error_category::budget, "sched.job_exceeds_budget", "picco di memoria oltre il budget",
+         {{"picco", std::to_string(plan.peak_bytes)}, {"budget", std::to_string(budget_bytes)}});
+  }
+  return read_input_bytes(input, budget_bytes);
 }
 
 // ---------------------------------------------------------------- decode

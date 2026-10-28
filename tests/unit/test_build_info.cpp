@@ -38,6 +38,14 @@ TEST(BuildInfo, WarningsAreErrors) {
   }
 }
 
+TEST(BuildInfo, T_M2B_SourceRevisionIsNeverEmpty) {
+  const std::string r = astro::build_info().revision;
+  EXPECT_FALSE(r.empty());
+#ifndef ASTRO_EXPLICIT_REVISION
+  EXPECT_TRUE(std::regex_match(r, std::regex("[0-9a-f]{40}"))) << r;
+#endif
+}
+
 TEST(BuildInfo, BuildTypeIsReported) {
   const std::string t = astro::build_info().build_type;
   EXPECT_TRUE(t == "Debug" || t == "RelWithDebInfo") << t;

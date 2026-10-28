@@ -4,7 +4,7 @@ Ultimo aggiornamento: 28 ottobre 2026. Unica fonte dello stato corrente; risulta
 
 ## Ora
 
-- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g, M2.f e M2.a DONE (`docs/evidence/M2-{g,f,a}.md`). Primo codice di prodotto: modello d'errore, immagine tipizzata, FITS da memoria; 77 test con ASan/UBSan.
+- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g, M2.f, M2.a, M2.b DONE (`docs/evidence/M2-{g,f,a,b}.md`). Core: errori, immagine, FITS da memoria, hash, JSON canonico, nodi DAG, slot e provenance; 122 test con ASan/UBSan.
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
@@ -28,7 +28,7 @@ I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) rest
 
 ## Prossima unità
 
-M2.b: content hash SHA-256 del buffer letto, nodo DAG immutabile con chiave canonica RFC 8785, token di generazione, invalidazione selettiva (`docs/contracts/ADR-05-dag-provenance.md`, T-M2B-01…13). Poi M2.c, M2.d, M2.e.
+M2.c: store SQLite durevole dietro l'interfaccia `dag_store`, scrittura atomica degli artefatti, recovery, migrazioni, snapshot e undo/redo, export con manifest (`docs/contracts/ADR-04-persistenza.md`, T-M2C-01…25; chiude anche T-M2B-11). Poi M2.d e M2.e.
 
 ## Limiti aperti
 
