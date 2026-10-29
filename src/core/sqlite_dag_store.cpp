@@ -455,6 +455,31 @@ std::vector<std::string> sqlite_dag_store::apply_recipe(const std::vector<resolv
   return changed;
 }
 
+void sqlite_dag_store::put_setting(const std::string& key, const std::string& value_canonical) {
+  require_writable();
+  if (key.empty()) {
+    throw stop_error(error_category::invalid_input, "store.bad_setting", "chiave di impostazione vuota");
+  }
+  if (canonical_json(parse_json(value_canonical)) != value_canonical) {
+    throw stop_error(error_category::invalid_input, "store.setting_not_canonical",
+                     "il valore non e' JSON canonico", {{"key", key}});
+  }
+  std::lock_guard lock(mutex_);
+  transaction tx(db_);
+  statement st(db_, "INSERT INTO settings(key, value_canonical) VALUES(?1,?2) "
+                    "ON CONFLICT(key) DO UPDATE SET value_canonical=excluded.value_canonical");
+  st.bind(1, key).bind(2, value_canonical).run();
+  tx.commit();
+}
+
+std::optional<std::string> sqlite_dag_store::get_setting(const std::string& key) const {
+  std::lock_guard lock(mutex_);
+  statement st(db_, "SELECT value_canonical FROM settings WHERE key=?1");
+  st.bind(1, key);
+  if (!st.step()) return std::nullopt;
+  return st.text(0);
+}
+
 input_record sqlite_dag_store::add_input(input_record input) {
   require_writable();
   if (!is_sha256_hex(input.sha256) || input.path.empty() || input.role.empty()) {

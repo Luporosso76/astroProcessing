@@ -11,20 +11,21 @@ int exit_code_for(error_category category) noexcept {
 namespace {
 
 job_outcome stopped(dag_store& store, const job_record& job, const stop_error& e, const node_spec& spec,
-                    std::vector<std::string> warnings) {
+                    std::vector<std::string> warnings, const std::optional<budget_snapshot>& budget) {
   const job_state state = e.category() == error_category::cancelled ? job_state::cancelled : job_state::failed;
   if (store.get_job(job.id)->state == job_state::running) store.finish_job(job.id, state, e.category(), e.code());
   std::fprintf(stderr, "job %llu su %s fermato: %s\n", static_cast<unsigned long long>(job.id),
                job.slot_name.c_str(), e.what());
   return job_outcome{exit_code_for(e.category()), *store.get_job(job.id), e,
                      provenance_record{spec, current_library_versions(), job.generation, state,
-                                       std::move(warnings), {}, e}};
+                                       std::move(warnings), {}, e, budget}};
 }
 
 }  // namespace
 
 job_outcome run_job(dag_store& store, const std::string& slot_name,
-                    const std::function<job_result(const job_record&)>& work) {
+                    const std::function<job_result(const job_record&)>& work,
+                    const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
   const job_record job = store.start_job(slot_name);
   const node_spec spec = *store.get_node(job.node_key);
   std::vector<std::string> warnings;
@@ -32,9 +33,12 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
   try {
     job_result result = work(job);
     warnings = std::move(result.warnings);
+    if (cancel != nullptr && cancel->requested()) {
+      throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto prima della pubblicazione");
+    }
     artifact = store.complete_job(job.id, std::move(result.artifact));
   } catch (const stop_error& e) {
-    return stopped(store, job, e, spec, std::move(warnings));
+    return stopped(store, job, e, spec, std::move(warnings), budget);
   } catch (...) {
     if (store.get_job(job.id)->state == job_state::running) {
       store.finish_job(job.id, job_state::failed, std::nullopt, "job.unexpected_exception");
@@ -43,7 +47,7 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
   }
   provenance_record provenance{spec, current_library_versions(), job.generation, job_state::completed,
                                std::move(warnings), {content_digest{artifact.sha256, artifact.size_bytes}},
-                               std::nullopt};
+                               std::nullopt, budget};
   return job_outcome{0, *store.get_job(job.id), std::nullopt, std::move(provenance)};
 }
 

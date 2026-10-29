@@ -105,6 +105,7 @@ json provenance_json(const provenance_record& r) {
   doc.set("warnings", std::move(warnings));
   if (r.state == job_state::completed) doc.set("output_digests", std::move(outputs));
   if (r.stop) doc.set("stop", stop_json(*r.stop));
+  if (r.budget) doc.set("budget", budget_json(*r.budget));
   return doc;
 }
 

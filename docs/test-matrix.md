@@ -41,12 +41,12 @@ Definiti in `docs/contracts/`; stato per unità, non per singolo test. Un ID si 
 |---|---|---|---|
 | T-M2A-01…13 | ADR-03 | M2.a | ESEGUITO, PASS (`docs/evidence/M2-a.md`) |
 | T-M2B-01…08, 10, 13 | ADR-05 | M2.b | ESEGUITO (T-M2B-10: record e provenance del runner; ledger ADR-16 e varianza ADR-17 con M2.e, scrittura atomica con M2.c) |
-| T-M2B-09 | ADR-05 | M2.b | PARZIALE: errore dell'input, confine del job e `descendants`; il blocco dei soli dipendenti è dello scheduler (M2.d) |
+| T-M2B-09 | ADR-05 | M2.b, M2.d | ESEGUITO: errore dell'input e confine del job (M2.b); blocco dei soli dipendenti con `run_branches` (`Branches.T_M2B_09_*`, M2.d, `docs/evidence/M2-d.md`) |
 | T-M2B-11 | ADR-05 | M2.b, M2.c | ESEGUITO, PASS: chiave e forma canonica invariate dopo una migrazione dello schema SQLite (`Store.T_M2B_11`, `docs/evidence/M2-c.md`) |
-| T-M2B-12 | ADR-05 | M2.b | PARZIALE: exit 2/3 e job marcato eseguiti; il rilascio delle prenotazioni è di M2.d |
+| T-M2B-12 | ADR-05 | M2.b, M2.d | ESEGUITO: exit 2/3 e job marcato (M2.b); prenotazioni rilasciate su successo, stop e cancel (`Scheduler.T_M2B_12_*`, M2.d, `docs/evidence/M2-d.md`) |
 | `io input.short_read` (ADR-05) | ADR-05 | M2.a | NON ESEGUITO: richiede un lettore iniettabile (pread che restituisce meno byte con dimensione invariata); il ramo esiste in `fits.cpp` (`unexpected_eof`) ma non ha test |
 | T-M2C-01…25 | ADR-04 | M2.c | ESEGUITO, PASS (`docs/evidence/M2-c.md`); durabilità contro perdita di corrente e processo malevolo stesso UID fuori dal modello; `readdir` senza test di iniezione |
-| T-M2D-01…15 | ADR-06 | M2.d | PIANIFICATO |
+| T-M2D-01…15 | ADR-06 | M2.d | ESEGUITO, PASS (`docs/evidence/M2-d.md`; test `Budget.T_M2D_01…03`, `Pool*.T_M2D_04/12`, `Scheduler.T_M2D_05…08/10/11/14/15`, `Resume.T_M2D_09`, `Spill.T_M2D_10`; T-M2D-13 è `test_m1d_protocol`, label `slow`). Soglie F-RES-01 0.50/0.25/10.0 iniziali, non confermate da carichi PSI reali; page cache dello spill fuori dal budget; TSan non nei preset |
 | T-M2E-01…27 | ADR-16, ADR-17 | M2.e | PIANIFICATO |
 | T-M2F-01 | ADR-13 | M2.f | ESEGUITO, PASS (`docs/evidence/M2-f.md`) |
 | T-M2F-02 | ADR-13 | M2.e | PIANIFICATO |

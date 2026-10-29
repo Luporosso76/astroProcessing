@@ -288,7 +288,7 @@ atomic_result atomic_write_stream(const atomic_options& o, const byte_reader& re
     throw;
   }
   bool reused = false;
-  if (::renameat2(o.dirfd, tmp.c_str(), o.dirfd, name.c_str(), RENAME_NOREPLACE) != 0) {
+  if (::renameat2(o.dirfd, tmp.c_str(), o.dirfd, name.c_str(), o.replace ? 0 : RENAME_NOREPLACE) != 0) {
     const int err = errno;
     if (err != EEXIST) {
       ::unlinkat(o.dirfd, tmp.c_str(), 0);

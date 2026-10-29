@@ -13,6 +13,7 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 ## Autonomia
 
 - M0–M9 sono autorizzate. Una milestone chiusa è un evento di avanzamento, non una domanda al proprietario. Nessuna approvazione rituale per ADR, spike, test o sotto-milestone. D-19 e D-20 sono già approvate P0 e non si riaprono.
+- Interfaccia grafica (proprietario, 29 ottobre 2026): prima di qualsiasi lavoro sulla GUI (shell Qt, viewer, codice o scelte di design dell'interfaccia) ci si ferma e la si progetta col proprietario. Core, CLI e test proseguono in autonomia.
 - Decisioni tecniche delegate: linguaggio, GUI, formati interni, SQLite/JSON, strumenti, algoritmi, dataset leciti, metodi di benchmark, packaging Linux, budget, organizzazione del codice. Si decidono dopo le evidenze richieste; nessuna preferenza sostituisce una misura. Nessuna funzione P0 mancante chiude un gate; una P1 non si promuove né si elimina in silenzio.
 - I gate automatici (scienza, regressione, sicurezza, licenze, correttezza numerica, prestazioni, compatibilità, DoD) si verificano senza chiedere pareri. Se falliscono, si corregge e si ripete.
 - Si blocca solo il ramo colpito da: M10, release commerciale, licenza del codice con effetto irreversibile, costo a pagamento non autorizzato, credenziale mancante, modifica distruttiva fuori progetto, permesso reale della piattaforma assente. Causa ed effetto vanno registrati; i rami indipendenti proseguono.

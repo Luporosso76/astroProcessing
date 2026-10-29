@@ -74,13 +74,15 @@ Picco = `shared_bytes + worker_count · per_task_bytes`. Il preflight lo prenota
 
 ### Guasto e cancel
 
-- Primo `stop_error` di un worker: registrato; `cancel_token` impostato; join di tutti i worker; nessuna pubblicazione; job `failed` con quell'errore (T-M2D-07).
-- Cancel dell'utente: `cancel_token` controllato a ogni task e a ogni blocco di righe. Nessuna pubblicazione, temporanei rimossi, job `cancelled`, categoria `cancelled`, `sched.cancelled`, uscita 3 (T-M2D-08).
+- Primo `stop_error` di un worker: registrato; stop interno impostato, visto da `check_cancel` dei task attivi (distinto dal cancel dell'utente); join di tutti i worker; nessuna pubblicazione; job `failed` con quell'errore (T-M2D-07).
+- Cancel dell'utente: `cancel_token` controllato a ogni task, a ogni blocco di righe, dopo `finalize` e al confine di pubblicazione (`run_job` riceve il `cancel_token`: richiesto al ritorno del lavoro, nulla si pubblica). Nessuna pubblicazione, temporanei rimossi, job `cancelled`, categoria `cancelled`, `sched.cancelled`, uscita 3 (T-M2D-08).
 - Prenotazioni e file di spill rilasciati in ogni caso.
 
 ### Checkpoint e resume
 
 `checkpoint_record`: `node_key`, `recipe_digest` (SHA-256 del JCS di `node_spec` più `tile_rows`, `worker_count`, `spill`, `checkpoint_every`), `backend`, indici dei task completati, digest dei risultati parziali. Scritto col protocollo atomico di ADR-04.
+
+A job riuscito il checkpoint lo rimuove il chiamante con `remove_checkpoint`, solo dopo pubblicazione riuscita; dopo stop, cancel o pubblicazione fallita resta. Dimensione massima 64 MiB, applicata da writer e reader (file più grande in lettura incluso): oltre, `limit_exceeded`, `sched.checkpoint_size`, checkpoint precedente invariato.
 
 Resume ammesso solo con `recipe_digest` e `backend` identici: altrimenti `resume_mismatch`, `sched.resume_recipe`. Digest di un parziale diverso: `integrity`, `sched.checkpoint_digest`. Un resume rifiutato non riparte da zero in automatico: una nuova esecuzione è un nuovo job (T-M2D-09).
 
@@ -107,6 +109,19 @@ Solo se dichiarato. `scratch_dir` deve esistere, essere una directory non symlin
 | T-M2D-13 | Protocollo M1.d completo sul prodotto: pool 32 MiB, tile 2 MiB, 1/2/4 worker, 40 GiB logici, spill fisico; RSS e page cache dello spill misurati. |
 | T-M2D-14 | Coda dei job piena: stop `sched.queue_full`. |
 | T-M2D-15 | `worker_count` 0 o oltre `cpu_count`, `sched_getaffinity` iniettata con errore o zero CPU: stop. |
+
+## Interfaccia e codici aggiunti in M2.d
+
+API in `src/core/include/astro/`: `budget.hpp`, `memory_pool.hpp`, `spill.hpp`, `checkpoint.hpp`, `scheduler.hpp`, `job_plan.hpp`, `cancel.hpp`. Il budget manuale è in `settings` alla chiave `budget.manual` come `{"spec":"<grammatica>"}`.
+
+- `/proc/self/cgroup` si valida per intero, riga per riga: `<id>:<controller>:<percorso assoluto>`; v1 con id > 0 senza zeri iniziali e controller non vuoti; v2 con id `0`, controller vuoti e al più una riga. Altrimenti `invalid_input`, `budget.cgroup_parse`; assenza di una riga v2 = nessun cgroup.
+- Il cgroup considerato è il livello v2, dal processo verso la radice, con meno margine (`limite − uso`) fra quelli con `memory.max` numerico. `cgroup_current ≥ cgroup_max` su uno qualunque dei livelli finiti: `budget.cgroup_over_limit`.
+- Il checkpoint di un job sta in `checkpoint_dir/<checkpoint_name>.ckpt.json`; il nome lo sceglie il chiamante. Dopo un arresto o un annullamento il checkpoint resta; a job riuscito si rimuove.
+- Il `budget_snapshot` entra nella provenance (`budget`) quando il chiamante lo passa a `run_job`.
+- `run_branches` esegue un job per slot in ordine di dipendenza, passando il `cancel_token` a ogni `run_job`; un arresto blocca (`blocked`) i soli slot discendenti, un annullamento lascia `not_started` quelli non partiti.
+- Codici non elencati sopra: `pool.exceeds_budget` (richiesta oltre il budget del pool), `spill.not_declared`, `spill.read`, `spill.write`, `spill.short_read`, `spill.offset_overflow`, `sched.queue_capacity`, `sched.tile_rows`, `sched.checkpoint_dir`, `sched.checkpoint_name`, `sched.checkpoint_missing`, `sched.checkpoint_malformed`, `sched.checkpoint_size`, `sched.resume_verifier`, `sched.task_digest`, `budget.cgroup_read`, `budget.setting_malformed`, `store.setting_not_canonical`.
+- La quota dello spill conta l'estensione logica massima raggiunta. Limite: un `pwrite` fallito lascia addebitata l'estensione fino alla distruzione dell'area (il job è comunque fermo). La page cache dello spill non è nel budget del pool: `spill_file::resident_bytes()` la misura, `drop_cache()` la restituisce al kernel su richiesta esplicita.
+- T-M2D-13 è l'eseguibile `test_m1d_protocol` (ctest label `slow`); gli altri test hanno label `fast`.
 
 ## Fuori da M2
 

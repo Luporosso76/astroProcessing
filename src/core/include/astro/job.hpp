@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "astro/budget.hpp"
+#include "astro/cancel.hpp"
 #include "astro/dag_store.hpp"
 #include "astro/error.hpp"
 #include "astro/provenance.hpp"
@@ -33,8 +35,12 @@ struct job_outcome {
 // Confine del job: avvia il job sullo slot (se non parte, l'errore si propaga: nessun job esiste), esegue `work`,
 // registra e pubblica l'artefatto. Uno stop_error marca il job `failed` (`cancelled` per la categoria cancelled),
 // scrive la diagnosi su stderr e restituisce 2 (3 per cancelled). Ogni altra eccezione marca il job `failed` e si
-// rilancia. Nessun percorso alternativo.
+// rilancia. Nessun percorso alternativo. `budget`, se presente, entra nella provenance (riuscito o fermato).
+// Con `cancel` richiesto quando `work` ritorna, il job e' cancelled e nulla si pubblica.
+// Le prenotazioni del pool appartengono a `work`: si rilasciano per RAII anche quando lancia.
 job_outcome run_job(dag_store& store, const std::string& slot_name,
-                    const std::function<job_result(const job_record&)>& work);
+                    const std::function<job_result(const job_record&)>& work,
+                    const std::optional<budget_snapshot>& budget = std::nullopt,
+                    const cancel_token* cancel = nullptr);
 
 }  // namespace astro

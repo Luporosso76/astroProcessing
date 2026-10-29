@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "astro/budget.hpp"
 #include "astro/dag_store.hpp"
 #include "astro/error.hpp"
 #include "astro/hash.hpp"
@@ -33,6 +34,7 @@ struct provenance_record {
   std::vector<std::string> warnings;
   std::vector<content_digest> output_digests;
   std::optional<stop_error> stop;
+  std::optional<budget_snapshot> budget = std::nullopt;  // fotografato nel preflight e fisso per tutto il job
 };
 
 json provenance_json(const provenance_record& record);

@@ -104,4 +104,24 @@ std::vector<std::uint8_t> read_verified_fits(const std::string& path, const cont
   return bytes;
 }
 
+verified_fits read_verified_fits(const std::string& path, const content_digest& expected, reservation& memory) {
+  fits_input input = open_fits_input(path);
+  reservation input_memory = memory.carve(input.size_bytes(), "input_read");
+  std::vector<std::uint8_t> bytes = read_input_bytes(input, input_memory.bytes());
+  const content_digest actual = digest_of(bytes);
+  if (actual != expected) {
+    throw stop_error(error_category::integrity, "input.digest_mismatch",
+                     "digest o dimensione del file diversi dal record",
+                     {{"percorso", path},
+                      {"atteso", expected.sha256 + ":" + std::to_string(expected.size_bytes)},
+                      {"letto", actual.sha256 + ":" + std::to_string(actual.size_bytes)}});
+  }
+  const fits_plan plan = plan_fits(bytes);
+  if (plan.peak_bytes > memory.bytes()) {
+    throw stop_error(error_category::budget, "sched.job_exceeds_budget", "picco di memoria oltre la prenotazione",
+                     {{"picco", std::to_string(plan.peak_bytes)}, {"prenotati", std::to_string(memory.bytes())}});
+  }
+  return verified_fits{std::move(input_memory), std::move(bytes)};
+}
+
 }  // namespace astro

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "astro/memory_pool.hpp"
+
 namespace astro {
 
 constexpr std::size_t sha256_chunk_bytes = std::size_t{1} << 20;
@@ -47,5 +49,13 @@ bool is_sha256_hex(const std::string& text) noexcept;
 // Diverso: integrity input.digest_mismatch. Il buffer restituito e' quello verificato.
 std::vector<std::uint8_t> read_verified_fits(const std::string& path, const content_digest& expected,
                                              std::uint64_t budget_bytes);
+
+// Come read_verified_fits, ma il buffer di lettura e' prenotato dentro `memory` (budget pool.reservation_exceeded se la
+// dimensione del file non entra nel residuo). La prenotazione resta impegnata finche' vive il risultato.
+struct verified_fits {
+  reservation memory;  // dichiarata prima di `bytes`: si rilascia dopo il buffer
+  std::vector<std::uint8_t> bytes;
+};
+verified_fits read_verified_fits(const std::string& path, const content_digest& expected, reservation& memory);
 
 }  // namespace astro

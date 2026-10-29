@@ -40,6 +40,11 @@ add_library(astrocore STATIC
   node.cpp
   dag_store.cpp
   job.cpp
+  budget.cpp
+  memory_pool.cpp
+  spill.cpp
+  checkpoint.cpp
+  scheduler.cpp
   provenance.cpp
   sqlite_internal.cpp
   sqlite_project.cpp

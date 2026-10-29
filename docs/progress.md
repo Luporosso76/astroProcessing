@@ -4,7 +4,7 @@ Ultimo aggiornamento: 29 ottobre 2026. Unica fonte dello stato corrente; risulta
 
 ## Ora
 
-- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g, M2.f, M2.a, M2.b, M2.c DONE (`docs/evidence/M2-{g,f,a,b,c}.md`). Core: errori, immagine, FITS da memoria, hash, JSON canonico, nodi DAG, slot, provenance, store SQLite durevole, snapshot undo/redo, export con manifest; 190 test dev (ASan/UBSan), 189 release.
+- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g, M2.f, M2.a, M2.b, M2.c, M2.d DONE (`docs/evidence/M2-{g,f,a,b,c,d}.md`). Core: errori, immagine, FITS da memoria, hash, JSON canonico, nodi DAG, slot, provenance, store SQLite durevole, snapshot undo/redo, export con manifest, budget di memoria, pool, scheduler con cancel, checkpoint/resume e spill; 268 test dev (ASan/UBSan, fast), 268 release (267 fast + 1 slow, T-M2D-13).
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
@@ -20,7 +20,7 @@ Ultimo aggiornamento: 29 ottobre 2026. Unica fonte dello stato corrente; risulta
 | M1.a | `docs/evidence/M1-a.md`, `M1-a-review.md` | Numerica corretta per C++, Rust, NumPy; prestazioni miste |
 | M1.b | `docs/evidence/M1-closure-001.md` | Viewer Qt Widgets: primo frame identico all'oracle su Wayland e XWayland, dpr 1 e 2 |
 | M1.c | `docs/evidence/M1-c-validation.md`, `M1-c-measurement.md` | Crash test SQLite 44/44, JSON 46/46; SQLite 1,09 volte più lento |
-| M1.d | `docs/evidence/M1-closure-001.md` | PARZIALE: spill a budget fisso esatto, guasti con exit 2; protocollo completo al gate M2.d |
+| M1.d | `docs/evidence/M1-closure-001.md`, `M2-d.md` | Spill a budget fisso esatto, guasti con exit 2; protocollo completo chiuso in M2.d (T-M2D-13) |
 | M1.e | `docs/evidence/M1-e-*.md` | Vulkan corretto; prestazioni sul microcaso non rappresentative |
 | M1.f | `docs/evidence/M1-closure-001.md` | SHA-256 circa 2,1 GB/s in memoria, 1,27 GB/s da file |
 
@@ -28,13 +28,14 @@ I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) rest
 
 ## Prossima unità
 
-M2.d: scheduler, budget e spill (`docs/contracts/ADR-06-budget-scheduler.md`, T-M2D-01…15; chiude anche T-M2B-09 e T-M2B-12). Poi M2.e.
+M2.e: calibrazione L−D, Q, maschere, varianza, report su dati sintetici e PUB-LFC-01; T-M2F-02 sotto strace (`plans/M2.md`, T-M2E-01…27). M2.d chiusa con `docs/evidence/M2-d.md`; T-M2B-09 e T-M2B-12 ora ESEGUITI.
 
 ## Limiti aperti
 
 - Gate M4.a: latenza pan/zoom, accessibilità, IME, colore ICC, confronto con QML.
-- Gate M2.d: protocollo M1.d completo (40 GiB logici, spill fisico, page cache contabilizzata).
+- M2.d: soglie F-RES-01 (0.50/0.25/10.0) invariate e non confermate da carichi PSI reali; costo per task (alloc/free di 3 buffer da 2 MiB) con 1 worker lento e variabile (60-102 s per 40 GiB), non indagato; cancel cooperativo; resume riesegue i task dopo l'ultimo checkpoint; page cache dello spill fuori dal budget (misura per cgroup assente); TSan non nei preset (eseguito a mano durante lo sviluppo); un `pwrite` fallito lascia l'estensione addebitata fino alla distruzione dell'area; `ctest --preset release` esegue anche lo slow (circa 107 s).
 - M2.c: durabilità contro perdita di corrente non provata (fuori dal modello di minaccia); processo malevolo con lo stesso UID fuori dal modello; `readdir` in `read_directory` senza test di iniezione.
+- Vincolo: prima di qualsiasi lavoro sulla GUI ci si ferma col proprietario (`AGENTS.md`).
 - Nessun dataset CFA reale ridistribuibile trovato: debayer M3.d senza dato reale per ora.
 - Cataloghi: Gaia e ESA Tycho2 solo uso non commerciale; APASS senza grant di redistribuzione dimostrato. Nessun pack adottato.
 - M10 non autorizzato. CodeGraph/Graphify: indici assenti, non creati.

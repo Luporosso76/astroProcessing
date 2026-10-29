@@ -34,6 +34,7 @@
       "name": "dev",
       "configurePreset": "dev",
       "output": {"outputOnFailure": true},
+      "filter": {"include": {"label": "fast"}},
       "environment": {"ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1"}
     },
     {

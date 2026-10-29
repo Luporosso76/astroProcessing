@@ -97,6 +97,8 @@ struct atomic_options {
   std::string conflict_code;
   std::string final_name;
   std::string extension;
+  // Il nome finale esistente viene sostituito (rename atomico) invece di essere un conflitto.
+  bool replace = false;
   const fault_injector* injector = nullptr;
 };
 struct atomic_result {

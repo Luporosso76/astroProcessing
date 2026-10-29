@@ -183,6 +183,10 @@ class sqlite_dag_store : public dag_store {
   // del nuovo ruolo (o missing), incrementa la generazione, crea uno snapshot (il ruolo vi e' registrato).
   void set_publish_role(const std::string& slot_name, const std::string& role);
 
+  // `settings`: `value_canonical` deve essere JSON canonico (altrimenti invalid_input store.setting_not_canonical).
+  void put_setting(const std::string& key, const std::string& value_canonical);
+  std::optional<std::string> get_setting(const std::string& key) const;
+
   input_record add_input(input_record input);
   std::vector<input_record> inputs() const;
 
