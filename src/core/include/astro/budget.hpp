@@ -22,6 +22,19 @@ constexpr double budget_fraction_normal = 0.375;
 constexpr double budget_fraction_pressure = 0.25;
 constexpr double budget_psi_threshold = 10.0;
 
+// Rapporto intero esatto: il budget automatico non usa mai virgola mobile per le frazioni.
+struct budget_ratio {
+  std::uint64_t num = 1, den = 1;
+  friend bool operator==(const budget_ratio&, const budget_ratio&) = default;
+};
+
+// Frazioni e soglia PSI del budget automatico; i default sono le costanti sopra.
+struct budget_tuning {
+  budget_ratio normal{3, 8};
+  budget_ratio pressure{1, 4};
+  double psi_threshold = budget_psi_threshold;
+};
+
 // Grammatica esatta: `<intero>MiB`, `<intero>GiB`, `<intero>%:<denominatore>`.
 struct manual_budget {
   budget_unit unit = budget_unit::mib;
@@ -46,6 +59,8 @@ struct budget_snapshot {
   std::optional<double> psi_some_avg10;
   double fraction = 0;  // solo automatic
   std::optional<manual_budget> manual;
+  // Configurazione delle risorse con default e origini (resource_config_json), se il chiamante la passa.
+  std::optional<json> resources;
 };
 
 // Sintassi: invalid_input budget.syntax. Zero, percentuale fuori 1..100 o valore non rappresentabile:
@@ -55,7 +70,7 @@ std::string to_string(const manual_budget& budget);
 
 // Errori: io budget.meminfo / budget.cgroup_read; budget budget.cgroup_over_limit; invalid_input budget.cgroup_parse /
 // budget.psi_parse. Il cgroup effettivo e' il livello, dal proprio verso la radice, con meno margine.
-budget_snapshot compute_automatic_budget(const budget_sources& sources = {});
+budget_snapshot compute_automatic_budget(const budget_sources& sources = {}, const budget_tuning& tuning = {});
 // Come sopra, piu': metadata_missing budget.no_cgroup_limit; invalid_input budget.out_of_range (zero o oltre mem_total).
 budget_snapshot compute_manual_budget(const manual_budget& manual, const budget_sources& sources = {});
 

@@ -12,6 +12,7 @@
 #include "astro/hash.hpp"
 #include "astro/image.hpp"
 #include "astro/job.hpp"
+#include "astro/resources.hpp"
 #include "astro/json.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/node.hpp"
@@ -170,9 +171,15 @@ struct calibration_job_options {
   unsigned worker_count = 1;
   std::uint32_t tile_rows = 64;
   std::size_t queue_capacity = 4;
+  // Se presente, worker, tile e coda dei task li sceglie plan_resources dal budget del pool (i valori espliciti della
+  // configurazione restano intatti) e i campi sopra sono ignorati. Configurazione e origini entrano nella provenance
+  // solo se il chiamante passa anche lo snapshot del budget: senza snapshot non viene registrato nulla.
+  std::optional<resource_config> resources;
   // Solo test: chiamato con "plan.done" dopo il piano dei file (prima della prenotazione) e con "preflight.done"
   // dopo il preflight e prima della riverifica dei file.
   std::function<void(std::string_view)> hook;
+  // Solo test: il job_plan effettivamente passato allo scheduler (dopo plan_resources, se presente).
+  std::function<void(const job_plan&)> on_job_plan;
 };
 
 constexpr const char* calibration_image_role = "primary";

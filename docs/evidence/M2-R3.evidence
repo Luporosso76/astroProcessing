@@ -1,0 +1,17 @@
+# Sorgente del blocco generato di M2-R3.md (tools/evidence.py)
+file docs/contracts/ADR-06-budget-scheduler.md
+file src/core/include/astro/resources.hpp
+file src/core/resources.cpp
+file src/core/include/astro/budget.hpp
+file src/core/budget.cpp
+file src/core/include/astro/scheduler.hpp
+file src/core/scheduler.cpp
+file src/core/include/astro/calibration.hpp
+file src/core/calibration_job.cpp
+file tests/unit/test_resources.cpp
+file tests/unit/test_calibration_job.cpp
+file tests/unit/CMakeLists.txt
+file tests/trace/M2.tsv
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

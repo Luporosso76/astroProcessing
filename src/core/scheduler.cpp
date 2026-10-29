@@ -8,6 +8,8 @@
 #include <exception>
 #include <mutex>
 #include <set>
+#include <pthread.h>
+
 #include <thread>
 
 #include "astro/hash.hpp"
@@ -200,7 +202,18 @@ void write_progress(run_state& st, const job_spec& spec, const std::string& reci
 }
 
 void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job_plan& plan, const job_spec& spec,
-                 const std::string& recipe) {
+                 const std::string& recipe, const cpu_set_t* pin) {
+  if (pin != nullptr) {
+    const int err = ::pthread_setaffinity_np(::pthread_self(), sizeof(cpu_set_t), pin);
+    if (err != 0) {
+      try {
+        sqlint::throw_errno(error_category::io, "sched.cpu_set_apply", "affinita' dei worker non applicabile", err);
+      } catch (...) {
+        st.fail(std::current_exception());
+      }
+      return;
+    }
+  }
   for (;;) {
     std::uint64_t index = 0;
     {
@@ -269,7 +282,28 @@ void produce(run_state& st, const std::vector<std::uint64_t>& pending, std::size
 
 job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const cancel_token& cancel) {
   ASTRO_ASSERT(static_cast<bool>(spec.run_task));
-  validate_plan(plan, spec, cpu_count(affinity_));
+  const std::size_t cpus = cpu_count(affinity_);
+  validate_plan(plan, spec, cpus);
+  if (tuning_.max_queued_jobs < 1) invalid("sched.queue_capacity", "max_queued_jobs deve essere almeno 1");
+  cpu_set_t worker_set;
+  CPU_ZERO(&worker_set);
+  if (!tuning_.cpu_set.empty()) {
+    cpu_set_t allowed;
+    CPU_ZERO(&allowed);
+    if (const int err = affinity_(&allowed); err != 0) {
+      sqlint::throw_errno(error_category::io, "sched.cpu_count", "sched_getaffinity fallita", err);
+    }
+    for (const unsigned cpu : tuning_.cpu_set) {
+      if (cpu >= CPU_SETSIZE || !CPU_ISSET(cpu, &allowed)) {
+        invalid("sched.cpu_set", "CPU fuori dall'affinita' del processo", {{"cpu", std::to_string(cpu)}});
+      }
+      CPU_SET(cpu, &worker_set);
+    }
+    if (plan.worker_count > static_cast<unsigned>(CPU_COUNT(&worker_set))) {
+      invalid("sched.worker_count", "worker_count oltre le CPU dell'insieme",
+              {{"worker_count", std::to_string(plan.worker_count)}, {"cpu_set", std::to_string(CPU_COUNT(&worker_set))}});
+    }
+  }
   const std::uint64_t peak = job_peak(plan, pool_.budget_bytes());
   if (peak > pool_.budget_bytes()) {
     throw stop_error(error_category::budget, "sched.job_exceeds_budget", "il picco del job supera il budget",
@@ -284,7 +318,7 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
   std::optional<checkpoint_record> resume;
   if (spec.resume) resume = load_resume(plan, spec);
 
-  reservation job_res = pool_.reserve(peak, "job", &cancel, job_queue_capacity);
+  reservation job_res = pool_.reserve(peak, "job", &cancel, tuning_.max_queued_jobs);
   reservation shared = job_res.carve(plan.shared_bytes, "shared");
   if (resume) verify_resume_digests(*resume, spec);
 
@@ -305,13 +339,14 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
     if (!st.done[i]) pending.push_back(i);
   }
 
+  const bool pin = !tuning_.cpu_set.empty();
   job_context jc{plan, shared, spill ? &*spill : nullptr, cancel, st.stopping};
   if (spec.prepare) spec.prepare(jc);
   {
     worker_threads workers(st);
     for (unsigned w = 0; w < plan.worker_count; ++w) {
       workers.threads.emplace_back(worker_loop, std::ref(st), std::ref(jc), std::ref(job_res), std::cref(plan),
-                                   std::cref(spec), std::cref(recipe));
+                                   std::cref(spec), std::cref(recipe), pin ? &worker_set : nullptr);
     }
     produce(st, pending, plan.queue_capacity, cancel);
     {

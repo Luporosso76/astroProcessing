@@ -497,4 +497,155 @@ TEST(CalibJob, T_FBK_01_store_failure_during_commit_and_corrupt_store_stop) {
   EXPECT_STOP(sqlite_dag_store::open(root, open_intent::read_write), error_category::integrity, "store.corrupt");
 }
 
+// ---------------------------------------------------------------- R3.1: pianificatore nel job reale
+
+planner_input job_planner_input(const disk_case& c, std::uint64_t budget) {
+  std::uint64_t peaks = 0;
+  for (const calibration_input_spec* spec : {&c.recipe.light, &c.recipe.dark, &c.recipe.flat, &c.recipe.dark_flat}) {
+    peaks += plan_fits(open_fits_input(spec->path)).peak_bytes;
+  }
+  const std::uint64_t header_bound = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
+  return planner_input{budget, 4, 40, 30, 4, peaks, header_bound};
+}
+
+TEST(CalibJob, T_M2R3_04_job_with_budget_equal_to_the_minimum_runs_and_one_byte_less_stops_before_any_task) {
+  const disk_case c = make_case("r3_minimum", job_set());
+  const resource_config cfg;
+  const std::uint64_t minimum = compute_plan_bounds(job_planner_input(c, 0), cfg).minimum_feasible_bytes;
+  int prepared = 0;
+  {
+    project p = make_project(c, "ok");
+    memory_pool pool(minimum);
+    calibration_job_options o;
+    o.resources = cfg;
+    o.hook = [&](std::string_view) {};
+    const job_outcome out = run_quiet(p, c, pool, o);
+    ASSERT_EQ(out.exit_code, 0);
+    EXPECT_EQ(pool.peak_reserved_bytes(), minimum);  // un worker: shared + per_task
+    EXPECT_EQ(pool.reserved_bytes(), 0u);
+  }
+  {
+    // Controllo indipendente: lo stesso budget con il percorso senza pianificatore (formula storica del job).
+    project p = make_project(c, "legacy_ok");
+    memory_pool pool(minimum);
+    EXPECT_EQ(run_quiet(p, c, pool).exit_code, 0);
+    project q = make_project(c, "legacy_stop");
+    memory_pool small(minimum - 1);
+    EXPECT_EQ(run_quiet(q, c, small).exit_code, 2);
+  }
+  {
+    project p = make_project(c, "stop");
+    memory_pool pool(minimum - 1);
+    calibration_job_options o;
+    o.resources = cfg;
+    o.hook = [&](std::string_view what) { if (what == "preflight.done") ++prepared; };
+    const job_outcome out = run_quiet(p, c, pool, o);
+    EXPECT_EQ(out.exit_code, 2);
+    EXPECT_EQ(prepared, 0);
+    expect_only_stop_provenance(p);
+    const fs::path root = p.store->root();
+    const std::string key = p.node.key();
+    p.store.reset();
+    const std::string prov = persisted_provenance(root, key);
+    EXPECT_NE(prov.find("sched.job_exceeds_budget"), std::string::npos);
+    EXPECT_NE(prov.find("minimum_feasible_bytes"), std::string::npos);
+    EXPECT_NE(prov.find(std::to_string(minimum)), std::string::npos);
+  }
+}
+
+TEST(CalibJob, T_M2R3_02_job_adapts_workers_to_the_budget_and_keeps_explicit_values) {
+  const disk_case c = make_case("r3_adapt", job_set());
+  const resource_config cfg;
+  const plan_bounds b = compute_plan_bounds(job_planner_input(c, 0), cfg);
+  // Budget per esattamente 2 worker: il piano ne usa 2 (gli altri task attendono), mai tile o worker ridotti dopo.
+  const std::uint64_t budget = b.shared_bytes + 2 * b.per_task_bytes;
+  project p = make_project(c, "store");
+  memory_pool pool(budget);
+  calibration_job_options o;
+  o.resources = cfg;
+  ASSERT_EQ(run_quiet(p, c, pool, o).exit_code, 0);
+  EXPECT_EQ(pool.peak_reserved_bytes(), budget);
+  EXPECT_LE(pool.peak_reserved_bytes(), pool.budget_bytes());
+  // Worker esplicito che non entra: stop, non riduzione.
+  project q = make_project(c, "explicit");
+  memory_pool pool2(budget);
+  resource_config explicit_cfg;
+  explicit_cfg.worker_count = 3;
+  o.resources = explicit_cfg;
+  EXPECT_EQ(run_quiet(q, c, pool2, o).exit_code, 2);
+  expect_only_stop_provenance(q);
+}
+
+TEST(CalibJob, T_M2R3_08_configured_queue_capacity_tile_and_workers_reach_the_scheduler_plan) {
+  const disk_case c = make_case("r3_wiring", job_set());
+  resource_config cfg;
+  cfg.task_queue_capacity = {9, "configurato"};
+  cfg.tile_rows = 5;
+  cfg.worker_count = 2;
+  cfg.report_margin_bytes = {2 * MiB, "configurato"};
+  std::optional<job_plan> seen;
+  calibration_job_options o;
+  o.resources = cfg;
+  o.on_job_plan = [&](const job_plan& plan) { seen = plan; };
+  project p = make_project(c, "store");
+  memory_pool pool(256 * MiB);
+  ASSERT_EQ(run_quiet(p, c, pool, o).exit_code, 0);
+  ASSERT_TRUE(seen.has_value());
+  EXPECT_EQ(seen->queue_capacity, 9u);
+  EXPECT_EQ(seen->tile_rows, 5u);
+  EXPECT_EQ(seen->worker_count, 2u);
+  EXPECT_EQ(seen->shared_bytes, compute_plan_bounds(job_planner_input(c, 256 * MiB), cfg).shared_bytes);
+  // Il margine configurato e' nel piano: 1 MiB in piu' del default.
+  EXPECT_EQ(seen->shared_bytes, compute_plan_bounds(job_planner_input(c, 256 * MiB), resource_config{}).shared_bytes + MiB);
+}
+
+TEST(CalibJob, T_M2R3_08_defaults_and_origins_reach_the_provenance_and_the_output_does_not_change) {
+  const disk_case c = make_case("r3_prov", job_set());
+  resource_config cfg;
+  cfg.fraction_normal = {{1, 2}, "configurato"};
+  budget_snapshot snapshot;
+  snapshot.mode = budget_mode::manual;
+  snapshot.manual = parse_manual_budget("256MiB");
+  snapshot.budget_bytes = 256 * MiB;
+  snapshot.mem_total_bytes = 1024 * MiB;
+  snapshot.mem_available_bytes = 512 * MiB;
+  project p = make_project(c, "store");
+  memory_pool pool(256 * MiB);
+  calibration_job_options o;
+  o.resources = cfg;
+  testing::internal::CaptureStderr();
+  const job_outcome out = run_calibration_job(*p.store, "cal", c.recipe, pool, o, never_cancelled(), snapshot);
+  testing::internal::GetCapturedStderr();
+  ASSERT_EQ(out.exit_code, 0);
+  const std::string primary = by_role(p).at("primary").sha256;
+  const fs::path root = p.store->root();
+  const std::string key = p.node.key();
+  p.store.reset();
+  const json prov = parse_json(persisted_provenance(root, key));
+  const json* recorded_budget = prov.find("budget");
+  ASSERT_NE(recorded_budget, nullptr);
+  ASSERT_NE(recorded_budget->find("resources"), nullptr);
+  const json& res = *recorded_budget->find("resources");
+  EXPECT_EQ(res.find("fraction_normal")->find("origin")->as_string(), "configurato");
+  EXPECT_EQ(res.find("fraction_pressure")->find("origin")->as_string(), resource_config{}.fraction_pressure.origin);
+  EXPECT_EQ(res.find("job_queue_capacity")->find("value")->as_integer(), 16);
+  EXPECT_EQ(res.find("psi_threshold")->find("origin")->as_string(), resource_config{}.psi_threshold.origin);
+  EXPECT_EQ(res.find("vram")->find("value")->type(), json::kind::null);
+  // L'uscita calibrata e' identica a quella del percorso senza pianificatore (T-M2E-16: indipendente da tile e worker).
+  project q = make_project(c, "legacy");
+  memory_pool pool2(256 * MiB);
+  ASSERT_EQ(run_quiet(q, c, pool2).exit_code, 0);
+  EXPECT_EQ(primary, by_role(q).at("primary").sha256);
+  // Senza snapshot del budget la configurazione non viene registrata (limite dichiarato in calibration.hpp).
+  q.store.reset();
+  project r = make_project(c, "no_snapshot");
+  memory_pool pool3(256 * MiB);
+  calibration_job_options plain;
+  plain.resources = cfg;
+  ASSERT_EQ(run_quiet(r, c, pool3, plain).exit_code, 0);
+  const fs::path rroot = r.store->root();
+  r.store.reset();
+  EXPECT_EQ(parse_json(persisted_provenance(rroot, r.node.key())).find("budget"), nullptr);
+}
+
 }  // namespace

@@ -31,6 +31,12 @@ int system_affinity(cpu_set_t* set);
 // CPU in sched_getaffinity. Chiamata fallita o zero CPU: io sched.cpu_count. hardware_concurrency non si usa.
 std::size_t cpu_count(const affinity_fn& affinity = system_affinity);
 
+// Parametri configurabili dello scheduler (resource_config). `cpu_set` vuoto = nessuna affinita' applicata.
+struct scheduler_tuning {
+  std::size_t max_queued_jobs = job_queue_capacity;
+  std::vector<unsigned> cpu_set;
+};
+
 struct job_context {
   const job_plan& plan;
   reservation& shared;  // shared_bytes del piano
@@ -84,8 +90,8 @@ struct job_report {
 // Esecutore dei job sul pool. Piu' scheduler (o piu' thread) possono condividere lo stesso pool.
 class job_scheduler {
  public:
-  explicit job_scheduler(memory_pool& pool, affinity_fn affinity = system_affinity)
-      : pool_(pool), affinity_(std::move(affinity)) {}
+  explicit job_scheduler(memory_pool& pool, affinity_fn affinity = system_affinity, scheduler_tuning tuning = {})
+      : pool_(pool), affinity_(std::move(affinity)), tuning_(std::move(tuning)) {}
 
   // Preflight: piano non valido (invalid_input sched.worker_count / sched.queue_capacity / sched.tile_rows /
   // sched.checkpoint_dir / sched.resume_verifier), picco > budget (budget sched.job_exceeds_budget), spill
@@ -100,6 +106,7 @@ class job_scheduler {
  private:
   memory_pool& pool_;
   affinity_fn affinity_;
+  scheduler_tuning tuning_;
 };
 
 enum class branch_state { completed, failed, cancelled, blocked, not_started };

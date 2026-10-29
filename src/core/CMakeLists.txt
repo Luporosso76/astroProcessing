@@ -45,6 +45,7 @@ add_library(astrocore STATIC
   spill.cpp
   checkpoint.cpp
   scheduler.cpp
+  resources.cpp
   provenance.cpp
   sqlite_internal.cpp
   sqlite_project.cpp

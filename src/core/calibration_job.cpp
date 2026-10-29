@@ -160,18 +160,30 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     const std::uint64_t out_buffers = samples * (2 * out_elem + sizeof(std::uint16_t));
 
     job_plan plan;
-    plan.shared_bytes = input_peaks + out_buffers + (out_buffers + output_header_bound) +
-                        samples * sizeof(double) + report_margin_bytes;
-    plan.per_task_bytes = std::uint64_t{lp.width} * (2 * sizeof(double) + sizeof(std::uint16_t));
-    plan.worker_count = options.worker_count;
-    plan.queue_capacity = options.queue_capacity;
-    plan.tile_rows = options.tile_rows;
+    if (options.resources) {
+      const std::size_t cpus = options.resources->cpu_set ? options.resources->cpu_set->size() : cpu_count();
+      const resource_plan chosen = plan_resources(
+          planner_input{pool.budget_bytes(), cpus, lp.width, lp.height, out_elem, input_peaks, output_header_bound},
+          *options.resources);
+      plan.shared_bytes = chosen.shared_bytes;
+      plan.per_task_bytes = chosen.per_task_bytes;
+      plan.worker_count = chosen.worker_count;
+      plan.queue_capacity = chosen.task_queue_capacity;
+      plan.tile_rows = chosen.tile_rows;
+    } else {
+      plan.shared_bytes = input_peaks + out_buffers + (out_buffers + output_header_bound) +
+                          samples * sizeof(double) + report_margin_bytes;
+      plan.per_task_bytes = std::uint64_t{lp.width} * (2 * sizeof(double) + sizeof(std::uint16_t));
+      plan.worker_count = options.worker_count;
+      plan.queue_capacity = options.queue_capacity;
+      plan.tile_rows = options.tile_rows;
+    }
 
     std::optional<prepared_calibration> prepared;
     json observed = json::array();
     std::vector<stored_file> files;
     std::vector<std::string> warnings;
-    const std::uint64_t tile_rows = options.tile_rows == 0 ? 1 : options.tile_rows;
+    const std::uint64_t tile_rows = plan.tile_rows == 0 ? 1 : plan.tile_rows;
     const std::uint64_t tasks = (std::uint64_t{lp.height} + tile_rows - 1) / tile_rows;
 
     job_spec spec(node, tasks, [&](task_context& ctx) -> std::string {
@@ -244,13 +256,17 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
                             calibration_report_text_role}});
     };
 
-    job_scheduler scheduler(pool);
+    if (options.on_job_plan) options.on_job_plan(plan);
+    job_scheduler scheduler(pool, system_affinity,
+                            options.resources ? scheduler_tuning_of(*options.resources) : scheduler_tuning{});
     scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
-  return run_job_files(store, slot_name, work, budget, &cancel);
+  std::optional<budget_snapshot> recorded = budget;
+  if (recorded && options.resources) recorded->resources = resource_config_json(*options.resources);
+  return run_job_files(store, slot_name, work, recorded, &cancel);
 }
 
 }  // namespace astro

@@ -298,14 +298,31 @@ std::string to_string(const manual_budget& budget) {
   std::abort();
 }
 
-budget_snapshot compute_automatic_budget(const budget_sources& sources) {
+namespace {
+
+void validate_tuning(const budget_tuning& t) {
+  const auto bad_ratio = [](const budget_ratio& r) { return r.num == 0 || r.num > r.den || r.den > 1000; };
+  if (bad_ratio(t.normal) || bad_ratio(t.pressure) || t.pressure.num * t.normal.den > t.normal.num * t.pressure.den ||
+      !std::isfinite(t.psi_threshold) || t.psi_threshold <= 0.0 || t.psi_threshold > 100.0) {
+    throw stop_error(error_category::invalid_input, "budget.tuning", "frazioni o soglia PSI fuori dominio",
+                     {{"normale", std::to_string(t.normal.num) + "/" + std::to_string(t.normal.den)},
+                      {"pressione", std::to_string(t.pressure.num) + "/" + std::to_string(t.pressure.den)},
+                      {"psi_threshold", std::to_string(t.psi_threshold)}});
+  }
+}
+
+}  // namespace
+
+budget_snapshot compute_automatic_budget(const budget_sources& sources, const budget_tuning& tuning) {
+  validate_tuning(tuning);
   budget_snapshot s = gather(sources);
   s.mode = budget_mode::automatic;
   std::uint64_t avail = s.mem_available_bytes;
   if (s.cgroup_max_bytes) avail = std::min(avail, *s.cgroup_max_bytes - *s.cgroup_current_bytes);
-  const bool pressure = s.psi_some_avg10 && *s.psi_some_avg10 >= budget_psi_threshold;
-  s.fraction = pressure ? budget_fraction_pressure : budget_fraction_normal;
-  s.budget_bytes = floor_mib(scale(avail, pressure ? pressure_ratio : normal_ratio));
+  const bool pressure = s.psi_some_avg10 && *s.psi_some_avg10 >= tuning.psi_threshold;
+  const budget_ratio& used = pressure ? tuning.pressure : tuning.normal;
+  s.fraction = static_cast<double>(used.num) / static_cast<double>(used.den);
+  s.budget_bytes = floor_mib(scale(avail, ratio{used.num, used.den}));
   return s;
 }
 
@@ -356,6 +373,7 @@ json budget_json(const budget_snapshot& s) {
   doc.set("psi_some_avg10", s.psi_some_avg10 ? json::number(*s.psi_some_avg10) : json::null());
   if (s.mode == budget_mode::automatic) doc.set("fraction", json::number(s.fraction));
   if (s.manual) doc.set("manual", json::string(to_string(*s.manual)));
+  if (s.resources) doc.set("resources", *s.resources);
   return doc;
 }
 
