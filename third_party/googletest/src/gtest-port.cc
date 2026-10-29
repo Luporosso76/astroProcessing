@@ -1129,7 +1129,10 @@ class CapturedStream {
     if (!EndsWithPathSeparator(name_template))
       name_template.push_back(GTEST_PATH_SEP_[0]);
 #else
-    name_template = "/tmp/";
+    // astroProcessor: TempDir() (TEST_TMPDIR/TMPDIR) al posto di "/tmp/" fisso.
+    name_template = TempDir();
+    if (name_template.empty() || name_template.back() != '/')
+      name_template.push_back('/');
 #endif
     name_template.append("gtest_captured_stream.XXXXXX");
 

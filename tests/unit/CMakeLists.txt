@@ -1,3 +1,5 @@
+# I temporanei di gtest (CaptureStderr, death test) e dei processi figli vanno in TEST_TMPDIR/TMPDIR dei preset di test, mai in /tmp.
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test_tmp/sys")
 include(GoogleTest)
 
 # Ogni test ha l'etichetta `fast` (ciclo veloce, selezionata dai preset di test) oppure `slow` (`ctest -L slow`).
