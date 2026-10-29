@@ -155,17 +155,17 @@ TEST(Budget, T_M2D_03_automatic_formula_without_cgroup_and_psi) {
   EXPECT_EQ(s.cgroup_max_bytes, std::nullopt);
   EXPECT_EQ(s.cgroup_current_bytes, std::nullopt);
   EXPECT_EQ(s.psi_some_avg10, std::nullopt);
-  EXPECT_DOUBLE_EQ(s.fraction, 0.50);
-  EXPECT_EQ(s.budget_bytes, 2 * GiB);
+  EXPECT_DOUBLE_EQ(s.fraction, 0.375);
+  EXPECT_EQ(s.budget_bytes, 1536 * MiB);
   EXPECT_EQ(s.manual, std::nullopt);
 }
 
 TEST(Budget, T_M2D_03_automatic_rounds_down_to_a_whole_mebibyte) {
   fake_system sys("budget_round");
-  sys.meminfo(8 * 1024 * 1024, 4 * 1024 * 1024 + 1999);  // 4 GiB + 1999 kB = +1.95 MiB: meta' = +0.97 MiB
-  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 2 * GiB);
-  sys.meminfo(8 * 1024 * 1024, 4 * 1024 * 1024 + 2048);  // +2 MiB: meta' = +1 MiB
-  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 2 * GiB + MiB);
+  sys.meminfo(8 * 1024 * 1024, 4 * 1024 * 1024 + 8191);  // 4 GiB + 8191 kB: 3/8 = +2.9996 MiB
+  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 1536 * MiB + 2 * MiB);
+  sys.meminfo(8 * 1024 * 1024, 4 * 1024 * 1024 + 8192);  // +8 MiB: 3/8 = +3 MiB
+  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 1536 * MiB + 3 * MiB);
   EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes % MiB, 0u);
 }
 
@@ -174,8 +174,8 @@ TEST(Budget, T_M2D_03_pressure_selects_the_lower_fraction_at_the_threshold) {
   sys.psi("some avg10=9.99 avg60=1.00 avg300=0.50 total=12345\nfull avg10=50.00 avg60=0.00 avg300=0.00 total=1\n");
   budget_snapshot s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.psi_some_avg10, 9.99);
-  EXPECT_DOUBLE_EQ(s.fraction, 0.50);
-  EXPECT_EQ(s.budget_bytes, 2 * GiB);
+  EXPECT_DOUBLE_EQ(s.fraction, 0.375);
+  EXPECT_EQ(s.budget_bytes, 1536 * MiB);
   sys.psi("some avg10=10.00 avg60=1.00 avg300=0.50 total=12345\n");
   s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.psi_some_avg10, 10.0);
@@ -192,25 +192,25 @@ TEST(Budget, T_M2D_03_cgroup_headroom_bounds_the_available_memory) {
   budget_snapshot s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.cgroup_max_bytes, 3 * GiB);
   EXPECT_EQ(s.cgroup_current_bytes, 1 * GiB);
-  EXPECT_EQ(s.budget_bytes, 1 * GiB);  // min(4, 2) GiB * 0.5
+  EXPECT_EQ(s.budget_bytes, 768 * MiB);  // min(4, 2) GiB * 0.375
 
   sys.cgroup("app/job", "max\n", "1073741824\n");  // senza limite al livello proprio: nessun cgroup
   s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.cgroup_max_bytes, std::nullopt);
-  EXPECT_EQ(s.budget_bytes, 2 * GiB);
+  EXPECT_EQ(s.budget_bytes, 1536 * MiB);
 
   sys.cgroup("app", "1610612736\n", "536870912\n");  // l'antenato ha 1 GiB di margine: stringe piu' del livello proprio
   s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.cgroup_max_bytes, 1536 * MiB);
   EXPECT_EQ(s.cgroup_current_bytes, 512 * MiB);
-  EXPECT_EQ(s.budget_bytes, 512 * MiB);
+  EXPECT_EQ(s.budget_bytes, 384 * MiB);
 
   sys.cgroup("app/job", "10737418240\n", "0\n");  // il livello proprio non stringe: resta l'antenato
-  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 512 * MiB);
+  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 384 * MiB);
   sys.cgroup("app/job", "2147483648\n", "1610612736\n");  // 512 MiB di margine contro 1 GiB dell'antenato
   s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.cgroup_max_bytes, 2 * GiB);
-  EXPECT_EQ(s.budget_bytes, 256 * MiB);
+  EXPECT_EQ(s.budget_bytes, 192 * MiB);
 }
 
 TEST(Budget, T_M2D_03_absent_cgroup_sources_are_nullopt_not_errors) {
@@ -219,7 +219,7 @@ TEST(Budget, T_M2D_03_absent_cgroup_sources_are_nullopt_not_errors) {
   EXPECT_EQ(compute_automatic_budget(sys.sources()).cgroup_max_bytes, std::nullopt);
   sys.self_cgroup("0::/missing/dir\n");  // il cgroup non ha file di memoria
   EXPECT_EQ(compute_automatic_budget(sys.sources()).cgroup_max_bytes, std::nullopt);
-  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 2 * GiB);
+  EXPECT_EQ(compute_automatic_budget(sys.sources()).budget_bytes, 1536 * MiB);
 }
 
 TEST(Budget, T_M2D_03_missing_or_incomplete_meminfo_stops) {

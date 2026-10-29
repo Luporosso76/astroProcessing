@@ -137,7 +137,9 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
   statement ins(db_, "INSERT INTO artifacts(node_key, generation, rel_path, size_bytes, sha256, kind, present, output_role) "
                      "VALUES(?1,?2,?3,?4,?5,?6,1,?7)");
   const artifact_record* published = nullptr;
+  const bool current = !slot.detached && slot.current_generation == generation;
   for (const auto& f : files) {
+    if (!current && f.role() == provenance_output_role) continue;
     ins.bind(1, node_key).bind_u64(2, generation).bind(3, f.rel_path()).bind_u64(4, f.digest().size_bytes);
     ins.bind(5, f.digest().sha256).bind(6, f.kind()).bind(7, f.role()).run();
     artifact_record a;
@@ -160,7 +162,6 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
                      {{"slot", slot_name}, {"ruolo", publish_role}});
   }
   check_fault("commit.inserted");
-  const bool current = !slot.detached && slot.current_generation == generation;
   if (current) {
     statement pub(db_, "UPDATE slots SET artifact_id=?2 WHERE slot_name=?1");
     pub.bind(1, slot_name).bind_u64(2, published->id).run();

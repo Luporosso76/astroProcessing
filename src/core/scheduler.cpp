@@ -347,14 +347,17 @@ struct branch_slot {
 
 }  // namespace
 
-std::vector<branch_result> run_branches(dag_store& store, std::vector<branch_job> jobs,
-                                        const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
-  std::vector<branch_slot> slots(jobs.size());
-  for (std::size_t i = 0; i < jobs.size(); ++i) {
-    const std::optional<slot_record> slot = store.get_slot(jobs[i].slot_name);
+namespace {
+
+// Ordine, blocco dei discendenti e cancel comuni ai due percorsi; `run_one(i)` esegue il job i-esimo.
+std::vector<branch_result> run_branches_with(const dag_store& store, const std::vector<std::string>& names,
+                                             const std::function<job_outcome(std::size_t)>& run_one) {
+  std::vector<branch_slot> slots(names.size());
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    const std::optional<slot_record> slot = store.get_slot(names[i]);
     if (!slot) {
       throw stop_error(error_category::invalid_input, "dag.unknown_slot", "slot inesistente",
-                       {{"slot", jobs[i].slot_name}});
+                       {{"slot", names[i]}});
     }
     slots[i].position = i;
     slots[i].target = slot->target_node_key;
@@ -365,23 +368,23 @@ std::vector<branch_result> run_branches(dag_store& store, std::vector<branch_job
     return child != parent && slots[parent].descendants.count(slots[child].target) > 0;
   };
 
-  std::vector<branch_result> results(jobs.size());
-  for (std::size_t i = 0; i < jobs.size(); ++i) results[i].slot_name = jobs[i].slot_name;
-  std::vector<bool> handled(jobs.size(), false);
+  std::vector<branch_result> results(names.size());
+  for (std::size_t i = 0; i < names.size(); ++i) results[i].slot_name = names[i];
+  std::vector<bool> handled(names.size(), false);
   bool cancelled = false;
-  for (std::size_t round = 0; round < jobs.size(); ++round) {
-    std::size_t next = jobs.size();
-    for (std::size_t i = 0; i < jobs.size() && next == jobs.size(); ++i) {
+  for (std::size_t round = 0; round < names.size(); ++round) {
+    std::size_t next = names.size();
+    for (std::size_t i = 0; i < names.size() && next == names.size(); ++i) {
       if (handled[i]) continue;
       bool ready = true;
-      for (std::size_t p = 0; p < jobs.size() && ready; ++p) ready = handled[p] || !depends_on(i, p);
+      for (std::size_t p = 0; p < names.size() && ready; ++p) ready = handled[p] || !depends_on(i, p);
       if (ready) next = i;
     }
-    ASTRO_ASSERT(next < jobs.size());
+    ASTRO_ASSERT(next < names.size());
     handled[next] = true;
     if (results[next].state == branch_state::blocked) continue;
     if (cancelled) continue;
-    job_outcome outcome = run_job(store, jobs[next].slot_name, jobs[next].work, budget, cancel);
+    job_outcome outcome = run_one(next);
     if (outcome.exit_code == 0) {
       results[next].state = branch_state::completed;
     } else if (outcome.exit_code == exit_code_cancelled) {
@@ -389,16 +392,36 @@ std::vector<branch_result> run_branches(dag_store& store, std::vector<branch_job
       cancelled = true;
     } else {
       results[next].state = branch_state::failed;
-      for (std::size_t j = 0; j < jobs.size(); ++j) {
+      for (std::size_t j = 0; j < names.size(); ++j) {
         if (!handled[j] && depends_on(j, next)) {
           results[j].state = branch_state::blocked;
-          results[j].blocked_by_slot = jobs[next].slot_name;
+          results[j].blocked_by_slot = names[next];
         }
       }
     }
     results[next].outcome = std::move(outcome);
   }
   return results;
+}
+
+}  // namespace
+
+std::vector<branch_result> run_branches(dag_store& store, std::vector<branch_job> jobs,
+                                        const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
+  std::vector<std::string> names;
+  for (const branch_job& j : jobs) names.push_back(j.slot_name);
+  return run_branches_with(store, names, [&](std::size_t i) {
+    return run_job(store, jobs[i].slot_name, jobs[i].work, budget, cancel);
+  });
+}
+
+std::vector<branch_result> run_branches(sqlite_dag_store& store, std::vector<branch_files_job> jobs,
+                                        const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
+  std::vector<std::string> names;
+  for (const branch_files_job& j : jobs) names.push_back(j.slot_name);
+  return run_branches_with(store, names, [&](std::size_t i) {
+    return run_job_files(store, jobs[i].slot_name, jobs[i].work, budget, cancel);
+  });
 }
 
 int branches_exit_code(const std::vector<branch_result>& results) noexcept {

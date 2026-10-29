@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
     cancel_token cancel;
     const job_outcome out = run_calibration_job(*store, "cal", recipe, pool, options, cancel);
     if (out.exit_code != 0) return fail("job di calibrazione fermato");
-    if (store->artifacts_for(node.key()).size() != 3) return fail("artefatti attesi: immagine, report, report testuale");
+    if (store->artifacts_for(node.key()).size() != 4) return fail("artefatti attesi: immagine, report, report testuale, provenance");
     const slot_view view = store->read_slot("cal");
     if (view.state != freshness::current || !view.artifact) return fail("slot non corrente");
     const std::string text = read_text(store->artifact_path(view.artifact->rel_path));

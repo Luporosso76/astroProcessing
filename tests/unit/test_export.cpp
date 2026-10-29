@@ -76,6 +76,31 @@ void write_bundle(const fs::path& dir, const std::string& manifest) {
   write_text(dir / "COMMIT", sha256_hex(bytes));
 }
 
+TEST(Export, T_M2A_readdir_failure_while_verifying_stops_as_io_and_names_errno) {
+  fixture f = make_fixture("readdir");
+  const fs::path dir = export_to(f, "readdir");
+  f.store.reset();
+  int calls = 0;
+  const fault_injector hook = [&](std::string_view p) { return p == "dir.readdir" ? (++calls, EIO) : 0; };
+  try {
+    verify_export(dir, hook);
+    ADD_FAILURE() << "stop_error atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::io);
+    EXPECT_EQ(e.code(), "export.open");
+    bool found = false;
+    for (const auto& kv : e.context()) found = found || (kv.first == "errno" && kv.second == std::to_string(EIO));
+    EXPECT_TRUE(found) << "errno=EIO assente dal contesto";
+  }
+  EXPECT_EQ(calls, 1);
+  const fault_injector throwing = [](std::string_view p) -> int {
+    if (p == "dir.readdir") throw std::runtime_error("callback fallita");
+    return 0;
+  };
+  EXPECT_THROW(verify_export(dir, throwing), std::runtime_error);  // il DIR* aperto si chiude per RAII (LeakSanitizer)
+  EXPECT_EQ(verify_export(dir).files.size(), 2u);
+}
+
 TEST(Export, T_M2C_19_manifest_lets_another_process_rebuild_keys_and_digests) {
   fixture f = make_fixture("t19");
   const fs::path dir = export_to(f, "t19");

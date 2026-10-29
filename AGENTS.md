@@ -44,8 +44,9 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 
 - Core CPU, offline, Linux. Nessun codice, runtime, CLI o API Siril. Solo letteratura e standard pubblici, implementazione indipendente.
 - Originali immutabili, in sola lettura, persistenti. I metadati di strumenti e filesystem si leggono in sola lettura, solo se strettamente necessari, mai segreti, senza modificare il sistema.
+- Nessun report di crash del sistema (proprietario, 29 ottobre 2026: arrivano come notifiche sul desktop). Gli script Python gestiscono ogni errore e terminano con `sys.exit("<diagnosi>")`, mai con un'eccezione non gestita, e si lanciano con `python3 -S` (niente hook di apport). Un abort voluto in un death test passa da `exit_instead_of_core_dump()` (`tests/unit/no_crash_report.hpp`).
 - Build, cache, fixture e temporanei dentro il progetto (`tmp/` alla radice). Nessun nuovo temporaneo esterno. Gli spike M1 usano codice isolato in `tmp/`, ammesso dopo M0 e mai integrato. Il codice di prodotto si scrive da M2, dopo i gate M1.
-- CodeGraph/Graphify: nessun indice creato dagli agenti. Si usa solo un indice già esistente, se il proprietario lo ha creato. Se l'indice manca, si prosegue: non è un prerequisito degli spike M1.
+- CodeGraph/Graphify (proprietario, 29 ottobre 2026): gli indici esistono (`.codegraph/`, `graphify-out/`, fuori da Git) e si usano. `codegraph sync` a inizio sessione e dopo modifiche ampie; `codegraph impact <simbolo>` prima di cambiare una firma o un simbolo condiviso; `graphify update .` dopo modifiche ampie al codice. Ricostruire la parte documentale di graphify consuma token: la si rifà solo quando cambiano piano, ADR o contratti.
 
 ## Delega e review
 

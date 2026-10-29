@@ -17,7 +17,7 @@ gtest_discover_tests(test_deps PROPERTIES LABELS fast)
 
 foreach(t test_error test_image test_fits test_json test_hash test_dag test_job test_store test_store_history
         test_store_contract test_store_crash test_export test_store_review
-        test_budget test_pool test_spill test_scheduler test_calibration test_calibration_job)
+        test_budget test_pool test_spill test_scheduler test_calibration test_calibration_job test_job_alloc)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main)
   target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
@@ -28,7 +28,7 @@ foreach(t test_error test_image test_fits test_json test_hash test_dag test_job 
 endforeach()
 target_link_libraries(test_fits PRIVATE OpenSSL::Crypto)
 target_link_libraries(test_budget PRIVATE SQLite::SQLite3)
-foreach(t test_store test_store_history test_store_contract test_store_crash test_export test_store_review)
+foreach(t test_store test_store_history test_store_contract test_store_crash test_export test_store_review test_job_alloc)
   target_link_libraries(${t} PRIVATE SQLite::SQLite3)
 endforeach()
 
@@ -95,6 +95,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_scheduler.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_job.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_job_alloc.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_stats.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_real.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/m2e_workflow.dir

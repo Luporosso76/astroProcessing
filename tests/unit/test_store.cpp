@@ -102,27 +102,24 @@ TEST(Store, T_M2C_04_failed_fsync_or_rename_fails_the_job_without_row_and_withou
   for (const std::string point : {"artifact.fsync_file", "artifact.rename", "artifact.fsync_dir"}) {
     auto store = make_project("t04");
     store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
-    int hits = 0;
-    store->set_fault_injector([&](std::string_view p) { return p == point ? (++hits, EIO) : 0; });
+    int reached = 0;
+    store->set_fault_injector([&](std::string_view p) { return p == point && ++reached == 1 ? EIO : 0; });
     sqlite_dag_store* raw = store.get();
     testing::internal::CaptureStderr();
-    const job_outcome out = run_job(*store, "s", [&](const job_record& job) {
+    const job_outcome out = run_job_files(*store, "s", [&](const job_record&) {
       const auto bytes = bytes_of("content");
-      const auto files = raw->write_files({artifact_content{bytes, "bin", "image", std::nullopt}});
-      artifact_record a;
-      a.node_key = job.node_key;
-      a.sha256 = files[0].digest().sha256;
-      a.size_bytes = files[0].digest().size_bytes;
-      a.rel_path = files[0].rel_path();
-      return job_result{a, {}};
+      return job_files_result{raw->write_files({artifact_content{bytes, "bin", "image", std::nullopt}}), {}};
     });
     testing::internal::GetCapturedStderr();
     EXPECT_EQ(out.exit_code, 2) << point;
     EXPECT_EQ(out.job.state, job_state::failed) << point;
     ASSERT_TRUE(out.stop.has_value());
     EXPECT_EQ(out.stop->category(), error_category::io) << point;
-    EXPECT_EQ(hits, 1) << point;
-    EXPECT_TRUE(store->artifacts_for(out.job.node_key).empty()) << point;
+    EXPECT_EQ(reached, 2) << point;  // il file del job (guasto) e la provenance dell'arresto: nessun retry
+    EXPECT_FALSE(out.provenance_not_persisted.has_value()) << point;
+    const auto rows = store->artifacts_for(out.job.node_key);
+    ASSERT_EQ(rows.size(), 1u) << point;
+    EXPECT_EQ(rows[0].output_role, "provenance") << point;
     EXPECT_EQ(store->read_slot("s").state, freshness::missing) << point;
   }
 }

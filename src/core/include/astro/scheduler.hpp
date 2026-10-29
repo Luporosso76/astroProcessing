@@ -109,6 +109,12 @@ struct branch_job {
   std::function<job_result(const job_record&)> work;
 };
 
+// Lavoro a file per uno store durevole (come run_job_files).
+struct branch_files_job {
+  std::string slot_name;
+  std::function<job_files_result(const job_record&)> work;
+};
+
 struct branch_result {
   std::string slot_name;
   branch_state state = branch_state::not_started;
@@ -120,6 +126,13 @@ struct branch_result {
 // solo i job il cui nodo e' discendente di quello fallito (blocked): i rami indipendenti proseguono (T-M2B-09).
 // `cancel` e' passato a ogni run_job (cancel richiesto al ritorno del lavoro: nulla si pubblica). Un annullamento ferma tutto: i job non ancora partiti sono not_started. Altre eccezioni si propagano.
 std::vector<branch_result> run_branches(dag_store& store, std::vector<branch_job> jobs,
+                                        const std::optional<budget_snapshot>& budget = std::nullopt,
+                                        const cancel_token* cancel = nullptr);
+
+// Stessa semantica di run_branches per uno store SQLite: ogni ramo e' un run_job_files (un record di provenance
+// durevole per job). Il tipo dello store non cambia il percorso a runtime: l'overload e' scelto da chi chiama, e
+// run_branches(dag_store&) con uno sqlite_dag_store si ferma con job.durable_store_requires_run_job_files.
+std::vector<branch_result> run_branches(sqlite_dag_store& store, std::vector<branch_files_job> jobs,
                                         const std::optional<budget_snapshot>& budget = std::nullopt,
                                         const cancel_token* cancel = nullptr);
 

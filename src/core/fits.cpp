@@ -456,11 +456,13 @@ namespace {
   fail(error_category::io, "input.short_read", "lettura incompleta con dimensione invariata");
 }
 
-void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::uint64_t expected_size) {
+void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::uint64_t expected_size,
+                 const fault_injector& fault) {
   auto* p = static_cast<char*>(dst);
   std::size_t done = 0;
   while (done < n) {
-    const ssize_t r = ::pread(fd, p + done, n - done, static_cast<off_t>(offset + done));
+    const bool eof = fault && fault("input.pread") != 0;
+    const ssize_t r = eof ? 0 : ::pread(fd, p + done, n - done, static_cast<off_t>(offset + done));
     if (r < 0) {
       if (errno == EINTR) continue;
       fail(error_category::io, "fits.read", "pread non riuscita", {{"errno", std::to_string(errno)}});
@@ -472,13 +474,15 @@ void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::ui
 
 }  // namespace
 
-fits_input::fits_input(fits_input&& other) noexcept : fd_(other.fd_), size_(other.size_) { other.fd_ = -1; }
+fits_input::fits_input(fits_input&& other) noexcept
+    : fd_(other.fd_), size_(other.size_), fault_(std::move(other.fault_)) { other.fd_ = -1; }
 
 fits_input& fits_input::operator=(fits_input&& other) noexcept {
   if (this != &other) {
     if (fd_ >= 0) ::close(fd_);
     fd_ = other.fd_;
     size_ = other.size_;
+    fault_ = std::move(other.fault_);
     other.fd_ = -1;
   }
   return *this;
@@ -516,7 +520,7 @@ fits_input open_fits_input(const std::string& path) {
 
 fits_plan plan_fits(const fits_input& input) {
   const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) {
-    pread_exact(input.fd_, offset, dst, n, input.size_);
+    pread_exact(input.fd_, offset, dst, n, input.size_, input.fault_);
   };
   return analyse(input.size_, read).plan;
 }
@@ -531,7 +535,7 @@ std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_
          {{"dimensione", std::to_string(input.size_)}, {"budget", std::to_string(budget_bytes)}});
   }
   std::vector<std::uint8_t> buffer(static_cast<std::size_t>(input.size_));
-  pread_exact(input.fd_, 0, buffer.data(), buffer.size(), input.size_);
+  pread_exact(input.fd_, 0, buffer.data(), buffer.size(), input.size_, input.fault_);
   std::uint8_t probe = 0;
   ssize_t extra;
   do {

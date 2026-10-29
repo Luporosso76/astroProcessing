@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "no_crash_report.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -164,8 +165,8 @@ namespace {
 
 TEST(ImageDeathTest, TypedAccessorAssertsOnTypeMismatch) {
   astro::image img = astro::make_image({2, 2, 1}, astro::sample_type::f32, astro::plane_layout::mono);
-  EXPECT_DEATH((void)img.data<double>(), "ASTRO_ASSERT");
-  EXPECT_DEATH((void)img.variance_data<float>(), "ASTRO_ASSERT");
+  EXPECT_DEATH({ exit_instead_of_core_dump(); (void)img.data<double>(); }, "ASTRO_ASSERT");
+  EXPECT_DEATH({ exit_instead_of_core_dump(); (void)img.variance_data<float>(); }, "ASTRO_ASSERT");
   EXPECT_NE(img.data<float>(), nullptr);
 }
 

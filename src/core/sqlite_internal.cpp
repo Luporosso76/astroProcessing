@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <algorithm>
 #include <cstring>
+#include <memory>
 
 namespace astro::sqlint {
 
@@ -342,17 +343,24 @@ atomic_result atomic_write_stream(const atomic_options& o, const byte_reader& re
   return result;
 }
 
-std::vector<std::string> read_directory(int dirfd, const char* code) {
-  DIR* stream = ::fdopendir(::dup(dirfd));
-  if (stream == nullptr) throw_errno(error_category::io, code, "fdopendir fallita", errno);
-  ::rewinddir(stream);  // il dup condivide l'offset del fd originale
+std::vector<std::string> read_directory(int dirfd, const char* code, const fault_injector* injector) {
+  const int copy = ::dup(dirfd);
+  if (copy < 0) throw_errno(error_category::io, code, "dup fallita", errno);
+  DIR* raw = ::fdopendir(copy);
+  if (raw == nullptr) {
+    const int err = errno;
+    ::close(copy);
+    throw_errno(error_category::io, code, "fdopendir fallita", err);
+  }
+  const std::unique_ptr<DIR, int (*)(DIR*)> stream(raw, &::closedir);
+  ::rewinddir(stream.get());  // il dup condivide l'offset del fd originale
   std::vector<std::string> names;
+  const int injected = injector != nullptr && *injector ? (*injector)("dir.readdir") : 0;
   for (;;) {
     errno = 0;
-    const dirent* de = ::readdir(stream);
+    const dirent* de = injected != 0 ? nullptr : ::readdir(stream.get());
     if (de == nullptr) {
-      const int err = errno;
-      ::closedir(stream);
+      const int err = injected != 0 ? injected : errno;
       if (err != 0) throw_errno(error_category::io, code, "readdir fallita", err);
       break;
     }

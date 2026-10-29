@@ -6,6 +6,8 @@
 #include <array>
 #include <map>
 
+#include <sys/stat.h>
+
 #include "astro/hash.hpp"
 #include "calib_support.hpp"
 
@@ -78,6 +80,14 @@ std::map<std::string, artifact_record> by_role(const project& p) {
   return out;
 }
 
+// Un job fermato non pubblica output: l'unico artefatto del nodo e' la provenance dell'arresto.
+void expect_only_stop_provenance(const project& p) {
+  const std::vector<artifact_record> all = p.store->artifacts_for(p.node.key());
+  ASSERT_EQ(all.size(), 1u);
+  EXPECT_EQ(all[0].output_role, "provenance");
+  EXPECT_EQ(artifact_file_count(p), 1u);
+}
+
 set_def job_set() {
   set_def s = synth_set(40, 30, -32);
   s.flat.v[5] = s.dark_flat.v[5];  // Fc = 0: pixel mascherato da q_nonpositive
@@ -101,8 +111,8 @@ TEST(CalibJob, T_M2E_12_publishes_image_report_and_text_coherent_with_the_output
   EXPECT_EQ(out.provenance.output_digests.size(), 3u);
 
   const auto roles = by_role(p);
-  ASSERT_EQ(roles.size(), 3u);
-  ASSERT_TRUE(roles.count("primary") && roles.count("report") && roles.count("report_text"));
+  ASSERT_EQ(roles.size(), 4u);
+  ASSERT_TRUE(roles.count("primary") && roles.count("report") && roles.count("report_text") && roles.count("provenance"));
   const slot_view view = p.store->read_slot("cal");
   ASSERT_EQ(view.state, freshness::current);
   EXPECT_EQ(view.artifact->sha256, roles.at("primary").sha256);
@@ -213,8 +223,7 @@ TEST(CalibJob, T_M2E_11_master_modified_or_removed_after_preflight_stops_the_bra
     EXPECT_EQ(out.stop->code(), "input.digest_mismatch");
     EXPECT_EQ(out.job.state, job_state::failed);
     EXPECT_EQ(p.store->read_slot("cal").state, freshness::missing);
-    EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
-    EXPECT_EQ(artifact_file_count(p), 0u);
+    expect_only_stop_provenance(p);
   }
   write_bytes(c.dir / "dark.fits", file_of(c.s.dark, c.s.w, c.s.h));
   {
@@ -227,7 +236,7 @@ TEST(CalibJob, T_M2E_11_master_modified_or_removed_after_preflight_stops_the_bra
     ASSERT_TRUE(out.stop.has_value());
     EXPECT_EQ(out.stop->category(), error_category::io);
     EXPECT_EQ(out.stop->code(), "input.missing");
-    EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
+    expect_only_stop_provenance(p);
   }
 }
 
@@ -262,8 +271,7 @@ TEST(CalibJob, T_M2E_31_geometry_changed_after_planning_stops) {
   ASSERT_TRUE(out.stop.has_value());
   EXPECT_EQ(out.stop->category(), error_category::integrity);
   EXPECT_TRUE(out.stop->code() == "input.size_changed" || out.stop->code() == "input.geometry_changed") << out.stop->code();
-  EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
-  EXPECT_EQ(artifact_file_count(p), 0u);
+  expect_only_stop_provenance(p);
 }
 
 // Soglia CV 0,01 di iid_assumption nel report del job: flat con Fc = 10000 (1 +- a), CV = a.
@@ -302,8 +310,7 @@ TEST(CalibJob, incompatible_inputs_stop_before_any_output) {
   EXPECT_EQ(out.stop->code(), "calib.mismatch.exposure_s");
   EXPECT_EQ(out.provenance.state, job_state::failed);
   EXPECT_TRUE(out.provenance.output_digests.empty());
-  EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
-  EXPECT_EQ(artifact_file_count(p), 0u);
+  expect_only_stop_provenance(p);
 }
 
 TEST(CalibJob, recipe_must_match_the_slot_node) {
@@ -327,8 +334,100 @@ TEST(CalibJob, cancel_requested_publishes_nothing) {
   const job_outcome out = run_quiet(p, c, pool, o, cancel);
   EXPECT_EQ(out.exit_code, exit_code_cancelled);
   EXPECT_EQ(out.job.state, job_state::cancelled);
-  EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
-  EXPECT_EQ(artifact_file_count(p), 0u);
+  expect_only_stop_provenance(p);
+}
+
+// ---------------------------------------------------------------- T-M2B-10 (persistenza), T-M2C-11 (originali)
+
+std::string persisted_provenance(const fs::path& project_dir, const std::string& node_key) {
+  const auto reopened = sqlite_dag_store::open(project_dir, open_intent::read_only);
+  std::string found;
+  int count = 0;
+  for (const artifact_record& a : reopened->artifacts_for(node_key)) {
+    if (a.output_role != "provenance") continue;
+    ++count;
+    found = read_text(reopened->artifact_path(a.rel_path));
+    EXPECT_EQ(digest_of(std::vector<std::uint8_t>(found.begin(), found.end())).sha256, a.sha256);
+  }
+  EXPECT_EQ(count, 1);
+  return found;
+}
+
+TEST(CalibJob, T_M2B_10_provenance_is_persisted_for_success_stop_and_cancel_and_survives_reopen) {
+  {
+    const disk_case c = make_case("prov_ok", job_set());
+    project p = make_project(c, "store");
+    memory_pool pool(256 * MiB);
+    const job_outcome out = run_quiet(p, c, pool);
+    ASSERT_EQ(out.exit_code, 0);
+    const std::string key = p.node.key();
+    p.store.reset();
+    EXPECT_EQ(persisted_provenance(c.dir / "store", key), provenance_canonical(out.provenance));
+    EXPECT_NE(persisted_provenance(c.dir / "store", key).find("\"state\":\"completed\""), std::string::npos);
+  }
+  {
+    const disk_case c = make_case("prov_stop", job_set());
+    project p = make_project(c, "store");
+    memory_pool pool(256 * MiB);
+    calibration_job_options o;
+    o.hook = [&](std::string_view) { fs::remove(c.dir / "flat.fits"); };
+    const job_outcome out = run_quiet(p, c, pool, o);
+    ASSERT_EQ(out.exit_code, exit_code_stop);
+    const std::string key = p.node.key();
+    p.store.reset();
+    const std::string text = persisted_provenance(c.dir / "store", key);
+    EXPECT_EQ(text, provenance_canonical(out.provenance));
+    EXPECT_NE(text.find("\"state\":\"failed\""), std::string::npos);
+    EXPECT_NE(text.find(out.stop->code()), std::string::npos);
+  }
+  {
+    const disk_case c = make_case("prov_cancel", job_set());
+    project p = make_project(c, "store");
+    memory_pool pool(256 * MiB);
+    cancel_token cancel;
+    calibration_job_options o;
+    o.hook = [&](std::string_view) { cancel.request(); };
+    const job_outcome out = run_quiet(p, c, pool, o, cancel);
+    ASSERT_EQ(out.exit_code, exit_code_cancelled);
+    const std::string key = p.node.key();
+    p.store.reset();
+    const std::string text = persisted_provenance(c.dir / "store", key);
+    EXPECT_EQ(text, provenance_canonical(out.provenance));
+    EXPECT_NE(text.find("\"state\":\"cancelled\""), std::string::npos);
+  }
+}
+
+struct file_state {
+  std::string sha256;
+  mode_t mode = 0;
+  ino_t ino = 0;
+  off_t size = 0;
+  timespec mtime{};
+  bool operator==(const file_state& o) const {
+    return sha256 == o.sha256 && mode == o.mode && ino == o.ino && size == o.size && mtime.tv_sec == o.mtime.tv_sec &&
+           mtime.tv_nsec == o.mtime.tv_nsec;
+  }
+};
+
+file_state state_of(const fs::path& path) {
+  struct stat st {};
+  EXPECT_EQ(::stat(path.c_str(), &st), 0);
+  const std::string text = read_text(path);
+  return file_state{digest_of(std::vector<std::uint8_t>(text.begin(), text.end())).sha256, st.st_mode, st.st_ino, st.st_size,
+                    st.st_mtim};
+}
+
+TEST(CalibJob, T_M2C_11_the_four_inputs_are_untouched_by_the_whole_calibration_workflow) {
+  const disk_case c = make_case("t11_originals", job_set());
+  const char* names[4] = {"light.fits", "dark.fits", "flat.fits", "dark_flat.fits"};
+  std::array<file_state, 4> before;
+  for (int i = 0; i < 4; ++i) before[i] = state_of(c.dir / names[i]);
+  project p = make_project(c, "store");
+  memory_pool pool(256 * MiB);
+  const job_outcome out = run_quiet(p, c, pool);
+  ASSERT_EQ(out.exit_code, 0);
+  p.store.reset();
+  for (int i = 0; i < 4; ++i) EXPECT_TRUE(before[i] == state_of(c.dir / names[i])) << names[i];
 }
 
 // ---------------------------------------------------------------- T-FBK-01, parte M2
@@ -348,8 +447,7 @@ TEST(CalibJob, T_FBK_01_failing_decoder_stops_without_alternative_path) {
   ASSERT_TRUE(out.stop.has_value());
   EXPECT_EQ(out.stop->category(), error_category::invalid_input);
   EXPECT_EQ(out.stop->code().rfind("fits.", 0), 0u) << out.stop->code();
-  EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
-  EXPECT_EQ(artifact_file_count(p), 0u);
+  expect_only_stop_provenance(p);
   EXPECT_EQ(p.store->read_slot("cal").state, freshness::missing);
 }
 
@@ -366,8 +464,7 @@ TEST(CalibJob, T_FBK_01_insufficient_budget_stops_without_reducing_tiles_or_work
   EXPECT_EQ(out.stop->category(), error_category::budget);
   EXPECT_EQ(out.stop->code(), "sched.job_exceeds_budget");
   EXPECT_EQ(pool.peak_reserved_bytes(), 0u);
-  EXPECT_TRUE(p.store->artifacts_for(p.node.key()).empty());
-  EXPECT_EQ(artifact_file_count(p), 0u);
+  expect_only_stop_provenance(p);
 }
 
 TEST(CalibJob, T_FBK_01_store_failure_during_commit_and_corrupt_store_stop) {

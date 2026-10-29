@@ -94,6 +94,7 @@ Artefatti in `.omc/artifacts/ask/codex-m2d-review*.md`. Revisione statica del co
 ## Limiti dichiarati
 
 - **Soglie F-RES-01** (frazione 0.50, frazione sotto pressione 0.25, soglia PSI 10.0): iniziali e invariate; **non confermate** da carichi PSI reali. Restano da confermare al gate con carichi misurati.
+  - *Aggiornamento del gate M2 (29 ottobre 2026):* misurate con carichi reali; la frazione normale è corretta da 0.50 a 0.375, 0.25 e 10.0 invariati (perimetro: il PC di sviluppo). Testo storico sopra conservato; misura e decisione in `docs/evidence/M2-gate.md`.
 - **Costo per task**: ogni task alloca e libera 3 buffer da 2 MiB. Il caso a 1 worker è lento e variabile (60,5-101,9 s per 40 GiB negli 8 blocchi del report); la causa non è indagata. Il risultato non influenza la correttezza (oracle e digest identici), solo il tempo.
 - **Cancel cooperativo**: il cancel e lo stop interno sono osservati a ogni task, a ogni blocco di righe, dopo `finalize` e al confine di pubblicazione; un task che non chiama `check_cancel` non si interrompe finché non ritorna.
 - **Resume**: riesegue i task dopo l'ultimo checkpoint; quelli già registrati nel checkpoint non si ripetono. Non riparte da zero in automatico.

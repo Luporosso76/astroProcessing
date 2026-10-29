@@ -4,8 +4,10 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "astro/fault_injector.hpp"
 #include "astro/image.hpp"
 
 namespace astro {
@@ -45,6 +47,10 @@ class fits_input {
 
   std::uint64_t size_bytes() const noexcept { return size_; }
 
+  // Solo test: il punto "input.pread" e' chiamato prima di ogni pread; un valore diverso da zero fa restituire 0 byte
+  // (fine file) alla lettura, con la dimensione del file invariata.
+  void set_fault_injector(fault_injector injector) { fault_ = std::move(injector); }
+
  private:
   friend fits_input open_fits_input(const std::string& path);
   friend fits_plan plan_fits(const fits_input& input);
@@ -54,6 +60,7 @@ class fits_input {
 
   int fd_ = -1;
   std::uint64_t size_ = 0;
+  fault_injector fault_;
 };
 
 // open + fstat. Non regolare: invalid_input fits.not_regular; oltre max_file_bytes: limit_exceeded fits.max_file_bytes.

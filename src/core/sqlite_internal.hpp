@@ -120,8 +120,9 @@ content_digest stream_digest(int fd, std::uint64_t max_bytes, std::string_view n
 std::string random_name(std::size_t bytes);
 
 
-// Voci di una directory (senza . e ..); errore di readdir distinto dalla fine.
-std::vector<std::string> read_directory(int dirfd, const char* code);
+// Voci di una directory (senza . e ..); errore di readdir distinto dalla fine. Con `injector`, il punto "dir.readdir"
+// e' chiamato una volta per elenco e un valore diverso da zero e' l'errno restituito dal primo readdir.
+std::vector<std::string> read_directory(int dirfd, const char* code, const fault_injector* injector = nullptr);
 
 // Rilancia `e` con categoria/codice nuovi conservando contesto (incluso errno, sqlite_rc, sqlite_msg) e causa.
 [[noreturn]] void rethrow_as(const stop_error& e, error_category category, const char* code, const char* message);

@@ -20,10 +20,16 @@ namespace fs = std::filesystem;
 namespace {
 
 constexpr std::uint64_t mib = std::uint64_t{1} << 20;
-constexpr unsigned normal_shift = 1;
-constexpr unsigned pressure_shift = 2;
-static_assert(budget_fraction_normal == 1.0 / (1 << normal_shift));
-static_assert(budget_fraction_pressure == 1.0 / (1 << pressure_shift));
+// Frazioni come rapporti interi esatti: num/den coincide con la costante pubblica.
+struct ratio { std::uint64_t num, den; };
+constexpr ratio normal_ratio{3, 8};
+constexpr ratio pressure_ratio{1, 4};
+static_assert(budget_fraction_normal == double(normal_ratio.num) / double(normal_ratio.den));
+static_assert(budget_fraction_pressure == double(pressure_ratio.num) / double(pressure_ratio.den));
+
+// floor(v·num/den) senza calcolare v·num, che puo' superare 2^64.
+constexpr std::uint64_t scale(std::uint64_t v, ratio r) { return v / r.den * r.num + v % r.den * r.num / r.den; }
+static_assert(scale(~std::uint64_t{0}, normal_ratio) == ~std::uint64_t{0} / 8 * 3 + 7 * 3 / 8);
 constexpr std::uint64_t max_source_bytes = std::uint64_t{1} << 16;
 
 [[noreturn]] void syntax(std::string_view text) {
@@ -299,7 +305,7 @@ budget_snapshot compute_automatic_budget(const budget_sources& sources) {
   if (s.cgroup_max_bytes) avail = std::min(avail, *s.cgroup_max_bytes - *s.cgroup_current_bytes);
   const bool pressure = s.psi_some_avg10 && *s.psi_some_avg10 >= budget_psi_threshold;
   s.fraction = pressure ? budget_fraction_pressure : budget_fraction_normal;
-  s.budget_bytes = floor_mib(avail >> (pressure ? pressure_shift : normal_shift));
+  s.budget_bytes = floor_mib(scale(avail, pressure ? pressure_ratio : normal_ratio));
   return s;
 }
 

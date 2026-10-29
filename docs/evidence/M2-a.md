@@ -18,6 +18,6 @@ Seconda verifica: PASS; probe ripetuti con esito di stop atteso. Residui chiusi:
 
 ## Limiti
 
-- `io input.short_read` non testato (richiede un reader iniettabile): riga NON ESEGUITO in `docs/test-matrix.md`.
+- `io input.short_read`: esito storico, non testato (richiedeva un reader iniettabile; riga NON ESEGUITO in `docs/test-matrix.md`). Ora coperto da `Fits.T_M2A_short_read_with_unchanged_size_stops_as_io` (punto `input.pread` del `fault_injector`, 0 byte con dimensione invariata), eseguito con `tools/check.sh` sul working tree sopra `c788a17` (non committato). Il test fallisce se il ramo viene rimosso: affermazione di progetto, senza log di mutazione conservato; non verificata in questa prova.
 - Budget come intero semplice fino al `job_plan` di M2.d; digest del buffer in M2.b.
 - Nessun dato CFA reale.

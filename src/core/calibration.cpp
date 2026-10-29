@@ -800,7 +800,12 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
       const std::size_t i = static_cast<std::size_t>(y) * p->w + x;
       if (!valid_for_n(i)) continue;
       const double f = p->flat.value(i), d = p->dark_flat.value(i);
-      vfc[p->channel_of(x, y)].push_back(p->flat.variance(i, f) + p->dark_flat.variance(i, d));
+      const double term = p->flat.variance(i, f) + p->dark_flat.variance(i, d);
+      if (!std::isfinite(term)) {
+        stop(error_category::numeric, "calib.variance_overflow", "varianza di Fc non finita: mediana non calcolabile",
+             {{"x", std::to_string(x)}, {"y", std::to_string(y)}});
+      }
+      vfc[p->channel_of(x, y)].push_back(term);
     }
   }
   constexpr double half_pi = 1.5707963267948966;

@@ -12,6 +12,8 @@
 //    (Lc*Lc)*vq: 3+11+1 = 15; /q4: 15+19+1 = 35. Somma dei due termini: 35+1 = 36.
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include "calib_support.hpp"
 
 namespace {
@@ -239,6 +241,19 @@ TEST(CalibM2E, T_M2E_29_normalization_square_overflow_stops) {
   s.flat.variance = std::vector<double>(32, 5e307);
   s.dark_flat.variance = std::vector<double>(32, 5e307);
   EXPECT_STOP(calibrate(plane_recipe(s, 0.05, 0.02), images_of(s)), error_category::numeric, "calib.variance_overflow");
+}
+
+TEST(CalibM2E, T_M2E_29_nonfinite_variance_term_stops_before_the_median) {
+  // Gain minuscolo: a/gain overflowa solo sul pixel con Fc enorme, il modello restituisce NaN per quel termine.
+  set_def s = empty_set(8, 4, -64, 1e-10);
+  for (std::size_t i = 0; i < 32; ++i) {
+    s.dark_flat.v[i] = 0;
+    s.flat.v[i] = 1000;
+    s.dark.v[i] = 500;
+    s.light.v[i] = 510;
+  }
+  s.flat.v[9] = 1e300;
+  EXPECT_STOP(calibrate(recipe_of(s), images_of(s)), error_category::numeric, "calib.variance_overflow");
 }
 
 TEST(CalibM2E, T_M2E_29_normalization_square_underflow_stops) {

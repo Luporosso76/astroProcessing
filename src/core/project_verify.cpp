@@ -201,8 +201,8 @@ void expect_unchanged(int dirfd, const std::string& rel, const opened_regular& b
 }
 
 bool has_extra_entries(int dirfd, const std::string& prefix, const std::set<std::string>& files,
-                       const std::set<std::string>& dirs, std::string& found) {
-  for (const auto& n : read_directory(dirfd, "export.open")) {
+                       const std::set<std::string>& dirs, std::string& found, const fault_injector& hook) {
+  for (const auto& n : read_directory(dirfd, "export.open", &hook)) {
     const std::string rel = prefix + n;
     struct stat st {};
     if (::fstatat(dirfd, n.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
@@ -211,7 +211,7 @@ bool has_extra_entries(int dirfd, const std::string& prefix, const std::set<std:
     if (S_ISREG(st.st_mode) && files.count(rel) != 0) continue;
     if (S_ISDIR(st.st_mode) && dirs.count(rel) != 0) {
       const unique_fd sub = open_dir_nofollow(dirfd, n.c_str(), "export.manifest_path");
-      if (has_extra_entries(sub.get(), rel + "/", files, dirs, found)) return true;
+      if (has_extra_entries(sub.get(), rel + "/", files, dirs, found, hook)) return true;
       continue;
     }
     found = rel;
@@ -223,14 +223,15 @@ bool has_extra_entries(int dirfd, const std::string& prefix, const std::set<std:
 using listings = std::map<std::string, std::vector<std::string>>;
 
 // Elenco ordinato di ogni directory del bundle che il manifest dichiara (radice inclusa).
-void scan_listings(int dirfd, const std::string& prefix, const std::set<std::string>& dirs, listings& out) {
-  std::vector<std::string> names = read_directory(dirfd, "export.open");
+void scan_listings(int dirfd, const std::string& prefix, const std::set<std::string>& dirs, listings& out,
+                   const fault_injector& hook) {
+  std::vector<std::string> names = read_directory(dirfd, "export.open", &hook);
   std::sort(names.begin(), names.end());
   for (const auto& n : names) {
     struct stat st {};
     if (::fstatat(dirfd, n.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode) && dirs.count(prefix + n) != 0) {
       const unique_fd sub = open_dir_nofollow(dirfd, n.c_str(), "export.manifest_path");
-      scan_listings(sub.get(), prefix + n + "/", dirs, out);
+      scan_listings(sub.get(), prefix + n + "/", dirs, out, hook);
     }
   }
   out[prefix] = std::move(names);
@@ -289,9 +290,9 @@ export_manifest verify_export(const fs::path& dir, const fault_injector& hook) {
     }
   }
   std::string extra;
-  if (has_extra_entries(root.get(), "", files, dirs, extra)) incomplete("file in piu'", extra);
+  if (has_extra_entries(root.get(), "", files, dirs, extra, hook)) incomplete("file in piu'", extra);
   listings scanned;
-  scan_listings(root.get(), "", dirs, scanned);
+  scan_listings(root.get(), "", dirs, scanned, hook);
   inject(&hook, "verify.after_read");
   {
     const unique_fd again = open_dir_nofollow(AT_FDCWD, dir.c_str(), "export.manifest_path");
@@ -299,10 +300,10 @@ export_manifest verify_export(const fs::path& dir, const fault_injector& hook) {
     if (::fstat(again.get(), &root_after) != 0) throw_errno(error_category::io, "export.open", "fstat fallita", errno);
     if (root_after.st_dev != root_before.st_dev || root_after.st_ino != root_before.st_ino) changed(".");
     listings rescanned;
-    scan_listings(again.get(), "", dirs, rescanned);
+    scan_listings(again.get(), "", dirs, rescanned, hook);
     if (rescanned != scanned) changed("elenco delle directory");
     std::string late_extra;
-    if (has_extra_entries(again.get(), "", files, dirs, late_extra)) incomplete("file in piu'", late_extra);
+    if (has_extra_entries(again.get(), "", files, dirs, late_extra, hook)) incomplete("file in piu'", late_extra);
   }
   expect_unchanged(root.get(), "manifest.json", *manifest_file);
   expect_unchanged(root.get(), "COMMIT", *commit);

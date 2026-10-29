@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "astro/fault_injector.hpp"
 #include "astro/dag_store.hpp"
 #include "astro/hash.hpp"
 #include "astro/node.hpp"
@@ -26,6 +27,9 @@ constexpr std::uint32_t project_application_id = 0x41535450;
 constexpr std::uint64_t export_manifest_max_bytes = std::uint64_t{64} << 20;
 constexpr const char* export_format = "astro.export.v1";
 
+// Ruolo riservato alla provenance del job: un solo record per job, coerente con lo stato finale.
+constexpr const char* provenance_output_role = "provenance";
+
 enum class open_intent { read_write, read_only };
 enum class open_mode { read_write, read_only_requested, read_only_unknown_schema };
 
@@ -34,10 +38,6 @@ struct schema_migration {
   std::uint32_t from_version = 0;
   std::vector<std::string> statements;
 };
-
-// Punto di iniezione dei guasti: chiamato prima di ogni passo del protocollo con il nome del punto; un valore diverso
-// da zero e' l'errno che il passo produce (io), senza eseguire la chiamata di sistema.
-using fault_injector = std::function<int(std::string_view point)>;
 
 struct open_options {
   std::uint32_t schema_version = project_schema_version;
@@ -195,7 +195,8 @@ class sqlite_dag_store : public dag_store {
   // Passo 6: un'unica transazione inserisce le righe di artifacts (nodo del job) e chiude il job `completed`;
   // se la generazione dello slot e' quella del job, lo slot punta al file con il proprio ruolo di pubblicazione
   // (assente fra i file: invalid_input store.role_not_produced). Generazione cambiata: le righe
-  // restano come cache, il job diventa `failed` e si lancia stale_generation dag.stale_publish.
+  // restano come cache (tranne il file di ruolo `provenance`, che dichiarerebbe `completed`: non ha riga e resta
+  // orfano per la recovery), il job diventa `failed` e si lancia stale_generation dag.stale_publish.
   std::vector<artifact_record> commit_job(std::uint64_t job_id, const std::vector<stored_file>& files);
 
   history_state history() const;

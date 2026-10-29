@@ -24,11 +24,11 @@ I percorsi `/proc` e `/sys/fs/cgroup` sono iniettabili per i test.
 
 ```
 avail  = min(mem_available, cgroup_max − cgroup_current se cgroup_max presente)
-f      = 0.50 se psi_some_avg10 assente o < 10.0, altrimenti 0.25
+f      = 0.375 se psi_some_avg10 assente o < 10.0, altrimenti 0.25
 budget = floor_MiB(avail · f)
 ```
 
-I valori 0.50, 0.25 e 10.0 sono iniziali: il gate M2.d li conferma o li corregge con carichi concorrenti misurati. La formula non cambia durante il job.
+Requisito della frazione normale: dopo il preflight un altro processo può crescere fino a 0.40·`avail` con al massimo 16 MiB di swap oltre il fondo, memory full avg10 < 1 e almeno 3 GiB di MemAvailable. Il gate M2 l'ha misurato sul PC di sviluppo (16 core, 31 GiB, swappiness 120: il perimetro è quello) (`docs/evidence/M2-gate.md`): 0.50 regge 0.25·`avail` in 2 prove su 3 (la terza a 16,5 MiB di swap contro 16) e non regge 0.40 (swap +73 MiB a PSI 0); 0.375 e 0.25 reggono 0.40·`avail` in 3 prove su 3 ciascuna. La frazione normale è 0.375, il valore più alto fra quelli provati che rispetta il requisito. La frazione sotto pressione resta 0.25 e la soglia PSI resta 10.0: il ramo scatta sui file iniettati e sul segnale reale, e con il budget 0.25 un job avviato dopo una pressione reale rispetta tutti i criteri (S4 quinquies: `psi_some_avg10` 17,6, swap 0, full avg10 max 0,83); il valore 10.0 non è confermato come ottimo, perché sul PC misurato lo swap arriva prima che la PSI salga (0.50 con crescita 0.40·`avail`: +73 MiB di swap a PSI 0), quindi è la frazione normale a proteggere il sistema. Il calcolo usa rapporti interi esatti (floor di `avail·3/8` e `avail/4`), senza overflow. La formula non cambia durante il job.
 
 `/proc/meminfo` illeggibile o senza `MemAvailable`: `io`, `budget.meminfo`. cgroup e PSI assenti non sono errori: compaiono `nullopt` nello snapshot. `cgroup_current ≥ cgroup_max`: `budget`, `budget.cgroup_over_limit`, con i due valori nel contesto; la sottrazione non si esegue mai in `uint64_t` senza questo controllo. File cgroup o PSI presenti ma non interpretabili: `invalid_input`, `budget.cgroup_parse` o `budget.psi_parse`.
 

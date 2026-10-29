@@ -16,8 +16,9 @@ enum class budget_mode { automatic, manual };
 enum class budget_unit { mib, gib, percent };
 enum class budget_denominator { mem_total, mem_available, cgroup_max };
 
-// Valori iniziali di F-RES-01: il gate M2.d li conferma o li corregge con carichi misurati.
-constexpr double budget_fraction_normal = 0.50;
+// F-RES-01: con 0.375 una crescita concorrente di 0.40·MemAvailable dopo il preflight resta entro 16 MiB di swap
+// oltre il fondo (misura e perimetro in docs/evidence/M2-gate.md).
+constexpr double budget_fraction_normal = 0.375;
 constexpr double budget_fraction_pressure = 0.25;
 constexpr double budget_psi_threshold = 10.0;
 

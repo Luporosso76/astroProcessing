@@ -35,7 +35,7 @@ Tutti PASS, dev e release.
 | T-M2C-08 | `Store.T_M2C_08` | Secondo processo rifiutato con `store.locked`. |
 | T-M2C-09 | `Store.T_M2C_09` | File estranei o `project.lock` assente: stop, nulla creato o modificato. |
 | T-M2C-10 | `Store.T_M2C_10` | Job in corso marcati `interrupted`, mai `completed`. |
-| T-M2C-11 | `Store.T_M2C_11` | Originali registrati mai toccati dal workflow dello store. |
+| T-M2C-11 | `Store.T_M2C_11`, `CalibJob.T_M2C_11_the_four_inputs_are_untouched_by_the_whole_calibration_workflow` | Originali registrati mai toccati dal workflow dello store e dall'intera calibrazione (digest, permessi, inode e mtime dei quattro input). |
 | T-M2C-12 | `Store.T_M2C_12` | Symlink in `artifacts/`: recovery ferma, nulla cancellato. |
 | T-M2C-13 | `Store.T_M2C_13` | Snapshot immutabili. |
 | T-M2C-14 | `History.T_M2C_14` | Modifica, undo, redo: stato logico identico, `artifact_id` ricollegato. |
@@ -87,8 +87,7 @@ Artefatti in `.omc/artifacts/ask/codex-m2c-review*.md`. Revisione statica del co
 
 - **Durabilità contro perdita di corrente non provata**: i test simulano la morte del processo con SIGKILL; `fsync` è invocato ma il suo effetto sul dispositivo non è verificato. Fuori dal modello.
 - **Processo malevolo con lo stesso UID fuori dal modello**: può riscrivere `project.db` e vincere corse deliberate fra controllo e uso.
-- **Percorso `readdir` senza test di iniezione**: `read_directory` (`src/core/sqlite_internal.cpp`) propaga l'errore di `readdir` come `io`, ma nessun test lo fa fallire; il ramo è coperto solo da lettura del codice.
+- **Percorso `readdir`**: `read_directory` (`src/core/sqlite_internal.cpp`) propaga l'errore di `readdir` come `io`; già senza test di iniezione nel giro 1 (esito storico), ora coperto da `Export.T_M2A_readdir_failure_while_verifying_stops_as_io_and_names_errno` (punto `dir.readdir` del `fault_injector`), eseguito con `tools/check.sh` sul working tree sopra `c788a17` (non committato). Nessun log di mutazione conservato: il fallimento del test senza il ramo non è tracciato.
 - Il crash test non prova l'interruzione a metà di un singolo `write` o `fsync`: i punti sono quelli registrati dall'iniettore, fra un passo e il successivo.
 - `job_state::queued` non è prodotto in M2 (la recovery lo tratta come `running`); il blocco dei soli dipendenti e il rilascio delle prenotazioni restano di M2.d (T-M2B-09, T-M2B-12).
-- T-M2C-11 verifica gli originali sul workflow dello store, non sul workflow completo di M2.e (ADR-04 lo estende a M2.e).
 - Il codice non è committato (vedi "Revisione e ambiente").

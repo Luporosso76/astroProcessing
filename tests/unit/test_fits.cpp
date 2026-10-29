@@ -419,6 +419,26 @@ TEST(Fits, T_M2A_05_non_regular_and_missing_files_stop) {
   EXPECT_STOP(open_fits_input(tmp_file("assente.fits")), error_category::io, "input.missing");
 }
 
+TEST(Fits, T_M2A_short_read_with_unchanged_size_stops_as_io) {
+  const std::string path = tmp_file("short_read.fits");
+  const fx::synth_frame f = fx::make_synth_frame(fx::frame_kind::light, 32, 16, 1);
+  write_file(path, f.file);
+  {
+    fits_input in = open_fits_input(path);
+    int calls = 0;
+    in.set_fault_injector([&](std::string_view point) { return point == "input.pread" ? (++calls, 5) : 0; });
+    EXPECT_STOP(read_input_bytes(in, big_budget), error_category::io, "input.short_read");
+    EXPECT_EQ(calls, 1);
+  }
+  {
+    fits_input in = open_fits_input(path);
+    int calls = 0;
+    in.set_fault_injector([&](std::string_view) { return ++calls == 1 ? 5 : 0; });
+    EXPECT_STOP(plan_fits(in), error_category::io, "input.short_read");
+    EXPECT_EQ(calls, 1);
+  }
+}
+
 TEST(Fits, T_M2A_05_file_changing_size_after_fstat_stops) {
   const std::string path = tmp_file("change.fits");
   const fx::synth_frame f = fx::make_synth_frame(fx::frame_kind::light, 32, 16, 1);

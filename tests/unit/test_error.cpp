@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "no_crash_report.hpp"
 
 #include "astro/error.hpp"
 
@@ -41,7 +42,7 @@ TEST(Error, CategoryNamesAreStable) {
 }
 
 TEST(ErrorDeathTest, AssertAbortsOnViolatedInvariant) {
-  EXPECT_DEATH(ASTRO_ASSERT(1 == 2), "ASTRO_ASSERT");
+  EXPECT_DEATH({ exit_instead_of_core_dump(); ASTRO_ASSERT(1 == 2); }, "ASTRO_ASSERT");
   ASTRO_ASSERT(1 == 1);
 }
 

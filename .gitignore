@@ -5,3 +5,5 @@ __pycache__/
 .omc/
 /build/
 /data/
+/.codegraph/
+/graphify-out/

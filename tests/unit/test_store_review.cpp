@@ -4,6 +4,7 @@
 
 #include <type_traits>
 
+#include "astro/scheduler.hpp"
 #include "store_test_support.hpp"
 
 namespace {
@@ -72,16 +73,9 @@ TEST(Review, B2_run_job_path_publishes_and_completes_in_one_transaction_under_si
     auto store = sqlite_dag_store::open(dir, open_intent::read_write, options);
     sqlite_dag_store* raw = store.get();
     testing::internal::CaptureStderr();
-    const job_outcome out = run_job(*store, "s", [&](const job_record& job) {
+    const job_outcome out = run_job_files(*store, "s", [&](const job_record&) {
       const auto bytes = bytes_of("run_job payload");
-      const auto files = raw->write_files({artifact_content{bytes, "bin", "image", std::nullopt}});
-      artifact_record a;
-      a.node_key = job.node_key;
-      a.sha256 = files[0].digest().sha256;
-      a.size_bytes = files[0].digest().size_bytes;
-      a.rel_path = files[0].rel_path();
-      a.kind = "image";
-      return job_result{a, {}};
+      return job_files_result{raw->write_files({artifact_content{bytes, "bin", "image", std::nullopt}}), {}};
     });
     testing::internal::GetCapturedStderr();
     if (out.exit_code != 0) throw std::runtime_error("run_job fallito");
@@ -563,7 +557,8 @@ TEST(Review, M10_verify_stops_when_a_file_is_replaced_or_modified_during_the_che
   const fs::path dir = store->root().parent_path() / "rv10_export";
   store->export_slots(dir, {"sd"});
   EXPECT_NO_THROW(verify_export(dir));
-  EXPECT_STOP(verify_export(dir, [&](std::string_view) {
+  EXPECT_STOP(verify_export(dir, [&](std::string_view p) {
+                if (p != "verify.after_read") return 0;
                 write_text(dir / "sd.new", "payload d");
                 fs::rename(dir / "sd.new", dir / "sd.bin");
                 return 0;
@@ -571,7 +566,8 @@ TEST(Review, M10_verify_stops_when_a_file_is_replaced_or_modified_during_the_che
               error_category::integrity, "export.changed_during_verify");
   fs::remove_all(dir);
   store->export_slots(dir, {"sd"});
-  EXPECT_STOP(verify_export(dir, [&](std::string_view) {
+  EXPECT_STOP(verify_export(dir, [&](std::string_view p) {
+                if (p != "verify.after_read") return 0;
                 std::ofstream out(dir / "sd.bin", std::ios::binary | std::ios::in | std::ios::out);
                 out.write("P", 1);
                 return 0;
@@ -585,7 +581,8 @@ TEST(Review, M6_verify_stops_when_a_file_is_added_or_the_root_is_replaced_during
   run_and_commit(*store, "sd", "payload d");
   const fs::path dir = store->root().parent_path() / "rv6v_export";
   store->export_slots(dir, {"sd"});
-  EXPECT_STOP(verify_export(dir, [&](std::string_view) {
+  EXPECT_STOP(verify_export(dir, [&](std::string_view p) {
+                if (p != "verify.after_read") return 0;
                 write_text(dir / "late.txt", "x");
                 return 0;
               }),
@@ -593,7 +590,8 @@ TEST(Review, M6_verify_stops_when_a_file_is_added_or_the_root_is_replaced_during
   fs::remove(dir / "late.txt");
   const fs::path moved = store->root().parent_path() / "rv6v_moved";
   fs::remove_all(moved);
-  EXPECT_STOP(verify_export(dir, [&](std::string_view) {
+  EXPECT_STOP(verify_export(dir, [&](std::string_view p) {
+                if (p != "verify.after_read") return 0;
                 fs::rename(dir, moved);
                 fs::create_directory(dir);
                 fs::copy(moved, dir, fs::copy_options::recursive);
@@ -612,6 +610,343 @@ TEST(Review, M11_export_destination_is_resolved_through_the_verified_parent) {
   EXPECT_STOP(store->export_slots(store->root() / "artifacts" / ".." / "exp", {"sd"}), error_category::security, "export.target_forbidden");
   EXPECT_STOP(store->export_slots(store->root().parent_path() / "..", {"sd"}), error_category::invalid_input, "export.target_invalid");
   EXPECT_FALSE(fs::exists(store->root() / "exp"));
+}
+
+// ---------------------------------------------------------------- provenance durevole: un record per job (ADR-05)
+
+std::vector<std::string> persisted_provenances(const fs::path& dir, const std::string& node_key) {
+  const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+  std::vector<std::string> texts;
+  for (const artifact_record& a : reopened->artifacts_for(node_key)) {
+    if (a.output_role == provenance_output_role) texts.push_back(read_text(reopened->artifact_path(a.rel_path)));
+  }
+  return texts;
+}
+
+job_files_result one_file(sqlite_dag_store& store, const std::string& content) {
+  const auto bytes = bytes_of(content);
+  return job_files_result{store.write_files({artifact_content{bytes, "bin", "image", std::nullopt}}), {}};
+}
+
+// Senza la correzione la commit lasciava la riga `completed` (cache) e lo stop ne aggiungeva una `failed`: due record.
+TEST(Review, P1_stale_generation_during_publication_leaves_one_failed_provenance_after_reopen) {
+  fs::path dir;
+  auto store = make_project("rvp1", &dir);
+  const auto nodes = diamond(2).resolve();
+  const auto keys = keys_of(nodes);
+  store->apply_recipe(nodes, {{"s", "a"}});
+  sqlite_dag_store* raw = store.get();
+  testing::internal::CaptureStderr();
+  const job_outcome out = run_job_files(*store, "s", [&](const job_record&) {
+    raw->retarget_slot("s", keys.at("c"));
+    return one_file(*raw, "stale payload");
+  });
+  testing::internal::GetCapturedStderr();
+  ASSERT_EQ(out.exit_code, 2);
+  ASSERT_TRUE(out.stop.has_value());
+  EXPECT_EQ(out.stop->code(), "dag.stale_publish");
+  EXPECT_EQ(out.job.state, job_state::failed);
+  EXPECT_FALSE(out.provenance_not_persisted.has_value());
+  const std::string key = out.job.node_key;
+  store.reset();
+  const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+  EXPECT_EQ(reopened->recovery().removed_orphans.size(), 1u);  // il file `completed` mai referenziato
+  std::vector<std::string> texts;
+  for (const artifact_record& a : reopened->artifacts_for(key)) {
+    if (a.output_role == provenance_output_role) texts.push_back(read_text(reopened->artifact_path(a.rel_path)));
+  }
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0], provenance_canonical(out.provenance));
+  EXPECT_NE(texts[0].find("\"state\":\"failed\""), std::string::npos);
+  EXPECT_NE(texts[0].find("dag.stale_publish"), std::string::npos);
+  EXPECT_EQ(texts[0].find("\"state\":\"completed\""), std::string::npos);
+}
+
+// Passa anche senza la correzione per run_job_files; fallisce per il percorso run_job (provenance solo in memoria),
+// che ora e' vietato su store durevole.
+TEST(Review, P2_completed_and_stopped_jobs_on_a_durable_store_persist_the_returned_provenance) {
+  fs::path dir;
+  auto store = make_project("rvp2", &dir);
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}, {"t", "b"}});
+  sqlite_dag_store* raw = store.get();
+  testing::internal::CaptureStderr();
+  const job_outcome ok = run_job_files(*store, "s", [&](const job_record&) { return one_file(*raw, "ok payload"); });
+  const job_outcome stop = run_job_files(*store, "t", [&](const job_record&) -> job_files_result {
+    throw stop_error(error_category::invalid_input, "test.condition", "guasto iniettato");
+  });
+  testing::internal::GetCapturedStderr();
+  ASSERT_EQ(ok.exit_code, 0);
+  ASSERT_EQ(stop.exit_code, 2);
+  const std::string ok_key = ok.job.node_key;
+  const std::string stop_key = stop.job.node_key;
+  store.reset();
+  const auto ok_texts = persisted_provenances(dir, ok_key);
+  ASSERT_EQ(ok_texts.size(), 1u);
+  EXPECT_EQ(ok_texts[0], provenance_canonical(ok.provenance));
+  const auto stop_texts = persisted_provenances(dir, stop_key);
+  ASSERT_EQ(stop_texts.size(), 1u);
+  EXPECT_EQ(stop_texts[0], provenance_canonical(stop.provenance));
+}
+
+// Senza la correzione run_job eseguiva il job su store durevole senza persistere la provenance.
+TEST(Review, P3_run_job_on_a_durable_store_stops_before_starting_the_job) {
+  auto store = make_project("rvp3");
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+  bool worked = false;
+  EXPECT_STOP(run_job(*store, "s", [&](const job_record&) -> job_result {
+                worked = true;
+                return job_result{};
+              }),
+              error_category::invalid_input, "job.durable_store_requires_run_job_files");
+  EXPECT_FALSE(worked);
+  EXPECT_FALSE(store->get_job(1).has_value());
+}
+
+// Senza la correzione l'errore sulla provenance dell'arresto andava solo su stderr: l'esito non lo dichiarava.
+TEST(Review, P4_failed_stop_provenance_write_is_declared_in_the_outcome_with_the_original_cause_primary) {
+  fs::path dir;
+  auto store = make_project("rvp4", &dir);
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+  store->set_fault_injector([](std::string_view p) { return p == "artifact.fsync_file" ? EIO : 0; });
+  testing::internal::CaptureStderr();
+  const job_outcome out = run_job_files(*store, "s", [](const job_record&) -> job_files_result {
+    throw stop_error(error_category::invalid_input, "test.condition", "guasto iniettato");
+  });
+  testing::internal::GetCapturedStderr();
+  EXPECT_EQ(out.exit_code, 2);
+  ASSERT_TRUE(out.stop.has_value());
+  EXPECT_EQ(out.stop->code(), "test.condition");
+  EXPECT_EQ(out.job.state, job_state::failed);
+  ASSERT_TRUE(out.provenance_not_persisted.has_value());
+  EXPECT_EQ(out.provenance_not_persisted->category(), error_category::io);
+  const std::string key = out.job.node_key;
+  store.reset();
+  EXPECT_TRUE(persisted_provenances(dir, key).empty());
+}
+
+std::vector<std::string> provenance_texts(const sqlite_dag_store& reopened, const std::string& node_key) {
+  std::vector<std::string> texts;
+  for (const artifact_record& a : reopened.artifacts_for(node_key)) {
+    if (a.output_role == provenance_output_role) texts.push_back(read_text(reopened.artifact_path(a.rel_path)));
+  }
+  return texts;
+}
+
+// Senza la correzione la provenance usava l'errore successivo (`store.injected_fault`) invece della causa gia'
+// registrata nel job (`dag.stale_publish`), discordando dallo stato durevole.
+TEST(Review, P5_error_after_a_stale_commit_does_not_replace_the_persisted_cause) {
+  fs::path dir;
+  auto store = make_project("rvp5", &dir);
+  const auto nodes = diamond(2).resolve();
+  const auto keys = keys_of(nodes);
+  store->apply_recipe(nodes, {{"s", "a"}});
+  sqlite_dag_store* raw = store.get();
+  store->set_fault_injector([](std::string_view p) { return p == "commit.after_commit" ? EIO : 0; });
+  testing::internal::CaptureStderr();
+  const job_outcome out = run_job_files(*store, "s", [&](const job_record&) {
+    raw->retarget_slot("s", keys.at("c"));
+    return one_file(*raw, "stale payload");
+  });
+  testing::internal::GetCapturedStderr();
+  ASSERT_EQ(out.exit_code, 2);
+  ASSERT_TRUE(out.stop.has_value());
+  EXPECT_EQ(out.stop->code(), "dag.stale_publish");
+  ASSERT_TRUE(out.subsequent_error.has_value());
+  EXPECT_EQ(out.subsequent_error->category(), error_category::io);
+  EXPECT_EQ(out.job.stop_code, "dag.stale_publish");
+  const std::string key = out.job.node_key;
+  store.reset();
+  const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+  const auto texts = provenance_texts(*reopened, key);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0], provenance_canonical(out.provenance));
+  EXPECT_NE(texts[0].find("dag.stale_publish"), std::string::npos);
+  EXPECT_EQ(texts[0].find(out.subsequent_error->code()), std::string::npos);
+}
+
+// Senza la correzione un'eccezione non stop_error lasciava il job `failed` senza alcun record di provenance.
+TEST(Review, P6_foreign_exception_persists_a_coherent_provenance_and_propagates_unchanged) {
+  {
+    fs::path dir;
+    auto store = make_project("rvp6a", &dir);
+    store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+    testing::internal::CaptureStderr();
+    EXPECT_THROW(run_job_files(*store, "s", [](const job_record&) -> job_files_result { throw std::runtime_error("bug"); }),
+                 std::runtime_error);
+    testing::internal::GetCapturedStderr();
+    const job_record job = *store->get_job(1);
+    EXPECT_EQ(job.state, job_state::failed);
+    EXPECT_EQ(job.stop_code, "job.unexpected_exception");
+    const std::string key = job.node_key;
+    store.reset();
+    const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+    const auto texts = provenance_texts(*reopened, key);
+    ASSERT_EQ(texts.size(), 1u);
+    EXPECT_NE(texts[0].find("\"state\":\"failed\""), std::string::npos);
+    EXPECT_NE(texts[0].find("job.unexpected_exception"), std::string::npos);
+  }
+  {  // eccezione estranea dopo un commit con generazione superata: il record rispecchia dag.stale_publish
+    fs::path dir;
+    auto store = make_project("rvp6b", &dir);
+    const auto nodes = diamond(2).resolve();
+    const auto keys = keys_of(nodes);
+    store->apply_recipe(nodes, {{"s", "a"}});
+    sqlite_dag_store* raw = store.get();
+    store->set_fault_injector([](std::string_view p) -> int {
+      if (p == "commit.after_commit") throw std::runtime_error("bug dopo il commit");
+      return 0;
+    });
+    testing::internal::CaptureStderr();
+    EXPECT_THROW(run_job_files(*store, "s",
+                               [&](const job_record&) {
+                                 raw->retarget_slot("s", keys.at("c"));
+                                 return one_file(*raw, "stale payload");
+                               }),
+                 std::runtime_error);
+    testing::internal::GetCapturedStderr();
+    const job_record job = *store->get_job(1);
+    EXPECT_EQ(job.stop_code, "dag.stale_publish");
+    const std::string key = job.node_key;
+    store.reset();
+    const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+    const auto texts = provenance_texts(*reopened, key);
+    ASSERT_EQ(texts.size(), 1u);
+    EXPECT_NE(texts[0].find("dag.stale_publish"), std::string::npos);
+    EXPECT_EQ(texts[0].find("unexpected_exception"), std::string::npos);
+  }
+  {  // provenance non scrivibile: l'eccezione originale non e' mascherata
+    fs::path dir;
+    auto store = make_project("rvp6c", &dir);
+    store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+    store->set_fault_injector([](std::string_view p) { return p == "artifact.fsync_file" ? EIO : 0; });
+    testing::internal::CaptureStderr();
+    EXPECT_THROW(run_job_files(*store, "s", [](const job_record&) -> job_files_result { throw std::runtime_error("bug"); }),
+                 std::runtime_error);
+    const std::string err = testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("gestione dell'eccezione del job"), std::string::npos);
+    EXPECT_EQ(store->get_job(1)->stop_code, "job.unexpected_exception");
+  }
+}
+
+// Senza l'overload durevole run_branches si fermava sullo store SQLite prima del primo lavoro.
+TEST(Review, P7_branches_on_a_durable_store_keep_order_blocking_and_one_provenance_per_job) {
+  fs::path dir;
+  auto store = make_project("rvp7", &dir);
+  const auto nodes = diamond(2).resolve();
+  const auto keys = keys_of(nodes);
+  store->apply_recipe(nodes, diamond_slots());
+  sqlite_dag_store* raw = store.get();
+  std::vector<std::string> order;
+  const auto ok = [&](const std::string& slot) {
+    return branch_files_job{slot, [&, slot](const job_record&) {
+                              order.push_back(slot);
+                              return one_file(*raw, "payload " + slot);
+                            }};
+  };
+  const auto failing = [&](const std::string& slot) {
+    return branch_files_job{slot, [&, slot](const job_record&) -> job_files_result {
+                              order.push_back(slot);
+                              throw stop_error(error_category::invalid_input, "test.condition", "guasto iniettato");
+                            }};
+  };
+  testing::internal::CaptureStderr();
+  const std::vector<branch_result> results = run_branches(*store, {ok("sd"), ok("sc"), failing("sb"), ok("sa")});
+  testing::internal::GetCapturedStderr();
+  std::map<std::string, branch_result> by_slot;
+  for (const branch_result& r : results) by_slot[r.slot_name] = r;
+  EXPECT_EQ(by_slot["sa"].state, branch_state::completed);
+  EXPECT_EQ(by_slot["sb"].state, branch_state::failed);
+  EXPECT_EQ(by_slot["sc"].state, branch_state::completed);
+  EXPECT_EQ(by_slot["sd"].state, branch_state::blocked);
+  EXPECT_EQ(by_slot["sd"].blocked_by_slot, "sb");
+  EXPECT_EQ(branches_exit_code(results), 2);
+  const auto pos = [&](const std::string& s) { return std::find(order.begin(), order.end(), s) - order.begin(); };
+  EXPECT_LT(pos("sa"), pos("sb"));
+  EXPECT_LT(pos("sa"), pos("sc"));
+  EXPECT_EQ(std::count(order.begin(), order.end(), "sd"), 0);
+  store.reset();
+  const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+  for (const char* id : {"a", "b", "c"}) {
+    const auto texts = provenance_texts(*reopened, keys.at(id));
+    ASSERT_EQ(texts.size(), 1u) << id;
+    EXPECT_NE(texts[0].find(std::string("\"state\":\"") + (std::string(id) == "b" ? "failed" : "completed") + "\""),
+              std::string::npos) << id;
+  }
+  EXPECT_TRUE(provenance_texts(*reopened, keys.at("d")).empty());
+  EXPECT_EQ(reopened->read_slot("sd").state, freshness::missing);
+}
+
+TEST(Review, P7_cancel_on_a_durable_store_stops_later_branches_and_persists_one_cancelled_provenance) {
+  fs::path dir;
+  auto store = make_project("rvp7c", &dir);
+  const auto nodes = diamond(2).resolve();
+  const auto keys = keys_of(nodes);
+  store->apply_recipe(nodes, diamond_slots());
+  sqlite_dag_store* raw = store.get();
+  cancel_token cancel;
+  testing::internal::CaptureStderr();
+  const std::vector<branch_result> results = run_branches(
+      *store,
+      {branch_files_job{"sa", [&](const job_record&) {
+                          cancel.request();
+                          return one_file(*raw, "payload a");
+                        }},
+       branch_files_job{"sb", [&](const job_record&) { return one_file(*raw, "payload b"); }}},
+      std::nullopt, &cancel);
+  testing::internal::GetCapturedStderr();
+  EXPECT_EQ(results[0].state, branch_state::cancelled);
+  EXPECT_EQ(results[1].state, branch_state::not_started);
+  EXPECT_EQ(branches_exit_code(results), 3);
+  store.reset();
+  const auto reopened = sqlite_dag_store::open(dir, open_intent::read_write);
+  const auto texts = provenance_texts(*reopened, keys.at("a"));
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_NE(texts[0].find("\"state\":\"cancelled\""), std::string::npos);
+  EXPECT_TRUE(provenance_texts(*reopened, keys.at("b")).empty());
+}
+
+// Senza la correzione l'eccezione secondaria non stop_error usciva al posto dell'originale.
+TEST(Review, P8_secondary_non_stop_exception_never_masks_the_original) {
+  {
+    const std::string point = "artifact.fsync_file";
+    auto store = make_project("rvp8");
+    store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+    store->set_fault_injector([&](std::string_view p) -> int {
+      if (p == point) throw std::logic_error("secondaria");
+      return 0;
+    });
+    testing::internal::CaptureStderr();
+    bool original = false;
+    try {
+      run_job_files(*store, "s", [](const job_record&) -> job_files_result { throw std::runtime_error("originale"); });
+    } catch (const std::runtime_error& ex) {
+      original = std::string(ex.what()) == "originale";
+    } catch (...) {
+    }
+    const std::string err = testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(original) << point;
+    EXPECT_NE(err.find("secondaria"), std::string::npos);
+  }
+}
+
+// Stop del lavoro e scrittura della provenance con eccezione non stop_error: l'esito la dichiara, causa primaria intatta.
+TEST(Review, P8_non_stop_exception_writing_the_stop_provenance_is_declared_in_the_outcome) {
+  auto store = make_project("rvp8b");
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+  store->set_fault_injector([](std::string_view p) -> int {
+    if (p == "artifact.fsync_file") throw std::logic_error("secondaria");
+    return 0;
+  });
+  testing::internal::CaptureStderr();
+  const job_outcome out = run_job_files(*store, "s", [](const job_record&) -> job_files_result {
+    throw stop_error(error_category::invalid_input, "test.condition", "guasto iniettato");
+  });
+  testing::internal::GetCapturedStderr();
+  EXPECT_EQ(out.exit_code, 2);
+  ASSERT_TRUE(out.stop.has_value());
+  EXPECT_EQ(out.stop->code(), "test.condition");
+  ASSERT_TRUE(out.provenance_not_persisted.has_value());
+  EXPECT_EQ(out.provenance_not_persisted->code(), "job.provenance_write_failed");
 }
 
 }  // namespace
