@@ -1,0 +1,74 @@
+# Regole ast-grep del progetto (NC-21: niente fallback, niente errori ingoiati). Eseguite da tools/lint.sh.
+# Ogni regola è una classe di difetto; le eccezioni ammesse stanno in tools/lint-allowlist.txt.
+id: cpp-catch-empty
+language: cpp
+severity: error
+message: "catch vuoto (o solo commenti), l'errore sparisce"
+rule:
+  kind: catch_clause
+  has:
+    field: body
+    kind: compound_statement
+    regex: '(?s)^\{(\s|//[^\n]*\n|/\*.*?\*/)*\}$'
+---
+id: cpp-catch-print-only
+language: cpp
+severity: error
+message: catch che stampa e prosegue senza throw/return né propagazione dell'eccezione
+rule:
+  kind: catch_clause
+  regex: '(fprintf|printf|puts|perror|std::cerr|std::cout)'
+  not:
+    any:
+      - has:
+          any:
+            - kind: throw_statement
+            - kind: return_statement
+          stopBy: end
+      - regex: '(current_exception|_exit|std::exit|abort\(|ADD_FAILURE|FAIL\(|EXPECT_|ASSERT_)'
+---
+id: cpp-catch-all-silent
+language: cpp
+severity: error
+message: catch (...) che non rilancia, non ritorna e non registra l'eccezione
+rule:
+  kind: catch_clause
+  regex: '^catch\s*\(\s*\.\.\.\s*\)'
+  not:
+    any:
+      - has:
+          any:
+            - kind: throw_statement
+            - kind: return_statement
+          stopBy: end
+      - regex: '(current_exception|_exit|std::exit|abort\(|ADD_FAILURE|FAIL\(|EXPECT_|ASSERT_)'
+---
+id: sh-or-true
+language: bash
+severity: error
+message: "'|| true' maschera un errore"
+rule:
+  kind: list
+  regex: '\|\|\s*(true|:)\s*$'
+---
+id: py-except-swallow
+language: python
+severity: error
+message: except che non termina con sys.exit né rilancia
+rule:
+  kind: except_clause
+  regex: '^except(\s+(Exception|BaseException)(\s+as\s+\w+)?)?\s*:'
+  not:
+    regex: '(sys\.exit|raise)'
+---
+id: py-main-without-handler
+language: python
+severity: error
+message: "euristica: il blocco `if __name__ == \"__main__\"` non ha un try di livello principale (ogni errore deve finire in sys.exit con diagnosi)"
+rule:
+  kind: if_statement
+  regex: '^if\s+__name__\s*==\s*["'']__main__["'']'
+  not:
+    has:
+      kind: try_statement
+      stopBy: end

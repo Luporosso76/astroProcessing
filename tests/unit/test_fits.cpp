@@ -1294,12 +1294,7 @@ TEST(Fits, REVIEW_structural_fuzz_accepts_only_what_it_can_write_back) {
       e.data.assign(static_cast<std::size_t>(n) * static_cast<std::size_t>(std::abs(e.bitpix) / 8), static_cast<std::uint8_t>(next() % 2 ? 0x80 : 0));
       hdus.push_back(e);
     }
-    fx::bytes file;
-    try {
-      file = fx::build_fits(hdus);
-    } catch (...) {
-      continue;
-    }
+    const fx::bytes file = fx::build_fits(hdus);
     std::optional<image> img;
     try {
       img = decode(file);

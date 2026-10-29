@@ -1,0 +1,10 @@
+# Allowlist del lint. Colonne separate da TAB: file, regola, SHA-256 del testo normalizzato (spazi collassati) dell'intero costrutto,
+# motivo. Una voce vale solo per quel file, quella regola e quel corpo: cambiare il corpo del costrutto la invalida.
+# Il debito non va qui: un difetto da correggere resta bloccante.
+tools/check_m2f02_network.sh	sh-or-true	8d35e32f183cb0f753a5c846499f622beefad50b22ba957cd9faedd6969b24c2	ammesso: il canarino fallisce per costruzione (porta chiusa); l'esito è provato dal controllo del log di strace nelle righe successive
+src/core/job.cpp	cpp-catch-all-silent	dea7a16111ec0d09a097328a1fa3cabf598bb750a5a30d472b0b763e0a8b0c01	ammesso: unexpected() è [[noreturn]] e rilancia l'eccezione originale; le altre occorrenze del testo hanno già throw/return
+src/core/job.cpp	cpp-catch-all-silent	0b6b3cf1bd54bb7781314ec4f31fc802237408ba796920223ea42500c3e32ec7	ammesso: unexpected() è [[noreturn]] e rilancia l'eccezione originale; le altre occorrenze del testo hanno già throw/return
+src/core/job.cpp	cpp-catch-print-only	77bf5eb9432d7fb8a52257c6e2e8ff77a1231b50a1745a42553f7fbfda1f3bb3	ammesso (ADR-05:90): la mancata scrittura della provenance va su stderr ed è conservata in not_persisted, restituito nel job_outcome
+tests/unit/test_job_alloc.cpp	cpp-catch-all-silent	3eb4fa7705023838ab6233595d5e4754480f34abca66f987f7dcb7cd4500e28a	ammesso (test): un tipo di eccezione diverso lascia original=false e EXPECT_TRUE(original) fallisce
+tests/unit/test_store_review.cpp	cpp-catch-all-silent	67b981868d6d5802b5d923b69f4a2bbee00859fe18b5d5303c84127c4f1576ff	ammesso (test): un tipo di eccezione diverso lascia original=false e EXPECT_TRUE(original) fallisce
+tests/unit/test_store_review.cpp	cpp-catch-empty	67b981868d6d5802b5d923b69f4a2bbee00859fe18b5d5303c84127c4f1576ff	ammesso (test): un tipo di eccezione diverso lascia original=false e EXPECT_TRUE(original) fallisce

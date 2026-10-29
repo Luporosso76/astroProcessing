@@ -101,3 +101,35 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/m2e_workflow.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_m1d_protocol.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
+
+# T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.
+find_program(ASTRO_PYTHON3 python3 REQUIRED)
+add_test(NAME T-M2R0-01.licenses
+  COMMAND ${ASTRO_PYTHON3} -S ${PROJECT_SOURCE_DIR}/tools/check_licenses.py
+    ${PROJECT_SOURCE_DIR}/docs/licenses.md ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME T-M2R0-01.licenses_negative
+  COMMAND ${ASTRO_PYTHON3} -S ${PROJECT_SOURCE_DIR}/tools/check_licenses.py --self-test
+    ${PROJECT_SOURCE_DIR}/docs/licenses.md ${CMAKE_CURRENT_BINARY_DIR})
+
+# T-M2R0-02 (NFR-SEC-02): nessun simbolo di esecuzione di processi o di caricamento dinamico nel core.
+add_test(NAME T-M2R0-02.noexec
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_noexec.sh $<TARGET_FILE:astrocore>)
+add_test(NAME T-M2R0-02.noexec_negative
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_noexec.sh --self-test ${CMAKE_CXX_COMPILER})
+
+# T-M2R0-04 (ADR-02, D-04): il core è headless, senza dipendenze dal toolkit grafico.
+add_test(NAME T-M2R0-04.headless
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_core_headless.sh $<TARGET_FILE:astrocore> $<TARGET_FILE:test_build_info>)
+add_test(NAME T-M2R0-04.headless_negative
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_core_headless.sh --self-test ${CMAKE_CXX_COMPILER})
+
+set_tests_properties(
+  T-M2R0-01.licenses T-M2R0-01.licenses_negative
+  T-M2R0-02.noexec T-M2R0-02.noexec_negative
+  T-M2R0-04.headless T-M2R0-04.headless_negative
+  PROPERTIES LABELS fast TIMEOUT 120)
+
+# Self-test degli strumenti di processo (tools/trace.py, tools/lint.sh) su dati sintetici in tmp/.
+add_test(NAME TOOLS.trace_selftest COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tools/trace.py selftest)
+add_test(NAME TOOLS.lint_selftest COMMAND ${PROJECT_SOURCE_DIR}/tools/lint.sh --selftest)
+set_tests_properties(TOOLS.trace_selftest TOOLS.lint_selftest PROPERTIES LABELS fast TIMEOUT 120)

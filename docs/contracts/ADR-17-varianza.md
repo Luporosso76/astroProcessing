@@ -79,7 +79,12 @@ Il `calibration_report` contiene: `covariance_model`, `variance_source` e parame
 - `offset_adu` è richiesto dalla compatibilità di tutti gli input: la sua assenza si ferma prima con `metadata_missing`, `calib.metadata.offset_adu`, mai con `var.source.offset_adu`.
 - Un HDU `VARIANCE` di geometria diversa letto da file è respinto dal lettore con `fits.extension_geometry`; `var.plane_geometry` vale per immagini in memoria il cui piano ha dimensione diversa, controllata prima di `validate_image`.
 - Un campione NaN in un input non genera `q_nonfinite` (ADR-16).
-- Non rappresentabile in modo normale: se per un prodotto, quoziente o somma del calcolo di `C`, `Q` e `Var` gli operandi sono non nulli e il risultato è zero, subnormale (`fpclassify`) o non finito, anche dopo l'arrotondamento al tipo di uscita, il pixel prende `result_nonfinite`. Un `rn²` non normale è `invalid_input`, `var.param.read_noise_adu`; una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
+- Rappresentabilità, nel calcolo di `C`, `Q` e `Var`: la stessa regola di C-02 §6.3 e di `calibration.cpp` (`mul_ok`, `div_ok`, `add_ok`, `convert_finite`).
+  - Un prodotto o un quoziente con operandi non nulli e risultato zero o subnormale (`fpclassify`) dà il pixel `result_nonfinite`. Lo stesso vale per una somma di termini non negativi non tutti nulli con quel risultato.
+  - Le differenze con segno (`L − D`, `F − DF`, `x − offset_adu`) non si controllano: uno zero o un subnormale è il loro risultato esatto (lemma di Sterbenz, underflow graduale).
+  - Ogni risultato non finito dà `result_nonfinite`, salvo `Q`: un `Q` non finito calcolato da input validi dà `q_nonfinite`, non `result_nonfinite` (ADR-16 §7, `calibration.cpp` riga 904).
+  - Nella conversione al tipo di uscita, un valore non nullo che diventa zero o subnormale dà `result_nonfinite`; uno zero esatto resta valido.
+  - Un `rn²` con `rn` non nullo e risultato zero, subnormale o non finito è `invalid_input`, `var.param.read_noise_adu`; con `rn = 0` il quadrato nullo è valido. Una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
 
 ## Fuori da M2
 

@@ -87,7 +87,7 @@ Pixel di uscita invalido, con il bit di ADR-03, se:
 - un input è invalido sullo stesso pixel (`source_*`, `master_invalid`);
 - `L` o `F` ≥ `saturation_adu` del rispettivo input, se dichiarato (`saturated`); se non dichiarato, avviso `saturation_not_evaluated` nel ledger;
 - `Q` non finito: solo `q_nonfinite`; altrimenti `Q ≤ 0`: solo `q_nonpositive`. Per questi due casi `q_unreliable` non si valuta, perché l'incertezza relativa non è definita;
-- con `Q > 0` finito, indipendenti: `Q < q_min` accende `q_below_min`; `sqrt(Var(Q))/Q > q_rel_sigma_max`, o `Var(Q)` non finita, accende `q_unreliable`;
+- con `Q > 0` finito, indipendenti: `Q < q_min` accende `q_below_min`; `sqrt(Var(Q))/Q > q_rel_sigma_max` accende `q_unreliable`. Una `Var(Q)` non finita, o non rappresentabile in modo normale, calcolata da input finiti è un overflow o un underflow numerico e dà `result_nonfinite` (`calibration.cpp` riga 913: `add_ok`, `div_ok`), non `q_unreliable`;
 - `C` non finito con input validi (`result_nonfinite`).
 
 Un `Q` valido maggiore di 1 resta valido (T-M2E-05). Mai epsilon.
@@ -139,7 +139,12 @@ Fixture `FIX-SYN-FITS-01` con `B`, `d`, `q`, `S`, `K` noti.
 - File riletto con dimensione o geometria diverse da quelle del piano di prenotazione: `integrity`, `input.size_changed` / `input.geometry_changed`.
 - Intermedi di varianza non finiti: `N²` nullo o non finito, o stima di `N` non finita, ferma con `numeric`, `calib.variance_overflow`; a livello di pixel un intermedio non finito o azzerato per underflow (`Q²`, `Q⁴`, `Lc²`, termini) accende `result_nonfinite`. Nessuna riscalatura.
 - Il report riporta valore e origine (`header`/`declared`) di `binning_x`, `binning_y`, `unit`, `linearity` per ogni input (`image_fields`).
-- Non rappresentabile in modo normale: se per un prodotto, quoziente o somma del calcolo di `C`, `Q` e `Var` gli operandi sono non nulli e il risultato è zero, subnormale (`fpclassify`) o non finito, anche dopo l'arrotondamento al tipo di uscita, il pixel prende `result_nonfinite`. Un `rn²` non normale è `invalid_input`, `var.param.read_noise_adu`; una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
+- Rappresentabilità, nel calcolo di `C`, `Q` e `Var`: la stessa regola di C-02 §6.3 e di `calibration.cpp` (`mul_ok`, `div_ok`, `add_ok`, `convert_finite`).
+  - Un prodotto o un quoziente con operandi non nulli e risultato zero o subnormale (`fpclassify`) dà il pixel `result_nonfinite`. Lo stesso vale per una somma di termini non negativi non tutti nulli con quel risultato.
+  - Le differenze con segno (`L − D`, `F − DF`, `x − offset_adu`) non si controllano: uno zero o un subnormale è il loro risultato esatto (lemma di Sterbenz, underflow graduale).
+  - Ogni risultato non finito dà `result_nonfinite`, salvo `Q`: un `Q` non finito calcolato da input validi dà `q_nonfinite`, non `result_nonfinite` (ADR-16 §7, `calibration.cpp` riga 904).
+  - Nella conversione al tipo di uscita, un valore non nullo che diventa zero o subnormale dà `result_nonfinite`; uno zero esatto resta valido.
+  - Un `rn²` con `rn` non nullo e risultato zero, subnormale o non finito è `invalid_input`, `var.param.read_noise_adu`; con `rn = 0` il quadrato nullo è valido. Una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
 
 ## Fuori da M2
 

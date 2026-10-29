@@ -26,6 +26,16 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 - Gli harness degli spike restano minimi: lanciano, misurano, confrontano con l'oracle. Un guard dell'harness che impedisce la misura è un difetto dell'harness, non un esito della prova.
 - Restano invariati: verità di riferimento indipendente, tolleranze derivate prima della misura, iniezione di guasti sui percorsi del prodotto, review indipendente sul diff.
 
+### Ciclo di un'unità (proprietario, 29 ottobre 2026: niente tempo perso)
+
+1. Perimetro dal registro dell'appendice D (`tools/trace.py ids --stage <Mx.y>`), mai dai riepiloghi del §21. Piano corto: il dettaglio sta in contratti e test.
+2. Contratto e test prima del codice: i test nuovi falliscono finché manca l'implementazione. Statistica e numerica: autore Opus fin dall'inizio.
+3. L'autore implementa ed esegue `tools/check.sh` (build, test, lint delle classi di difetto) e `tools/mutate.sh` per le prove di mutazione. Non consegna con controlli rossi.
+4. L'autore chiede la review con `tools/review.sh` (prompt e checklist fissi, elenco completo al primo giro, nessun tetto di righe), corregge e ripete sul solo delta fino al PASS. Non scrive il prompt del revisore: passa solo fatti (ID, file, log).
+5. Il coordinatore verifica (build pulita dev+release, `tools/trace.py check`), poi privacy, commit e push. Stato, conteggi e tabella ID → test si generano con `tools/trace.py` e `tools/status.py`, non si scrivono a mano.
+6. Unità indipendenti nel grafo girano in parallelo in worktree separati, dividendo il tetto del 70% delle CPU. Un harness di misura passa in review prima di misurare.
+7. Attese su un processo: per pid o `pgrep -x <nome>`, sempre con un tempo massimo. Mai `pgrep -f "<testo>"` se il testo compare nel comando che aspetta: trova sé stesso e l'attesa non finisce.
+
 ## Git
 
 - Repository ufficiale: `https://github.com/Luporosso76/astroProcessing.git`. Nessun repository alternativo. Branch di lavoro: `work/m0-m1`.
