@@ -174,6 +174,43 @@ Export esplicito di slot `current` in una directory nuova indicata dall'utente:
 | T-M2C-24 | Manifest malevolo: `..`, assoluto, NUL, `a//b`, `./a`, duplicato, symlink verso fuori, file non regolare, manifest oltre 64 MiB o malformato: stop, nessuna lettura fuori dalla directory. |
 | T-M2C-25 | `create` su directory esistente: stop `store.target_exists`. |
 
+## Aggiunte di R0.b e R1: disco pieno sull'export, report di import, cache delle thumbnails
+
+### Disco pieno sull'export (C-10.a campo 10, D13)
+
+ENOSPC si prova iniettando il guasto nelle chiamate di scrittura del prodotto (fault injector), non su un filesystem pieno (una modifica di sistema, vietata dall'`AGENTS.md`). Per l'export i punti di scrittura sono `export.file.{create,write,fsync_file,rename,fsync_dir}`, `export.manifest.*` e `export.commit.*`, più `export.mkdir`. Con ENOSPC iniettato a ciascuno: stop `io`, `export.write` (anche per `mkdir`, la cui causa iniettata resta nel contesto), `errno = 28` nel contesto; nessun file temporaneo residuo; la destinazione non contiene `COMMIT` e `verify_export` non la dichiara completa (assente o `integrity`, `export.incomplete`); gli originali e lo stato dello store restano invariati (T-M2R0-03). Nessun retry e nessun percorso alternativo.
+
+### Report di import come artefatto (NFR-REP-01.a, F-IO-10)
+
+`run_import_job` pubblica due file per slot: ruolo `primary`, tipo `import_report` (JSON canonico, `format = "astro.import_report.v1"`) e ruolo `report_text`, tipo `import_report_text` (resa testuale dello stesso documento). Il JSON contiene: digest e dimensione del sorgente, gli HDU dell'inventario, geometria, layout, CFA, metadati con origine, fase e linearità con origine, `header_cards`, `uninterpreted_keywords` e il preflight delle operazioni (tabella di [ADR-03](ADR-03-pixel-maschere.md)), con le diagnostiche C-14. Il report riletto dopo la riapertura dello store coincide con l'inventario (T-M2R1-08).
+
+### Cache derivata delle thumbnails (F-IO-05, NFR-DATA-01.a, D3)
+
+```
+<progetto>/cache/thumbnails/<chiave>.<digest>.thm
+```
+
+- La directory si crea con `mkdirat` sul fd del progetto, `O_NOFOLLOW | O_DIRECTORY`; `cache` o `thumbnails` symlink o non directory: `security`, `cache.symlink`. Il progetto non richiede la cache per aprirsi; la recovery dello store non la tocca (opera solo in `artifacts/`).
+- `chiave` = SHA-256 esadecimale di `"astro.cache.thumbnail.v1\n"` + JCS di `{source_sha256, source_size, block_width, block_height, algorithm_version}`; `digest` = SHA-256 del contenuto del file, nel nome. Contenuto: magic `ASTRTHM1`, sette `uint32` little-endian (`source_width`, `source_height`, `planes`, `block_width`, `block_height`, `width`, `height`), poi i campioni f32 e i conteggi u32 little-endian. Deterministico: gli stessi parametri producono gli stessi byte.
+- Scrittura col protocollo atomico di questo contratto (temporaneo `O_EXCL`, `fsync`, `renameat2`, `fsync` della directory) con punti di guasto `cache.entry.*`.
+- Lettura (`lookup`): ogni voce col prefisso `chiave.` si apre con `O_NOFOLLOW` (symlink: `security`, `cache.symlink`), deve essere regolare con `st_nlink = 1` (altrimenti `security`, `cache.hardlink`, nessuna lettura) e di dimensione ≤ della quota; il suo SHA-256 si ricalcola a ogni lettura. Digest diverso da quello nel nome, formato non valido, o più voci per la stessa chiave: `integrity`, `cache.corrupt`, con `atteso`, `trovato` e `voce` nel contesto. La voce non si serve e non si modifica. Voce assente: `computed`; voce valida: `cache_hit`.
+- Memoria: ogni lettura di una voce prenota nel pool 2 volte la sua dimensione (buffer letto e anteprima analizzata) prima di leggerla, sulla dimensione dello stesso fd aperto che è anche il limite della lettura (una crescita concorrente è `limit_exceeded`, `cache.read`); la lettura di una voce da sostituire, 1 volta; il calcolo di una voce, 2 volte la dimensione della voce (anteprima e buffer serializzato) dopo `make_preview`. Prenotazione impossibile: `budget`, `sched.job_exceeds_budget` con `minimo` e `budget`.
+- Quota: `cache_options::quota_bytes` (obbligatoria, nessun default). La somma delle dimensioni delle voci più la nuova, oltre la quota: `budget`, `cache.quota_exceeded`, prima di scrivere. Nessuna rimozione automatica di voci per fare posto.
+- Cleanup confinato (`cleanup_temporaries`): elimina solo i `.tmp-*` regolari con `st_nlink = 1` dentro `cache/thumbnails/`, con `unlinkat` relativo al fd di directory; un `.tmp-*` symlink o con `st_nlink ≠ 1` è `security` e non si tocca nulla. Elenca ciò che ha rimosso.
+- Ricostruzione: solo il job esplicito `cache.rebuild` (sotto). Un'esecuzione fallita del job `thumbnail` non ricostruisce mai (T-M2R1-04); nessun percorso ricostruisce da solo.
+
+Job: `run_thumbnail_job` calcola o riusa la voce e pubblica un riferimento (`thumbnail_ref`, JSON: chiave, voce, digest, esito, geometria); l'esito (`cache_hit` o `computed`) è nella provenance (`details.cache`). `run_cache_rebuild_job` richiede una voce presente per la chiave, registra causa (`cache.corrupt` o `user_request`) e voce sostituita (nome, digest trovato), scrive la nuova voce con rename atomico sul nome finale e rimuove la vecchia solo se il nome è diverso. Assenza della voce: `invalid_input`, `cache.rebuild_nothing`.
+
+### Test di R0.b e R1
+
+| ID | Clausola |
+|---|---|
+| T-M2R0-03 | ENOSPC iniettato a ogni punto di scrittura dell'export: stop `io` con l'errno, nessun bundle completo secondo `verify_export`, destinazione senza `COMMIT`, originali invariati. Esatta. |
+| T-M2R1-04 | Voce alterata di un byte: il job `thumbnail` si ferma con `cache.corrupt` e digest atteso e trovato; nessun output, il file resta identico byte per byte, la provenance non registra `cache.rebuild`. Esatta. |
+| T-M2R1-08 | Il report di import riletto dopo la riapertura è coerente con l'inventario. |
+| T-M2R1-11 | `cache.rebuild` sulla voce corrotta: nuova voce identica byte per byte all'originale, provenance con job, causa e voce sostituita; la richiesta successiva dà `cache_hit`. Esatta. |
+| T-M2R1-12 | Voce assente: `computed`; valida: `cache_hit` senza ricalcolo (contatore); quota superata, symlink e hardlink nella cache: stop. Cleanup confinato. |
+
 ## Fuori da M2
 
-Branch e migrazioni reali (ADR-04.b); asset utente e event log delle maschere dipinte; garbage collection con lease; branch della storia (redo multipli); export di slot non correnti; quota della cache.
+Branch e migrazioni reali (ADR-04.b); asset utente e event log delle maschere dipinte; garbage collection con lease; branch della storia (redo multipli); export di slot non correnti.

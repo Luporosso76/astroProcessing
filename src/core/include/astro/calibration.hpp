@@ -114,6 +114,9 @@ class prepared_calibration {
   const std::vector<channel_normalization>& normalization() const noexcept;
   const std::vector<std::string>& warnings() const noexcept;
 
+  // Elenco JSON dei quattro ingressi letti (digest, fase, linearita', keyword non interpretate) per la provenance.
+  json observed_inputs() const;
+
   // Byte di scratch per riga richiesti da calibrate_rows (per task).
   std::uint64_t row_scratch_bytes() const noexcept;
 
@@ -137,6 +140,16 @@ class prepared_calibration {
 // calib.master_state_unknown / var.source.<campo>; unsupported calib.master_state_m2 / calib.shared_input /
 // var.combine_method.
 void validate_calibration_recipe(const calibration_recipe& recipe);
+
+// Fase di un ingresso (ADR-03, R1): assente = metadata_missing calib.metadata.phase; non raw = incompatible
+// op.phase_blocked, con `input` nel contesto. Solo metadati: nessun campione e' stato letto.
+void require_calibration_phase(const char* input_name, const std::optional<metadata_value<process_phase>>& phase);
+
+// Linearita' di un ingresso dai metadati (header e dichiarazione della ricetta): conflitto = incompatible
+// metadata.declared_conflict; assente = metadata_missing calib.metadata.linearity; non lineare = unsupported
+// calib.linearity. Con `input` nel contesto.
+void require_calibration_linearity(const char* input_name, const std::optional<linearity>& header,
+                                   const std::optional<linearity>& declared);
 
 // Preflight completo sulle immagini (nessun calcolo prima che tutto sia verificato) e normalizzazione N.
 prepared_calibration prepare_calibration(const calibration_recipe& recipe, calibration_images images);

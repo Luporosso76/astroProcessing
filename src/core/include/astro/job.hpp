@@ -56,6 +56,8 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
 struct job_files_result {
   std::vector<stored_file> files;
   std::vector<std::string> warnings;
+  // Osservazioni per la provenance di un job riuscito (`details`, ADR-05).
+  std::optional<json> details = std::nullopt;
 };
 
 // Come run_job per uno store durevole: `work` scrive i file con write_files e la pubblicazione e' un'unica

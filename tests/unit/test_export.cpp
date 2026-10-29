@@ -1,3 +1,5 @@
+#include <cerrno>
+#include <map>
 #include <sys/stat.h>
 
 #include "store_test_support.hpp"
@@ -163,6 +165,60 @@ TEST(Export, T_M2C_20_sigkill_at_every_export_step_leaves_a_bundle_verify_declar
       EXPECT_STOP(verify_export(dir), error_category::integrity, "export.incomplete");
     }
     EXPECT_EQ(sqlite_dag_store::open(project, open_intent::read_write)->read_slot("sd").state, freshness::current);
+  }
+}
+
+// T-M2R0-03 (C-10.a campo 10, D13): ENOSPC iniettato in ogni punto di scrittura dell'export.
+TEST(Export, T_M2R0_03_enospc_at_every_export_write_point_stops_io_and_leaves_no_complete_bundle) {
+  fixture dry = make_fixture("r0b03_dry");
+  const std::vector<std::string> points = record_points([&](const fault_injector& f) {
+    dry.store->set_fault_injector(f);
+    dry.store->export_slots(dry.project.parent_path() / "r0b03_dry_export", {"sb", "sd"});
+  });
+  dry.store.reset();
+  ASSERT_GE(points.size(), 16u);
+  const auto stored_files = [](const fs::path& project) {
+    std::map<std::string, std::string> out;
+    for (const auto& e : fs::directory_iterator(project / "artifacts")) out[e.path().filename().string()] = read_text(e.path());
+    return out;
+  };
+  for (std::size_t i = 1; i <= points.size(); ++i) {
+    SCOPED_TRACE("ENOSPC al punto " + std::to_string(i) + ": " + points[i - 1]);
+    fixture f = make_fixture("r0b03");
+    const fs::path dir = f.project.parent_path() / "r0b03_export";
+    fs::remove_all(dir);
+    const auto before = stored_files(f.project);
+    int calls = 0;
+    f.store->set_fault_injector([&](std::string_view) { return ++calls == static_cast<int>(i) ? ENOSPC : 0; });
+    try {
+      f.store->export_slots(dir, {"sb", "sd"});
+      ADD_FAILURE() << "stop_error atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::io) << e.what();
+      EXPECT_EQ(e.code(), "export.write") << e.what();
+      std::string errno_text;
+      for (const auto& [key, value] : e.context()) {
+        if (key == "errno") errno_text = value;
+      }
+      EXPECT_EQ(errno_text, std::to_string(ENOSPC)) << e.what();
+    }
+    f.store->set_fault_injector({});
+    EXPECT_EQ(calls, static_cast<int>(i));
+    if (fs::exists(dir)) {
+      EXPECT_FALSE(fs::exists(dir / "COMMIT"));
+      for (const auto& e : fs::directory_iterator(dir)) {
+        EXPECT_NE(e.path().filename().string().rfind(".tmp-", 0), 0u) << "temporaneo residuo " << e.path();
+      }
+      EXPECT_STOP(verify_export(dir), error_category::integrity, "export.incomplete");
+    } else {
+      EXPECT_EQ(i, 1u) << "solo il guasto su mkdir lascia la destinazione assente";
+    }
+    EXPECT_EQ(stored_files(f.project), before);
+    EXPECT_EQ(f.store->read_slot("sb").state, freshness::current);
+    EXPECT_EQ(f.store->read_slot("sd").state, freshness::current);
+    fs::remove_all(dir);
+    f.store->export_slots(dir, {"sb", "sd"});
+    EXPECT_EQ(verify_export(dir).files.size(), 2u);
   }
 }
 

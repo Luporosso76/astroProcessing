@@ -143,6 +143,89 @@ Lo scrittore produce solo un buffer in memoria; nessuna sua API accetta un perco
 - Campi dichiarabili dalla ricetta oltre a `frame_metadata`: `binning_x`, `binning_y`, `unit`, `linearity` (`declared_image_fields`). Un valore già presente nell'header e diverso dal dichiarato: `incompatible`, `metadata.declared_conflict`; uguale: nessun effetto. Assente nell'header: vale il dichiarato. I valori dichiarati entrano nei parametri del nodo di calibrazione (chiave del nodo) e il report riporta l'origine (`header` o `declared`) di ogni metadato.
 - T-M2E-14, unione delle maschere: la maschera di uscita contiene la unione bit a bit dei bit di light, dark, flat e dark-flat; se un master (dark, flat, dark-flat) ha qualunque bit acceso sul pixel si aggiunge anche `master_invalid`.
 
+## Aggiunte di R1: fase, linearità, inventario, anteprima, keyword non interpretate
+
+Unità R1 di `plans/M2-residui.md` (F-IO-01, F-IO-05, F-IO-10, NFR-SEC-01 sull'inventario e sull'anteprima). Decisioni D1 e D2 del piano.
+
+### Fase di processo e linearità (F-IO-10, D1)
+
+| Tipo | Valori | Note |
+|---|---|---|
+| `process_phase` | `raw`, `calibrated`, `prestacked` | Dichiarata all'import ed obbligatoria: nessun valore di comodo. |
+| `linearity_class` | `linear`, `nonlinear`, `unknown` | `unknown` è un valore esplicito: non è mai trattato come `linear`. È la classe di un'immagine con `lin` assente. |
+
+- `image.phase` è `std::optional<metadata_value<process_phase>>`: origine `header` (keyword `ASTRPHAS`, stringa `raw`, `calibrated` o `prestacked`, senza distinzione di maiuscole; altro valore: `unsupported`, `fits.phase`) oppure `declared` (`fits_read_options::declared_phase`). Il confronto fra immagini ignora l'origine, come per gli altri metadati.
+- La linearità resta `image.lin` (`LINEAR`). `fits_read_options::declared_linearity` (`linearity_class`) la dichiara. Header e dichiarazione in conflitto, anche `unknown` dichiarato contro un `LINEAR` presente: `incompatible`, `metadata.declared_conflict`, con il campo nel contesto. `linear` o `nonlinear` dichiarati su header privo di `LINEAR` valgono con origine `declared`; `unknown` dichiarato su header privo di `LINEAR` non scrive nulla e l'import lo registra con origine `declared`.
+- `ASTRPHAS` è interpretata e lo scrittore la emette quando `image.phase` è valorizzata e la card manca; la rilettura la restituisce con origine `header`. Un `ASTRPHAS` diverso dalla fase dichiarata: `incompatible`, `metadata.declared_conflict`, campo `phase`.
+- `decode_fits` senza `ASTRPHAS` e senza `declared_phase` lascia `phase` vuota: il decoder non inventa una fase. `inventory_fits` riporta la fase se c'è; `run_import_job` e la calibrazione la richiedono: assente, `metadata_missing`, `import.phase_missing` o `calib.metadata.phase`.
+- L'output della calibrazione porta `phase = calibrated` (origine `header` alla rilettura) e conserva `lin`.
+- `image.lin_origin` conserva l'origine di `lin` (`header` o `declared`, vuota se `lin` è assente); non entra nel confronto fra immagini. Il report di calibrazione e la provenance la riportano. `equivalent_content` confronta anche il valore della fase (presente contro assente è una differenza), ignorandone l'origine.
+- Il job di calibrazione controlla fase e linearità dai soli header e dalle dichiarazioni della ricetta (`peek_header`, senza prenotazioni nel pool) di tutti e quattro gli ingressi prima del piano e di ogni lettura di campioni; `prepare_calibration` li controlla prima di `check_image`. Stessi codici in entrambi (`require_calibration_phase`, `require_calibration_linearity`). `image.lin_origin` è valorizzata solo se `lin` è presente.
+
+Tabella di compatibilità operazione × fase × linearità, scritta prima del codice (`require_operation_allowed`, T-M2R1-05). Il preflight applica la riga prima di qualunque lettura di campioni: l'operazione non ammessa è uno stop `incompatible` senza output.
+
+| Operazione | Fase ammessa | Linearità ammessa | Esito se non ammessa |
+|---|---|---|---|
+| `inventory`, `preview`, `export_bundle` | qualunque | qualunque | sempre ammesse |
+| `master_create`, `calibrate` | `raw` | `linear` | fase: `incompatible`, `op.phase_blocked`; linearità: `incompatible`, `op.linearity_blocked` (la fase si controlla per prima) |
+| `linear_ancestor_required` (C-14) | qualunque | `linear` | `incompatible`, `op.linear_ancestor_missing` |
+
+I quattro ingressi della calibrazione (light, dark, flat, dark-flat) devono essere `raw` e `linear`; in R2 la tabella si estende ai master prodotti dal prodotto. Calibrato e prestacked importati si inventariano, si visualizzano e si esportano; su input `nonlinear` o `unknown` il preflight dichiara il limite C-14 («antenato lineare verificabile assente», piano 10.15) e non esiste alcuna operazione che inverta uno stretch o che sostituisca l'operatore.
+
+### Segnalazione delle keyword non interpretate (F-IO-01)
+
+`header_cards` e `uninterpreted_keywords` (unione senza duplicati, in ordine di prima comparsa) restano come in M2.a. Da R1 l'elenco compare anche: nel report di import (`uninterpreted_keywords`), nel report di calibrazione (per ogni ingresso, `uninterpreted_keywords`) e nella provenance dei job che leggono il file (`details.observed_inputs[].uninterpreted_keywords`, [ADR-05](ADR-05-dag-provenance.md)). Le card commento (`COMMENT`, `HISTORY`) sono elencate come qualunque altra keyword non interpretata; le card a keyword vuota no. `ASTRPHAS` è interpretata e non compare nell'elenco.
+
+### Inventario (F-IO-05, D2)
+
+`inventory_fits(const fits_input&, const fits_read_options&, memory_pool&)` legge con `pread` i soli blocchi di header di tutti gli HDU (nessun byte di data unit: un `pread` verso un offset di dati è un difetto, T-M2R1-01) e restituisce `fits_inventory`: dimensione del file, byte di header letti, per HDU indice, `EXTNAME`, `BITPIX`, assi, `BSCALE`, `BZERO`, offset di header e dati, numero di card; per il primario `layout`, `cfa`, unità, linearità (`image.lin`), fase, metadati interpretati, `header_cards`, `uninterpreted_keywords`. Si applicano gli stessi limiti di `fits_limits` e gli stessi errori della scansione (NFR-SEC-01); l'inventario non verifica `CHECKSUM` né il digest dei dati (richiederebbero i pixel).
+
+Memoria: l'header vive in memoria per la durata della chiamata. La prenotazione nel pool, presa prima della scansione e senza attesa, è
+
+`inventory_reserve_bytes(file_bytes) = 4096 + min(⌊file_bytes/80⌋, max_hdus · max_header_cards) · 128`
+
+(contabilità convenzionale: 128 byte per card, tra testo, oggetto stringa e allocatore). Il pool limita le prenotazioni, non l'RSS ([ADR-06](ADR-06-budget-scheduler.md)). Budget sotto il minimo: `budget`, `sched.job_exceeds_budget`, con `minimo` e `budget` nel contesto; nessuna lettura dell'header.
+
+HDU compressi a tile (tabelle binarie con `ZIMAGE`): il lettore M2 li rifiuta già (`unsupported`, `fits.hdu_kind`), quindi la clausola D2 sulla decodifica intera di un HDU compresso è vuota in M2 e nessun percorso di codice la gestisce; T-M2R1-10 verifica che inventario e anteprima si fermino.
+
+### Anteprima a blocchi (F-IO-05, D2)
+
+`make_preview(const fits_input&, const preview_request&, memory_pool&, const cancel_token*)` calcola, per ogni piano del primario (HDU non compresso, tutti i `BITPIX`), la media per blocco di `block_width × block_height` campioni (`preview_request`, entrambi in [1, `max_axis_length`], altrimenti `invalid_input`, `preview.block`). I blocchi di bordo sono più piccoli.
+
+- Valore di un campione: `v = raw · BSCALE + BZERO` in f64 (stessa formula del lettore). Somma ricorsiva in f64 nell'ordine riga per riga dentro il blocco, con il solo contributo dei campioni finiti (`NaN`, ±Inf esclusi); media = somma / numero di campioni finiti, arrotondata a f32. Un blocco senza campioni finiti vale `NaN` e `finite_counts = 0`: nessun valore sostitutivo.
+- Le estensioni `INVALID` e `VARIANCE` non si leggono: l'anteprima è sui soli campioni del primario. Limite dichiarato.
+- Lettura per fasce di `block_height` righe di un piano con `pread` nella fascia prenotata; la fascia è l'unico buffer che scala con la larghezza. Un `pread` fallito è `io`, `fits.read`; fine file prematura `integrity`, `input.size_changed` o `io`, `input.short_read` ([ADR-05](ADR-05-dag-provenance.md)).
+- Prenotazione, in una volta sola e senza attesa: `preview_reserve_bytes = inventory_reserve_bytes(file_bytes) + fascia + somme + uscita`, con fascia = `width · min(block_height, height) · |BITPIX|/8` (byte), somme = `⌈width/block_width⌉ · 12` (una somma f64 e un contatore u32 per colonna di blocchi), uscita = `⌈width/block_width⌉ · ⌈height/block_height⌉ · planes · 8` (un f32 e un u32 per blocco). Dopo la scansione dell'header, `need = preview_reserve_bytes`; budget sotto `need`: `budget`, `sched.job_exceeds_budget` con `minimo`. La fascia e le somme sono `pool_buffer` della prenotazione (un eccesso è `pool.reservation_exceeded`); il risultato riporta `reserved_bytes` e `observed_peak_bytes` (massimo di byte impegnati), sempre `observed_peak_bytes ≤ reserved_bytes`.
+- Un cancel richiesto fra due fasce: `cancelled`, `sched.cancelled`.
+- Una somma di blocco non finita (overflow di f64 con soli campioni finiti): `numeric`, `preview.sum_overflow`; una media finita in f64 ma oltre il campo di f32: `numeric`, `preview.f32_overflow`. Piano e blocco nel contesto; nessuna media sostitutiva. Una media non nulla che in f32 diventa zero o subnormale è un arrotondamento a f32 dichiarato, non un errore.
+- `fits_input` registra dimensione, `mtime` e `ctime` all'apertura. `inventory_fits`, `make_preview`, `digest_fits_input` e i job di import, thumbnail e rebuild confrontano il file con quella fotografia dopo aver consumato i byte: dimensione diversa `integrity`, `input.size_changed`; `mtime` o `ctime` diversi `integrity`, `input.modified`. È il modello di identità di ADR-04 (stat), non una difesa contro una corsa deliberata.
+
+Errori aggiuntivi:
+
+| Condizione | Categoria | Codice |
+|---|---|---|
+| `ASTRPHAS` con valore non riconosciuto | `unsupported` | `fits.phase` |
+| Fase assente all'import | `metadata_missing` | `import.phase_missing` |
+| Fase o linearità dichiarate in conflitto con l'header | `incompatible` | `metadata.declared_conflict` |
+| Operazione non ammessa dalla tabella | `incompatible` | `op.phase_blocked`, `op.linearity_blocked`, `op.linear_ancestor_missing` |
+| Blocco dell'anteprima fuori intervallo | `invalid_input` | `preview.block` |
+| Somma o media del blocco non finita | `numeric` | `preview.sum_overflow`, `preview.f32_overflow` |
+| File cambiato dopo l'apertura | `integrity` | `input.size_changed`, `input.modified` |
+| Budget sotto la prenotazione minima | `budget` | `sched.job_exceeds_budget` |
+
+### Test di R1
+
+| ID | Clausola |
+|---|---|
+| T-M2R1-01 | Inventario con data unit che risponde EIO a ogni offset di pixel (osservatore di `pread` del test): riesce, e i byte letti, contati dall'osservatore, sono al più header + 2880. Esatta. |
+| T-M2R1-02 | Prenotazione di inventario e anteprima uguale alla formula, `observed_peak_bytes ≤ reserved_bytes`, picco del pool = prenotazione; budget sotto il minimo: stop con il minimo nel contesto; budget uguale al minimo: riesce. Esatta. |
+| T-M2R1-03 | Anteprima contro l'oracle del test (media per blocco in f64 dai valori del generatore): tolleranza `γ_k · max\|x\|` con `k` = campioni sommati del blocco, più ½ ulp f32; zero sui valori dyadic. Un campione non finito: escluso; blocco tutto non finito: `NaN` e conteggio 0. |
+| T-M2R1-05 | Matrice fase × linearità × operazione: ammesse solo le righe della tabella; le altre si fermano prima del calcolo, senza output. Dichiarazione in conflitto con l'header: stop. `unknown` mai lineare. |
+| T-M2R1-06 | Calibrato e prestacked senza RAW: inventario, anteprima ed export; il preflight C-14 su `nonlinear` e `unknown` mostra il limite e non modifica i campioni. |
+| T-M2R1-07 | Le keyword non interpretate nei report e nella provenance coincidono con l'insieme calcolato dal test sulle card generate. |
+| T-M2R1-09 | PUB-LFC-01 e PUB-CFA-01 (hash registrato prima): importati e inventariati, `BAYERPAT` letto, roundtrip bit-esatto. |
+| T-M2R1-10 | Fuzz breve di inventario e anteprima (header e data unit corrotti): stop controllato, nessun crash sotto ASan/UBSan, nessuna allocazione oltre il limite. |
+
 ## Fuori da M2
 
 Tile e piramide; alpha; coverage e capability; maschere di editing usate dagli operatori; XISF e RAW (ADR-08.b, M3.a); unità `electron` prodotte da conversione di gain.

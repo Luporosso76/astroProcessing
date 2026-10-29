@@ -1,4 +1,5 @@
 #include "astro/node.hpp"
+#include "astro/operations.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -152,11 +153,18 @@ json node_spec::to_json() const {
 
 node_spec make_fits_decode_node(const content_digest& input, const fits_read_options& options,
                                 const frame_metadata& declared, sample_type precision, std::string backend) {
-  static_assert(sizeof(fits_read_options) == 2 * sizeof(std::optional<std::uint8_t>),
+  static_assert(sizeof(fits_read_options) == 2 * sizeof(std::optional<std::uint8_t>) +
+                                                  sizeof(std::optional<process_phase>) +
+                                                  sizeof(std::optional<linearity_class>),
                 "nuovo campo in fits_read_options: aggiungerlo ai parametri del nodo fits.decode");
   json read_options = json::object();
   read_options.set("declared_bayer_x_offset", optional_offset(options.declared_bayer_x_offset));
   read_options.set("declared_bayer_y_offset", optional_offset(options.declared_bayer_y_offset));
+  // Solo se dichiarate: le chiavi dei nodi senza fase ne' linearita' dichiarate non cambiano (ADR-05, R1).
+  if (options.declared_phase) read_options.set("declared_phase", json::string(to_string(*options.declared_phase)));
+  if (options.declared_linearity) {
+    read_options.set("declared_linearity", json::string(to_string(*options.declared_linearity)));
+  }
   json params = json::object();
   params.set("fits_read_options", std::move(read_options));
   params.set("declared_metadata", declared_metadata_json(declared));

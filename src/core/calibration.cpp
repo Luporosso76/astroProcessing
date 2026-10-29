@@ -6,6 +6,7 @@
 
 #include "astro/calibration.hpp"
 #include "astro/error.hpp"
+#include "astro/operations.hpp"
 #include "calibration_internal.hpp"
 
 namespace astro {
@@ -291,11 +292,12 @@ field_origins apply_declared(image& im, const calibration_input_spec& spec, cons
   origins.binning_x = f.binning_x && !im.geometry.binning_x;
   origins.binning_y = f.binning_y && !im.geometry.binning_y;
   origins.unit = f.unit && !im.unit;
-  origins.lin = f.lin && !im.lin;
+  origins.lin = (f.lin && !im.lin) || (im.lin && im.lin_origin.value == metadata_origin::declared);
   declare_plain(im.geometry.binning_x, f.binning_x, "binning_x");
   declare_plain(im.geometry.binning_y, f.binning_y, "binning_y");
   declare_plain(im.unit, f.unit, "unit");
   declare_plain(im.lin, f.lin, "linearity");
+  if (origins.lin) im.lin_origin.value = metadata_origin::declared;
   return origins;
 }
 
@@ -612,7 +614,13 @@ json input_report(const slot& s, const image& im, const input_view& view, const 
     f.set("unit", field(json::string(*im.unit == pixel_unit::adu ? "adu" : *im.unit == pixel_unit::electron ? "electron" : "dimensionless"),
                         origins.unit));
     f.set("linearity", field(json::string(*im.lin == linearity::linear ? "linear" : "nonlinear"), origins.lin));
+    f.set("phase", field(json::string(to_string(im.phase->value)), im.phase->source.origin == metadata_origin::declared));
     o.set("image_fields", std::move(f));
+  }
+  {
+    json keywords = json::array();
+    for (const std::string& k : im.uninterpreted_keywords) keywords.push(json::string(k));
+    o.set("uninterpreted_keywords", std::move(keywords));
   }
   o.set("metadata", metadata_report(im));
   if (s.spec.descriptor) {
@@ -651,6 +659,39 @@ void validate_calibration_recipe(const calibration_recipe& recipe) {
   validate_variance_specs(recipe);
 }
 
+void require_calibration_phase(const char* input_name, const std::optional<metadata_value<process_phase>>& phase) {
+  if (!phase) {
+    throw stop_error(error_category::metadata_missing, "calib.metadata.phase", "fase di processo non dichiarata",
+                     {{"input", input_name}});
+  }
+  try {
+    require_operation_allowed(operation_kind::calibrate, process_state{phase->value, linearity_class::linear});
+  } catch (stop_error& e) {
+    e.add_context("input", input_name);
+    throw;
+  }
+}
+
+void require_calibration_linearity(const char* input_name, const std::optional<linearity>& header,
+                                   const std::optional<linearity>& declared) {
+  std::optional<linearity> lin = header;
+  if (declared) {
+    if (lin && *lin != *declared) {
+      throw stop_error(error_category::incompatible, "metadata.declared_conflict",
+                       "valore dichiarato diverso da quello presente", {{"input", input_name}, {"campo", "linearity"}});
+    }
+    lin = declared;
+  }
+  if (!lin) {
+    throw stop_error(error_category::metadata_missing, "calib.metadata.linearity", "linearita' non dichiarata",
+                     {{"input", input_name}});
+  }
+  if (*lin != linearity::linear) {
+    throw stop_error(error_category::unsupported, "calib.linearity", "la ricetta M2 richiede dati lineari",
+                     {{"input", input_name}});
+  }
+}
+
 prepared_calibration::prepared_calibration(std::unique_ptr<impl> i) : impl_(std::move(i)) {}
 prepared_calibration::prepared_calibration(prepared_calibration&&) noexcept = default;
 prepared_calibration& prepared_calibration::operator=(prepared_calibration&&) noexcept = default;
@@ -660,6 +701,25 @@ std::uint32_t prepared_calibration::width() const noexcept { return impl_->w; }
 std::uint32_t prepared_calibration::height() const noexcept { return impl_->h; }
 const std::vector<channel_normalization>& prepared_calibration::normalization() const noexcept { return impl_->channels; }
 const std::vector<std::string>& prepared_calibration::warnings() const noexcept { return impl_->warnings; }
+
+// Osservazione dei file letti per la provenance (ADR-05, R1), derivata dal report degli ingressi.
+json prepared_calibration::observed_inputs() const {
+  json list = json::array();
+  const json& inputs = *impl_->report.find("inputs");
+  for (std::size_t i = 0; i < inputs.keys().size(); ++i) {
+    const json& in = inputs.items()[i];
+    const json& fields = *in.find("image_fields");
+    json o = json::object();
+    o.set("input_name", json::string(inputs.keys()[i]));
+    o.set("sha256", *in.find("digest_sha256"));
+    o.set("size_bytes", *in.find("size_bytes"));
+    o.set("phase", *fields.find("phase"));
+    o.set("linearity", *fields.find("linearity"));
+    o.set("uninterpreted_keywords", *in.find("uninterpreted_keywords"));
+    list.push(std::move(o));
+  }
+  return list;
+}
 
 std::uint64_t prepared_calibration::row_scratch_bytes() const noexcept {
   return std::uint64_t{impl_->w} * (sizeof(double) * 2 + sizeof(std::uint16_t));
@@ -684,19 +744,15 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
            {{"input", f.name}, {"layout", layout_name(f.img->layout)}});
     }
   }
+  // Tabella di compatibilita' (ADR-03, R1): la fase si controlla sui metadati, prima di ogni accesso ai campioni.
+  for (const frame& f : frames) require_calibration_phase(f.name, f.img->phase);
   std::array<field_origins, 4> origins;
   for (std::size_t i = 0; i < frames.size(); ++i) origins[i] = apply_declared(*frames[i].img, specs[i].spec, frames[i].name);
+  for (const frame& f : frames) require_calibration_linearity(f.name, f.img->lin, std::nullopt);
   for (const frame& f : frames) check_image(f);
 
   for (const frame& f : frames) {
     const image& x = *f.img;
-    if (!x.lin) {
-      stop(error_category::metadata_missing, "calib.metadata.linearity", "linearita' non dichiarata",
-           {{"input", f.name}});
-    }
-    if (*x.lin != linearity::linear) {
-      stop(error_category::unsupported, "calib.linearity", "la ricetta M2 richiede dati lineari", {{"input", f.name}});
-    }
     if (!x.unit) {
       stop(error_category::metadata_missing, "calib.metadata.unit", "unita' non dichiarata", {{"input", f.name}});
     }
@@ -827,7 +883,10 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
   p->out.unit = im.light.unit;
   p->out.lin = im.light.lin;
   p->out.metadata = im.light.metadata;
-  p->out.header_cards = im.light.header_cards;
+  p->out.phase = metadata_value<process_phase>{process_phase::calibrated, {metadata_origin::header, "ASTRPHAS"}};
+  for (const std::string& card : im.light.header_cards) {
+    if (card.compare(0, 8, "ASTRPHAS") != 0) p->out.header_cards.push_back(card);
+  }
   p->out.uninterpreted_keywords = im.light.uninterpreted_keywords;
   p->out.variance = variance_plane{aligned_buffer(p->out.samples.size())};
 

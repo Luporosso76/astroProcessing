@@ -223,7 +223,11 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
   const std::span<const std::uint8_t> manifest_bytes(reinterpret_cast<const std::uint8_t*>(manifest.data()), manifest.size());
   const std::string manifest_digest = sha256_hex(manifest_bytes);
 
-  check_fault("export.mkdir");
+  try {
+    check_fault("export.mkdir");
+  } catch (const stop_error& e) {
+    rethrow_as(e, error_category::io, "export.write", "mkdir della destinazione fallita");
+  }
   if (::mkdirat(parent_fd.get(), leaf.c_str(), 0755) != 0) {
     if (errno == EEXIST) {
       throw stop_error(error_category::security, "export.target_exists", "la destinazione esiste gia'", {{"destinazione", dir.string()}});
@@ -233,8 +237,14 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
   const unique_fd out = open_dir_nofollow(parent_fd.get(), leaf.c_str(), "export.target_exists");
   for (const auto& it : items) copy_artifact(artifacts.get(), out.get(), it, fault_);
   write_export_file(out.get(), "export.manifest", "manifest.json", manifest_bytes, fault_);
-  write_export_file(out.get(), "export.commit", "COMMIT",
-                    {reinterpret_cast<const std::uint8_t*>(manifest_digest.data()), manifest_digest.size()}, fault_);
+  try {
+    write_export_file(out.get(), "export.commit", "COMMIT",
+                      {reinterpret_cast<const std::uint8_t*>(manifest_digest.data()), manifest_digest.size()}, fault_);
+  } catch (stop_error& e) {
+    // Un export fallito non deve risultare completo: un guasto dopo il rename (fsync della directory) toglie COMMIT.
+    if (::unlinkat(out.get(), "COMMIT", 0) != 0 && errno != ENOENT) e.add_context("commit_rimozione_errno", std::to_string(errno));
+    throw;
+  }
 }
 
 }  // namespace astro

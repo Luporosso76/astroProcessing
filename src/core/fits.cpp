@@ -457,7 +457,13 @@ namespace {
 }
 
 void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::uint64_t expected_size,
-                 const fault_injector& fault) {
+                 const fault_injector& fault, const fits_input::pread_observer& observer) {
+  if (observer) {
+    const int injected = observer(offset, n);
+    if (injected != 0) {
+      fail(error_category::io, "fits.read", "pread non riuscita", {{"errno", std::to_string(injected)}});
+    }
+  }
   auto* p = static_cast<char*>(dst);
   std::size_t done = 0;
   while (done < n) {
@@ -475,14 +481,20 @@ void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::ui
 }  // namespace
 
 fits_input::fits_input(fits_input&& other) noexcept
-    : fd_(other.fd_), size_(other.size_), fault_(std::move(other.fault_)) { other.fd_ = -1; }
+    : fd_(other.fd_), size_(other.size_), mtime_ns_(other.mtime_ns_), ctime_ns_(other.ctime_ns_),
+      fault_(std::move(other.fault_)), observer_(std::move(other.observer_)) {
+  other.fd_ = -1;
+}
 
 fits_input& fits_input::operator=(fits_input&& other) noexcept {
   if (this != &other) {
     if (fd_ >= 0) ::close(fd_);
     fd_ = other.fd_;
     size_ = other.size_;
+    mtime_ns_ = other.mtime_ns_;
+    ctime_ns_ = other.ctime_ns_;
     fault_ = std::move(other.fault_);
+    observer_ = std::move(other.observer_);
     other.fd_ = -1;
   }
   return *this;
@@ -491,6 +503,33 @@ fits_input& fits_input::operator=(fits_input&& other) noexcept {
 fits_input::~fits_input() {
   if (fd_ >= 0) ::close(fd_);
 }
+
+namespace fits_detail {
+
+void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::size_t n) {
+  if (offset > input.size_ || n > input.size_ - offset) {
+    fail(error_category::invalid_input, "fits.malformed", "lettura oltre la fine del file",
+         {{"offset", std::to_string(offset)}, {"lunghezza", std::to_string(n)}});
+  }
+  pread_exact(input.fd_, offset, dst, n, input.size_, input.fault_, input.observer_);
+}
+
+void check_unchanged(const fits_input& input) {
+  struct stat sb {};
+  if (::fstat(input.fd_, &sb) != 0) {
+    fail(error_category::io, "fits.fstat", "fstat non riuscita", {{"errno", std::to_string(errno)}});
+  }
+  if (static_cast<std::uint64_t>(sb.st_size) != input.size_) {
+    fail(error_category::integrity, "input.size_changed", "la dimensione del file e' cambiata dopo fstat",
+         {{"atteso", std::to_string(input.size_)}, {"trovata", std::to_string(sb.st_size)}});
+  }
+  const auto ns = [](const struct timespec& t) { return std::int64_t{t.tv_sec} * 1000000000 + t.tv_nsec; };
+  if (ns(sb.st_mtim) != input.mtime_ns_ || ns(sb.st_ctim) != input.ctime_ns_) {
+    fail(error_category::integrity, "input.modified", "il file e' stato modificato dopo l'apertura");
+  }
+}
+
+}  // namespace fits_detail
 
 fits_input open_fits_input(const std::string& path) {
   int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
@@ -515,14 +554,22 @@ fits_input open_fits_input(const std::string& path) {
     fail(error_category::limit_exceeded, "fits.max_file_bytes", "file oltre il limite",
          {{"dimensione", std::to_string(size)}, {"limite", std::to_string(fits_limits::max_file_bytes)}});
   }
-  return fits_input(fd, size);
+  const auto ns = [](const struct timespec& t) { return std::int64_t{t.tv_sec} * 1000000000 + t.tv_nsec; };
+  return fits_input(fd, size, ns(sb.st_mtim), ns(sb.st_ctim));
 }
 
 fits_plan plan_fits(const fits_input& input) {
   const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) {
-    pread_exact(input.fd_, offset, dst, n, input.size_, input.fault_);
+    pread_exact(input.fd_, offset, dst, n, input.size_, input.fault_, input.observer_);
   };
   return analyse(input.size_, read).plan;
+}
+
+header_peek peek_header(const fits_input& input, const fits_read_options& options) {
+  const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) { read_exact(input, offset, dst, n); };
+  const scan_result scan = analyse(input.size_bytes(), read);
+  const header_info info = interpret_header(scan.hdus[0].cards, scan.hdus[0].planes(), options);
+  return header_peek{info.phase, info.lin};
 }
 
 fits_plan plan_fits(std::span<const std::uint8_t> bytes) {
@@ -535,7 +582,7 @@ std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_
          {{"dimensione", std::to_string(input.size_)}, {"budget", std::to_string(budget_bytes)}});
   }
   std::vector<std::uint8_t> buffer(static_cast<std::size_t>(input.size_));
-  pread_exact(input.fd_, 0, buffer.data(), buffer.size(), input.size_, input.fault_);
+  pread_exact(input.fd_, 0, buffer.data(), buffer.size(), input.size_, input.fault_, input.observer_);
   std::uint8_t probe = 0;
   ssize_t extra;
   do {
@@ -580,6 +627,8 @@ image decode_fits(std::span<const std::uint8_t> bytes, std::uint64_t budget_byte
   image img = make_image(geometry, scan.plan.type, info.layout, info.cfa);
   img.unit = info.unit;
   img.lin = info.lin;
+  if (info.lin) img.lin_origin.value = info.lin_origin;
+  img.phase = info.phase;
   img.metadata = info.metadata;
   img.header_cards = info.header_cards;
   img.uninterpreted_keywords = info.uninterpreted_keywords;

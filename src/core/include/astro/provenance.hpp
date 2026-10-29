@@ -35,6 +35,8 @@ struct provenance_record {
   std::vector<content_digest> output_digests;
   std::optional<stop_error> stop;
   std::optional<budget_snapshot> budget = std::nullopt;  // fotografato nel preflight e fisso per tutto il job
+  // Osservazioni del job (file letti, esito della cache): serializzate come `details` solo se presenti (ADR-05, R1).
+  std::optional<json> details = std::nullopt;
 };
 
 json provenance_json(const provenance_record& record);

@@ -131,7 +131,7 @@ std::uint64_t allocated_sample_bytes() noexcept { return g_allocated_bytes.load(
 
 bool equivalent_content(const image& a, const image& b) {
   return a.geometry == b.geometry && a.layout == b.layout && a.type == b.type && a.unit == b.unit &&
-         a.lin == b.lin && a.cfa == b.cfa && a.samples == b.samples && a.invalid == b.invalid &&
+         a.lin == b.lin && a.phase == b.phase && a.cfa == b.cfa && a.samples == b.samples && a.invalid == b.invalid &&
          a.variance == b.variance && a.metadata == b.metadata;
 }
 

@@ -1,0 +1,27 @@
+# Sorgente del blocco generato di M2-R1.md (tools/evidence.py)
+file docs/contracts/ADR-03-pixel-maschere.md
+file docs/contracts/ADR-04-persistenza.md
+file docs/contracts/ADR-05-dag-provenance.md
+file docs/datasets/PUB-CFA-01.md
+file src/core/include/astro/inventory.hpp
+file src/core/include/astro/operations.hpp
+file src/core/include/astro/thumbnail_cache.hpp
+file src/core/include/astro/import_job.hpp
+file src/core/inventory.cpp
+file src/core/operations.cpp
+file src/core/thumbnail_cache.cpp
+file src/core/import_job.cpp
+file src/core/fits_header.cpp
+file src/core/fits.cpp
+file src/core/calibration.cpp
+file src/core/calibration_job.cpp
+file tests/unit/test_inventory.cpp
+file tests/unit/test_import.cpp
+file tests/unit/test_phase.cpp
+file tests/unit/test_import_real.cpp
+file tests/unit/import_support.hpp
+file tests/unit/CMakeLists.txt
+file tests/trace/M2.tsv
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

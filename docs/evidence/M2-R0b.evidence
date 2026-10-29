@@ -1,0 +1,7 @@
+# Sorgente del blocco generato di M2-R0b.md (tools/evidence.py)
+file src/core/project_export.cpp
+file tests/unit/test_export.cpp
+file docs/contracts/ADR-04-persistenza.md
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

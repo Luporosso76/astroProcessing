@@ -56,6 +56,10 @@ add_library(astrocore STATIC
   calibration.cpp
   calibration_report.cpp
   calibration_job.cpp
+  operations.cpp
+  inventory.cpp
+  thumbnail_cache.cpp
+  import_job.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
 add_dependencies(astrocore astro_source_revision)

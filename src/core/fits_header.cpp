@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -30,8 +31,8 @@ void for_each_field(F&& f) {
   f(&frame_metadata::roi_y, "YORGSUBF");
 }
 
-constexpr const char* other_keys[] = {"BUNIT",    "LINEAR",   "BAYERPAT", "XBAYROFF",
-                                      "YBAYROFF", "XBINNING", "YBINNING"};
+constexpr const char* other_keys[] = {"BUNIT",    "LINEAR",   "BAYERPAT", "XBAYROFF", "YBAYROFF",
+                                      "XBINNING", "YBINNING", "ASTRPHAS"};
 
 [[noreturn]] void bad_value(const std::string& key, const char* expected) {
   fail(error_category::invalid_input, "fits.keyword_value", "tipo o valore di keyword non valido",
@@ -155,6 +156,24 @@ const char* unit_text(pixel_unit u) {
   std::abort();
 }
 
+const char* phase_text(process_phase p) {
+  switch (p) {
+    case process_phase::raw: return "raw";
+    case process_phase::calibrated: return "calibrated";
+    case process_phase::prestacked: return "prestacked";
+  }
+  std::abort();
+}
+
+process_phase parse_phase(const std::string& raw) {
+  std::string s = raw;
+  for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  if (s == "raw") return process_phase::raw;
+  if (s == "calibrated") return process_phase::calibrated;
+  if (s == "prestacked") return process_phase::prestacked;
+  fail(error_category::unsupported, "fits.phase", "ASTRPHAS non riconosciuta", {{"valore", raw}});
+}
+
 const char* pattern_text(cfa_pattern p) {
   switch (p) {
     case cfa_pattern::rggb: return "RGGB";
@@ -251,7 +270,35 @@ header_info interpret_header(const std::vector<std::string>& cards, std::uint32_
     else if (u == "DIMENSIONLESS") info.unit = pixel_unit::dimensionless;
     else fail(error_category::unsupported, "fits.bunit", "BUNIT non riconosciuta", {{"valore", u}});
   }
-  if (auto l = idx.find("LINEAR")) info.lin = as_logical(*l) ? linearity::linear : linearity::nonlinear;
+  if (auto l = idx.find("LINEAR")) {
+    info.lin = as_logical(*l) ? linearity::linear : linearity::nonlinear;
+    info.lin_origin = metadata_origin::header;
+  }
+  if (options.declared_linearity) {
+    const linearity_class declared = *options.declared_linearity;
+    if (info.lin) {
+      const linearity_class found = *info.lin == linearity::linear ? linearity_class::linear : linearity_class::nonlinear;
+      if (declared != found) {
+        fail(error_category::incompatible, "metadata.declared_conflict", "linearita' dichiarata diversa dall'header",
+             {{"campo", "linearity"}});
+      }
+    } else {
+      info.lin_origin = metadata_origin::declared;
+      if (declared == linearity_class::linear) info.lin = linearity::linear;
+      if (declared == linearity_class::nonlinear) info.lin = linearity::nonlinear;
+    }
+  }
+  if (auto l = idx.find("ASTRPHAS")) {
+    info.phase = metadata_value<process_phase>{parse_phase(as_string(*l)), {metadata_origin::header, "ASTRPHAS"}};
+  }
+  if (options.declared_phase) {
+    if (!info.phase) {
+      info.phase = metadata_value<process_phase>{*options.declared_phase, {metadata_origin::declared, {}}};
+    } else if (info.phase->value != *options.declared_phase) {
+      fail(error_category::incompatible, "metadata.declared_conflict", "fase dichiarata diversa dall'header",
+           {{"campo", "phase"}});
+    }
+  }
   info.binning_x = read_binning(idx, "XBINNING");
   info.binning_y = read_binning(idx, "YBINNING");
 
@@ -288,6 +335,7 @@ std::vector<std::string> missing_cards(const image& img, const std::vector<std::
   });
   if (img.unit) add("BUNIT", std::string(unit_text(*img.unit)));
   if (img.lin) add("LINEAR", *img.lin == linearity::linear);
+  if (img.phase) add("ASTRPHAS", std::string(phase_text(img.phase->value)));
   if (img.cfa) {
     add("BAYERPAT", std::string(pattern_text(img.cfa->pattern)));
     add("XBAYROFF", static_cast<std::int64_t>(img.cfa->x_offset));
@@ -306,6 +354,7 @@ void check_header_matches(const image& img, const header_info& info) {
   };
   if (img.unit != info.unit) bad("unit");
   if (img.lin != info.lin) bad("lin");
+  if (img.phase != info.phase) bad("phase");
   if (img.cfa != info.cfa) bad("cfa");
   if (img.layout != info.layout) bad("layout");
   if (img.geometry.binning_x != info.binning_x || img.geometry.binning_y != info.binning_y) bad("binning");

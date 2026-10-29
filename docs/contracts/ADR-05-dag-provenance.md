@@ -107,6 +107,15 @@ Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita re
 | T-M2B-12 | Ogni categoria al confine: exit 2 (3 per `cancelled`), job marcato, prenotazioni rilasciate. |
 | T-M2B-13 | `fits.decode`: cambiare `fits_read_options` o un valore `declare_metadata` cambia `node_key`; stessi parametri, stessa chiave. Da implementare in M2.b. |
 
+## Aggiunte di R1: nodi di import, thumbnail e rebuild; fase e linearità nella provenance
+
+- `provenance_record` ha il campo opzionale `details` (oggetto JSON), serializzato come `details` solo se presente. I job ne sono gli unici autori; non entra nella chiave del nodo.
+- Un job che legge file ne elenca la lettura in `details.observed_inputs`: per ogni file `input_name`, `sha256`, `size_bytes`, `phase` e `linearity` con la rispettiva `origin` (`header` o `declared`; la linearità `unknown` non ha origine di header), e `uninterpreted_keywords` (F-IO-01, F-IO-10). Lo scrivono `run_import_job` e `run_calibration_job`.
+- `details.cache` (job `thumbnail` e `cache.rebuild`): `action`, `key`, `entry`, `outcome` (`cache_hit`, `computed`, `rebuilt`); per `cache.rebuild` anche `cause` e `replaced_entry` (`name`, `found_digest`).
+- Nodi (precisione `f64`, backend `cpu_scalar`, nessun seed): `io.import` (parametri `declared_phase`, `declared_linearity`, `declared_bayer_x_offset`, `declared_bayer_y_offset`, `report_version`), `io.thumbnail` (`block_width`, `block_height`, `cache_algorithm_version`) e `cache.rebuild` (gli stessi, più `target` e `cause`); ingresso: il digest del file sorgente. Un nodo `io.thumbnail` e un nodo `cache.rebuild` con gli stessi parametri hanno chiavi diverse.
+- `fits_read_options` con `declared_phase` o `declared_linearity` entra nei parametri del nodo `fits.decode` solo se valorizzata (le chiavi dei nodi esistenti non cambiano).
+- Il nodo di calibrazione riporta in `fits_read_options` di ogni ingresso anche `declared_phase`. La calibrazione richiede la fase `raw` e la linearità `linear` per tutti i suoi quattro ingressi ([ADR-03](ADR-03-pixel-maschere.md)).
+
 ## Fuori da M2
 
 Ruleset e cache di ricerca (ADR-05.b); snapshot immutabili degli input; digest parziali per l'esplorazione; distinzione fra controllo di regressione e validazione indipendente; verifica di completezza per configurazione (§11.11).

@@ -233,6 +233,11 @@ struct calib_header {
   int xbin = 1;
   int ybin = 1;
   bool with_unit_and_linear = true;
+  // Con `with_unit_and_linear`: LINEAR assente se `with_linear` e' falso, altrimenti `linear_value`.
+  bool with_linear = true;
+  bool linear_value = true;
+  // Fase di processo (card ASTRPHAS); vuota = card assente.
+  std::string phase = "raw";
   std::vector<std::string> extra;
 };
 
@@ -245,8 +250,9 @@ inline std::vector<std::string> calib_cards(const calib_header& h) {
   if (h.saturation != 0) c.push_back(card_real("SATURATE", h.saturation));
   if (h.with_unit_and_linear) {
     c.push_back(card_str("BUNIT", "adu"));
-    c.push_back(card_bool("LINEAR", true));
+    if (h.with_linear) c.push_back(card_bool("LINEAR", h.linear_value));
   }
+  if (!h.phase.empty()) c.push_back(card_str("ASTRPHAS", h.phase));
   if (!h.bayer.empty()) {
     c.push_back(card_str("BAYERPAT", h.bayer));
     c.push_back(card_int("XBAYROFF", h.bayer_x));

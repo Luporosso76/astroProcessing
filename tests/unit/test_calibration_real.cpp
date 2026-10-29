@@ -183,6 +183,7 @@ void run_band(const band& b, const std::map<std::string, double>& env) {
     in->declared_fields.binning_y = 1;
     in->declared_fields.unit = pixel_unit::adu;
     in->declared_fields.lin = linearity::linear;
+    in->read_options.declared_phase = process_phase::raw;
   }
   r.normalization = normalization_mode::global_median;
   r.q_min = 0.05;

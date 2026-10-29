@@ -182,7 +182,7 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
     std::vector<content_digest> digests;
     for (const stored_file& f : result.files) digests.push_back(f.digest());
     provenance.emplace(provenance_record{spec, current_library_versions(), job.generation, job_state::completed, warnings,
-                                         std::move(digests), std::nullopt, budget});
+                                         std::move(digests), std::nullopt, budget, std::move(result.details)});
     std::vector<stored_file> files = std::move(result.files);
     files.push_back(write_provenance(store, *provenance));
     store.commit_job(job.id, files);

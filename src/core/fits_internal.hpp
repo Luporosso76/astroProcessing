@@ -73,6 +73,9 @@ sample_type type_for_encoding(int bitpix, double bscale, double bzero);
 struct header_info {
   std::optional<pixel_unit> unit;
   std::optional<linearity> lin;
+  // Origine della linearita': assente se non e' ne' nell'header ne' dichiarata (classe `unknown`).
+  std::optional<metadata_origin> lin_origin;
+  std::optional<metadata_value<process_phase>> phase;
   std::optional<cfa_layout> cfa;
   std::optional<std::uint32_t> binning_x;
   std::optional<std::uint32_t> binning_y;

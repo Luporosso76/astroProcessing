@@ -14,6 +14,9 @@ namespace astro {
 enum class sample_type { f32, f64 };
 enum class pixel_unit { adu, electron, dimensionless };
 enum class linearity { linear, nonlinear };
+// Classe di linearita' di un'immagine: `unknown` e' un valore esplicito e non e' mai trattato come `linear` (ADR-03).
+enum class linearity_class { linear, nonlinear, unknown };
+enum class process_phase { raw, calibrated, prestacked };
 enum class cfa_pattern { rggb, bggr, grbg, gbrg };
 enum class plane_layout { mono, cfa, rgb, multi_plane };
 
@@ -171,6 +174,12 @@ void declare_metadata(std::optional<metadata_value<T>>& field, const T& value,
   field = metadata_value<T>{value, {metadata_origin::declared, {}}};
 }
 
+// Origine di un valore che non fa parte del contenuto: l'uguaglianza non la confronta.
+struct origin_note {
+  std::optional<metadata_origin> value;
+  friend bool operator==(const origin_note&, const origin_note&) noexcept { return true; }
+};
+
 struct source_encoding {
   int bitpix = 0;
   double bzero = 0.0;
@@ -186,6 +195,10 @@ struct image {
   sample_type type = sample_type::f32;
   std::optional<pixel_unit> unit;
   std::optional<linearity> lin;
+  // Origine di `lin` (header o dichiarata); vuota se `lin` e' assente.
+  origin_note lin_origin;
+  // Fase di processo dichiarata (header `ASTRPHAS` o dichiarazione); assente = non dichiarata, mai indovinata.
+  std::optional<metadata_value<process_phase>> phase;
   std::optional<cfa_layout> cfa;
   aligned_buffer samples;
   invalid_mask invalid;
@@ -227,7 +240,7 @@ struct image {
   }
 };
 
-// Contenuto scientifico: geometria, layout, tipo, unita', linearita', cfa, campioni, maschera, varianza e
+// Contenuto scientifico: geometria, layout, tipo, unita', linearita', fase (valore, senza origine), cfa, campioni, maschera, varianza e
 // valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine dei metadati.
 bool equivalent_content(const image& a, const image& b);
 

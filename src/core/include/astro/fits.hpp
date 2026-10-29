@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -11,6 +13,15 @@
 #include "astro/image.hpp"
 
 namespace astro {
+
+class fits_input;
+
+namespace fits_detail {
+void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::size_t n);
+// Confronta dimensione, mtime e ctime del file aperto con quelli di open_fits_input: dimensione diversa =
+// integrity input.size_changed; mtime o ctime diversi = integrity input.modified.
+void check_unchanged(const fits_input& input);
+}
 
 namespace fits_limits {
 constexpr std::uint32_t max_naxis = 3;
@@ -51,16 +62,27 @@ class fits_input {
   // (fine file) alla lettura, con la dimensione del file invariata.
   void set_fault_injector(fault_injector injector) { fault_ = std::move(injector); }
 
+  // Solo test: chiamato con offset e lunghezza di ogni lettura prima del pread; un valore diverso da zero e' l'errno
+  // dell'errore di I/O che la lettura produce (io, fits.read), senza eseguire il pread.
+  using pread_observer = std::function<int(std::uint64_t offset, std::size_t length)>;
+  void set_pread_observer(pread_observer observer) { observer_ = std::move(observer); }
+
  private:
   friend fits_input open_fits_input(const std::string& path);
   friend fits_plan plan_fits(const fits_input& input);
   friend std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_t budget_bytes);
   friend std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t budget_bytes);
-  fits_input(int fd, std::uint64_t size) noexcept : fd_(fd), size_(size) {}
+  friend void fits_detail::read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::size_t n);
+  friend void fits_detail::check_unchanged(const fits_input& input);
+  fits_input(int fd, std::uint64_t size, std::int64_t mtime_ns, std::int64_t ctime_ns) noexcept
+      : fd_(fd), size_(size), mtime_ns_(mtime_ns), ctime_ns_(ctime_ns) {}
 
   int fd_ = -1;
   std::uint64_t size_ = 0;
+  std::int64_t mtime_ns_ = 0;
+  std::int64_t ctime_ns_ = 0;
   fault_injector fault_;
+  pread_observer observer_;
 };
 
 // open + fstat. Non regolare: invalid_input fits.not_regular; oltre max_file_bytes: limit_exceeded fits.max_file_bytes.
@@ -85,7 +107,18 @@ std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t
 struct fits_read_options {
   std::optional<std::uint8_t> declared_bayer_x_offset;
   std::optional<std::uint8_t> declared_bayer_y_offset;
+  // Fase e linearita' dichiarate all'import (ADR-03, R1): in conflitto con l'header = stop.
+  std::optional<process_phase> declared_phase;
+  std::optional<linearity_class> declared_linearity;
 };
+
+// Fase e linearita' dai soli header (`ASTRPHAS`, `LINEAR` o `options`), con gli stessi limiti e senza leggere campioni.
+// Assenti: nullopt. Conflitto con le dichiarazioni: incompatible metadata.declared_conflict.
+struct header_peek {
+  std::optional<metadata_value<process_phase>> phase;
+  std::optional<linearity> lin;
+};
+header_peek peek_header(const fits_input& input, const fits_read_options& options);
 
 // Decode da buffer in memoria (CFITSIO fits_open_memfile). Rifa' l'analisi sul buffer e controlla il picco
 // contro budget_bytes (budget: sched.job_exceeds_budget) prima di allocare i campioni.

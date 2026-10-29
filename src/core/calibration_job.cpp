@@ -3,6 +3,7 @@
 
 #include "astro/calibration.hpp"
 #include "astro/error.hpp"
+#include "astro/operations.hpp"
 #include "astro/scheduler.hpp"
 
 namespace astro {
@@ -71,6 +72,9 @@ json input_params(const calibration_input_spec& s) {
            s.read_options.declared_bayer_x_offset ? json::uinteger(*s.read_options.declared_bayer_x_offset) : json::null());
   read.set("declared_bayer_y_offset",
            s.read_options.declared_bayer_y_offset ? json::uinteger(*s.read_options.declared_bayer_y_offset) : json::null());
+  read.set("declared_phase", s.read_options.declared_phase ? json::string(to_string(*s.read_options.declared_phase)) : json::null());
+  read.set("declared_linearity",
+           s.read_options.declared_linearity ? json::string(to_string(*s.read_options.declared_linearity)) : json::null());
   o.set("fits_read_options", std::move(read));
   json var = json::object();
   var.set("source", json::string(*s.variance.source == variance_source::plane ? "plane" : "noise_model"));
@@ -137,7 +141,12 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     std::array<fits_plan, 4> plans;
     std::uint64_t input_peaks = 0;
     for (std::size_t i = 0; i < specs.size(); ++i) {
-      plans[i] = plan_fits(open_fits_input(specs[i]->path));
+      fits_input input = open_fits_input(specs[i]->path);
+      // Fase e linearita' dai soli header e dalla ricetta, prima di ogni lettura di campioni (ADR-03, R1).
+      const header_peek peek = peek_header(input, specs[i]->read_options);
+      require_calibration_phase(names[i], peek.phase);
+      require_calibration_linearity(names[i], peek.lin, specs[i]->declared_fields.lin);
+      plans[i] = plan_fits(input);
       input_peaks += plans[i].peak_bytes;
     }
     if (options.hook) options.hook("plan.done");
@@ -159,6 +168,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     plan.tile_rows = options.tile_rows;
 
     std::optional<prepared_calibration> prepared;
+    json observed = json::array();
     std::vector<stored_file> files;
     std::vector<std::string> warnings;
     const std::uint64_t tile_rows = options.tile_rows == 0 ? 1 : options.tile_rows;
@@ -196,6 +206,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       prepared.emplace(prepare_calibration(
           recipe, calibration_images{std::move(images[0]), std::move(images[1]), std::move(images[2]),
                                      std::move(images[3])}));
+      observed = prepared->observed_inputs();
       if (options.hook) options.hook("preflight.done");
       for (std::size_t i = 0; i < specs.size(); ++i) {
         try {
@@ -235,7 +246,9 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
 
     job_scheduler scheduler(pool);
     scheduler.run(plan, spec, cancel);
-    return job_files_result{std::move(files), std::move(warnings)};
+    json details = json::object();
+    details.set("observed_inputs", std::move(observed));
+    return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
   return run_job_files(store, slot_name, work, budget, &cancel);
 }
