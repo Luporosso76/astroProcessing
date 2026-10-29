@@ -93,7 +93,7 @@ Stima progettuale del pack, non misurata, con circa 28–32 byte per stella più
 |---|---|
 | PUB-REG-01 | ESO EFOSC2, NGC 2808, prog. 092.D-0449(A), filtro R#642. Riserva: Zenodo 3989223 (WASP-74b) |
 | RAW M3.a | raw.pixls.us, solo file CC0; esclusi i file CC BY-NC-SA 4.0 |
-| CFA M3.d | Zenodo 17843622, sub Seestar. Acquisizione in streaming rinviata all'inizio di M3.d |
+| CFA M3.d | Zenodo 17843622, sub Seestar (PUB-CFA-01). Acquisizione nei residui M2 (R1, T-M2R1-09); in M3.d solo l'uso per il debayer |
 | PUB-DEEP-01 | Cutout HST ACS drz/drc di un campo nebulare, da scegliere in M3.i |
 | Colore per tutto il cielo M3.q | BLOCKED: nessun catalogo broadband ridistribuibile. Sblocco solo con autorizzazione scritta ESA o conferma USNO per UCAC4; decisione del proprietario |
 | Solver M3.p | 2MASS PSC per l'astrometria |
