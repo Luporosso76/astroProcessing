@@ -1,6 +1,6 @@
 # Gate M2: verifica complessiva della milestone
 
-Stato: **PASS**, 29 ottobre 2026. Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
+Stato: **RIAPERTO**, 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è revocato: manca F-IO-10 (import prestacked e calibrato tipizzato), che il registro dell'appendice D impone a M2.c (`M2.c requires_all F-IO-10`, piano attivo riga 4415; foglia a riga 1821). Lo ha rilevato la review del piano M3 (`.omc/artifacts/ask/codex-m3plan-review1-20261029-1424.md`); i sette giri del gate non l'avevano visto. Storico del gate: Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
 
 ## Clausola del gate e record
 
