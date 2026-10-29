@@ -74,12 +74,16 @@ std::vector<stored_file> sqlite_dag_store::write_files(const std::vector<artifac
     if (!valid_role(f.role) || !roles.insert(f.role).second) {
       throw stop_error(error_category::invalid_input, "store.bad_role", "ruolo non valido o ripetuto", {{"ruolo", f.role}});
     }
+    if (f.source && !f.expected) {
+      throw stop_error(error_category::invalid_input, "store.stream_digest",
+                       "un contenuto in streaming richiede il digest atteso", {{"ruolo", f.role}});
+    }
   }
   const unique_fd dir = open_dir_nofollow(root_fd_, "artifacts", "store.symlink");
   const inode_set originals = original_inodes(db_);
   // Regola hardlink su tutti i nomi finali prima della prima scrittura: un rifiuto non lascia file degli altri output.
   for (const auto& f : files) {
-    const std::string name = digest_of(f.bytes).sha256 + "." + f.extension;
+    const std::string name = (f.source ? f.expected->sha256 : digest_of(f.bytes).sha256) + "." + f.extension;
     struct stat st {};
     if (::fstatat(dir.get(), name.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
       if (errno == ENOENT) continue;
@@ -98,7 +102,9 @@ std::vector<stored_file> sqlite_dag_store::write_files(const std::vector<artifac
     options.managed = true;
     options.originals = &originals;
     options.observer = &observer_;
-    const atomic_result r = atomic_write(options, f.bytes, f.expected);
+    if (f.source) options.known_name = f.expected->sha256 + "." + f.extension;
+    const atomic_result r = f.source ? atomic_write_stream(options, f.source, f.expected)
+                                     : atomic_write(options, f.bytes, f.expected);
     const std::uint64_t token = next_token_++;
     out.push_back(stored_file(r.name, r.digest, f.kind, f.role, store_id_, file_identity(r.final_stat), token));
     written_.emplace(token, out.back());

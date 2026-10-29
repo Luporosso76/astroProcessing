@@ -1,8 +1,15 @@
 #include <gtest/gtest.h>
+#include <signal.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <cerrno>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -212,6 +219,173 @@ TEST(Spill, a_failed_allocation_in_resident_bytes_does_not_leak_the_mapping) {
       },
       std::bad_alloc);
   EXPECT_EQ(mapping_count(dir), before);
+}
+
+// ---------------------------------------------------------------- T-M2R3-05: ENOSPC e quota
+
+TEST(Spill, T_M2R3_05_enospc_on_a_write_is_io_with_errno_and_releases_the_extension) {
+  const fs::path dir = fresh_dir("spill_enospc");
+  spill_area area(spill_config{dir, 1 << 20});
+  int calls = 0;
+  area.set_fault_injector([&](std::string_view point) {
+    EXPECT_EQ(point, "spill.write");
+    return ++calls == 2 ? ENOSPC : 0;
+  });
+  spill_file f = area.create_file();
+  f.write(0, pattern(4096, 1));
+  EXPECT_EQ(area.used_bytes(), 4096u);
+  try {
+    f.write(4096, pattern(8192, 2));
+    ADD_FAILURE() << "ENOSPC atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::io);
+    EXPECT_EQ(e.code(), "spill.write");
+    bool found = false;
+    for (const auto& [k, v] : e.context()) found = found || (k == "errno" && v == std::to_string(ENOSPC));
+    EXPECT_TRUE(found) << e.what();
+  }
+  EXPECT_EQ(area.used_bytes(), 4096u) << "l'estensione della scrittura fallita torna alla quota";
+  EXPECT_EQ(f.size_bytes(), 4096u);
+  f.write(4096, pattern(8192, 3));
+  EXPECT_EQ(area.used_bytes(), 12288u);
+  std::vector<std::byte> back(8192);
+  f.read(4096, back);
+  EXPECT_EQ(back, pattern(8192, 3));
+}
+
+TEST(Spill, T_M2R3_05_a_failed_write_inside_the_extension_keeps_the_charge) {
+  const fs::path dir = fresh_dir("spill_enospc_inner");
+  spill_area area(spill_config{dir, 1 << 20});
+  bool fail = false;
+  area.set_fault_injector([&](std::string_view) { return fail ? ENOSPC : 0; });
+  spill_file f = area.create_file();
+  f.write(0, pattern(8192, 1));
+  fail = true;
+  EXPECT_STOP(f.write(100, pattern(10, 2)), error_category::io, "spill.write");
+  EXPECT_EQ(area.used_bytes(), 8192u);
+}
+
+// ---------------------------------------------------------------- T-M2R3-06: staging nominato
+
+TEST(Spill, T_M2R3_06_named_file_survives_the_area_and_is_reopened_with_its_extension_charged) {
+  const fs::path dir = fresh_dir("spill_named");
+  {
+    spill_area area(spill_config{dir, 1 << 20});
+    spill_file& f = area.open_named_file("job.stage", false);
+    f.write(0, pattern(5000, 4));
+    EXPECT_EQ(area.used_bytes(), 5000u);
+  }
+  ASSERT_TRUE(fs::exists(dir / "job.stage"));
+  EXPECT_EQ(fs::file_size(dir / "job.stage"), 5000u);
+  {
+    spill_area area(spill_config{dir, 1 << 20});
+    spill_file& f = area.open_named_file("job.stage", true);
+    EXPECT_EQ(area.used_bytes(), 5000u);
+    std::vector<std::byte> back(5000);
+    f.read(0, back);
+    EXPECT_EQ(back, pattern(5000, 4));
+  }
+  {
+    spill_area area(spill_config{dir, 4000});
+    EXPECT_STOP(area.open_named_file("job.stage", true), error_category::budget, "spill.quota_exceeded");
+  }
+  {
+    spill_area area(spill_config{dir, 1 << 20});
+    spill_file& f = area.open_named_file("job.stage", false);  // esecuzione nuova: troncato
+    EXPECT_EQ(f.size_bytes(), 0u);
+    EXPECT_EQ(area.used_bytes(), 0u);
+  }
+  EXPECT_EQ(fs::file_size(dir / "job.stage"), 0u);
+  remove_named_spill_file(dir, "job.stage");
+  EXPECT_FALSE(fs::exists(dir / "job.stage"));
+  remove_named_spill_file(dir, "job.stage");
+}
+
+TEST(Spill, T_M2R3_06_named_file_rules) {
+  const fs::path dir = fresh_dir("spill_named_rules");
+  spill_area area(spill_config{dir, 1 << 20});
+  EXPECT_STOP(area.open_named_file("absent.stage", true), error_category::metadata_missing, "sched.checkpoint_missing");
+  for (const char* bad : {"", ".", "..", "a/b", "x y"}) {
+    EXPECT_STOP(area.open_named_file(bad, false), error_category::invalid_input, "spill.staging_name");
+  }
+  write_text(dir / "target", "x");
+  fs::create_symlink(dir / "target", dir / "link.stage");
+  EXPECT_STOP(area.open_named_file("link.stage", false), error_category::security, "spill.staging_unsafe");
+  EXPECT_STOP(area.open_named_file("link.stage", true), error_category::security, "spill.staging_unsafe");
+  ASSERT_EQ(::link((dir / "target").c_str(), (dir / "hard.stage").c_str()), 0);
+  EXPECT_STOP(area.open_named_file("hard.stage", true), error_category::security, "spill.staging_unsafe");
+  fs::create_directory(dir / "sub.stage");
+  EXPECT_STOP(area.open_named_file("sub.stage", true), error_category::security, "spill.staging_unsafe");
+  EXPECT_EQ(read_text(dir / "target"), "x");
+}
+
+// Scrittura corta reale: RLIMIT_FSIZE nel processo figlio tronca il pwrite e il successivo da' EFBIG.
+TEST(Spill, T_M2R3_05_a_short_write_keeps_extension_and_quota_of_the_bytes_written) {
+  const fs::path dir = fresh_dir("spill_short_write");
+  const pid_t pid = ::fork();
+  ASSERT_GE(pid, 0);
+  if (pid == 0) {
+    ::signal(SIGXFSZ, SIG_IGN);
+    struct rlimit limit {6000, 6000};
+    if (::setrlimit(RLIMIT_FSIZE, &limit) != 0) ::_exit(10);
+    try {
+      spill_area area(spill_config{dir, 1 << 20});
+      spill_file f = area.create_file();
+      f.write(0, pattern(4096, 1));
+      bool stopped = false;
+      try {
+        f.write(4096, pattern(4096, 2));
+      } catch (const stop_error& e) {
+        stopped = e.code() == "spill.write";
+      }
+      if (!stopped) ::_exit(11);
+      if (f.size_bytes() != 6000) ::_exit(12);
+      if (area.used_bytes() != 6000) ::_exit(13);
+      std::vector<std::byte> back(6000 - 4096);
+      f.read(4096, back);
+      const std::vector<std::byte> expected = pattern(4096, 2);
+      if (!std::equal(back.begin(), back.end(), expected.begin())) ::_exit(14);
+    } catch (...) {
+      ::_exit(15);
+    }
+    ::_exit(0);
+  }
+  int status = 0;
+  ASSERT_EQ(::waitpid(pid, &status, 0), pid);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0) << "10 setrlimit, 11 nessuno stop, 12 estensione, 13 quota, 14 contenuto, 15 eccezione";
+}
+
+TEST(Spill, T_M2R3_05_a_write_inside_a_failing_extension_waits_and_keeps_its_bytes) {
+  const fs::path dir = fresh_dir("spill_concurrent_fail");
+  spill_area area(spill_config{dir, 1 << 20});
+  spill_file f = area.create_file();
+  f.write(0, pattern(1000, 1));
+  m2d::gate release;
+  std::atomic<bool> first_inside{false}, second_done{false};
+  area.set_fault_injector([&](std::string_view) {
+    if (!first_inside.exchange(true)) {
+      EXPECT_TRUE(release.wait());
+      return ENOSPC;
+    }
+    return 0;
+  });
+  std::thread failing([&] { EXPECT_STOP(f.write(1000, pattern(9000, 2)), error_category::io, "spill.write"); });
+  EXPECT_TRUE(wait_until([&] { return first_inside.load(); }));
+  std::thread inside([&] {
+    f.write(2000, pattern(500, 3));  // dentro l'estensione della scrittura che fallira'
+    second_done = true;
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(30));
+  EXPECT_FALSE(second_done.load()) << "la scrittura nel tratto incerto attende l'esito";
+  release.open();
+  failing.join();
+  inside.join();
+  EXPECT_EQ(f.size_bytes(), 2500u);
+  EXPECT_EQ(area.used_bytes(), 2500u);
+  std::vector<std::byte> back(500);
+  f.read(2000, back);
+  EXPECT_EQ(back, pattern(500, 3));
 }
 
 }  // namespace

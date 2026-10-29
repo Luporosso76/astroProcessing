@@ -2,10 +2,13 @@
 
 #include <sched.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -13,6 +16,7 @@
 #include "astro/budget.hpp"
 #include "astro/cancel.hpp"
 #include "astro/checkpoint.hpp"
+#include "astro/fault_injector.hpp"
 #include "astro/job.hpp"
 #include "astro/job_plan.hpp"
 #include "astro/memory_pool.hpp"
@@ -31,10 +35,30 @@ int system_affinity(cpu_set_t* set);
 // CPU in sched_getaffinity. Chiamata fallita o zero CPU: io sched.cpu_count. hardware_concurrency non si usa.
 std::size_t cpu_count(const affinity_fn& affinity = system_affinity);
 
+// Ammissione sotto pressione (ADR-06, estensione R3.2; D11, D12): campionata a ogni ammissione di un job, prima della
+// prenotazione del pool. Con PSI >= threshold l'ammissione attende senza timeout e ricampiona ogni `poll`.
+struct pressure_gate {
+  // PSI `some avg10`; nullopt = sorgente assente (nessuna pressione). Errore della sorgente: si propaga.
+  std::function<std::optional<double>()> sample;
+  double threshold = budget_psi_threshold;
+  std::chrono::milliseconds poll{1000};
+  // Job in attesa di ammissione per pressione (aggiornato dallo scheduler; letto dal monitor).
+  std::atomic<std::size_t> waiting_jobs{0};
+};
+
+// Lettura della pressione fatta durante l'ammissione di un job.
+struct admission_sample {
+  std::optional<double> psi;
+  bool admitted = false;
+  friend bool operator==(const admission_sample&, const admission_sample&) = default;
+};
+
 // Parametri configurabili dello scheduler (resource_config). `cpu_set` vuoto = nessuna affinita' applicata.
+// `pressure` nullo = ammissione senza campionamento della pressione.
 struct scheduler_tuning {
   std::size_t max_queued_jobs = job_queue_capacity;
   std::vector<unsigned> cpu_set;
+  std::shared_ptr<pressure_gate> pressure;
 };
 
 struct job_context {
@@ -66,12 +90,15 @@ struct job_spec {
   // Esegue il task e restituisce il digest SHA-256 esadecimale del risultato parziale (richiesto se checkpoint_every > 0).
   std::function<std::string(task_context&)> run_task;
   // Solo per il resume: ricalcola il digest del risultato parziale gia' salvato del task.
+  // Chiamato dopo `prepare` e prima del primo task.
   std::function<std::string(std::uint64_t)> verify_partial;
   std::function<void(job_context&)> prepare;   // una volta, prima del primo task
   std::function<void(job_context&)> finalize;  // una volta, dopo l'ultimo task e solo se nessuno e' fallito
   std::filesystem::path checkpoint_dir;        // con checkpoint_name: obbligatori se checkpoint_every > 0 o resume
   std::string checkpoint_name;                 // identifica il job nella directory (vedi write_checkpoint)
   bool resume = false;
+  // Solo test: iniettore dei guasti della scrittura dei checkpoint (punti `checkpoint.<passo>`).
+  fault_injector fault;
 };
 
 struct job_report {
@@ -85,6 +112,10 @@ struct job_report {
   std::uint64_t job_peak_bytes = 0;
   std::uint64_t spill_peak_bytes = 0;
   std::vector<std::string> partial_digests;  // per indice di task
+  // Ammissione sotto pressione (vuoto senza pressure_gate): la prima lettura e, se diversa, quella dell'ammissione.
+  // Le letture intermedie sopra soglia sono solo contate: la memoria non cresce con la durata dell'attesa.
+  std::vector<admission_sample> admission;
+  std::uint64_t pressure_wait_samples = 0;  // letture sopra soglia (attesa)
 };
 
 // Esecutore dei job sul pool. Piu' scheduler (o piu' thread) possono condividere lo stesso pool.

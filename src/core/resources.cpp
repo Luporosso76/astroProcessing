@@ -67,7 +67,8 @@ resource_config::resource_config()
       report_margin_bytes{mib, declared_origin},
       fraction_normal{{3, 8}, gate_origin},
       fraction_pressure{{1, 4}, gate_origin},
-      psi_threshold{budget_psi_threshold, gate_origin} {}
+      psi_threshold{budget_psi_threshold, gate_origin},
+      pressure_poll_ms{1000, declared_origin} {}
 
 void validate_resource_config(const resource_config& c) {
   if (c.rss_target_bytes && *c.rss_target_bytes == 0) invalid("resources.rss_target_bytes", "l'obiettivo RSS deve essere > 0");
@@ -75,6 +76,7 @@ void validate_resource_config(const resource_config& c) {
   check_persistable(c.job_queue_capacity.value, "job_queue_capacity");
   check_persistable(c.task_queue_capacity.value, "task_queue_capacity");
   check_persistable(c.report_margin_bytes.value, "report_margin_bytes");
+  check_persistable(c.pressure_poll_ms.value, "pressure_poll_ms");
   check_dir_quota(c.scratch, "scratch");
   check_dir_quota(c.disk_cache, "disk_cache");
   if (c.cpu_set) {
@@ -102,6 +104,8 @@ void validate_resource_config(const resource_config& c) {
   const double psi = c.psi_threshold.value;
   if (!std::isfinite(psi) || psi <= 0.0 || psi > 100.0) invalid("resources.psi_threshold", "soglia PSI fuori da (0, 100]");
   check_origin(c.psi_threshold.origin, "psi_threshold");
+  if (c.pressure_poll_ms.value < 1) invalid("resources.pressure_poll_ms", "intervallo >= 1 ms");
+  check_origin(c.pressure_poll_ms.origin, "pressure_poll_ms");
 }
 
 void validate_cpu_set(const resource_config& c, const affinity_fn& affinity) {
@@ -131,6 +135,15 @@ scheduler_tuning scheduler_tuning_of(const resource_config& c) {
   t.max_queued_jobs = c.job_queue_capacity.value;
   if (c.cpu_set) t.cpu_set = *c.cpu_set;
   return t;
+}
+
+std::shared_ptr<pressure_gate> make_pressure_gate(const resource_config& c, const budget_sources& sources) {
+  validate_resource_config(c);
+  auto gate = std::make_shared<pressure_gate>();
+  gate->sample = [sources] { return read_memory_pressure(sources); };
+  gate->threshold = c.psi_threshold.value;
+  gate->poll = std::chrono::milliseconds(static_cast<std::int64_t>(c.pressure_poll_ms.value));
+  return gate;
 }
 
 // ---------------------------------------------------------------- JSON
@@ -242,6 +255,7 @@ json resource_config_json(const resource_config& c) {
   psi.set("value", json::number(c.psi_threshold.value));
   psi.set("origin", json::string(c.psi_threshold.origin));
   o.set("psi_threshold", std::move(psi));
+  o.set("pressure_poll_ms", tunable_json(c.pressure_poll_ms.value, c.pressure_poll_ms.origin));
   json vram = json::object();
   vram.set("value", json::null());
   vram.set("reason", json::string(vram_null_reason));
@@ -252,7 +266,7 @@ json resource_config_json(const resource_config& c) {
 resource_config parse_resource_config(const json& doc) {
   expect_keys(doc, {"rss_target_bytes", "scratch", "disk_cache", "cpu_set", "worker_count", "tile_rows",
                     "job_queue_capacity", "task_queue_capacity", "report_margin_bytes", "fraction_normal",
-                    "fraction_pressure", "psi_threshold", "vram"},
+                    "fraction_pressure", "psi_threshold", "pressure_poll_ms", "vram"},
               "resources.config");
   resource_config c;
   c.rss_target_bytes = opt_from(need(doc, "rss_target_bytes"), "rss_target_bytes");
@@ -282,6 +296,7 @@ resource_config parse_resource_config(const json& doc) {
   }
   c.psi_threshold = {pv.type() == json::kind::integer ? static_cast<double>(pv.as_integer()) : pv.as_number(),
                      po.as_string()};
+  c.pressure_poll_ms = tunable_from<std::uint64_t>(need(doc, "pressure_poll_ms"), "pressure_poll_ms");
   const json& vram = need(doc, "vram");
   expect_keys(vram, {"value", "reason"}, "vram");
   if (need(vram, "value").type() != json::kind::null || need(vram, "reason").type() != json::kind::string ||
@@ -344,15 +359,54 @@ plan_bounds compute_plan_bounds(const planner_input& in, const resource_config& 
   return b;
 }
 
+namespace {
+
+// Modello della residenza a blocchi (ADR-06, estensione R3.2): stesso tile della residenza intera.
+plan_bounds block_bounds(const planner_input& in, const resource_config& config, std::uint32_t tile_rows) {
+  if (in.block_raw_bytes_per_row == 0 || in.block_band_bytes_per_row == 0 || in.block_regions == 0 ||
+      (in.normalization_channels != 1 && in.normalization_channels != 4)) {
+    invalid("resources.planner_input", "ingressi della residenza a blocchi mancanti o non validi");
+  }
+  plan_bounds b;
+  b.tile_rows = tile_rows;
+  b.task_count = ceil_div(in.height, tile_rows);
+  const u128 t = tile_rows, w = in.width, e = in.out_sample_bytes;
+  const u128 in_band = t * (static_cast<u128>(in.block_raw_bytes_per_row) + in.block_band_bytes_per_row);
+  const u128 per_task = in_band + t * w * (2 * e + 2) + w * per_task_bytes_per_column;
+  const u128 template_bytes = (u128{1} << 20) + 2880 +
+                              2 * (static_cast<u128>(in.header_bound_bytes) + 3 * 2880 * ceil_div(8 * in.width, 2880)) +
+                              w * per_task_bytes_per_column;
+  const u128 shared = in_band + 32 * static_cast<u128>(b.task_count) * in.block_regions +
+                      static_cast<u128>(in.normalization_channels) * 4 * 256 * 8 + template_bytes +
+                      config.report_margin_bytes.value;
+  b.shared_bytes = narrow(shared);
+  b.per_task_bytes = narrow(per_task);
+  b.minimum_feasible_bytes = narrow(static_cast<u128>(b.shared_bytes) + b.per_task_bytes);
+  const std::uint64_t parallel = std::min<std::uint64_t>(in.cpus, b.task_count);
+  b.working_set_bytes = narrow(static_cast<u128>(b.shared_bytes) + static_cast<u128>(parallel) * b.per_task_bytes);
+  return b;
+}
+
+}  // namespace
+
 resource_plan plan_resources(const planner_input& in, const resource_config& config) {
-  const plan_bounds b = compute_plan_bounds(in, config);
+  const plan_bounds whole = compute_plan_bounds(in, config);
+  const bool blocks = in.checkpoint || in.budget_bytes < whole.minimum_feasible_bytes;
+  if (blocks && in.checkpoint && !config.scratch) {
+    invalid("calib.checkpoint_scratch", "il checkpoint del job richiede lo scratch nella configurazione");
+  }
+  const plan_bounds b = blocks && config.scratch ? block_bounds(in, config, whole.tile_rows) : whole;
+  const char* residency = blocks && config.scratch ? "blocks" : "whole";
   const auto exceeds = [&](std::uint64_t peak) {
-    return stop_error(error_category::budget, "sched.job_exceeds_budget",
-                      "il picco del job supera il budget", {{"picco", std::to_string(peak)},
-                      {"budget_bytes", std::to_string(in.budget_bytes)},
-                      {"minimum_feasible_bytes", std::to_string(b.minimum_feasible_bytes)},
-                      {"shared_bytes", std::to_string(b.shared_bytes)},
-                      {"per_task_bytes", std::to_string(b.per_task_bytes)}});
+    stop_error e(error_category::budget, "sched.job_exceeds_budget",
+                 "il picco del job supera il budget", {{"picco", std::to_string(peak)},
+                 {"budget_bytes", std::to_string(in.budget_bytes)},
+                 {"minimum_feasible_bytes", std::to_string(b.minimum_feasible_bytes)},
+                 {"shared_bytes", std::to_string(b.shared_bytes)},
+                 {"per_task_bytes", std::to_string(b.per_task_bytes)},
+                 {"residenza", residency}});
+    if (blocks && !config.scratch) e.add_context("residenza_blocchi", "scratch non dichiarato");
+    return e;
   };
   if (in.budget_bytes < b.minimum_feasible_bytes) throw exceeds(b.minimum_feasible_bytes);
   resource_plan p;
@@ -361,7 +415,8 @@ resource_plan plan_resources(const planner_input& in, const resource_config& con
   p.shared_bytes = b.shared_bytes;
   p.per_task_bytes = b.per_task_bytes;
   p.minimum_feasible_bytes = b.minimum_feasible_bytes;
-  p.working_set_bytes = b.working_set_bytes;
+  p.whole_minimum_bytes = whole.minimum_feasible_bytes;
+  p.working_set_bytes = whole.working_set_bytes;
   p.task_queue_capacity = config.task_queue_capacity.value;
   if (config.worker_count) {
     p.worker_count = *config.worker_count;
@@ -374,7 +429,18 @@ resource_plan plan_resources(const planner_input& in, const resource_config& con
     p.peak_bytes = b.shared_bytes + std::uint64_t{p.worker_count} * b.per_task_bytes;
   }
   if (config.tile_rows) p.user_fixed.push_back("tile_rows");
-  p.budget_below_working_set = in.budget_bytes < b.working_set_bytes;
+  p.budget_below_working_set = in.budget_bytes < whole.working_set_bytes;
+  if (blocks) {
+    p.frame_residency = "blocks";
+    p.master_residency = "blocks";
+    p.staging_bytes = narrow(static_cast<u128>(in.width) * in.height * (2 * static_cast<u128>(in.out_sample_bytes) + 2));
+    if (p.staging_bytes > config.scratch->quota_bytes) {
+      throw stop_error(error_category::budget, "spill.quota_exceeded", "lo staging supera la quota dello scratch",
+                       {{"staging_bytes", std::to_string(p.staging_bytes)},
+                        {"quota", std::to_string(config.scratch->quota_bytes)}});
+    }
+    p.spill = spill_config{config.scratch->dir, config.scratch->quota_bytes};
+  }
   return p;
 }
 
@@ -392,6 +458,8 @@ json resource_plan_json(const resource_plan& p) {
   o.set("frame_residency", json::string(p.frame_residency));
   o.set("master_residency", json::string(p.master_residency));
   o.set("budget_below_working_set", json::boolean(p.budget_below_working_set));
+  o.set("whole_minimum_bytes", json::uinteger(p.whole_minimum_bytes));
+  o.set("staging_bytes", json::uinteger(p.staging_bytes));
   json fixed = json::array();
   for (const std::string& f : p.user_fixed) fixed.push(json::string(f));
   o.set("user_fixed", std::move(fixed));
@@ -553,6 +621,14 @@ resource_sample sample_resources(const monitor_inputs& in) {
     d.set("scratch", std::move(sc));
   } else {
     d.set("scratch", json::null());
+  }
+  if (in.pressure != nullptr) {
+    json pr = json::object();
+    pr.set("waiting_jobs", json::uinteger(in.pressure->waiting_jobs.load()));
+    pr.set("threshold", json::number(in.pressure->threshold));
+    d.set("pressure", std::move(pr));
+  } else {
+    d.set("pressure", json::null());
   }
   if (in.config != nullptr && in.config->disk_cache) {
     const disk_cache_usage usage = measure_disk_cache(in.config->disk_cache->dir);

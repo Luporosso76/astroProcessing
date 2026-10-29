@@ -122,6 +122,9 @@ struct artifact_content {
   std::string kind;
   std::optional<content_digest> expected;
   std::string role = "primary";  // [a-z0-9_]{1,32}, distinto fra gli output dello stesso job
+  // Contenuto in streaming al posto di `bytes` (ADR-06, estensione R3.2): chiamato finche' restituisce 0. Richiede
+  // `expected` (il nome finale deriva dal digest prima della scrittura): senza, invalid_input store.stream_digest.
+  std::function<std::size_t(std::span<std::uint8_t>)> source = nullptr;
 };
 
 class sqlite_dag_store;

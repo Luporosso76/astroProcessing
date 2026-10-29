@@ -21,6 +21,8 @@ void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::s
 // Confronta dimensione, mtime e ctime del file aperto con quelli di open_fits_input: dimensione diversa =
 // integrity input.size_changed; mtime o ctime diversi = integrity input.modified.
 void check_unchanged(const fits_input& input);
+// (st_dev, st_ino) del file aperto.
+std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input);
 }
 
 namespace fits_limits {
@@ -74,6 +76,7 @@ class fits_input {
   friend std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t budget_bytes);
   friend void fits_detail::read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::size_t n);
   friend void fits_detail::check_unchanged(const fits_input& input);
+  friend std::pair<std::uint64_t, std::uint64_t> fits_detail::identity_of(const fits_input& input);
   fits_input(int fd, std::uint64_t size, std::int64_t mtime_ns, std::int64_t ctime_ns) noexcept
       : fd_(fd), size_(size), mtime_ns_(mtime_ns), ctime_ns_(ctime_ns) {}
 

@@ -2,6 +2,7 @@
 #include <array>
 #include <cmath>
 #include <cfloat>
+#include <functional>
 #include <limits>
 
 #include "astro/calibration.hpp"
@@ -349,7 +350,7 @@ void compare_pair(compat_state& cs, const char* pair, const frame& a, const fram
 
 // ---------------------------------------------------------------- vista e varianza degli input
 
-input_view make_view(const frame& f, const calibration_input_spec& spec) {
+input_view make_view(const frame& f, const calibration_input_spec& spec, bool pixels) {
   const image& im = *f.img;
   input_view v;
   v.samples = im.samples.data();
@@ -371,16 +372,7 @@ input_view make_view(const frame& f, const calibration_input_spec& spec) {
     }
     v.plane = true;
     v.variance_plane = im.variance->samples.data();
-    const std::size_t n = im.samples.size() / sample_size(im.type);
-    for (std::size_t i = 0; i < n; ++i) {
-      if (v.mask[i] != 0) continue;
-      const double var = v.f32 ? static_cast<double>(static_cast<const float*>(v.variance_plane)[i])
-                               : static_cast<const double*>(v.variance_plane)[i];
-      if (!std::isfinite(var) || var < 0) {
-        stop(error_category::invalid_input, "var.plane_values", "varianza non finita o negativa su un pixel valido",
-             {{"input", f.name}, {"indice", std::to_string(i)}});
-      }
-    }
+    if (pixels) calib_detail::check_variance_rows(v, f.name, 0, im.samples.size() / sample_size(im.type));
   } else {
     v.plane = false;
     const char* who = f.name;
@@ -463,6 +455,82 @@ json input_report(const slot& s, const image& im, const input_view& view, const 
 
 }  // namespace
 
+// ---------------------------------------------------------------- parti comuni alle due residenze (ADR-06, R3.2)
+
+double calib_detail::median_of(std::vector<double>& v) {
+  const std::size_t n = v.size();
+  const std::size_t mid = n / 2;
+  std::nth_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid), v.end());
+  const double hi = v[mid];
+  const double r = n % 2 == 1 ? hi : (*std::max_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid)) + hi) * 0.5;
+  return r == 0 ? 0.0 : r;
+}
+
+void calib_detail::check_variance_rows(const input_view& v, const char* input, std::size_t first, std::size_t count) {
+  for (std::size_t i = 0; i < count; ++i) {
+    if (v.mask[i] != 0) continue;
+    const double var = v.f32 ? static_cast<double>(static_cast<const float*>(v.variance_plane)[i])
+                             : static_cast<const double*>(v.variance_plane)[i];
+    if (!std::isfinite(var) || var < 0) {
+      stop(error_category::invalid_input, "var.plane_values", "varianza non finita o negativa su un pixel valido",
+           {{"input", input}, {"indice", std::to_string(first + i)}});
+    }
+  }
+}
+
+void calib_detail::finish_normalization(prepared_calibration::impl& p, const std::vector<normalization_acc>& acc,
+                                        const std::function<double(std::size_t)>& median_fc) {
+  const std::size_t channels = acc.size();
+  std::array<const char*, 4> labels = {"all", "", "", ""};
+  if (p.per_channel) labels = channel_labels(p.images.light.cfa->pattern);
+  p.channels.resize(channels);
+  for (std::size_t c = 0; c < channels; ++c) {
+    channel_normalization& ch = p.channels[c];
+    ch.label = labels[c];
+    ch.n_valid = acc[c].n;
+    ch.fc_nonpositive = acc[c].nonpositive;
+    if (ch.n_valid == 0) {
+      stop(error_category::numeric, "calib.normalization_invalid", "nessun pixel valido per la normalizzazione",
+           {{"canale", ch.label}});
+    }
+    if (ch.n_valid >= 2 && acc[c].mean != 0.0) {
+      ch.fc_cv = std::sqrt(acc[c].m2 / static_cast<double>(ch.n_valid - 1)) / std::fabs(acc[c].mean);
+      if (!std::isfinite(*ch.fc_cv)) ch.fc_cv.reset();  // non calcolabile: nel report resta null e l'ipotesi iid non e' verificata
+    }
+    ch.iid_not_verified = !ch.fc_cv || !(*ch.fc_cv <= iid_cv_threshold);
+    ch.n = median_fc(c);
+    if (!std::isfinite(ch.n) || !(ch.n > 0)) {
+      stop(error_category::numeric, "calib.normalization_invalid", "normalizzazione non positiva o non finita",
+           {{"canale", ch.label}, {"N", num_text(ch.n)}});
+    }
+    p.norm[c] = ch.n;
+    p.norm_sq[c] = ch.n * ch.n;
+    if (!is_normal(p.norm_sq[c])) {
+      stop(error_category::numeric, "calib.variance_overflow", "N al quadrato non finito o nullo: Var(Q) non calcolabile",
+           {{"canale", ch.label}, {"N", num_text(ch.n)}});
+    }
+  }
+}
+
+void calib_detail::stop_fc_variance_nonfinite(std::uint32_t x, std::uint32_t y) {
+  stop(error_category::numeric, "calib.variance_overflow", "varianza di Fc non finita: mediana non calcolabile",
+       {{"x", std::to_string(x)}, {"y", std::to_string(y)}});
+}
+
+void calib_detail::finish_variance(prepared_calibration::impl& p, const std::function<double(std::size_t)>& median_vfc) {
+  constexpr double half_pi = 1.5707963267948966;
+  for (std::size_t c = 0; c < p.channels.size(); ++c) {
+    channel_normalization& ch = p.channels[c];
+    const double median_var = median_vfc(c);
+    const double denominator = static_cast<double>(ch.n_valid) * p.norm_sq[c];
+    ch.rel_var_estimate = half_pi * median_var / denominator;
+    if (!std::isfinite(median_var) || !is_normal(denominator) || !div_ok(median_var, ch.rel_var_estimate)) {
+      stop(error_category::numeric, "calib.variance_overflow", "stima della varianza di N non calcolabile in modo finito",
+           {{"canale", ch.label}});
+    }
+  }
+}
+
 // ---------------------------------------------------------------- interfaccia
 
 void validate_calibration_recipe(const calibration_recipe& recipe) {
@@ -517,9 +585,11 @@ const std::vector<channel_normalization>& prepared_calibration::normalization() 
 const std::vector<std::string>& prepared_calibration::warnings() const noexcept { return impl_->warnings; }
 
 // Osservazione dei file letti per la provenance (ADR-05, R1), derivata dal report degli ingressi.
-json prepared_calibration::observed_inputs() const {
+json prepared_calibration::observed_inputs() const { return calib_detail::observed_inputs(*impl_); }
+
+json calib_detail::observed_inputs(const prepared_calibration::impl& p) {
   json list = json::array();
-  const json& inputs = *impl_->report.find("inputs");
+  const json& inputs = *p.report.find("inputs");
   for (std::size_t i = 0; i < inputs.keys().size(); ++i) {
     const json& in = inputs.items()[i];
     const json& fields = *in.find("image_fields");
@@ -539,7 +609,12 @@ std::uint64_t prepared_calibration::row_scratch_bytes() const noexcept {
   return std::uint64_t{impl_->w} * (sizeof(double) * 2 + sizeof(std::uint16_t));
 }
 
-prepared_calibration prepare_calibration(const calibration_recipe& recipe, calibration_images images) {
+namespace {
+
+// Preflight comune: con `pixels` = false le immagini sono di soli header e i controlli sui campioni, la normalizzazione
+// e l'uscita li fa chi legge a blocchi (calibration_blocks.cpp) con le stesse funzioni.
+std::unique_ptr<prepared_calibration::impl> prepare_impl(const calibration_recipe& recipe, calibration_images images,
+                                                         bool pixels) {
   validate_calibration_recipe(recipe);
   auto p = std::make_unique<prepared_calibration::impl>();
   p->recipe = recipe;
@@ -563,7 +638,9 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
   std::array<field_origins, 4> origins;
   for (std::size_t i = 0; i < frames.size(); ++i) origins[i] = apply_declared(*frames[i].img, specs[i].spec.declared, specs[i].spec.declared_fields, frames[i].name);
   for (const frame& f : frames) require_calibration_linearity(f.name, f.img->lin, std::nullopt);
-  for (const frame& f : frames) check_image(f);
+  if (pixels) {
+    for (const frame& f : frames) check_image(f);
+  }
 
   for (const frame& f : frames) {
     const image& x = *f.img;
@@ -595,10 +672,10 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
   compare_pair(cs, "light-flat", frames[0], frames[2], false, recipe);
   for (std::string& w : cs.warnings) warnings.push_back(std::move(w));
 
-  p->light = make_view(frames[0], specs[0].spec);
-  p->dark = make_view(frames[1], specs[1].spec);
-  p->flat = make_view(frames[2], specs[2].spec);
-  p->dark_flat = make_view(frames[3], specs[3].spec);
+  p->light = make_view(frames[0], specs[0].spec, pixels);
+  p->dark = make_view(frames[1], specs[1].spec, pixels);
+  p->flat = make_view(frames[2], specs[2].spec, pixels);
+  p->dark_flat = make_view(frames[3], specs[3].spec, pixels);
   for (const input_view* v : {&p->light, &p->flat}) {
     if (!v->has_saturation) warnings.push_back(std::string("saturation_not_evaluated:") + (v == &p->light ? "light" : "flat"));
   }
@@ -610,90 +687,45 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
     p->cfa_x = im.light.cfa->x_offset;
     p->cfa_y = im.light.cfa->y_offset;
   }
-  const std::size_t channels = p->per_channel ? 4 : 1;
-  std::array<const char*, 4> labels = {"all", "", "", ""};
-  if (p->per_channel) labels = channel_labels(im.light.cfa->pattern);
-
   // Normalizzazione N: mediana di Fc sui pixel validi per N, prima di ogni tile.
-  std::vector<std::vector<double>> fc(channels);
-  std::vector<std::uint64_t> nonpositive(channels, 0);
-  std::vector<double> mean(channels, 0.0), m2(channels, 0.0);
-  const auto valid_for_n = [&](std::size_t i) {
-    if ((p->flat.mask[i] | p->dark_flat.mask[i]) != 0) return false;
-    if (p->flat.has_saturation && p->flat.value(i) >= p->flat.saturation) return false;
-    return std::isfinite(p->flat.value(i) - p->dark_flat.value(i));
-  };
-  for (std::uint32_t y = 0; y < p->h; ++y) {
-    for (std::uint32_t x = 0; x < p->w; ++x) {
-      const std::size_t i = static_cast<std::size_t>(y) * p->w + x;
-      if (!valid_for_n(i)) continue;
-      const std::size_t c = p->channel_of(x, y);
-      const double v = p->flat.value(i) - p->dark_flat.value(i);
-      if (v <= 0) ++nonpositive[c];
-      fc[c].push_back(v);
-      const double delta = v - mean[c];
-      mean[c] += delta / static_cast<double>(fc[c].size());
-      m2[c] += delta * (v - mean[c]);
-    }
-  }
-  p->channels.resize(channels);
-  for (std::size_t c = 0; c < channels; ++c) {
-    channel_normalization& ch = p->channels[c];
-    ch.label = labels[c];
-    ch.n_valid = fc[c].size();
-    ch.fc_nonpositive = nonpositive[c];
-    if (fc[c].empty()) {
-      stop(error_category::numeric, "calib.normalization_invalid", "nessun pixel valido per la normalizzazione",
-           {{"canale", ch.label}});
-    }
-    if (ch.n_valid >= 2 && mean[c] != 0.0) {
-      ch.fc_cv = std::sqrt(m2[c] / static_cast<double>(ch.n_valid - 1)) / std::fabs(mean[c]);
-      if (!std::isfinite(*ch.fc_cv)) ch.fc_cv.reset();  // non calcolabile: nel report resta null e l'ipotesi iid non e' verificata
-    }
-    ch.iid_not_verified = !ch.fc_cv || !(*ch.fc_cv <= calib_detail::iid_cv_threshold);
-    ch.n = median_of(fc[c]);
-    if (!std::isfinite(ch.n) || !(ch.n > 0)) {
-      stop(error_category::numeric, "calib.normalization_invalid", "normalizzazione non positiva o non finita",
-           {{"canale", ch.label}, {"N", num_text(ch.n)}});
-    }
-    p->norm[c] = ch.n;
-    p->norm_sq[c] = ch.n * ch.n;
-    if (!calib_detail::is_normal(p->norm_sq[c])) {
-      stop(error_category::numeric, "calib.variance_overflow", "N al quadrato non finito o nullo: Var(Q) non calcolabile",
-           {{"canale", ch.label}, {"N", num_text(ch.n)}});
-    }
-    std::vector<double>().swap(fc[c]);
-  }
-  std::vector<std::vector<double>> vfc(channels);
-  for (std::uint32_t y = 0; y < p->h; ++y) {
-    for (std::uint32_t x = 0; x < p->w; ++x) {
-      const std::size_t i = static_cast<std::size_t>(y) * p->w + x;
-      if (!valid_for_n(i)) continue;
-      const double f = p->flat.value(i), d = p->dark_flat.value(i);
-      const double term = p->flat.variance(i, f) + p->dark_flat.variance(i, d);
-      if (!std::isfinite(term)) {
-        stop(error_category::numeric, "calib.variance_overflow", "varianza di Fc non finita: mediana non calcolabile",
-             {{"x", std::to_string(x)}, {"y", std::to_string(y)}});
-      }
-      vfc[p->channel_of(x, y)].push_back(term);
-    }
-  }
-  constexpr double half_pi = 1.5707963267948966;
-  for (std::size_t c = 0; c < channels; ++c) {
-    channel_normalization& ch = p->channels[c];
-    const double median_var = median_of(vfc[c]);
-    const double denominator = static_cast<double>(ch.n_valid) * p->norm_sq[c];
-    ch.rel_var_estimate = half_pi * median_var / denominator;
-    if (!std::isfinite(median_var) || !calib_detail::is_normal(denominator) ||
-        !calib_detail::div_ok(median_var, ch.rel_var_estimate)) {
-      stop(error_category::numeric, "calib.variance_overflow", "stima della varianza di N non calcolabile in modo finito",
-           {{"canale", ch.label}});
-    }
-    std::vector<double>().swap(vfc[c]);
+  if (pixels) {
+    const std::size_t channels = p->per_channel ? 4 : 1;
+    std::vector<std::vector<double>> fc(channels);
+    std::vector<calib_detail::normalization_acc> acc(channels);
+    calib_detail::for_valid_n(*p, p->flat, p->dark_flat, 0, 0, p->h,
+                              [&](std::size_t c, std::uint32_t, std::uint32_t, std::size_t i) {
+                                const double v = p->flat.value(i) - p->dark_flat.value(i);
+                                acc[c].add(v);
+                                fc[c].push_back(v);
+                              });
+    calib_detail::finish_normalization(*p, acc, [&](std::size_t c) {
+      const double m = calib_detail::median_of(fc[c]);
+      std::vector<double>().swap(fc[c]);
+      return m;
+    });
+    std::vector<std::vector<double>> vfc(channels);
+    calib_detail::for_valid_n(*p, p->flat, p->dark_flat, 0, 0, p->h,
+                              [&](std::size_t c, std::uint32_t x, std::uint32_t y, std::size_t i) {
+                                const double term = calib_detail::fc_variance_term(p->flat, p->dark_flat, i);
+                                if (!std::isfinite(term)) calib_detail::stop_fc_variance_nonfinite(x, y);
+                                vfc[c].push_back(term);
+                              });
+    calib_detail::finish_variance(*p, [&](std::size_t c) {
+      const double m = calib_detail::median_of(vfc[c]);
+      std::vector<double>().swap(vfc[c]);
+      return m;
+    });
   }
 
   // Uscita: stessa geometria e tipo del light, maschera azzerata, varianza dello stesso tipo.
-  p->out = make_image(im.light.geometry, im.light.type, im.light.layout, im.light.cfa);
+  if (pixels) {
+    p->out = make_image(im.light.geometry, im.light.type, im.light.layout, im.light.cfa);
+  } else {
+    p->out.geometry = im.light.geometry;
+    p->out.type = im.light.type;
+    p->out.layout = im.light.layout;
+    p->out.cfa = im.light.cfa;
+  }
   p->out.unit = im.light.unit;
   p->out.lin = im.light.lin;
   p->out.metadata = im.light.metadata;
@@ -702,7 +734,7 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
     if (card.compare(0, 8, "ASTRPHAS") != 0) p->out.header_cards.push_back(card);
   }
   p->out.uninterpreted_keywords = im.light.uninterpreted_keywords;
-  p->out.variance = variance_plane{aligned_buffer(p->out.samples.size())};
+  p->out.variance = pixels ? variance_plane{aligned_buffer(p->out.samples.size())} : variance_plane{};
 
   p->warnings = std::move(warnings);
 
@@ -742,7 +774,18 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
     }
   }
   p->report.set("assumptions", std::move(hyp));
-  return prepared_calibration(std::move(p));
+  return p;
+}
+
+}  // namespace
+
+prepared_calibration prepare_calibration(const calibration_recipe& recipe, calibration_images images) {
+  return prepared_calibration(prepare_impl(recipe, std::move(images), true));
+}
+
+std::unique_ptr<prepared_calibration::impl> calib_detail::prepare_headers(const calibration_recipe& recipe,
+                                                                        calibration_images images) {
+  return prepare_impl(recipe, std::move(images), false);
 }
 
 // ---------------------------------------------------------------- calcolo per righe
@@ -750,17 +793,17 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
 namespace {
 
 template <class T>
-void rows_kernel(prepared_calibration::impl& p, std::uint32_t y0, std::uint32_t y1, double* qrow, double* varq,
-                 std::uint16_t* qbits) {
+void rows_kernel(const prepared_calibration::impl& p, const calib_detail::kernel_io& io, std::uint32_t y0,
+                 std::uint32_t y1, double* qrow, double* varq, std::uint16_t* qbits) {
   const std::uint32_t w = p.w;
-  T* out = p.out.data<T>();
-  T* outv = p.out.variance_data<T>();
-  std::uint16_t* out_mask = p.out.invalid.bits.data();
-  const input_view &L = p.light, &D = p.dark, &F = p.flat, &DF = p.dark_flat;
+  T* out = static_cast<T*>(io.out);
+  T* outv = static_cast<T*>(io.out_variance);
+  std::uint16_t* out_mask = io.out_mask;
+  const input_view &L = *io.light, &D = *io.dark, &F = *io.flat, &DF = *io.dark_flat;
   constexpr T nan = std::numeric_limits<T>::quiet_NaN();
   for (std::uint32_t y = y0; y < y1; ++y) {
     for (std::uint32_t x = 0; x < w; ++x) {
-      const std::size_t i = static_cast<std::size_t>(y) * w + x;
+      const std::size_t i = static_cast<std::size_t>(y - io.row0) * w + x;
       qbits[x] = 0;
       qrow[x] = std::numeric_limits<double>::quiet_NaN();
       varq[x] = std::numeric_limits<double>::quiet_NaN();
@@ -791,7 +834,7 @@ void rows_kernel(prepared_calibration::impl& p, std::uint32_t y0, std::uint32_t 
       }
     }
     for (std::uint32_t x = 0; x < w; ++x) {
-      const std::size_t i = static_cast<std::size_t>(y) * w + x;
+      const std::size_t i = static_cast<std::size_t>(y - io.row0) * w + x;
       const std::uint16_t master_bits = static_cast<std::uint16_t>(D.mask[i] | F.mask[i] | DF.mask[i]);
       std::uint16_t bits = static_cast<std::uint16_t>(L.mask[i] | master_bits | qbits[x]);
       if (master_bits != 0) bits |= invalid_reason::master_invalid;
@@ -835,13 +878,22 @@ void rows_kernel(prepared_calibration::impl& p, std::uint32_t y0, std::uint32_t 
 
 }  // namespace
 
+void calib_detail::calibrate_band(const prepared_calibration::impl& p, const kernel_io& io, std::uint32_t row_begin,
+                                  std::uint32_t row_end, void* scratch) {
+  ASTRO_ASSERT(io.row0 <= row_begin && row_begin <= row_end && row_end <= p.h);
+  auto* qrow = static_cast<double*>(scratch);
+  double* varq = qrow + p.w;
+  auto* qbits = reinterpret_cast<std::uint16_t*>(varq + p.w);
+  if (p.out.type == sample_type::f32) rows_kernel<float>(p, io, row_begin, row_end, qrow, varq, qbits);
+  else rows_kernel<double>(p, io, row_begin, row_end, qrow, varq, qbits);
+}
+
 void prepared_calibration::calibrate_rows(std::uint32_t row_begin, std::uint32_t row_end, void* scratch) {
   ASTRO_ASSERT(row_begin <= row_end && row_end <= impl_->h);
-  auto* qrow = static_cast<double*>(scratch);
-  double* varq = qrow + impl_->w;
-  auto* qbits = reinterpret_cast<std::uint16_t*>(varq + impl_->w);
-  if (impl_->out.type == sample_type::f32) rows_kernel<float>(*impl_, row_begin, row_end, qrow, varq, qbits);
-  else rows_kernel<double>(*impl_, row_begin, row_end, qrow, varq, qbits);
+  impl& p = *impl_;
+  const calib_detail::kernel_io io{&p.light, &p.dark, &p.flat, &p.dark_flat, p.out.samples.data(),
+                                   p.out.variance->samples.data(), p.out.invalid.bits.data(), 0};
+  calib_detail::calibrate_band(p, io, row_begin, row_end, scratch);
 }
 
 std::string prepared_calibration::rows_digest(std::uint32_t row_begin, std::uint32_t row_end) const {

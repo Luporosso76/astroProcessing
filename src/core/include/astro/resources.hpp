@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -47,6 +48,8 @@ struct resource_config {
   tunable<budget_ratio> fraction_normal;
   tunable<budget_ratio> fraction_pressure;
   tunable<double> psi_threshold;
+  // Intervallo di campionamento della pressione durante l'attesa di ammissione (estensione R3.2), in millisecondi.
+  tunable<std::uint64_t> pressure_poll_ms;
 
   resource_config();
   friend bool operator==(const resource_config&, const resource_config&) = default;
@@ -63,9 +66,14 @@ void save_resource_config(sqlite_dag_store& store, const resource_config& config
 std::optional<resource_config> load_resource_config(const sqlite_dag_store& store);
 
 budget_tuning budget_tuning_of(const resource_config& config);
+// `pressure` resta nullo: il chiamante lo imposta con make_pressure_gate.
 scheduler_tuning scheduler_tuning_of(const resource_config& config);
 
-// Ingresso del pianificatore per la calibrazione (formule in ADR-06, estensione R3.1).
+// Porta della pressione di sistema (estensione R3.2): PSI da read_memory_pressure(sources), soglia psi_threshold,
+// intervallo pressure_poll_ms.
+std::shared_ptr<pressure_gate> make_pressure_gate(const resource_config& config, const budget_sources& sources = {});
+
+// Ingresso del pianificatore per la calibrazione (formule in ADR-06, estensioni R3.1 e R3.2).
 struct planner_input {
   std::uint64_t budget_bytes = 0;
   std::size_t cpus = 1;
@@ -73,6 +81,13 @@ struct planner_input {
   std::uint64_t out_sample_bytes = 0;
   std::uint64_t input_peak_bytes = 0;
   std::uint64_t header_bound_bytes = 0;
+  // Residenza a blocchi (R3.2): R_raw e R_band (byte per riga dei quattro ingressi, gia' moltiplicati per W), G
+  // (data unit letti), Cn (canali di normalizzazione), checkpoint dichiarato.
+  std::uint64_t block_raw_bytes_per_row = 0;
+  std::uint64_t block_band_bytes_per_row = 0;
+  std::uint64_t block_regions = 0;
+  std::uint32_t normalization_channels = 1;
+  bool checkpoint = false;
 };
 
 struct resource_plan {
@@ -89,6 +104,10 @@ struct resource_plan {
   std::string master_residency = "whole";
   bool budget_below_working_set = false;
   std::vector<std::string> user_fixed;
+  // Residenza a blocchi (R3.2): minimo della residenza intera, byte di staging e spill dichiarato.
+  std::uint64_t whole_minimum_bytes = 0;
+  std::uint64_t staging_bytes = 0;
+  std::optional<spill_config> spill;
 };
 
 // Grandezze del modello che non dipendono dal budget (nessuno stop per budget). invalid_input resources.planner_input
@@ -104,6 +123,9 @@ struct plan_bounds {
 plan_bounds compute_plan_bounds(const planner_input& input, const resource_config& config);
 
 // Stop budget sched.job_exceeds_budget (con minimum_feasible_bytes) se il minimo o il piano esplicito non entrano.
+// Residenza `blocks` se e' dichiarato un checkpoint o se il budget e' sotto il minimo della residenza intera (R3.2):
+// richiede `scratch` (altrimenti, con checkpoint, invalid_input calib.checkpoint_scratch) e staging entro la quota
+// (budget spill.quota_exceeded).
 resource_plan plan_resources(const planner_input& input, const resource_config& config);
 json resource_plan_json(const resource_plan& plan);
 
@@ -122,6 +144,7 @@ struct monitor_inputs {
   const resource_config* config = nullptr;   // con planner: obbligatoria
   const budget_snapshot* budget = nullptr;
   const spill_area* scratch = nullptr;
+  const pressure_gate* pressure = nullptr;  // `pressure`: job in attesa e soglia, o null
   std::uint64_t resident_cache_bytes = 0;
   std::filesystem::path proc_root = "/proc";
 };

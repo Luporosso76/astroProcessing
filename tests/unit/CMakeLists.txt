@@ -20,7 +20,7 @@ gtest_discover_tests(test_deps PROPERTIES LABELS fast)
 foreach(t test_error test_image test_fits test_json test_hash test_dag test_job test_store test_store_history
         test_store_contract test_store_crash test_export test_store_review
         test_budget test_resources test_pool test_spill test_scheduler test_calibration test_calibration_job test_job_alloc
-        test_inventory test_phase test_import test_recovery test_master)
+        test_inventory test_phase test_import test_recovery test_master test_blocks test_calibration_r32)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main)
   target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
@@ -30,6 +30,7 @@ foreach(t test_error test_image test_fits test_json test_hash test_dag test_job 
   gtest_discover_tests(${t} PROPERTIES LABELS fast)
 endforeach()
 target_link_libraries(test_fits PRIVATE OpenSSL::Crypto)
+target_link_libraries(test_blocks PRIVATE PkgConfig::CFITSIO)
 target_link_libraries(test_budget PRIVATE SQLite::SQLite3)
 target_link_libraries(test_resources PRIVATE SQLite::SQLite3)
 foreach(t test_store test_store_history test_store_contract test_store_crash test_export test_store_review test_job_alloc

@@ -397,4 +397,6 @@ std::optional<manual_budget> load_manual_budget(const sqlite_dag_store& store) {
   return parse_manual_budget(spec->as_string());
 }
 
+std::optional<double> read_memory_pressure(const budget_sources& sources) { return read_psi(sources); }
+
 }  // namespace astro

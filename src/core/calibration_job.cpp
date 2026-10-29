@@ -4,8 +4,10 @@
 #include "astro/calibration.hpp"
 #include "astro/error.hpp"
 #include "astro/master.hpp"
+#include "astro/fits_blocks.hpp"
 #include "astro/operations.hpp"
 #include "astro/scheduler.hpp"
+#include "calibration_internal.hpp"
 
 namespace astro {
 
@@ -170,9 +172,14 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
              {{"input", names[i]}, {"nodo", *s.master_node_key}, {"sha256", s.digest.sha256}});
       }
     }
+    if (options.checkpoint && (!options.resources || !options.resources->scratch)) {
+      fail(error_category::invalid_input, "calib.checkpoint_scratch",
+           "il checkpoint del job richiede lo scratch nella configurazione delle risorse");
+    }
 
     std::array<fits_plan, 4> plans;
     std::uint64_t input_peaks = 0;
+    std::uint64_t block_raw = 0, block_band = 0, block_regions = 0;
     for (std::size_t i = 0; i < specs.size(); ++i) {
       fits_input input = open_fits_input(specs[i]->path);
       // Fase e linearita' dai soli header e dalla ricetta, prima di ogni lettura di campioni (ADR-03, R1).
@@ -181,6 +188,14 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       require_calibration_linearity(names[i], peek.lin, specs[i]->declared_fields.lin);
       plans[i] = plan_fits(input);
       input_peaks += plans[i].peak_bytes;
+      if (options.resources) {
+        const std::uint64_t e = sample_size(plans[i].type);
+        const bool plane = *specs[i]->variance.source == variance_source::plane && plans[i].has_variance;
+        block_raw += std::uint64_t{plans[i].width} *
+                     (primary_sample_bytes(input) + (plans[i].has_invalid ? 2 : 0) + (plane ? e : 0));
+        block_band += std::uint64_t{plans[i].width} * (e + 2 + (plane ? e : 0));
+        block_regions += 1 + (plans[i].has_invalid ? 1 : 0) + (plane ? 1 : 0);
+      }
     }
     if (options.hook) options.hook("plan.done");
     const fits_plan& lp = plans[0];
@@ -193,11 +208,21 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     const std::uint64_t out_buffers = samples * (2 * out_elem + sizeof(std::uint16_t));
 
     job_plan plan;
+    std::optional<resource_plan> chosen_plan;
     if (options.resources) {
       const std::size_t cpus = options.resources->cpu_set ? options.resources->cpu_set->size() : cpu_count();
-      const resource_plan chosen = plan_resources(
-          planner_input{pool.budget_bytes(), cpus, lp.width, lp.height, out_elem, input_peaks, output_header_bound},
-          *options.resources);
+      planner_input in{pool.budget_bytes(), cpus, lp.width, lp.height, out_elem, input_peaks, output_header_bound};
+      in.block_raw_bytes_per_row = block_raw;
+      in.block_band_bytes_per_row = block_band;
+      in.block_regions = block_regions;
+      in.normalization_channels = *recipe.normalization == normalization_mode::cfa_channel_median ? 4 : 1;
+      in.checkpoint = options.checkpoint.has_value();
+      chosen_plan = plan_resources(in, *options.resources);
+      const resource_plan& chosen = *chosen_plan;
+      if (chosen.spill) {
+        return calib_detail::run_block_calibration(
+            store, pool, calib_detail::block_job_request{recipe, node, chosen, *options.resources, plans, options}, cancel);
+      }
       plan.shared_bytes = chosen.shared_bytes;
       plan.per_task_bytes = chosen.per_task_bytes;
       plan.worker_count = chosen.worker_count;
@@ -290,16 +315,28 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     };
 
     if (options.on_job_plan) options.on_job_plan(plan);
-    job_scheduler scheduler(pool, system_affinity,
-                            options.resources ? scheduler_tuning_of(*options.resources) : scheduler_tuning{});
-    scheduler.run(plan, spec, cancel);
+    scheduler_tuning tuning = options.resources ? scheduler_tuning_of(*options.resources) : scheduler_tuning{};
+    tuning.pressure = options.pressure;
+    job_scheduler scheduler(pool, system_affinity, std::move(tuning));
+    const job_report report = scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
+    if (chosen_plan) {
+      details.set("resource_plan", resource_plan_json(*chosen_plan));
+      details.set("scheduler", calib_detail::scheduler_details(report));
+    }
+    if (options.pressure) details.set("admission", calib_detail::admission_details(report));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
   std::optional<budget_snapshot> recorded = budget;
   if (recorded && options.resources) recorded->resources = resource_config_json(*options.resources);
-  return run_job_files(store, slot_name, work, recorded, &cancel);
+  job_outcome outcome = run_job_files(store, slot_name, work, recorded, &cancel);
+  // Checkpoint e staging restano dopo stop e annullamento (stato del resume); dopo la pubblicazione si rimuovono.
+  if (outcome.exit_code == 0 && options.checkpoint) {
+    remove_checkpoint(options.resources->scratch->dir, options.checkpoint->name);
+    remove_named_spill_file(options.resources->scratch->dir, options.checkpoint->name + ".stage");
+  }
+  return outcome;
 }
 
 }  // namespace astro

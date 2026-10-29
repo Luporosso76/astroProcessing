@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cerrno>
+#include <mutex>
+#include <optional>
 #include <map>
 #include <set>
 #include <thread>
@@ -1087,6 +1091,389 @@ TEST(Branches, scheduler_failures_inside_branches_block_dependents) {
   EXPECT_EQ(state["g1"], branch_state::blocked);
   EXPECT_EQ(state["r2"], branch_state::completed);
   EXPECT_EQ(state["c2"], branch_state::completed);
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+}
+
+// ---------------------------------------------------------------- T-M2R3-07: pressione all'ammissione
+
+// Sorgente PSI sintetica, modificabile dal test durante l'esecuzione.
+struct synthetic_psi {
+  std::mutex m;
+  std::optional<double> value;
+  void set(std::optional<double> v) {
+    std::lock_guard lock(m);
+    value = v;
+  }
+  std::shared_ptr<pressure_gate> gate_for(double threshold = 10.0) {
+    auto g = std::make_shared<pressure_gate>();
+    g->sample = [this] {
+      std::lock_guard lock(m);
+      return value;
+    };
+    g->threshold = threshold;
+    g->poll = std::chrono::milliseconds(1);
+    return g;
+  }
+};
+
+scheduler_tuning with_pressure(std::shared_ptr<pressure_gate> g) {
+  scheduler_tuning t;
+  t.pressure = std::move(g);
+  return t;
+}
+
+TEST(Scheduler, T_M2R3_07_queued_job_waits_above_the_threshold_and_is_admitted_when_pressure_falls) {
+  memory_pool pool(1 << 20);
+  synthetic_psi psi;
+  psi.set(5.0);
+  const std::shared_ptr<pressure_gate> g = psi.gate_for();
+  job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(g));
+  cancel_token cancel;
+  const fs::path dir = fresh_dir("pressure_queued");
+  const node_spec node_a = test_node("pressure_a"), node_b = test_node("pressure_b");
+  m2d::gate release_a;
+  std::atomic<bool> a_running{false}, b_prepared{false};
+  // Il job in corso scrive un checkpoint a ogni task: il suo recipe_digest si legge prima e dopo la pressione.
+  job_spec a{node_a, 4, [&](task_context& ctx) -> std::string {
+               if (ctx.index == 2) {
+                 a_running = true;
+                 EXPECT_TRUE(release_a.wait());
+               }
+               return digest_for(ctx.index);
+             }};
+  a.checkpoint_dir = dir;
+  a.checkpoint_name = "a";
+  job_plan plan_a = plan_of(1, 1000, 1000);
+  plan_a.checkpoint_every = 1;
+  job_spec b{node_b, 4, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+  b.prepare = [&](job_context&) { b_prepared = true; };
+  job_report ra, rb;
+  std::thread ta([&] { ra = sched.run(plan_a, a, cancel); });
+  const bool a_started = wait_until([&] { return a_running.load(); });
+  EXPECT_TRUE(a_started);
+  const std::optional<checkpoint_record> before = read_checkpoint(dir, "a");
+  psi.set(12.0);
+  std::thread tb([&] { rb = sched.run(plan_of(1, 2000, 1000), b, cancel); });
+  EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; }));
+  EXPECT_EQ(pool.reserved_bytes(), 2000u) << "solo il job in corso ha prenotato";
+  EXPECT_FALSE(b_prepared.load());
+  psi.set(10.0);  // soglia inclusa: ancora in attesa
+  std::this_thread::sleep_for(std::chrono::milliseconds(30));
+  EXPECT_EQ(g->waiting_jobs.load(), 1u);
+  EXPECT_FALSE(b_prepared.load());
+  psi.set(3.0);
+  tb.join();
+  EXPECT_TRUE(b_prepared.load());
+  EXPECT_EQ(g->waiting_jobs.load(), 0u);
+  release_a.open();
+  ta.join();
+  const std::optional<checkpoint_record> after = read_checkpoint(dir, "a");
+  ASSERT_TRUE(before && after);
+  EXPECT_EQ(before->completed, (std::vector<std::uint64_t>{0, 1}));
+  EXPECT_EQ(after->completed.size(), 4u);
+  EXPECT_EQ(before->recipe_digest, recipe_digest(node_a, plan_a));
+  EXPECT_EQ(after->recipe_digest, before->recipe_digest) << "il job in corso conserva la ricetta";
+  ASSERT_EQ(ra.admission.size(), 1u);
+  EXPECT_EQ(ra.admission[0], (admission_sample{5.0, true}));
+  EXPECT_EQ(ra.pressure_wait_samples, 0u);
+  // Prima lettura sopra soglia e lettura dell'ammissione; le letture intermedie sono solo contate.
+  ASSERT_EQ(rb.admission.size(), 2u);
+  EXPECT_EQ(rb.admission.front(), (admission_sample{12.0, false}));
+  EXPECT_EQ(rb.admission.back(), (admission_sample{3.0, true}));
+  EXPECT_GE(rb.pressure_wait_samples, 2u) << "12 e almeno una lettura a 10, soglia inclusa";
+  for (std::uint64_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(ra.partial_digests[i], digest_for(i));
+    EXPECT_EQ(rb.partial_digests[i], digest_for(i));
+  }
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+}
+
+TEST(Scheduler, T_M2R3_07_cancel_while_waiting_for_pressure_reserves_nothing) {
+  memory_pool pool(1 << 20);
+  synthetic_psi psi;
+  psi.set(50.0);
+  const std::shared_ptr<pressure_gate> g = psi.gate_for();
+  job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(g));
+  cancel_token cancel;
+  bool prepared = false;
+  const node_spec node = test_node("pressure_cancel");
+  job_spec spec{node, 2, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+  spec.prepare = [&](job_context&) { prepared = true; };
+  std::thread canceller([&] {
+    EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; }));
+    cancel.request();
+  });
+  EXPECT_STOP(sched.run(plan_of(1), spec, cancel), error_category::cancelled, "sched.cancelled");
+  canceller.join();
+  EXPECT_FALSE(prepared);
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+  EXPECT_EQ(g->waiting_jobs.load(), 0u);
+}
+
+TEST(Scheduler, T_M2R3_07_absent_source_admits_and_a_failing_source_stops_before_any_reservation) {
+  memory_pool pool(1 << 20);
+  synthetic_psi psi;
+  std::shared_ptr<pressure_gate> g = psi.gate_for();
+  job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(g));
+  cancel_token cancel;
+  const node_spec node = test_node("pressure_absent");
+  job_spec spec{node, 2, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+  const job_report r = sched.run(plan_of(1), spec, cancel);
+  ASSERT_EQ(r.admission.size(), 1u);
+  EXPECT_EQ(r.admission[0], (admission_sample{std::nullopt, true}));
+  g->sample = []() -> std::optional<double> {
+    throw stop_error(error_category::invalid_input, "budget.psi_parse", "PSI non interpretabile");
+  };
+  bool prepared = false;
+  spec.prepare = [&](job_context&) { prepared = true; };
+  EXPECT_STOP(sched.run(plan_of(1), spec, cancel), error_category::invalid_input, "budget.psi_parse");
+  EXPECT_FALSE(prepared);
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+  EXPECT_EQ(g->waiting_jobs.load(), 0u);
+}
+
+TEST_F(Resume, T_M2R3_07_impossible_reservation_during_execution_stops_with_the_checkpoint_and_resume_completes) {
+  memory_pool pool(1 << 20);
+  job_scheduler sched(pool, affinity_of(test_cpus));
+  const node_spec node = test_node("impossible");
+  cancel_token cancel;
+  job_spec failing = make_spec(node, 10, -1, false);
+  const auto inner = failing.run_task;
+  failing.run_task = [&, inner](task_context& ctx) -> std::string {
+    if (ctx.index == 5) pool_buffer more(ctx.memory, static_cast<std::size_t>(ctx.memory.bytes()) + 1);
+    return inner(ctx);
+  };
+  EXPECT_STOP(sched.run(checkpointed(1), failing, cancel), error_category::budget, "pool.reservation_exceeded");
+  const std::optional<checkpoint_record> saved = read_checkpoint(dir, "job");
+  ASSERT_TRUE(saved);
+  EXPECT_EQ(saved->completed, (std::vector<std::uint64_t>{0, 1, 2, 3}));
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+  executed.clear();
+  const job_report report = sched.run(checkpointed(1), make_spec(node, 10, -1, true), cancel);
+  EXPECT_EQ(report.tasks_resumed, 4u);
+  EXPECT_EQ(executed, (std::vector<std::uint64_t>{4, 5, 6, 7, 8, 9}));
+  for (std::uint64_t i = 0; i < 10; ++i) EXPECT_EQ(report.partial_digests[i], digest_text("partial-" + std::to_string(i)));
+}
+
+// ---------------------------------------------------------------- T-M2R3-05: ENOSPC sul checkpoint
+
+TEST_F(Resume, T_M2R3_05_enospc_at_every_checkpoint_step_stops_io_and_leaves_a_consistent_checkpoint) {
+  memory_pool pool(1 << 20);
+  job_scheduler sched(pool, affinity_of(test_cpus));
+  cancel_token cancel;
+  // Prima del rename resta il checkpoint precedente; dal rename riuscito in poi quello nuovo, gia' completo. In entrambi
+  // i casi descrive solo task completati, e il resume identico completa.
+  const std::pair<const char*, std::vector<std::uint64_t>> steps[] = {
+      {"checkpoint.create", {0, 1}}, {"checkpoint.write", {0, 1}}, {"checkpoint.fsync_file", {0, 1}},
+      {"checkpoint.rename", {0, 1}}, {"checkpoint.fsync_dir", {0, 1, 2, 3}}};
+  int run = 0;
+  for (const auto& [step, kept] : steps) {
+    SCOPED_TRACE(step);
+    const node_spec node = test_node(std::string("ckpt_enospc_") + std::to_string(run++));
+    remove_checkpoint(dir, "job");
+    partial.clear();
+    job_spec spec = make_spec(node, 10, -1, false);
+    int hits = 0;
+    const std::string point = step;
+    spec.fault = [&](std::string_view p) { return p == point && ++hits == 2 ? ENOSPC : 0; };
+    try {
+      (void)sched.run(checkpointed(1), spec, cancel);
+      ADD_FAILURE() << "ENOSPC atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::io);
+      bool errno_found = false;
+      for (const auto& [k, v] : e.context()) errno_found = errno_found || (k == "errno" && v == std::to_string(ENOSPC));
+      EXPECT_TRUE(errno_found) << e.what();
+    }
+    const std::optional<checkpoint_record> saved = read_checkpoint(dir, "job");
+    ASSERT_TRUE(saved);
+    EXPECT_EQ(saved->completed, kept);
+    EXPECT_EQ(entry_count(dir), 1u) << "nessun temporaneo del checkpoint resta nella directory";
+    EXPECT_EQ(pool.reserved_bytes(), 0u);
+    executed.clear();
+    const job_report report = sched.run(checkpointed(1), make_spec(node, 10, -1, true), cancel);
+    EXPECT_EQ(report.tasks_resumed, kept.size());
+  }
+}
+
+// ---------------------------------------------------------------- T-M2R3-06: verifica dei parziali dopo prepare
+
+TEST_F(Resume, T_M2R3_06_partials_are_verified_after_prepare_and_before_any_task) {
+  memory_pool pool(1 << 20);
+  job_scheduler sched(pool, affinity_of(test_cpus));
+  const node_spec node = test_node("verify_order");
+  cancel_token cancel;
+  EXPECT_STOP(sched.run(checkpointed(1), make_spec(node, 10, 5, false), cancel), error_category::io, "test.injected");
+  std::vector<std::string> order;
+  job_spec spec = make_spec(node, 10, -1, true);
+  const auto verify = spec.verify_partial;
+  const auto task = spec.run_task;
+  spec.prepare = [&](job_context&) { order.push_back("prepare"); };
+  spec.verify_partial = [&, verify](std::uint64_t i) {
+    order.push_back("verify");
+    return verify(i);
+  };
+  spec.run_task = [&, task](task_context& ctx) {
+    {
+      std::lock_guard lock(m);
+      order.push_back("task");
+    }
+    return task(ctx);
+  };
+  (void)sched.run(checkpointed(1), spec, cancel);
+  ASSERT_GE(order.size(), 6u);
+  EXPECT_EQ(order[0], "prepare");
+  for (std::size_t i = 1; i <= 4; ++i) EXPECT_EQ(order[i], "verify");
+  EXPECT_EQ(order[5], "task");
+}
+
+TEST(Scheduler, T_M2R3_07_pressure_rising_while_waiting_for_memory_is_sampled_again_at_admission) {
+  memory_pool pool(3000);
+  synthetic_psi psi;
+  psi.set(2.0);
+  const std::shared_ptr<pressure_gate> g = psi.gate_for();
+  job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(g));
+  cancel_token cancel;
+  const node_spec node_a = test_node("memory_a"), node_b = test_node("memory_b");
+  m2d::gate release_a;
+  std::atomic<bool> a_running{false}, b_prepared{false};
+  job_spec a{node_a, 1, [&](task_context& ctx) -> std::string {
+               a_running = true;
+               EXPECT_TRUE(release_a.wait());
+               return digest_for(ctx.index);
+             }};
+  job_spec b{node_b, 1, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+  b.prepare = [&](job_context&) { b_prepared = true; };
+  job_report rb;
+  std::thread ta([&] { (void)sched.run(plan_of(1, 2000, 1000), a, cancel); });
+  EXPECT_TRUE(wait_until([&] { return a_running.load(); }));
+  std::thread tb([&] { rb = sched.run(plan_of(1, 1000, 1000), b, cancel); });
+  EXPECT_TRUE(wait_until([&] { return pool.waiting_count() == 1; })) << "B attende la memoria, non la pressione";
+  EXPECT_EQ(g->waiting_jobs.load(), 0u);
+  psi.set(15.0);  // la pressione sale mentre B e' in coda nel pool
+  release_a.open();
+  ta.join();
+  EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; })) << "ricampionata all'ammissione effettiva";
+  std::this_thread::sleep_for(std::chrono::milliseconds(30));
+  EXPECT_FALSE(b_prepared.load());
+  EXPECT_EQ(pool.reserved_bytes(), 0u) << "la prenotazione presa sopra soglia e' restituita";
+  psi.set(4.0);
+  tb.join();
+  EXPECT_TRUE(b_prepared.load());
+  ASSERT_EQ(rb.admission.size(), 2u);
+  EXPECT_EQ(rb.admission.front(), (admission_sample{2.0, true}));
+  EXPECT_EQ(rb.admission.back(), (admission_sample{4.0, true}));
+  EXPECT_GE(rb.pressure_wait_samples, 1u);
+  EXPECT_EQ(g->waiting_jobs.load(), 0u);
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+}
+
+TEST(Scheduler, T_M2R3_07_cancel_interrupts_a_long_sampling_interval) {
+  memory_pool pool(1 << 20);
+  synthetic_psi psi;
+  psi.set(50.0);
+  const std::shared_ptr<pressure_gate> g = psi.gate_for();
+  g->poll = std::chrono::seconds(30);
+  job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(g));
+  cancel_token cancel;
+  const node_spec node = test_node("pressure_long_poll");
+  job_spec spec{node, 1, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+  std::thread canceller([&] {
+    EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; }));
+    cancel.request();
+  });
+  const auto start = std::chrono::steady_clock::now();
+  EXPECT_STOP(sched.run(plan_of(1), spec, cancel), error_category::cancelled, "sched.cancelled");
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  canceller.join();
+  EXPECT_LT(elapsed, std::chrono::seconds(10)) << "l'annullamento interrompe l'intervallo di 30 s";
+  EXPECT_EQ(g->waiting_jobs.load(), 0u);
+  EXPECT_EQ(pool.reserved_bytes(), 0u);
+}
+
+TEST(Scheduler, T_M2R3_07_cancel_interrupts_the_largest_configurable_sampling_interval) {
+  // 2^53 - 1 ms e' il massimo di pressure_poll_ms; 9,3e12 ms supera 2^63 ns una volta convertito, quindi una scadenza
+  // assoluta now() + poll andrebbe in overflow anche dove l'overflow non e' rilevato (release).
+  for (const std::int64_t poll_ms : {(std::int64_t{1} << 53) - 1, std::int64_t{9'300'000'000'000}}) {
+    SCOPED_TRACE("poll " + std::to_string(poll_ms) + " ms");
+    memory_pool pool(1 << 20);
+    synthetic_psi psi;
+    psi.set(50.0);
+    const std::shared_ptr<pressure_gate> g = psi.gate_for();
+    g->poll = std::chrono::milliseconds(poll_ms);
+    std::atomic<std::size_t> samples{0};
+    const auto inner = g->sample;
+    g->sample = [&samples, inner] {
+      ++samples;
+      return inner();
+    };
+    job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(g));
+    cancel_token cancel;
+    const node_spec node = test_node("pressure_max_poll");
+    job_spec spec{node, 1, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+    std::thread canceller([&] {
+      EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; }));
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));  // l'attesa e' dentro l'intervallo
+      cancel.request();
+    });
+    const auto start = std::chrono::steady_clock::now();
+    EXPECT_STOP(sched.run(plan_of(1), spec, cancel), error_category::cancelled, "sched.cancelled");
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    canceller.join();
+    EXPECT_LT(elapsed, std::chrono::seconds(10));
+    EXPECT_EQ(samples.load(), 1u) << "dopo la prima lettura il job dorme l'intervallo, senza ricampionare";
+    EXPECT_EQ(g->waiting_jobs.load(), 0u);
+    EXPECT_EQ(pool.reserved_bytes(), 0u);
+  }
+}
+
+// Sorgente a sequenza: ogni lettura restituisce il valore successivo, l'ultimo si ripete.
+std::shared_ptr<pressure_gate> sequence_gate(std::vector<double> values, std::atomic<std::size_t>& calls) {
+  auto g = std::make_shared<pressure_gate>();
+  g->sample = [values, &calls]() -> std::optional<double> {
+    const std::size_t i = calls.fetch_add(1);
+    return values[std::min(i, values.size() - 1)];
+  };
+  g->threshold = 10.0;
+  g->poll = std::chrono::milliseconds(1);
+  return g;
+}
+
+TEST(Scheduler, T_M2R3_07_the_first_reading_is_kept_when_pressure_changes_only_after_the_reservation) {
+  memory_pool pool(1 << 20);
+  cancel_token cancel;
+  const node_spec node = test_node("pressure_after_reservation");
+  job_spec spec{node, 1, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
+  {
+    // 2 prima della prenotazione, 4 all'ammissione effettiva: nessuna attesa, due letture diverse.
+    std::atomic<std::size_t> calls{0};
+    job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(sequence_gate({2.0, 4.0}, calls)));
+    const job_report r = sched.run(plan_of(1), spec, cancel);
+    EXPECT_EQ(calls.load(), 2u);
+    EXPECT_EQ(r.pressure_wait_samples, 0u);
+    ASSERT_EQ(r.admission.size(), 2u);
+    EXPECT_EQ(r.admission.front(), (admission_sample{2.0, true}));
+    EXPECT_EQ(r.admission.back(), (admission_sample{4.0, true}));
+  }
+  {
+    // 2 prima della prenotazione, 15 all'ammissione (prenotazione restituita), poi 4: la prima lettura resta.
+    std::atomic<std::size_t> calls{0};
+    job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(sequence_gate({2.0, 15.0, 4.0}, calls)));
+    const job_report r = sched.run(plan_of(1), spec, cancel);
+    EXPECT_EQ(r.pressure_wait_samples, 1u);
+    ASSERT_EQ(r.admission.size(), 2u);
+    EXPECT_EQ(r.admission.front(), (admission_sample{2.0, true}));
+    EXPECT_EQ(r.admission.back(), (admission_sample{4.0, true}));
+  }
+  {
+    // 2, 15, 2: prima e ultima lettura uguali, una sola voce.
+    std::atomic<std::size_t> calls{0};
+    job_scheduler sched(pool, affinity_of(test_cpus), with_pressure(sequence_gate({2.0, 15.0, 2.0}, calls)));
+    const job_report r = sched.run(plan_of(1), spec, cancel);
+    EXPECT_EQ(r.pressure_wait_samples, 1u);
+    ASSERT_EQ(r.admission.size(), 1u);
+    EXPECT_EQ(r.admission.front(), (admission_sample{2.0, true}));
+  }
   EXPECT_EQ(pool.reserved_bytes(), 0u);
 }
 

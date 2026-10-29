@@ -57,6 +57,69 @@ spill_file& spill_area::create_shared_file() {
   return shared_.back();
 }
 
+namespace {
+
+void check_staging_name(const std::string& name) {
+  const bool valid = !name.empty() && name.size() <= 128 && name != "." && name != ".." &&
+                     std::all_of(name.begin(), name.end(), [](char c) {
+                       return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' ||
+                              c == '_' || c == '-';
+                     });
+  if (!valid) {
+    throw stop_error(error_category::invalid_input, "spill.staging_name", "nome dello staging non valido", {{"nome", name}});
+  }
+}
+
+[[noreturn]] void unsafe_staging(const std::string& name, const char* why) {
+  throw stop_error(error_category::security, "spill.staging_unsafe", why, {{"nome", name}});
+}
+
+}  // namespace
+
+spill_file& spill_area::open_named_file(const std::string& name, bool existing) {
+  check_staging_name(name);
+  const int flags = O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY | (existing ? 0 : O_CREAT);
+  const int fd = ::openat(dir_fd_, name.c_str(), flags, 0600);
+  if (fd < 0) {
+    const int err = errno;
+    if (existing && err == ENOENT) {
+      throw stop_error(error_category::metadata_missing, "sched.checkpoint_missing", "staging del checkpoint assente",
+                       {{"nome", name}});
+    }
+    if (err == ELOOP) unsafe_staging(name, "lo staging e' un symlink");
+    if (err == EISDIR) unsafe_staging(name, "lo staging non e' un file regolare");
+    throw_errno(error_category::io, "spill.staging_open", "apertura dello staging fallita", err, {{"nome", name}});
+  }
+  spill_file file(*this, fd);
+  open_files_.fetch_add(1);
+  struct stat st {};
+  if (::fstat(fd, &st) != 0) throw_errno(error_category::io, "spill.staging_open", "fstat dello staging fallita", errno);
+  if (!S_ISREG(st.st_mode)) unsafe_staging(name, "lo staging non e' un file regolare");
+  if (st.st_nlink != 1) unsafe_staging(name, "lo staging ha piu' di un collegamento");
+  if (!existing) {
+    if (::ftruncate(fd, 0) != 0) throw_errno(error_category::io, "spill.staging_open", "troncamento dello staging fallito", errno);
+  } else {
+    const auto size = static_cast<std::uint64_t>(st.st_size);
+    charge(size);
+    file.size_.store(size, std::memory_order_release);
+  }
+  std::lock_guard lock(shared_mutex_);
+  shared_.push_back(std::move(file));
+  return shared_.back();
+}
+
+void remove_named_spill_file(const std::filesystem::path& dir, const std::string& name) {
+  check_staging_name(name);
+  const int dir_fd = ::open(dir.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (dir_fd < 0) throw_errno(error_category::io, "spill.staging_remove", "directory di scratch inutilizzabile", errno);
+  const int rc = ::unlinkat(dir_fd, name.c_str(), 0);
+  const int err = errno;
+  ::close(dir_fd);
+  if (rc != 0 && err != ENOENT) {
+    throw_errno(error_category::io, "spill.staging_remove", "rimozione dello staging fallita", err, {{"nome", name}});
+  }
+}
+
 void spill_area::charge(std::uint64_t bytes) {
   std::uint64_t cur = used_.load(std::memory_order_relaxed);
   do {
@@ -89,24 +152,34 @@ void spill_file::write(std::uint64_t offset, std::span<const std::byte> data) {
   if (end < offset) {
     throw stop_error(error_category::limit_exceeded, "spill.offset_overflow", "offset oltre 2^64");
   }
-  {
-    std::lock_guard lock(grow_mutex_);
-    const std::uint64_t cur = size_.load(std::memory_order_acquire);
-    if (end > cur) {
-      area_->charge(end - cur);
-      size_.store(end, std::memory_order_release);
-    }
-  }
+  // Una scrittura che estende il file tiene grow_mutex_ fino all'esito: l'estensione dichiarata (size_) e la quota
+  // crescono solo con i byte scritti davvero, e nessun'altra scrittura cade nel tratto ancora incerto.
+  std::unique_lock lock(grow_mutex_);
+  const std::uint64_t before = size_.load(std::memory_order_acquire);
+  const bool extends = end > before;
+  if (extends) area_->charge(end - before);
+  else lock.unlock();
   std::size_t done = 0;
+  const auto fail = [&](int err) {
+    if (extends) {
+      const std::uint64_t reached = done > 0 ? std::max(before, offset + done) : before;
+      area_->uncharge(end - reached);
+      size_.store(reached, std::memory_order_release);
+    }
+    throw_errno(error_category::io, "spill.write", "scrittura dello spill fallita", err,
+                {{"offset", std::to_string(offset + done)}});
+  };
   while (done < data.size()) {
+    const int injected = area_->fault_ ? area_->fault_("spill.write") : 0;
+    if (injected != 0) fail(injected);
     const ssize_t n = ::pwrite(fd_, data.data() + done, data.size() - done, static_cast<off_t>(offset + done));
     if (n < 0) {
       if (errno == EINTR) continue;  // interruzione da segnale: si riprende lo stesso trasferimento
-      throw_errno(error_category::io, "spill.write", "scrittura dello spill fallita", errno,
-                  {{"offset", std::to_string(offset + done)}});
+      fail(errno);
     }
     done += static_cast<std::size_t>(n);
   }
+  if (extends) size_.store(end, std::memory_order_release);
 }
 
 void spill_file::read(std::uint64_t offset, std::span<std::byte> out) const {

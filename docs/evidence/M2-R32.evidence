@@ -1,0 +1,34 @@
+# Sorgente del blocco generato di M2-R32.md (tools/evidence.py)
+file docs/contracts/ADR-06-budget-scheduler.md
+file src/core/include/astro/fits_blocks.hpp
+file src/core/fits_blocks.cpp
+file src/core/calibration_blocks.cpp
+file src/core/calibration.cpp
+file src/core/calibration_internal.hpp
+file src/core/calibration_report.cpp
+file src/core/calibration_job.cpp
+file src/core/include/astro/calibration.hpp
+file src/core/include/astro/scheduler.hpp
+file src/core/scheduler.cpp
+file src/core/include/astro/spill.hpp
+file src/core/spill.cpp
+file src/core/include/astro/checkpoint.hpp
+file src/core/checkpoint.cpp
+file src/core/include/astro/resources.hpp
+file src/core/resources.cpp
+file src/core/include/astro/budget.hpp
+file src/core/budget.cpp
+file src/core/include/astro/sqlite_dag_store.hpp
+file src/core/sqlite_files.cpp
+file src/core/include/astro/fits.hpp
+file src/core/fits.cpp
+file tests/unit/test_blocks.cpp
+file tests/unit/test_calibration_r32.cpp
+file tests/unit/test_resources.cpp
+file tests/unit/test_scheduler.cpp
+file tests/unit/test_spill.cpp
+file tests/unit/CMakeLists.txt
+file tests/trace/M2.tsv
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

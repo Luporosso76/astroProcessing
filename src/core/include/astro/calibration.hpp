@@ -183,6 +183,19 @@ struct calibration_job_options {
   // configurazione restano intatti) e i campi sopra sono ignorati. Configurazione e origini entrano nella provenance
   // solo se il chiamante passa anche lo snapshot del budget: senza snapshot non viene registrato nulla.
   std::optional<resource_config> resources;
+  // Checkpoint del job (ADR-06, estensione R3.2): ogni `every` task in resources->scratch, con staging `<name>.stage`;
+  // `resume` riprende dal checkpoint `<name>`. Implica la residenza a blocchi e richiede `scratch`
+  // (invalid_input calib.checkpoint_scratch). Dopo la pubblicazione riuscita checkpoint e staging sono rimossi.
+  struct checkpoint_options {
+    std::string name;
+    std::uint32_t every = 1;
+    bool resume = false;
+  };
+  std::optional<checkpoint_options> checkpoint;
+  // Ammissione sotto pressione (make_pressure_gate); nullo = nessun campionamento.
+  std::shared_ptr<pressure_gate> pressure;
+  // Solo test: iniettore dei guasti di scratch (`spill.write`) e checkpoint (`checkpoint.<passo>`).
+  fault_injector fault;
   // Solo test: chiamato con "plan.done" dopo il piano dei file (prima della prenotazione) e con "preflight.done"
   // dopo il preflight e prima della riverifica dei file.
   std::function<void(std::string_view)> hook;

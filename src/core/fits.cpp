@@ -530,6 +530,14 @@ void check_unchanged(const fits_input& input) {
   }
 }
 
+std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input) {
+  struct stat sb {};
+  if (::fstat(input.fd_, &sb) != 0) {
+    fail(error_category::io, "fits.fstat", "fstat non riuscita", {{"errno", std::to_string(errno)}});
+  }
+  return {static_cast<std::uint64_t>(sb.st_dev), static_cast<std::uint64_t>(sb.st_ino)};
+}
+
 }  // namespace fits_detail
 
 fits_input open_fits_input(const std::string& path) {

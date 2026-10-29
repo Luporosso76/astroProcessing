@@ -75,7 +75,8 @@ std::string recipe_digest(const node_spec& spec, const job_plan& plan) {
   return sha256_hex({reinterpret_cast<const std::uint8_t*>(text.data()), text.size()});
 }
 
-void write_checkpoint(const fs::path& dir, const std::string& checkpoint_name, const checkpoint_record& record) {
+void write_checkpoint(const fs::path& dir, const std::string& checkpoint_name, const checkpoint_record& record,
+                      const fault_injector* injector) {
   const std::string name = file_name(checkpoint_name);
   if (record.completed.size() != record.partial_digests.size()) {
     throw stop_error(error_category::invalid_input, "sched.checkpoint_inconsistent",
@@ -106,6 +107,7 @@ void write_checkpoint(const fs::path& dir, const std::string& checkpoint_name, c
   options.conflict_code = "sched.checkpoint_conflict";
   options.final_name = name;
   options.replace = true;
+  options.injector = injector;
   atomic_write(options, {reinterpret_cast<const std::uint8_t*>(text.data()), text.size()}, std::nullopt);
 }
 

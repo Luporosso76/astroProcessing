@@ -76,6 +76,10 @@ budget_snapshot compute_manual_budget(const manual_budget& manual, const budget_
 
 json budget_json(const budget_snapshot& snapshot);
 
+// PSI `some avg10` da <proc_root>/pressure/memory: nullopt se il file manca; non interpretabile: invalid_input
+// budget.psi_parse. Stessa lettura del budget automatico.
+std::optional<double> read_memory_pressure(const budget_sources& sources = {});
+
 constexpr const char* manual_budget_setting_key = "budget.manual";
 // Convalida prima di scrivere in `settings` (JSON canonico).
 void save_manual_budget(sqlite_dag_store& store, const manual_budget& budget);

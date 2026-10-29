@@ -197,7 +197,7 @@ void write_progress(run_state& st, const job_spec& spec, const std::string& reci
     record.completed.push_back(i);
     record.partial_digests.push_back(st.digests[i]);
   }
-  write_checkpoint(spec.checkpoint_dir, spec.checkpoint_name, record);
+  write_checkpoint(spec.checkpoint_dir, spec.checkpoint_name, record, spec.fault ? &spec.fault : nullptr);
   ++st.report.checkpoints_written;
 }
 
@@ -254,6 +254,69 @@ void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job
     }
   }
 }
+
+// Ammissione sotto pressione (D11, D12): attende senza timeout finche' la PSI e' sotto soglia o arriva un annullamento.
+// Conserva la prima lettura e quella dell'ammissione; le letture intermedie sopra soglia sono solo contate.
+class pressure_admission {
+ public:
+  pressure_admission(pressure_gate& gate, const cancel_token& cancel) : gate_(gate), cancel_(cancel) {}
+  ~pressure_admission() { set_waiting(false); }
+  pressure_admission(const pressure_admission&) = delete;
+  pressure_admission& operator=(const pressure_admission&) = delete;
+
+  // Una lettura: true sotto soglia (o sorgente assente). Sopra soglia il job conta come in attesa.
+  bool sample_below() {
+    check_cancel();
+    const std::optional<double> psi = gate_.sample();
+    const bool below = !psi || *psi < gate_.threshold;
+    if (!first_) first_ = admission_sample{psi, below};
+    last_ = admission_sample{psi, below};
+    if (!below) ++waits_;
+    set_waiting(!below);
+    return below;
+  }
+  void wait_below() {
+    while (!sample_below()) sleep_one_poll();
+  }
+  // Un intervallo di campionamento, interrotto dall'annullamento: il controllo avviene almeno ogni 10 ms. Il tempo si
+  // conta a tratti di al piu' 10 ms sottratti da `poll` (sleep_for dorme almeno il tratto): nessuna scadenza assoluta,
+  // quindi nessun overflow anche con `poll` vicino al massimo configurabile.
+  void sleep_one_poll() {
+    constexpr std::chrono::milliseconds slice{10};
+    for (std::chrono::milliseconds remaining = gate_.poll; remaining.count() > 0;) {
+      check_cancel();
+      const std::chrono::milliseconds step = std::min(remaining, slice);
+      std::this_thread::sleep_for(step);
+      remaining -= step;
+    }
+    check_cancel();
+  }
+  // La prima lettura sempre; l'ultima solo se diversa dalla prima.
+  std::vector<admission_sample> samples() const {
+    if (*last_ == *first_) return {*first_};
+    return {*first_, *last_};
+  }
+  std::uint64_t waits() const noexcept { return waits_; }
+
+ private:
+  void check_cancel() const {
+    if (cancel_.requested()) {
+      throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto durante l'attesa di ammissione");
+    }
+  }
+  void set_waiting(bool waiting) {
+    if (waiting == waiting_) return;
+    waiting_ = waiting;
+    if (waiting) gate_.waiting_jobs.fetch_add(1);
+    else gate_.waiting_jobs.fetch_sub(1);
+  }
+
+  pressure_gate& gate_;
+  const cancel_token& cancel_;
+  std::optional<admission_sample> first_, last_;
+  std::uint64_t waits_ = 0;
+  bool waiting_ = false;
+};
 
 // Produce gli indici in ordine; si blocca a coda piena senza scartare nulla.
 void produce(run_state& st, const std::vector<std::uint64_t>& pending, std::size_t capacity, const cancel_token& cancel) {
@@ -318,15 +381,29 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
   std::optional<checkpoint_record> resume;
   if (spec.resume) resume = load_resume(plan, spec);
 
-  reservation job_res = pool_.reserve(peak, "job", &cancel, tuning_.max_queued_jobs);
+  // La pressione si campiona prima della coda del pool e di nuovo all'ammissione effettiva: se e' salita durante
+  // l'attesa della memoria, la prenotazione si restituisce e l'attesa riprende.
+  std::optional<pressure_admission> pressure;
+  if (tuning_.pressure) pressure.emplace(*tuning_.pressure, cancel);
+  reservation job_res;
+  for (;;) {
+    if (pressure) pressure->wait_below();
+    job_res = pool_.reserve(peak, "job", &cancel, tuning_.max_queued_jobs);
+    if (!pressure || pressure->sample_below()) break;
+    job_res.release();
+    pressure->sleep_one_poll();
+  }
   reservation shared = job_res.carve(plan.shared_bytes, "shared");
-  if (resume) verify_resume_digests(*resume, spec);
 
   run_state st;
   st.done.assign(spec.task_count, false);
   st.digests.assign(spec.task_count, std::string());
   st.report.task_count = spec.task_count;
   st.report.job_peak_bytes = peak;
+  if (pressure) {
+    st.report.admission = pressure->samples();
+    st.report.pressure_wait_samples = pressure->waits();
+  }
   if (resume) {
     for (std::size_t i = 0; i < resume->completed.size(); ++i) {
       st.done[resume->completed[i]] = true;
@@ -342,6 +419,7 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
   const bool pin = !tuning_.cpu_set.empty();
   job_context jc{plan, shared, spill ? &*spill : nullptr, cancel, st.stopping};
   if (spec.prepare) spec.prepare(jc);
+  if (resume) verify_resume_digests(*resume, spec);
   {
     worker_threads workers(st);
     for (unsigned w = 0; w < plan.worker_count; ++w) {

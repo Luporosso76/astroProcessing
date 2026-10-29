@@ -51,16 +51,8 @@ std::string calibration_report_text(const json& report) {
   return out.str();
 }
 
-calibration_result finish_calibration(prepared_calibration&& prepared) {
-  prepared_calibration::impl& p = *prepared.impl_;
-  std::array<std::uint64_t, 9> counts{};
-  std::uint64_t invalid_pixels = 0;
-  for (const std::uint16_t bits : p.out.invalid.bits) {
-    if (bits != 0) ++invalid_pixels;
-    for (std::size_t b = 0; b < counts.size(); ++b) {
-      if ((bits >> b) & 1u) ++counts[b];
-    }
-  }
+json calib_detail::calibration_report(const prepared_calibration::impl& p, const std::array<std::uint64_t, 9>& counts,
+                                      std::uint64_t invalid_pixels) {
   const std::uint64_t total = static_cast<std::uint64_t>(p.w) * p.h;
 
   json mask = json::object();
@@ -128,6 +120,20 @@ calibration_result finish_calibration(prepared_calibration&& prepared) {
   report.set("sample_type", json::string(p.out.type == sample_type::f32 ? "f32" : "f64"));
   report.set("width", json::uinteger(p.w));
   report.set("height", json::uinteger(p.h));
+  return report;
+}
+
+calibration_result finish_calibration(prepared_calibration&& prepared) {
+  prepared_calibration::impl& p = *prepared.impl_;
+  std::array<std::uint64_t, 9> counts{};
+  std::uint64_t invalid_pixels = 0;
+  for (const std::uint16_t bits : p.out.invalid.bits) {
+    if (bits != 0) ++invalid_pixels;
+    for (std::size_t b = 0; b < counts.size(); ++b) {
+      if ((bits >> b) & 1u) ++counts[b];
+    }
+  }
+  json report = calib_detail::calibration_report(p, counts, invalid_pixels);
 
   calibration_result result;
   result.report_text = calibration_report_text(report);

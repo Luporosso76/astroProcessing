@@ -7,6 +7,9 @@
 #include <filesystem>
 #include <mutex>
 #include <span>
+#include <string>
+
+#include "astro/fault_injector.hpp"
 
 namespace astro {
 
@@ -29,7 +32,9 @@ class spill_file {
   spill_file& operator=(const spill_file&) = delete;
   ~spill_file();
 
-  // Quota superata: budget spill.quota_exceeded (nessun byte scritto). Errori di sistema: io spill.write.
+  // Quota superata: budget spill.quota_exceeded (nessun byte scritto). Errori di sistema: io spill.write con l'errno.
+  // Una scrittura che estende il file e' esclusiva fino all'esito; se fallisce, estensione e quota restano quelle dei
+  // byte scritti davvero (anche una scrittura corta).
   void write(std::uint64_t offset, std::span<const std::byte> data);
   // Oltre l'estensione scritta o lettura corta: integrity spill.short_read. Errori di sistema: io spill.read.
   void read(std::uint64_t offset, std::span<std::byte> out) const;
@@ -66,6 +71,16 @@ class spill_area {
   // File posseduto dall'area e condiviso fra i task del job: vive fino alla distruzione dell'area.
   spill_file& create_shared_file();
 
+  // Come create_shared_file, ma con nome nella directory di scratch: resta su disco dopo la distruzione dell'area
+  // (staging di un job con checkpoint, ADR-06 estensione R3.2). `existing` = false: creato o troncato; true: riaperto
+  // e la sua estensione addebitata alla quota. Nome [A-Za-z0-9._-]{1,128} diverso da . e .. (invalid_input
+  // spill.staging_name); symlink, non regolare o st_nlink != 1: security spill.staging_unsafe; assente con `existing`:
+  // metadata_missing sched.checkpoint_missing; altri errori: io spill.staging_open.
+  spill_file& open_named_file(const std::string& name, bool existing);
+
+  // Solo test: chiamato con "spill.write" prima di ogni pwrite; un valore diverso da zero e' l'errno della scrittura.
+  void set_fault_injector(fault_injector injector) { fault_ = std::move(injector); }
+
   std::uint64_t quota_bytes() const noexcept { return quota_bytes_; }
   std::uint64_t used_bytes() const noexcept { return used_.load(std::memory_order_acquire); }
   std::uint64_t peak_bytes() const noexcept { return peak_.load(std::memory_order_acquire); }
@@ -82,6 +97,10 @@ class spill_area {
   std::atomic<std::size_t> open_files_{0};
   std::mutex shared_mutex_;
   std::deque<spill_file> shared_;
+  fault_injector fault_;
 };
+
+// Rimuove il file nominato `name` da `dir` (assente: nessun errore). Errori: io spill.staging_remove.
+void remove_named_spill_file(const std::filesystem::path& dir, const std::string& name);
 
 }  // namespace astro

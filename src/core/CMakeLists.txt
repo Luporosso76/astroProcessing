@@ -44,6 +44,8 @@ add_library(astrocore STATIC
   memory_pool.cpp
   spill.cpp
   checkpoint.cpp
+  calibration_blocks.cpp
+  fits_blocks.cpp
   scheduler.cpp
   resources.cpp
   provenance.cpp

@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <optional>
 #include <cerrno>
 #include <cstring>
 #include <cmath>
@@ -745,6 +747,180 @@ TEST(Resources, T_M2R3_03_monitor_rejects_an_unreadable_status_instead_of_invent
   EXPECT_EQ(u64(*s.document.find("rss"), "rss_bytes"), 100 * 1024u);
   EXPECT_EQ(u64(*s.document.find("rss"), "rss_peak_bytes"), 200 * 1024u);
   EXPECT_EQ(s.document.find("rss")->find("target_bytes")->type(), json::kind::null);
+}
+
+// ---------------------------------------------------------------- T-M2R3-01: residenza a blocchi (casi g-o)
+
+constexpr std::uint64_t whole_min_hand = 81'483'856, blocks_min_hand = 16'736'720;
+constexpr std::uint64_t blocks_shared_hand = 11'552'720, blocks_per_task_hand = 5'184'000;
+
+planner_input blocks_input(std::uint64_t budget, bool checkpoint = false) {
+  planner_input in;
+  in.budget_bytes = budget;
+  in.cpus = 4;
+  in.width = 1000;
+  in.height = 1000;
+  in.out_sample_bytes = 4;
+  in.input_peak_bytes = 50'000'000;
+  in.header_bound_bytes = 2'417'280;
+  in.block_raw_bytes_per_row = 32'000;
+  in.block_band_bytes_per_row = 40'000;
+  in.block_regions = 8;
+  in.normalization_channels = 1;
+  in.checkpoint = checkpoint;
+  return in;
+}
+
+resource_config with_scratch(std::uint64_t quota = 10'000'000) {
+  resource_config c;
+  c.scratch = dir_quota{"/scratch-di-prova", quota};
+  return c;
+}
+
+void expect_stop_with_minimum(const planner_input& in, const resource_config& c, std::uint64_t minimum,
+                              const char* residency) {
+  try {
+    (void)plan_resources(in, c);
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::budget);
+    EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+    EXPECT_EQ(context_value(e, "minimum_feasible_bytes"), std::to_string(minimum));
+    EXPECT_EQ(context_value(e, "residenza"), residency);
+  }
+}
+
+TEST(Resources, T_M2R3_01_planner_chooses_blocks_with_the_hand_computed_table) {
+  {  // g
+    const resource_plan p = plan_resources(blocks_input(whole_min_hand), with_scratch());
+    EXPECT_EQ(p.frame_residency, "whole");
+    EXPECT_EQ(p.master_residency, "whole");
+    EXPECT_EQ(p.minimum_feasible_bytes, whole_min_hand);
+    EXPECT_FALSE(p.spill);
+  }
+  {  // h
+    const resource_plan p = plan_resources(blocks_input(whole_min_hand - 1), with_scratch());
+    EXPECT_EQ(p.frame_residency, "blocks");
+    EXPECT_EQ(p.master_residency, "blocks");
+    EXPECT_EQ(p.tile_rows, 63u);
+    EXPECT_EQ(p.task_count, 16u);
+    EXPECT_EQ(p.per_task_bytes, blocks_per_task_hand);
+    EXPECT_EQ(p.shared_bytes, blocks_shared_hand);
+    EXPECT_EQ(p.minimum_feasible_bytes, blocks_min_hand);
+    EXPECT_EQ(p.whole_minimum_bytes, whole_min_hand);
+    EXPECT_EQ(p.worker_count, 4u);
+    EXPECT_EQ(p.peak_bytes, blocks_shared_hand + 4 * blocks_per_task_hand);
+    EXPECT_EQ(p.staging_bytes, 10'000'000u);
+    EXPECT_TRUE(p.budget_below_working_set);
+    ASSERT_TRUE(p.spill);
+    EXPECT_EQ(p.spill->scratch_dir, fs::path("/scratch-di-prova"));
+    EXPECT_EQ(p.spill->quota_bytes, 10'000'000u);
+  }
+  {  // i
+    const resource_plan p = plan_resources(blocks_input(blocks_min_hand), with_scratch());
+    EXPECT_EQ(p.frame_residency, "blocks");
+    EXPECT_EQ(p.worker_count, 1u);
+    EXPECT_EQ(p.peak_bytes, blocks_min_hand);
+  }
+  expect_stop_with_minimum(blocks_input(blocks_min_hand - 1), with_scratch(), blocks_min_hand, "blocks");  // j
+  {  // k
+    const resource_plan p = plan_resources(blocks_input(whole_min_hand, true), with_scratch());
+    EXPECT_EQ(p.frame_residency, "blocks");
+    EXPECT_EQ(p.worker_count, 4u);
+  }
+  {  // l
+    try {
+      (void)plan_resources(blocks_input(whole_min_hand - 1), resource_config{});
+      ADD_FAILURE() << "stop atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+      EXPECT_EQ(context_value(e, "minimum_feasible_bytes"), std::to_string(whole_min_hand));
+      EXPECT_EQ(context_value(e, "residenza_blocchi"), "scratch non dichiarato");
+    }
+  }
+  EXPECT_STOP(plan_resources(blocks_input(blocks_min_hand), with_scratch(9'999'999)), error_category::budget,
+              "spill.quota_exceeded");  // m
+  {  // n
+    resource_config c = with_scratch();
+    c.worker_count = 2;
+    try {
+      (void)plan_resources(blocks_input(blocks_min_hand), c);
+      ADD_FAILURE() << "stop atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+      EXPECT_EQ(context_value(e, "picco"), "21920720");
+    }
+  }
+  EXPECT_STOP(plan_resources(blocks_input(blocks_min_hand, true), resource_config{}), error_category::invalid_input,
+              "calib.checkpoint_scratch");  // o
+  // Con budget ampio e senza checkpoint il piano di R3.1 resta identico anche con scratch dichiarato.
+  const resource_plan whole = plan_resources(table_input(104'857'600, 4), with_scratch());
+  const resource_plan r31 = plan_resources(table_input(104'857'600, 4), resource_config{});
+  EXPECT_EQ(resource_plan_json(whole).find("worker_count")->as_integer(), resource_plan_json(r31).find("worker_count")->as_integer());
+  EXPECT_EQ(whole.shared_bytes, r31.shared_bytes);
+  EXPECT_EQ(whole.frame_residency, "whole");
+}
+
+// ---------------------------------------------------------------- T-M2R3-07: porta della pressione e monitor
+
+TEST(Resources, T_M2R3_07_pressure_poll_is_a_persisted_parameter_with_origin) {
+  const resource_config d;
+  EXPECT_EQ(d.pressure_poll_ms.value, 1000u);
+  EXPECT_EQ(d.pressure_poll_ms.origin, "default dichiarato, non misurato");
+  resource_config c;
+  c.pressure_poll_ms = {25, "configurato"};
+  EXPECT_EQ(parse_resource_config(resource_config_json(c)), c);
+  const fs::path root = fresh_dir("res_poll") / "project";
+  auto store = sqlite_dag_store::create(root);
+  save_resource_config(*store, c);
+  EXPECT_EQ(load_resource_config(*store), c);
+  c.pressure_poll_ms.value = 0;
+  EXPECT_STOP(validate_resource_config(c), error_category::invalid_input, "resources.pressure_poll_ms");
+  c.pressure_poll_ms = {too_big, "configurato"};
+  EXPECT_STOP(validate_resource_config(c), error_category::invalid_input, "resources.pressure_poll_ms");
+  c.pressure_poll_ms = {5, ""};
+  EXPECT_STOP(validate_resource_config(c), error_category::invalid_input, "resources.pressure_poll_ms");
+}
+
+TEST(Resources, T_M2R3_07_system_pressure_gate_reads_psi_with_the_configured_threshold) {
+  fake_system sys("res_gate");
+  resource_config c;
+  c.psi_threshold = {12.5, "configurato"};
+  c.pressure_poll_ms = {7, "configurato"};
+  const std::shared_ptr<pressure_gate> g = make_pressure_gate(c, sys.sources());
+  EXPECT_EQ(g->threshold, 12.5);
+  EXPECT_EQ(g->poll, std::chrono::milliseconds(7));
+  EXPECT_EQ(g->sample(), std::nullopt);
+  sys.psi("some avg10=13.25 avg60=1.00 avg300=0.50 total=12345\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n");
+  EXPECT_EQ(g->sample(), std::optional<double>(13.25));
+  EXPECT_EQ(read_memory_pressure(sys.sources()), std::optional<double>(13.25));
+  sys.psi("rotto\n");
+  EXPECT_STOP(g->sample(), error_category::invalid_input, "budget.psi_parse");
+}
+
+TEST(Resources, T_M2R3_07_monitor_exposes_the_jobs_waiting_for_pressure) {
+  fake_system sys("res_monitor_pressure");
+  write_text(sys.root / "proc" / "self" / "status", "VmHWM:\t 200 kB\nVmRSS:\t 100 kB\n");
+  const budget_snapshot budget = compute_manual_budget(parse_manual_budget("64MiB"), sys.sources());
+  memory_pool pool(budget);
+  pressure_gate g;
+  g.threshold = 10.0;
+  g.waiting_jobs = 2;
+  monitor_inputs mi;
+  mi.pool = &pool;
+  mi.budget = &budget;
+  mi.proc_root = sys.root / "proc";
+  const json absent = sample_resources(mi).document;
+  ASSERT_NE(absent.find("pressure"), nullptr);
+  EXPECT_EQ(absent.find("pressure")->type(), json::kind::null);
+  mi.pressure = &g;
+  const resource_sample s = sample_resources(mi);
+  const json* pressure = s.document.find("pressure");
+  ASSERT_NE(pressure, nullptr);
+  ASSERT_EQ(pressure->type(), json::kind::object);
+  ASSERT_NE(pressure->find("threshold"), nullptr);
+  EXPECT_EQ(u64(*pressure, "waiting_jobs"), 2u);
+  EXPECT_EQ(pressure->find("threshold")->as_number(), 10.0);
 }
 
 }  // namespace
