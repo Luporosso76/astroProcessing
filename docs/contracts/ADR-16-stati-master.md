@@ -131,6 +131,16 @@ Fixture `FIX-SYN-FITS-01` con `B`, `d`, `q`, `S`, `K` noti.
 | T-M2E-19 | `roi_x`, `roi_y`, `readout_mode`, `row_order` diversi: stop; assenti: elencati fra le ipotesi del report. |
 | T-M2E-27 | Parametri assenti, non finiti o fuori dominio: stop `calib.param.<nome>`; `pedestal_adu` ≠ 0: stop `calib.pedestal`. |
 
+## Aggiunte di M2.e
+
+- Campione NaN o ±Inf in un input: il pixel è invalido per input (`source_nonfinite`, più `master_invalid` se l'input è un master). `q_nonfinite` è riservato al `Q` calcolato da input validi (per esempio overflow di `Fc`); `Q` non si valuta su un pixel con input invalido.
+- Descrittore di master assente: `metadata_missing`, `calib.master_state_unknown`. Descrittore presente sul light: `invalid_input`, `calib.role_slot`.
+- Maschera di uscita: unione dei bit degli input più `master_invalid` (vedi ADR-03, T-M2E-14).
+- File riletto con dimensione o geometria diverse da quelle del piano di prenotazione: `integrity`, `input.size_changed` / `input.geometry_changed`.
+- Intermedi di varianza non finiti: `N²` nullo o non finito, o stima di `N` non finita, ferma con `numeric`, `calib.variance_overflow`; a livello di pixel un intermedio non finito o azzerato per underflow (`Q²`, `Q⁴`, `Lc²`, termini) accende `result_nonfinite`. Nessuna riscalatura.
+- Il report riporta valore e origine (`header`/`declared`) di `binning_x`, `binning_y`, `unit`, `linearity` per ogni input (`image_fields`).
+- Non rappresentabile in modo normale: se per un prodotto, quoziente o somma del calcolo di `C`, `Q` e `Var` gli operandi sono non nulli e il risultato è zero, subnormale (`fpclassify`) o non finito, anche dopo l'arrotondamento al tipo di uscita, il pixel prende `result_nonfinite`. Un `rn²` non normale è `invalid_input`, `var.param.read_noise_adu`; una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
+
 ## Fuori da M2
 
 Matrice delle otto combinazioni, omissioni pianificate, `L − B − D'`, dark scalato, solo bias, passthrough, `F − B`, dark-flat `bias_subtracted`, flat `calibrated` o `corrected_unnormalized` (ADR-16.b, M3.c); debayer; RAW e offset del decoder (M3.a); stato dichiarato da header dedicati.

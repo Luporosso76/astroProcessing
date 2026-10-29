@@ -74,6 +74,13 @@ Il `calibration_report` contiene: `covariance_model`, `variance_source` e parame
 | T-M2E-25 | Valore sotto l'offset: varianza uguale al rumore di lettura su `n`. |
 | T-M2E-26 | Report: modello, sorgenti, `n_valid`, stima su `N` con ipotesi, master condivisi. Monte Carlo con seed su flat uniforme, `n_valid ≥ 10⁴`, `K` realizzazioni: rapporto fra varianza empirica di `N` e stima dentro l'intervallo chi-quadro a `K − 1` gradi di libertà con α = 10⁻³, allargato di ±2 % per l'approssimazione asintotica; soglie fissate prima della misura. Su flat vignettato il rapporto si misura e si registra come limite, senza gate.; il report marca `iid_assumption = not_verified` quando il coefficiente di variazione spaziale di `Fc` sui pixel validi supera 0,01, soglia dichiarata prima della misura. |
 
+## Aggiunte di M2.e
+
+- `offset_adu` è richiesto dalla compatibilità di tutti gli input: la sua assenza si ferma prima con `metadata_missing`, `calib.metadata.offset_adu`, mai con `var.source.offset_adu`.
+- Un HDU `VARIANCE` di geometria diversa letto da file è respinto dal lettore con `fits.extension_geometry`; `var.plane_geometry` vale per immagini in memoria il cui piano ha dimensione diversa, controllata prima di `validate_image`.
+- Un campione NaN in un input non genera `q_nonfinite` (ADR-16).
+- Non rappresentabile in modo normale: se per un prodotto, quoziente o somma del calcolo di `C`, `Q` e `Var` gli operandi sono non nulli e il risultato è zero, subnormale (`fpclassify`) o non finito, anche dopo l'arrotondamento al tipo di uscita, il pixel prende `result_nonfinite`. Un `rn²` non normale è `invalid_input`, `var.param.read_noise_adu`; una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
+
 ## Fuori da M2
 
 NPS locale, kernel di correlazione e fattore di apertura (ADR-17.b, M3); correlazioni dei master usate nello stacking; incertezza della geometria; covarianza fra canali dopo debayer; pesi dello stacking; varianza di master combinati con mediana senza piano dichiarato.

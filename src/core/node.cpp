@@ -47,6 +47,22 @@ void add_metadata(json& out, const char* name, const std::optional<metadata_valu
   }
 }
 
+
+const char* precision_name(sample_type type) {
+  switch (type) {
+    case sample_type::f32: return "f32";
+    case sample_type::f64: return "f64";
+  }
+  ASTRO_ASSERT(false);
+  return "";
+}
+
+json optional_offset(const std::optional<std::uint8_t>& v) {
+  return v ? json::uinteger(*v) : json::null();
+}
+
+}  // namespace
+
 json declared_metadata_json(const frame_metadata& m) {
   json out = json::object();
   add_metadata(out, "exposure_s", m.exposure_s);
@@ -65,21 +81,6 @@ json declared_metadata_json(const frame_metadata& m) {
   add_metadata(out, "row_order", m.row_order);
   return out;
 }
-
-const char* precision_name(sample_type type) {
-  switch (type) {
-    case sample_type::f32: return "f32";
-    case sample_type::f64: return "f64";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-json optional_offset(const std::optional<std::uint8_t>& v) {
-  return v ? json::uinteger(*v) : json::null();
-}
-
-}  // namespace
 
 node_input node_input::from_node(std::string input_name, const std::string& node_key) {
   check_ref(node_key);

@@ -214,4 +214,85 @@ inline synth_frame make_synth_frame(frame_kind kind, std::uint32_t width, std::u
   return f;
 }
 
+// ---------------------------------------------------------------- frame M2.e con valori arbitrari
+
+// Header di un frame di calibrazione: ogni campo e' una card; `cfa` aggiunge BAYERPAT e gli offset.
+struct calib_header {
+  std::string imagetyp = "Light Frame";
+  double exposure = 60;
+  double gain = 100;
+  double egain = 1.5;
+  double offset = 10;
+  double temperature = -10;
+  std::string filter = "L";
+  std::string camera = "SYN-CAM";
+  double saturation = 0;  // 0 = card assente
+  std::string bayer;      // vuoto = mono
+  int bayer_x = 0;
+  int bayer_y = 0;
+  int xbin = 1;
+  int ybin = 1;
+  bool with_unit_and_linear = true;
+  std::vector<std::string> extra;
+};
+
+inline std::vector<std::string> calib_cards(const calib_header& h) {
+  std::vector<std::string> c = {card_str("IMAGETYP", h.imagetyp), card_real("EXPTIME", h.exposure),
+                                card_real("GAIN", h.gain),        card_real("EGAIN", h.egain),
+                                card_real("OFFSET", h.offset),    card_real("CCD-TEMP", h.temperature),
+                                card_str("FILTER", h.filter),     card_str("INSTRUME", h.camera),
+                                card_int("XBINNING", h.xbin),     card_int("YBINNING", h.ybin)};
+  if (h.saturation != 0) c.push_back(card_real("SATURATE", h.saturation));
+  if (h.with_unit_and_linear) {
+    c.push_back(card_str("BUNIT", "adu"));
+    c.push_back(card_bool("LINEAR", true));
+  }
+  if (!h.bayer.empty()) {
+    c.push_back(card_str("BAYERPAT", h.bayer));
+    c.push_back(card_int("XBAYROFF", h.bayer_x));
+    c.push_back(card_int("YBAYROFF", h.bayer_y));
+  }
+  for (const auto& e : h.extra) c.push_back(e);
+  return c;
+}
+
+// File FITS con campioni BITPIX -32 o -64 (valori scritti dopo l'arrotondamento al tipo), `planes` piani.
+inline bytes float_frame(std::uint32_t width, std::uint32_t height, int bitpix, const std::vector<double>& values,
+                         const std::vector<std::string>& cards, std::uint32_t planes = 1) {
+  raw_hdu h;
+  h.bitpix = bitpix;
+  h.axes = {width, height};
+  if (planes > 1) h.axes.push_back(planes);
+  h.cards = cards;
+  for (double v : values) {
+    if (bitpix == -32) put_be(h.data, bits_of(static_cast<float>(v)), 4);
+    else put_be(h.data, bits_of(v), 8);
+  }
+  return build_fits({h});
+}
+
+// HDU VARIANCE accodata a un frame float (stessa larghezza e altezza, stesso BITPIX).
+inline bytes float_frame_with_variance(std::uint32_t width, std::uint32_t height, int bitpix,
+                                       const std::vector<double>& values, const std::vector<double>& variance,
+                                       const std::vector<std::string>& cards) {
+  raw_hdu primary;
+  primary.bitpix = bitpix;
+  primary.axes = {width, height};
+  primary.cards = cards;
+  raw_hdu ext;
+  ext.primary = false;
+  ext.bitpix = bitpix;
+  ext.axes = {width, height};
+  ext.cards = {card_str("EXTNAME", "VARIANCE")};
+  const auto fill = [&](raw_hdu& hdu, const std::vector<double>& src) {
+    for (double v : src) {
+      if (bitpix == -32) put_be(hdu.data, bits_of(static_cast<float>(v)), 4);
+      else put_be(hdu.data, bits_of(v), 8);
+    }
+  };
+  fill(primary, values);
+  fill(ext, variance);
+  return build_fits({primary, ext});
+}
+
 }  // namespace astro_fixture

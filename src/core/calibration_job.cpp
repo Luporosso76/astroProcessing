@@ -1,0 +1,243 @@
+#include <algorithm>
+#include <array>
+
+#include "astro/calibration.hpp"
+#include "astro/error.hpp"
+#include "astro/scheduler.hpp"
+
+namespace astro {
+
+namespace {
+
+const char* name_of(normalization_mode m) {
+  return m == normalization_mode::global_median ? "global_median" : "cfa_channel_median";
+}
+
+const char* name_of(temperature_policy p) {
+  return p == temperature_policy::compare ? "compare" : "not_applicable_declared";
+}
+
+const char* role_text(master_role r) {
+  switch (r) {
+    case master_role::bias: return "bias";
+    case master_role::dark: return "dark";
+    case master_role::dark_flat: return "dark_flat";
+    case master_role::flat: return "flat";
+  }
+  ASTRO_ASSERT(false);
+  return "";
+}
+
+json descriptor_json(const std::optional<master_descriptor>& d) {
+  if (!d) return json::null();
+  json o = json::object();
+  o.set("role", json::string(role_text(d->role)));
+  const auto text = [](auto v, auto fn) { return v ? json::string(fn(*v)) : json::null(); };
+  o.set("additive", text(d->additive, [](additive_state s) {
+          return s == additive_state::bias_included ? "bias_included"
+                 : s == additive_state::bias_subtracted ? "bias_subtracted" : "unknown";
+        }));
+  o.set("scaling", text(d->scaling, [](scaling_state s) {
+          return s == scaling_state::unscaled ? "unscaled" : s == scaling_state::scaled ? "scaled" : "unknown";
+        }));
+  o.set("flat", text(d->flat, [](flat_state s) {
+          return s == flat_state::raw ? "raw" : s == flat_state::corrected_unnormalized ? "corrected_unnormalized"
+                 : s == flat_state::calibrated ? "calibrated" : "unknown";
+        }));
+  o.set("combine_count", d->combine_count ? json::uinteger(*d->combine_count) : json::null());
+  o.set("combine_method", text(d->combine, [](combine_method m) {
+          return m == combine_method::mean ? "mean" : m == combine_method::median ? "median" : "other";
+        }));
+  return o;
+}
+
+json input_params(const calibration_input_spec& s) {
+  json o = json::object();
+  o.set("descriptor", descriptor_json(s.descriptor));
+  o.set("declared_metadata", declared_metadata_json(s.declared));
+  json fields = json::object();
+  fields.set("binning_x", s.declared_fields.binning_x ? json::uinteger(*s.declared_fields.binning_x) : json::null());
+  fields.set("binning_y", s.declared_fields.binning_y ? json::uinteger(*s.declared_fields.binning_y) : json::null());
+  fields.set("unit", s.declared_fields.unit
+                         ? json::string(*s.declared_fields.unit == pixel_unit::adu ? "adu"
+                                        : *s.declared_fields.unit == pixel_unit::electron ? "electron" : "dimensionless")
+                         : json::null());
+  fields.set("linearity", s.declared_fields.lin
+                              ? json::string(*s.declared_fields.lin == linearity::linear ? "linear" : "nonlinear")
+                              : json::null());
+  o.set("declared_fields", std::move(fields));
+  json read = json::object();
+  read.set("declared_bayer_x_offset",
+           s.read_options.declared_bayer_x_offset ? json::uinteger(*s.read_options.declared_bayer_x_offset) : json::null());
+  read.set("declared_bayer_y_offset",
+           s.read_options.declared_bayer_y_offset ? json::uinteger(*s.read_options.declared_bayer_y_offset) : json::null());
+  o.set("fits_read_options", std::move(read));
+  json var = json::object();
+  var.set("source", json::string(*s.variance.source == variance_source::plane ? "plane" : "noise_model"));
+  var.set("read_noise_adu", s.variance.read_noise_adu ? json::number(*s.variance.read_noise_adu) : json::null());
+  o.set("variance", std::move(var));
+  return o;
+}
+
+[[noreturn]] void fail(error_category c, const char* code, const char* message,
+                       stop_error::context_list ctx = {}) {
+  throw stop_error(c, code, message, std::move(ctx));
+}
+
+}  // namespace
+
+node_spec make_calibration_node(const calibration_recipe& recipe) {
+  validate_calibration_recipe(recipe);
+  json params = json::object();
+  params.set("normalization", json::string(name_of(*recipe.normalization)));
+  params.set("q_min", json::number(*recipe.q_min));
+  params.set("q_rel_sigma_max", json::number(*recipe.q_rel_sigma_max));
+  params.set("exposure_rel_tol", json::number(*recipe.exposure_rel_tol));
+  params.set("temperature_abs_tol_c", json::number(*recipe.temperature_abs_tol_c));
+  params.set("temperature_policy", json::string(name_of(*recipe.temp_policy)));
+  json inputs = json::object();
+  inputs.set("light", input_params(recipe.light));
+  inputs.set("dark", input_params(recipe.dark));
+  inputs.set("flat", input_params(recipe.flat));
+  inputs.set("dark_flat", input_params(recipe.dark_flat));
+  params.set("inputs", std::move(inputs));
+  std::vector<node_input> node_inputs;
+  node_inputs.push_back(node_input::from_file("light", recipe.light.digest));
+  node_inputs.push_back(node_input::from_file("dark", recipe.dark.digest));
+  node_inputs.push_back(node_input::from_file("flat", recipe.flat.digest));
+  node_inputs.push_back(node_input::from_file("dark_flat", recipe.dark_flat.digest));
+  return node_spec(calibration_operator_id, calibration_algorithm_version, calibration_serialization_version,
+                   std::move(params), std::move(node_inputs), sample_type::f64, calibration_backend, std::nullopt);
+}
+
+namespace {
+
+constexpr std::uint64_t report_margin_bytes = std::uint64_t{1} << 20;
+// Header di uscita: al piu' tre HDU con max_header_cards card ciascuno, piu' il riempimento dei blocchi.
+constexpr std::uint64_t output_header_bound =
+    3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
+
+}  // namespace
+
+job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot_name,
+                                const calibration_recipe& recipe, memory_pool& pool,
+                                const calibration_job_options& options, const cancel_token& cancel,
+                                const std::optional<budget_snapshot>& budget) {
+  const auto work = [&](const job_record& job) -> job_files_result {
+    validate_calibration_recipe(recipe);
+    const node_spec node = make_calibration_node(recipe);
+    if (node.key() != job.node_key) {
+      fail(error_category::invalid_input, "calib.node_mismatch", "la ricetta non corrisponde al nodo dello slot",
+           {{"nodo_slot", job.node_key}, {"nodo_ricetta", node.key()}});
+    }
+    const std::array<const calibration_input_spec*, 4> specs = {&recipe.light, &recipe.dark, &recipe.flat,
+                                                                &recipe.dark_flat};
+    constexpr const char* names[4] = {"light", "dark", "flat", "dark_flat"};
+
+    std::array<fits_plan, 4> plans;
+    std::uint64_t input_peaks = 0;
+    for (std::size_t i = 0; i < specs.size(); ++i) {
+      plans[i] = plan_fits(open_fits_input(specs[i]->path));
+      input_peaks += plans[i].peak_bytes;
+    }
+    if (options.hook) options.hook("plan.done");
+    const fits_plan& lp = plans[0];
+    if (lp.planes != 1) {
+      fail(error_category::unsupported, "calib.plane_layout", "la ricetta M2 accetta solo mono e CFA",
+           {{"input", "light"}, {"planes", std::to_string(lp.planes)}});
+    }
+    const std::uint64_t samples = lp.samples;
+    const std::uint64_t out_elem = sample_size(lp.type);
+    const std::uint64_t out_buffers = samples * (2 * out_elem + sizeof(std::uint16_t));
+
+    job_plan plan;
+    plan.shared_bytes = input_peaks + out_buffers + (out_buffers + output_header_bound) +
+                        samples * sizeof(double) + report_margin_bytes;
+    plan.per_task_bytes = std::uint64_t{lp.width} * (2 * sizeof(double) + sizeof(std::uint16_t));
+    plan.worker_count = options.worker_count;
+    plan.queue_capacity = options.queue_capacity;
+    plan.tile_rows = options.tile_rows;
+
+    std::optional<prepared_calibration> prepared;
+    std::vector<stored_file> files;
+    std::vector<std::string> warnings;
+    const std::uint64_t tile_rows = options.tile_rows == 0 ? 1 : options.tile_rows;
+    const std::uint64_t tasks = (std::uint64_t{lp.height} + tile_rows - 1) / tile_rows;
+
+    job_spec spec(node, tasks, [&](task_context& ctx) -> std::string {
+      pool_buffer scratch(ctx.memory, prepared->row_scratch_bytes());
+      const std::uint32_t y0 = static_cast<std::uint32_t>(ctx.index * tile_rows);
+      const std::uint32_t y1 = static_cast<std::uint32_t>(std::min<std::uint64_t>(lp.height, y0 + tile_rows));
+      for (std::uint32_t y = y0; y < y1; ++y) {
+        ctx.check_cancel();
+        prepared->calibrate_rows(y, y + 1, scratch.data());
+      }
+      return prepared->rows_digest(y0, y1);
+    });
+
+    spec.prepare = [&](job_context& jc) {
+      const std::uint64_t budget_bytes = jc.shared.bytes();
+      std::array<image, 4> images;
+      for (std::size_t i = 0; i < specs.size(); ++i) {
+        const std::vector<std::uint8_t> bytes = read_verified_fits(specs[i]->path, specs[i]->digest, budget_bytes);
+        images[i] = decode_fits(bytes, budget_bytes, specs[i]->read_options);
+        const fits_plan& planned = plans[i];
+        if (bytes.size() != planned.file_bytes) {
+          fail(error_category::integrity, "input.size_changed", "il file riletto ha dimensione diversa da quella pianificata",
+               {{"input", names[i]}, {"pianificata", std::to_string(planned.file_bytes)}, {"riletta", std::to_string(bytes.size())}});
+        }
+        const image_geometry& g = images[i].geometry;
+        if (g.width != planned.width || g.height != planned.height || g.planes != planned.planes) {
+          fail(error_category::integrity, "input.geometry_changed", "la geometria riletta differisce da quella del piano",
+               {{"input", names[i]}, {"pianificata", std::to_string(planned.width) + "x" + std::to_string(planned.height)},
+                {"riletta", std::to_string(g.width) + "x" + std::to_string(g.height)}});
+        }
+      }
+      prepared.emplace(prepare_calibration(
+          recipe, calibration_images{std::move(images[0]), std::move(images[1]), std::move(images[2]),
+                                     std::move(images[3])}));
+      if (options.hook) options.hook("preflight.done");
+      for (std::size_t i = 0; i < specs.size(); ++i) {
+        try {
+          (void)read_verified_fits(specs[i]->path, specs[i]->digest, budget_bytes);
+        } catch (stop_error& e) {
+          e.add_context("fase", "riverifica dopo il preflight");
+          e.add_context("input", names[i]);
+          throw;
+        }
+      }
+    };
+
+    spec.finalize = [&](job_context&) {
+      warnings = prepared->warnings();
+      calibration_result result = finish_calibration(std::move(*prepared));
+      prepared.reset();
+      const std::vector<std::uint8_t> fits = encode_fits(result.output);
+      const content_digest fits_digest = digest_of(fits);
+      json image_out = json::object();
+      image_out.set("sha256", json::string(fits_digest.sha256));
+      image_out.set("size_bytes", json::uinteger(fits_digest.size_bytes));
+      image_out.set("unit", json::string("adu"));
+      json outputs = json::object();
+      outputs.set("calibrated_image", std::move(image_out));
+      result.report.set("outputs", std::move(outputs));
+      const std::string report_json = canonical_json(result.report);
+      const std::string report_text = calibration_report_text(result.report);
+      const auto span = [](const std::string& s) {
+        return std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
+      };
+      files = store.write_files(
+          {artifact_content{fits, "fits", "image", std::nullopt, calibration_image_role},
+           artifact_content{span(report_json), "json", "calibration_report", std::nullopt, calibration_report_role},
+           artifact_content{span(report_text), "txt", "calibration_report_text", std::nullopt,
+                            calibration_report_text_role}});
+    };
+
+    job_scheduler scheduler(pool);
+    scheduler.run(plan, spec, cancel);
+    return job_files_result{std::move(files), std::move(warnings)};
+  };
+  return run_job_files(store, slot_name, work, budget, &cancel);
+}
+
+}  // namespace astro

@@ -10,6 +10,7 @@
 #include "astro/dag_store.hpp"
 #include "astro/error.hpp"
 #include "astro/provenance.hpp"
+#include "astro/sqlite_dag_store.hpp"
 
 namespace astro {
 
@@ -42,5 +43,18 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
                     const std::function<job_result(const job_record&)>& work,
                     const std::optional<budget_snapshot>& budget = std::nullopt,
                     const cancel_token* cancel = nullptr);
+
+// Output multipli (ruoli distinti) gia' scritti con write_files.
+struct job_files_result {
+  std::vector<stored_file> files;
+  std::vector<std::string> warnings;
+};
+
+// Come run_job per uno store durevole: `work` scrive i file con write_files e la pubblicazione e' un'unica
+// transazione (commit_job) con tutti i file; la provenance riporta i digest di tutti gli output.
+job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
+                          const std::function<job_files_result(const job_record&)>& work,
+                          const std::optional<budget_snapshot>& budget = std::nullopt,
+                          const cancel_token* cancel = nullptr);
 
 }  // namespace astro

@@ -1,6 +1,6 @@
 # Matrice dei test
 
-Stato: **seed pianificato. Nessun test qui è stato eseguito.** Una riga `PIANIFICATO` non è una prova e non chiude un gate. Solo un record in `docs/evidence/` con comando, hash, versioni, ambiente, esito e limiti può sostenere un esito.
+Stato: **seed pianificato. Le righe `PIANIFICATO` non sono state eseguite; i test M2 eseguiti sono elencati nella sezione "M2: ID di lavoro dai contratti".** Una riga `PIANIFICATO` non è una prova e non chiude un gate. Solo un record in `docs/evidence/` con comando, hash, versioni, ambiente, esito e limiti può sostenere un esito.
 
 ## Regole
 
@@ -14,8 +14,8 @@ Stato: **seed pianificato. Nessun test qui è stato eseguito.** Una riga `PIANIF
 
 | Test | Requisito o gate | Dataset / fixture | Metodo | Metrica preregistrata | Tolleranza | Evidenza prevista | Stato |
 |---|---|---|---|---|---|---|---|
-| T-FBK-01 | NFR-FBK-01, NC-21; M2 core, M3, M4, M5 | `FIX-FAULT-01` guasti sintetici: backend assente, decoder che fallisce, GPU che si stacca | Iniezione del guasto; traccia delle chiamate ai backend; exit code; provenance dell'arresto | Zero invocazioni del percorso sostitutivo; nessun output pubblicato; errore non nullo | Binaria: sostituzione assente o presente | `docs/evidence/` | PIANIFICATO — non eseguito |
-| M2 slice calibrazione | Gate M2; F-CAL-01/02 | `FIX-SYN-FITS-01` FITS sintetico con dark e flat; ground truth | Calibrazione `L - D`, flat `Q`, maschere, varianza, report | Errore numerico, varianza propagata, doppia sottrazione assente | Da derivare dal contratto e dal ground truth | `docs/evidence/` | PIANIFICATO — non eseguito |
+| T-FBK-01 | NFR-FBK-01, NC-21; M2 core, M3, M4, M5 | `FIX-FAULT-01` guasti sintetici: backend assente, decoder che fallisce, GPU che si stacca | Iniezione del guasto; traccia delle chiamate ai backend; exit code; provenance dell'arresto | Zero invocazioni del percorso sostitutivo; nessun output pubblicato; errore non nullo | Binaria: sostituzione assente o presente | `docs/evidence/` | PARZIALE: parte M2 ESEGUITA (decoder che fallisce, budget insufficiente, store corrotto o guasto in commit: `CalibJob.T_FBK_01_*`, `docs/evidence/M2-e.md`); M3, M4, M5 PIANIFICATO |
+| M2 slice calibrazione | Gate M2; F-CAL-01/02 | `FIX-SYN-FITS-01` FITS sintetico con dark e flat; ground truth; PUB-LFC-01 reale | Calibrazione `L - D`, flat `Q`, maschere, varianza, report | Errore numerico, varianza propagata, doppia sottrazione assente | Derivate prima della misura (zero per i dyadic, `gamma_6 |C|`, `gamma_36 Var(C)`, Wilson-Hilferty; vedi `docs/evidence/M2-e.md`) | `docs/evidence/M2-e.md` | ESEGUITO, PASS (T-M2E-01…32; T-M2E-26 e il flat vignettato registrati come limite) |
 | T-CAL-08 | M3.c; F-CAL-02.b, F-CAL-03.b, F-CAL-04, F-CAL-06.b | `FIX-SYN-CAL-08`: otto combinazioni di master, incluso dark-flat e casi mancanti | Matrice delle ricette, omissioni pianificate, prerequisito perso | Correzioni applicate, omissioni dichiarate, stop sul prerequisito mancante | Da derivare per combinazione | `docs/evidence/` | PIANIFICATO — non eseguito |
 | T-REG-02 | M3.f; F-REG-02 | `FIX-SYN-WARP-01` trasformazioni note; `PUB-REG-01` pubblico licenziato | Registrazione, residui, ambiguità | Errore di trasformazione, residuo, casi ambigui non pubblicati | Da derivare dalla trasformazione nota | `docs/evidence/` | PIANIFICATO — non eseguito |
 | T-POST-09 | M3.l; F-POST-09.a.1 | `FIX-SYN-NOISE-01` rumore noto, struttura debole, stelle | Denoise lineare e non lineare, rollback | Bias, NPS, danno su struttura debole e stelle | Da derivare dal modello di rumore | `docs/evidence/` | PIANIFICATO — non eseguito |
@@ -47,6 +47,7 @@ Definiti in `docs/contracts/`; stato per unità, non per singolo test. Un ID si 
 | `io input.short_read` (ADR-05) | ADR-05 | M2.a | NON ESEGUITO: richiede un lettore iniettabile (pread che restituisce meno byte con dimensione invariata); il ramo esiste in `fits.cpp` (`unexpected_eof`) ma non ha test |
 | T-M2C-01…25 | ADR-04 | M2.c | ESEGUITO, PASS (`docs/evidence/M2-c.md`); durabilità contro perdita di corrente e processo malevolo stesso UID fuori dal modello; `readdir` senza test di iniezione |
 | T-M2D-01…15 | ADR-06 | M2.d | ESEGUITO, PASS (`docs/evidence/M2-d.md`; test `Budget.T_M2D_01…03`, `Pool*.T_M2D_04/12`, `Scheduler.T_M2D_05…08/10/11/14/15`, `Resume.T_M2D_09`, `Spill.T_M2D_10`; T-M2D-13 è `test_m1d_protocol`, label `slow`). Soglie F-RES-01 0.50/0.25/10.0 iniziali, non confermate da carichi PSI reali; page cache dello spill fuori dal budget; TSan non nei preset |
-| T-M2E-01…27 | ADR-16, ADR-17 | M2.e | PIANIFICATO |
+| T-M2E-01…32 | ADR-16, ADR-17, ADR-03 | M2.e | ESEGUITO, PASS (`docs/evidence/M2-e.md`; test `T_M2E_*` nelle suite `CalibM2E`, `CalibJob`, `CalibStats`, `CalibReal`; T-M2E-20 dentro `T_M2E_02`; 28-32 nati dalle review; T-M2E-13 su PUB-LFC-01 e T-M2E-21/26 sono `slow`). Limiti: checkpoint/resume non collegato, master non combinati dal prodotto, overscan non ritagliato, stima di N non valida su flat vignettato (rapporto 8,33, nessun gate) |
+| T-FBK-01 (parte M2) | NFR-FBK-01, NC-21 | M2.e | ESEGUITO, PASS (`CalibJob.T_FBK_01_*`, `docs/evidence/M2-e.md`) |
 | T-M2F-01 | ADR-13 | M2.f | ESEGUITO, PASS (`docs/evidence/M2-f.md`) |
-| T-M2F-02 | ADR-13 | M2.e | PIANIFICATO |
+| T-M2F-02 | ADR-13 | M2.e | ESEGUITO, PASS (`tools/check_m2f02_network.sh`, ctest `T-M2F-02.m2e_network`: canarino visto da strace, 0 righe di rete sul workflow; `docs/evidence/M2-e.md`) |

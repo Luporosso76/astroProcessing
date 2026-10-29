@@ -74,6 +74,10 @@ class node_spec {
   std::string key_;
 };
 
+// Valori dichiarati come oggetto JSON canonico dei parametri; un valore con origine `header` e' un errore
+// (invalid_input dag.metadata_not_declared).
+json declared_metadata_json(const frame_metadata& declared);
+
 // Nodo `fits.decode`: fits_read_options e i valori dichiarati entrano nei parametri. `declared` deve contenere
 // solo valori con origine `declared` (altrimenti invalid_input dag.metadata_not_declared).
 node_spec make_fits_decode_node(const content_digest& input, const fits_read_options& options,

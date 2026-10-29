@@ -24,6 +24,9 @@ constexpr std::uint64_t max_file_bytes = max_samples * 18 + (std::uint64_t{16} <
 struct fits_plan {
   std::uint64_t file_bytes = 0;
   std::uint64_t samples = 0;
+  std::uint32_t width = 0;
+  std::uint32_t height = 0;
+  std::uint32_t planes = 0;
   sample_type type = sample_type::f32;
   bool has_invalid = false;
   bool has_variance = false;

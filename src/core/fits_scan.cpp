@@ -368,6 +368,9 @@ scan_result analyse(std::uint64_t size, const read_fn& read) {
   }
   r.plan.file_bytes = size;
   r.plan.samples = p.samples();
+  r.plan.width = p.width();
+  r.plan.height = p.height();
+  r.plan.planes = p.planes();
   r.plan.type = type_for_encoding(p.bitpix, p.bscale, p.bzero);
   classify_extensions(r);
   const std::uint64_t n = r.plan.samples;

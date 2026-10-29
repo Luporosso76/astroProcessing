@@ -138,6 +138,11 @@ Lo scrittore produce solo un buffer in memoria; nessuna sua API accetta un perco
 | T-M2A-12 | HDU non supportati: stop `unsupported`. |
 | T-M2A-13 | RGB e multi-plane (NAXIS3) letti, conservati e riscritti bit-esatti (F-IO-01). |
 
+## Aggiunte di M2.e
+
+- Campi dichiarabili dalla ricetta oltre a `frame_metadata`: `binning_x`, `binning_y`, `unit`, `linearity` (`declared_image_fields`). Un valore già presente nell'header e diverso dal dichiarato: `incompatible`, `metadata.declared_conflict`; uguale: nessun effetto. Assente nell'header: vale il dichiarato. I valori dichiarati entrano nei parametri del nodo di calibrazione (chiave del nodo) e il report riporta l'origine (`header` o `declared`) di ogni metadato.
+- T-M2E-14, unione delle maschere: la maschera di uscita contiene la unione bit a bit dei bit di light, dark, flat e dark-flat; se un master (dark, flat, dark-flat) ha qualunque bit acceso sul pixel si aggiunge anche `master_invalid`.
+
 ## Fuori da M2
 
 Tile e piramide; alpha; coverage e capability; maschere di editing usate dagli operatori; XISF e RAW (ADR-08.b, M3.a); unità `electron` prodotte da conversione di gain.
