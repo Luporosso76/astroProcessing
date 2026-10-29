@@ -213,6 +213,32 @@ TEST(CalibM2E, T_M2E_04_nan_flat_sample_is_input_invalid_not_q_bit) {
   EXPECT_EQ(r.output.invalid.bits[9], invalid_reason::source_nonfinite | invalid_reason::master_invalid);
 }
 
+// ADR-16 §7 (aggiunte di R2): una Var(Q) non rappresentabile calcolata da input finiti e' result_nonfinite, mai
+// q_unreliable. Fc = N = 1e-150 ovunque (Q = 1, N^2 = 1e-300 normale); la mediana di Var(Fc) resta normale.
+TEST(CalibM2E, T_M2E_04_var_q_overflow_is_result_nonfinite_not_q_unreliable) {
+  set_def s = empty_set(8, 4, -64);
+  std::vector<double> vf(32, 1e-301), vdf(32, 1e-301);
+  vf[0] = 5e299;  // Var(Fc) = 1e300 finita, Var(Fc)/N^2 = 1e600: overflow del quoziente
+  vdf[0] = 5e299;
+  vf[1] = 1e-310;  // Var(F) + Var(DF) sottonormale da termini non tutti nulli
+  vdf[1] = 0;
+  for (std::size_t i = 0; i < 32; ++i) {
+    s.dark_flat.v[i] = 0;
+    s.flat.v[i] = 1e-150;
+    s.dark.v[i] = 500;
+    s.light.v[i] = 510;
+  }
+  s.light.variance = std::vector<double>(32, 1.0);
+  s.dark.variance = std::vector<double>(32, 1.0);
+  s.flat.variance = vf;
+  s.dark_flat.variance = vdf;
+  const calibration_result r = calibrate(plane_recipe(s, 0.05, 1.0), images_of(s));
+  EXPECT_EQ(r.output.invalid.bits[0], invalid_reason::result_nonfinite);
+  EXPECT_EQ(r.output.invalid.bits[1], invalid_reason::result_nonfinite);
+  for (std::size_t i = 2; i < 32; ++i) EXPECT_EQ(r.output.invalid.bits[i], 0) << i;
+  EXPECT_TRUE(operator_output_invariants_hold(r.output));
+}
+
 TEST(CalibM2E, T_M2E_28_half_ulp_f32_at_subnormal_boundaries) {
   const auto pow2 = [](int k) {
     return k >= 0 ? rat{exact::shl(exact::from_u64(1), static_cast<unsigned>(k)), exact::from_u64(1)}

@@ -3,6 +3,7 @@
 
 #include "astro/calibration.hpp"
 #include "astro/error.hpp"
+#include "astro/master.hpp"
 #include "astro/operations.hpp"
 #include "astro/scheduler.hpp"
 
@@ -49,6 +50,9 @@ json descriptor_json(const std::optional<master_descriptor>& d) {
   o.set("combine_method", text(d->combine, [](combine_method m) {
           return m == combine_method::mean ? "mean" : m == combine_method::median ? "median" : "other";
         }));
+  // Campi dei master del prodotto: nei parametri solo se presenti, cosi' le chiavi dei nodi esistenti non cambiano.
+  if (d->rejection) o.set("rejection", json::string(*d->rejection == master_rejection::none ? "none" : "sigma_clip"));
+  if (d->estimator) o.set("variance_estimator", json::string("empirical"));
   return o;
 }
 
@@ -105,11 +109,15 @@ node_spec make_calibration_node(const calibration_recipe& recipe) {
   inputs.set("flat", input_params(recipe.flat));
   inputs.set("dark_flat", input_params(recipe.dark_flat));
   params.set("inputs", std::move(inputs));
+  // Un master del prodotto entra dal suo nodo (ADR-16, aggiunte di R2): la calibrazione e' sua discendente nel DAG.
+  const auto input_of = [](const char* name, const calibration_input_spec& s) {
+    return s.master_node_key ? node_input::from_node(name, *s.master_node_key) : node_input::from_file(name, s.digest);
+  };
   std::vector<node_input> node_inputs;
-  node_inputs.push_back(node_input::from_file("light", recipe.light.digest));
-  node_inputs.push_back(node_input::from_file("dark", recipe.dark.digest));
-  node_inputs.push_back(node_input::from_file("flat", recipe.flat.digest));
-  node_inputs.push_back(node_input::from_file("dark_flat", recipe.dark_flat.digest));
+  node_inputs.push_back(input_of("light", recipe.light));
+  node_inputs.push_back(input_of("dark", recipe.dark));
+  node_inputs.push_back(input_of("flat", recipe.flat));
+  node_inputs.push_back(input_of("dark_flat", recipe.dark_flat));
   return node_spec(calibration_operator_id, calibration_algorithm_version, calibration_serialization_version,
                    std::move(params), std::move(node_inputs), sample_type::f64, calibration_backend, std::nullopt);
 }
@@ -137,6 +145,31 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     const std::array<const calibration_input_spec*, 4> specs = {&recipe.light, &recipe.dark, &recipe.flat,
                                                                 &recipe.dark_flat};
     constexpr const char* names[4] = {"light", "dark", "flat", "dark_flat"};
+    // Master del prodotto: descrittore derivato dal nodo e file uguale a un artefatto `primary` del nodo.
+    for (std::size_t i = 0; i < specs.size(); ++i) {
+      const calibration_input_spec& s = *specs[i];
+      if (!s.master_node_key) continue;
+      const std::optional<node_spec> master_node = store.get_node(*s.master_node_key);
+      if (!master_node) {
+        fail(error_category::graph, "dag.missing_node", "nodo del master assente dallo store",
+             {{"input", names[i]}, {"nodo", *s.master_node_key}});
+      }
+      if (!(master_descriptor_from_node(*master_node) == *s.descriptor)) {
+        fail(error_category::invalid_input, "calib.descriptor_mismatch",
+             "il descrittore della ricetta differisce da quello derivato dal nodo del master",
+             {{"input", names[i]}, {"nodo", *s.master_node_key}});
+      }
+      bool published = false;
+      for (const artifact_record& a : store.artifacts_for(*s.master_node_key)) {
+        published = published || (a.present && a.output_role == master_image_role && a.sha256 == s.digest.sha256 &&
+                                  a.size_bytes == s.digest.size_bytes);
+      }
+      if (!published) {
+        fail(error_category::integrity, "calib.master_artifact_mismatch",
+             "il file dell'ingresso non e' un artefatto del nodo del master",
+             {{"input", names[i]}, {"nodo", *s.master_node_key}, {"sha256", s.digest.sha256}});
+      }
+    }
 
     std::array<fits_plan, 4> plans;
     std::uint64_t input_peaks = 0;

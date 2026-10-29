@@ -128,4 +128,30 @@ image decode_fits(std::span<const std::uint8_t> bytes, std::uint64_t budget_byte
 // Scrive in memoria (CFITSIO fits_create_memfile). Nessuna API su percorso.
 std::vector<std::uint8_t> encode_fits(const image& img);
 
+// Lettura a fasce di righe del primario e di INVALID con pread sullo stesso descrittore (C-02.a, aggiunte di R2).
+// Valori e bit uguali a quelli di decode_fits sullo stesso contenuto: campioni convertiti come decode_fits al tipo dei
+// campioni e poi a double, bit di INVALID, NaN e infiniti senza bit marcati source_nonfinite. Le verifiche di
+// struttura, checksum e scala sono quelle di decode_fits sull'intero file, che il chiamante esegue prima.
+struct fits_row_layout {
+  std::uint32_t width = 0;
+  std::uint32_t height = 0;
+  int bitpix = 0;
+  double bscale = 1.0;
+  double bzero = 0.0;
+  sample_type type = sample_type::f32;
+  std::uint64_t data_offset = 0;
+  std::optional<std::uint64_t> invalid_offset;
+};
+
+// Solo header, con i limiti di plan_fits. Piu' di un piano: unsupported fits.row_planes.
+fits_row_layout plan_fits_rows(const fits_input& input);
+
+// Byte di appoggio richiesti da read_fits_rows per `rows` righe.
+std::uint64_t fits_row_scratch_bytes(const fits_row_layout& layout, std::uint32_t rows);
+
+// Righe [y0, y0 + rows): `values` e `bits` hanno rows * width elementi, `scratch` fits_row_scratch_bytes byte.
+// Bit riservati in INVALID: invalid_input fits.invalid_reserved_bits.
+void read_fits_rows(const fits_input& input, const fits_row_layout& layout, std::uint32_t y0, std::uint32_t rows,
+                    std::byte* scratch, double* values, std::uint16_t* bits);
+
 }  // namespace astro

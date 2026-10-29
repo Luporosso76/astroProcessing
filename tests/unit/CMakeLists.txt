@@ -20,7 +20,7 @@ gtest_discover_tests(test_deps PROPERTIES LABELS fast)
 foreach(t test_error test_image test_fits test_json test_hash test_dag test_job test_store test_store_history
         test_store_contract test_store_crash test_export test_store_review
         test_budget test_resources test_pool test_spill test_scheduler test_calibration test_calibration_job test_job_alloc
-        test_inventory test_phase test_import test_recovery)
+        test_inventory test_phase test_import test_recovery test_master)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main)
   target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
@@ -53,8 +53,25 @@ target_compile_definitions(test_calibration_real PRIVATE
   ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
   ASTRO_TEST_TMP="${PROJECT_SOURCE_DIR}/tmp/m2e-real"
   ASTRO_REAL_OUT="${PROJECT_SOURCE_DIR}/tmp/m2e-real/report")
-add_test(NAME T-M2E-13.real_palomar_lfc COMMAND test_calibration_real)
-set_tests_properties(T-M2E-13.real_palomar_lfc PROPERTIES LABELS slow TIMEOUT 1800)
+add_test(NAME T-M2E-13.real_palomar_lfc COMMAND test_calibration_real --gtest_filter=CalibReal.T_M2E_13_*)
+set_tests_properties(T-M2E-13.real_palomar_lfc PROPERTIES LABELS slow TIMEOUT 1800
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+# T-M2R2-09: master del prodotto dai frame grezzi di PUB-LFC-01, poi T-M2E-13 su quei master.
+add_test(NAME T-M2R2-09.real_palomar_product_masters COMMAND test_calibration_real --gtest_filter=CalibReal.T_M2R2_09_*)
+set_tests_properties(T-M2R2-09.real_palomar_product_masters PROPERTIES LABELS slow TIMEOUT 1800
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+
+# T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
+add_executable(test_master_stats test_master_stats.cpp)
+target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_master_stats PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_stats PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+add_test(NAME T-M2R2-04.monte_carlo COMMAND test_master_stats --gtest_filter=MasterStats.chi2_*:MasterStats.T_M2R2_04_*)
+set_tests_properties(T-M2R2-04.monte_carlo PROPERTIES LABELS slow TIMEOUT 1800
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+add_test(NAME T-M2E-21.product_masters_monte_carlo COMMAND test_master_stats --gtest_filter=MasterStats.T_M2E_21_*)
+set_tests_properties(T-M2E-21.product_masters_monte_carlo PROPERTIES LABELS slow TIMEOUT 1800
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 
 # T-M2R1-09: campioni pubblici PUB-LFC-01 e PUB-CFA-01 (non versionati: il test fallisce se mancano). Lungo: `ctest -L slow`.
 add_executable(test_import_real test_import_real.cpp)
@@ -114,6 +131,8 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_inventory.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_phase.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_import.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_stats.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_import_real.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_recovery.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_stats.dir

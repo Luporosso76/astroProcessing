@@ -11,7 +11,7 @@
 
 namespace astro {
 
-using calib_detail::input_view;
+using namespace calib_detail;
 
 namespace {
 
@@ -31,97 +31,6 @@ struct slot {
 std::array<slot, 4> slots_of(const calibration_recipe& r) {
   return {slot{"light", r.light, std::nullopt}, slot{"dark", r.dark, master_role::dark},
           slot{"flat", r.flat, master_role::flat}, slot{"dark_flat", r.dark_flat, master_role::dark_flat}};
-}
-
-const char* role_name(master_role r) {
-  switch (r) {
-    case master_role::bias: return "bias";
-    case master_role::dark: return "dark";
-    case master_role::dark_flat: return "dark_flat";
-    case master_role::flat: return "flat";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-const char* additive_name(additive_state s) {
-  switch (s) {
-    case additive_state::bias_included: return "bias_included";
-    case additive_state::bias_subtracted: return "bias_subtracted";
-    case additive_state::unknown: return "unknown";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-const char* scaling_name(scaling_state s) {
-  switch (s) {
-    case scaling_state::unscaled: return "unscaled";
-    case scaling_state::scaled: return "scaled";
-    case scaling_state::unknown: return "unknown";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-const char* flat_name(flat_state s) {
-  switch (s) {
-    case flat_state::raw: return "raw";
-    case flat_state::corrected_unnormalized: return "corrected_unnormalized";
-    case flat_state::calibrated: return "calibrated";
-    case flat_state::unknown: return "unknown";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-const char* combine_name(combine_method m) {
-  switch (m) {
-    case combine_method::mean: return "mean";
-    case combine_method::median: return "median";
-    case combine_method::other: return "other";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-const char* layout_name(plane_layout l) {
-  switch (l) {
-    case plane_layout::mono: return "mono";
-    case plane_layout::cfa: return "cfa";
-    case plane_layout::rgb: return "rgb";
-    case plane_layout::multi_plane: return "multi_plane";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-const char* pattern_name(cfa_pattern p) {
-  switch (p) {
-    case cfa_pattern::rggb: return "rggb";
-    case cfa_pattern::bggr: return "bggr";
-    case cfa_pattern::grbg: return "grbg";
-    case cfa_pattern::gbrg: return "gbrg";
-  }
-  ASTRO_ASSERT(false);
-  return "";
-}
-
-std::string cfa_text(const std::optional<cfa_layout>& c) {
-  if (!c) return "none";
-  return std::string(pattern_name(c->pattern)) + "@" + std::to_string(c->x_offset) + "," + std::to_string(c->y_offset);
-}
-
-// Etichette dei quattro canali nell'ordine delle posizioni (x, y) della cella 2x2; G1 precede G2 in ordine raster.
-std::array<const char*, 4> channel_labels(cfa_pattern p) {
-  switch (p) {
-    case cfa_pattern::rggb: return {"R", "G1", "G2", "B"};
-    case cfa_pattern::bggr: return {"B", "G1", "G2", "R"};
-    case cfa_pattern::grbg: return {"G1", "R", "B", "G2"};
-    case cfa_pattern::gbrg: return {"G1", "B", "R", "G2"};
-  }
-  ASTRO_ASSERT(false);
-  return {"", "", "", ""};
 }
 
 // ---------------------------------------------------------------- validazione della ricetta
@@ -241,65 +150,29 @@ void validate_variance_specs(const calibration_recipe& r) {
   }
 }
 
+// Master del prodotto (ADR-16, aggiunte di R2): piano empirico, media senza rejection.
+void validate_product_masters(const calibration_recipe& r) {
+  for (const slot& s : slots_of(r)) {
+    if (!s.spec.master_node_key) continue;
+    const auto bad = [&](const char* field) {
+      stop(error_category::invalid_input, "calib.product_master", "ingresso di un master del prodotto incoerente",
+           {{"slot", s.name}, {"campo", field}});
+    };
+    if (!s.expected) bad("master_node_key");
+    if (*s.spec.variance.source != variance_source::plane) bad("variance_source");
+    const master_descriptor& d = *s.spec.descriptor;
+    if (d.combine != combine_method::mean) bad("combine_method");
+    if (d.rejection != master_rejection::none) bad("rejection");
+    if (d.estimator != variance_estimator::empirical) bad("variance_estimator");
+  }
+}
+
 // ---------------------------------------------------------------- preflight sulle immagini
 
 struct frame {
   const char* name;
   image* img;
 };
-
-// Campi di image_fields assenti dall'header e riempiti dalla ricetta (origine `declared` nel report).
-struct field_origins {
-  bool binning_x = false, binning_y = false, unit = false, lin = false;
-};
-
-field_origins apply_declared(image& im, const calibration_input_spec& spec, const char* name) {
-  const frame_metadata& d = spec.declared;
-  const auto apply = [&](auto& field, const auto& declared, const char* field_name) {
-    if (!declared) return;
-    if (declared->source.origin != metadata_origin::declared) {
-      stop(error_category::invalid_input, "dag.metadata_not_declared", "la ricetta accetta solo valori dichiarati",
-           {{"input", name}, {"campo", field_name}});
-    }
-    declare_metadata(field, declared->value, field_name);
-  };
-  frame_metadata& m = im.metadata;
-  apply(m.exposure_s, d.exposure_s, "exposure_s");
-  apply(m.gain, d.gain, "gain");
-  apply(m.conversion_gain_e_per_adu, d.conversion_gain_e_per_adu, "conversion_gain_e_per_adu");
-  apply(m.offset_adu, d.offset_adu, "offset_adu");
-  apply(m.temperature_c, d.temperature_c, "temperature_c");
-  apply(m.filter, d.filter, "filter");
-  apply(m.camera, d.camera, "camera");
-  apply(m.imagetyp, d.imagetyp, "imagetyp");
-  apply(m.saturation_adu, d.saturation_adu, "saturation_adu");
-  apply(m.pedestal_adu, d.pedestal_adu, "pedestal_adu");
-  apply(m.roi_x, d.roi_x, "roi_x");
-  apply(m.roi_y, d.roi_y, "roi_y");
-  apply(m.readout_mode, d.readout_mode, "readout_mode");
-  apply(m.row_order, d.row_order, "row_order");
-
-  const declared_image_fields& f = spec.declared_fields;
-  const auto declare_plain = [&](auto& field, const auto& value, const char* field_name) {
-    if (!value) return;
-    if (field && *field != *value) {
-      stop(error_category::incompatible, "metadata.declared_conflict", "valore dichiarato diverso da quello presente",
-           {{"input", name}, {"campo", field_name}});
-    }
-    field = *value;
-  };
-  field_origins origins;
-  origins.binning_x = f.binning_x && !im.geometry.binning_x;
-  origins.binning_y = f.binning_y && !im.geometry.binning_y;
-  origins.unit = f.unit && !im.unit;
-  origins.lin = (f.lin && !im.lin) || (im.lin && im.lin_origin.value == metadata_origin::declared);
-  declare_plain(im.geometry.binning_x, f.binning_x, "binning_x");
-  declare_plain(im.geometry.binning_y, f.binning_y, "binning_y");
-  declare_plain(im.unit, f.unit, "unit");
-  declare_plain(im.lin, f.lin, "linearity");
-  if (origins.lin) im.lin_origin.value = metadata_origin::declared;
-  return origins;
-}
 
 template <class T>
 bool all_finite_or_flagged(const image& im) {
@@ -323,22 +196,6 @@ void check_image(const frame& f) {
     stop(error_category::invalid_input, "calib.nonfinite_unflagged", "campione non finito senza bit di invalidita'",
          {{"input", f.name}});
   }
-}
-
-std::string lower(std::string s) {
-  for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  return s;
-}
-
-// Ruolo indicato da un IMAGETYP riconosciuto; nullopt per un valore non riconosciuto.
-std::optional<std::string> imagetyp_role(const std::string& value) {
-  const std::string v = lower(value);
-  if (v == "light" || v == "light frame") return "light";
-  if (v == "dark" || v == "dark frame") return "dark";
-  if (v == "flat" || v == "flat field" || v == "flat frame") return "flat";
-  if (v == "bias" || v == "bias frame") return "bias";
-  if (v == "dark flat" || v == "flat dark") return "dark_flat";
-  return std::nullopt;
 }
 
 void check_imagetyp(const frame& f, const char* slot_role, std::vector<std::string>& warnings) {
@@ -380,12 +237,6 @@ json record_of(const char* pair, const char* field, json left, json right, const
                            const std::string& tolerance) {
   stop(error_category::incompatible, std::string("calib.mismatch.") + field, "input incompatibili",
        {{"coppia", pair}, {"campo", field}, {"sinistra", left}, {"destra", right}, {"tolleranza", tolerance}});
-}
-
-std::string num_text(double v) {
-  char b[40];
-  std::snprintf(b, sizeof b, "%.17g", v);
-  return b;
 }
 
 template <class T>
@@ -550,47 +401,6 @@ input_view make_view(const frame& f, const calibration_input_spec& spec) {
   return v;
 }
 
-double median_of(std::vector<double>& v) {
-  const std::size_t n = v.size();
-  const std::size_t mid = n / 2;
-  std::nth_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid), v.end());
-  const double hi = v[mid];
-  if (n % 2 == 1) return hi;
-  const double lo = *std::max_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid));
-  return (lo + hi) * 0.5;
-}
-
-json metadata_report(const image& im) {
-  json out = json::object();
-  const auto add = [&](const char* name, const auto& field, auto to_json) {
-    if (!field) return;
-    json e = json::object();
-    e.set("value", to_json(field->value));
-    e.set("origin", json::string(field->source.origin == metadata_origin::header ? "header" : "declared"));
-    if (!field->source.keyword.empty()) e.set("keyword", json::string(field->source.keyword));
-    out.set(name, std::move(e));
-  };
-  const auto d = [](double v) { return json::number(v); };
-  const auto s = [](const std::string& v) { return json::string(v); };
-  const auto i = [](std::int64_t v) { return json::integer(v); };
-  const frame_metadata& m = im.metadata;
-  add("exposure_s", m.exposure_s, d);
-  add("gain", m.gain, d);
-  add("conversion_gain_e_per_adu", m.conversion_gain_e_per_adu, d);
-  add("offset_adu", m.offset_adu, d);
-  add("temperature_c", m.temperature_c, d);
-  add("filter", m.filter, s);
-  add("camera", m.camera, s);
-  add("imagetyp", m.imagetyp, s);
-  add("saturation_adu", m.saturation_adu, d);
-  add("pedestal_adu", m.pedestal_adu, d);
-  add("roi_x", m.roi_x, i);
-  add("roi_y", m.roi_y, i);
-  add("readout_mode", m.readout_mode, s);
-  add("row_order", m.row_order, s);
-  return out;
-}
-
 json input_report(const slot& s, const image& im, const input_view& view, const field_origins& origins) {
   json o = json::object();
   o.set("digest_sha256", json::string(s.spec.digest.sha256));
@@ -627,12 +437,15 @@ json input_report(const slot& s, const image& im, const input_view& view, const 
     const master_descriptor& d = *s.spec.descriptor;
     json st = json::object();
     st.set("role", json::string(role_name(d.role)));
-    st.set("state_source", json::string("declared"));
+    st.set("state_source", json::string(s.spec.master_node_key ? "master_node" : "declared"));
     if (d.additive) st.set("additive", json::string(additive_name(*d.additive)));
     if (d.scaling) st.set("scaling", json::string(scaling_name(*d.scaling)));
     if (d.flat) st.set("flat", json::string(flat_name(*d.flat)));
     if (d.combine_count) st.set("combine_count", json::uinteger(*d.combine_count));
     if (d.combine) st.set("combine_method", json::string(combine_name(*d.combine)));
+    if (d.rejection) st.set("rejection", json::string(rejection_name(*d.rejection)));
+    if (d.estimator) st.set("variance_estimator", json::string(estimator_name(*d.estimator)));
+    if (s.spec.master_node_key) st.set("master_node_key", json::string(*s.spec.master_node_key));
     o.set("master_state", std::move(st));
   }
   json var = json::object();
@@ -657,6 +470,7 @@ void validate_calibration_recipe(const calibration_recipe& recipe) {
   validate_masters(recipe);
   validate_shared(recipe);
   validate_variance_specs(recipe);
+  validate_product_masters(recipe);
 }
 
 void require_calibration_phase(const char* input_name, const std::optional<metadata_value<process_phase>>& phase) {
@@ -747,7 +561,7 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
   // Tabella di compatibilita' (ADR-03, R1): la fase si controlla sui metadati, prima di ogni accesso ai campioni.
   for (const frame& f : frames) require_calibration_phase(f.name, f.img->phase);
   std::array<field_origins, 4> origins;
-  for (std::size_t i = 0; i < frames.size(); ++i) origins[i] = apply_declared(*frames[i].img, specs[i].spec, frames[i].name);
+  for (std::size_t i = 0; i < frames.size(); ++i) origins[i] = apply_declared(*frames[i].img, specs[i].spec.declared, specs[i].spec.declared_fields, frames[i].name);
   for (const frame& f : frames) require_calibration_linearity(f.name, f.img->lin, std::nullopt);
   for (const frame& f : frames) check_image(f);
 
@@ -917,6 +731,16 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
     hyp.push(json::string(h));
   }
   for (const std::string& h : cs.hypotheses) hyp.push(json::string(h));
+  // Master con piano empirico (ADR-17, aggiunte di R2): stima casuale, non garanzia per pixel.
+  for (const slot& s : specs) {
+    if (!s.spec.descriptor || s.spec.descriptor->estimator != variance_estimator::empirical) continue;
+    hyp.push(json::string(std::string("empirical_master_variance_is_estimate:") + s.name));
+    if (s.spec.descriptor->role == master_role::flat) {
+      hyp.push(json::string(std::string("master_flat_variance_level_bias:") + s.name));
+      hyp.push(json::string("master_flat_hypotheses_not_verified:same_illumination_shape,level_proportional,"
+                            "additive_nonnegative,nonnegative_signal"));
+    }
+  }
   p->report.set("assumptions", std::move(hyp));
   return prepared_calibration(std::move(p));
 }
@@ -924,17 +748,6 @@ prepared_calibration prepare_calibration(const calibration_recipe& recipe, calib
 // ---------------------------------------------------------------- calcolo per righe
 
 namespace {
-
-template <class T>
-bool convert_finite(double v, T& out) {
-  if (!std::isfinite(v)) return false;
-  if constexpr (std::is_same_v<T, float>) {
-    if (std::fabs(v) > static_cast<double>(FLT_MAX)) return false;
-  }
-  out = static_cast<T>(v);
-  // Valore non nullo che nel tipo di uscita diventa zero o subnormale: non rappresentabile in modo normale.
-  return v == 0 || std::fpclassify(out) == FP_NORMAL;
-}
 
 template <class T>
 void rows_kernel(prepared_calibration::impl& p, std::uint32_t y0, std::uint32_t y1, double* qrow, double* varq,
@@ -974,7 +787,7 @@ void rows_kernel(prepared_calibration::impl& p, std::uint32_t y0, std::uint32_t 
           continue;
         }
         if (q < p.q_min) qbits[x] |= invalid_reason::q_below_min;
-        if (!std::isfinite(vq) || std::sqrt(vq) / q > p.q_rel_sigma_max) qbits[x] |= invalid_reason::q_unreliable;
+        if (std::sqrt(vq) / q > p.q_rel_sigma_max) qbits[x] |= invalid_reason::q_unreliable;
       }
     }
     for (std::uint32_t x = 0; x < w; ++x) {

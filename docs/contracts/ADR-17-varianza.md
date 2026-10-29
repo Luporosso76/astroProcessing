@@ -86,6 +86,20 @@ Il `calibration_report` contiene: `covariance_model`, `variance_source` e parame
   - Nella conversione al tipo di uscita, un valore non nullo che diventa zero o subnormale dà `result_nonfinite`; uno zero esatto resta valido.
   - Un `rn²` con `rn` non nullo e risultato zero, subnormale o non finito è `invalid_input`, `var.param.read_noise_adu`; con `rn = 0` il quadrato nullo è valido. Una stima di `N` non normale è `numeric`, `calib.variance_overflow`.
 
+## Aggiunte di R2: varianza dei master del prodotto
+
+Applicazione della «Estensione richiesta ad ADR-17» di [C-02.a](C-02-master.md#estensione-richiesta-ad-adr-17).
+
+1. **Sorgente.** Un master del prodotto ha `variance_source = plane` con `combine_method = mean` e `variance_estimator = empirical` nel descrittore derivato dal nodo ([ADR-16](ADR-16-stati-master.md#aggiunte-di-r2-descrittore-derivato-dal-nodo-del-master)). `noise_model` resta per i master esterni con `combine_method = mean`.
+2. **Propagazione.** Invariata: `Var(Fc) = Var(F) + Var(DF)` con `Cov(F, DF) = 0`, `Var(Lc) = Var(L) + Var(D)`. Il master flat non contiene il dark-flat (C-02.a §6.2).
+3. **Errori ereditati.** Per ogni ingresso con `variance_estimator = empirical` il report di calibrazione aggiunge alle ipotesi `empirical_master_variance_is_estimate:<slot>`: il piano è una stima casuale, non una garanzia per pixel. Per il flat aggiunge `master_flat_variance_level_bias:flat` (sovrastima in valore atteso `B(p)`, limitata da `B_max(p)` sotto le ipotesi di C-02.a §6.2) e `master_flat_hypotheses_not_verified:same_illumination_shape,level_proportional,additive_nonnegative,nonnegative_signal`. I valori di `level_bias_estimate` restano nel report del master, citato dal digest del suo artefatto.
+4. **Test.** Soglie fissate prima della misura.
+   - **T-M2E-20 sui master del prodotto**: master dark, flat e dark-flat combinati dal prodotto da frame non dyadic; oracle razionale della propagazione sui piani `VARIANCE` dei master decodificati e sui loro campioni. Stessa tolleranza di T-M2E-20 (`γ_m · Var(C)` con `m` contato sulle operazioni, più mezzo ulp f32).
+   - **T-M2E-21 sui master del prodotto**, due parti, `α = 10⁻³` complessivo con Bonferroni sulle `m` statistiche delle due parti, quantili chi-quadro esatti come C-02.a §9 (gamma incompleta regolarizzata, bisezione, errore relativo ≤ 10⁻¹⁰ sul quantile):
+     - (a) valori di `C`: `K` realizzazioni indipendenti di light e frame di tutti i master, rumore gaussiano noto, regime `Var(Q)/Q² ≤ 10⁻⁴`. Riferimento: la varianza vera di `C` al primo ordine, calcolata dalle varianze vere dei master della simulazione (`σ²/n`), non dai piani empirici. `(K − 1) var_K(C)/Var(C)` nell'intervallo bilaterale di `χ²_(K−1)` al livello `α/m`. I valori di `C` dipendono solo dalle medie dei master: la variabilità dei piani empirici non entra in questa statistica.
+     - (b) varianza riportata di `C`: fixture con flat e dark-flat senza rumore e `Fc` costante, quindi `Q = 1` esatto e `Var(Q) = 0`, light con piano nullo. Allora `Var(C)` riportata è il piano del master dark senza arrotondamenti, `(n − 1) n P_D/σ_D² ~ χ²_(n−1)` per realizzazione e `K(n − 1) · media_K(Var(C))/(σ_D²/n) ~ χ²_(K(n−1))`: la soglia è l'intervallo esatto della distribuzione del piano empirico, nessuna approssimazione.
+   - La media della `Var(C)` riportata con piani empirici rumorosi anche nel flat non ha un gate: la sua distribuzione è quella di un rapporto di variabili casuali, non derivata in `.a`. È un limite dichiarato; la parte (b) e T-M2R2-04 coprono il piano e la sua propagazione.
+
 ## Fuori da M2
 
 NPS locale, kernel di correlazione e fattore di apertura (ADR-17.b, M3); correlazioni dei master usate nello stacking; incertezza della geometria; covarianza fra canali dopo debayer; pesi dello stacking; varianza di master combinati con mediana senza piano dichiarato.

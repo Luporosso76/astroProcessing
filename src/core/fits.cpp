@@ -11,6 +11,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <type_traits>
 
 #include <fitsio.h>
 
@@ -698,6 +699,103 @@ std::vector<std::uint8_t> encode_fits(const image& img) {
   std::memcpy(out.data(), mem.ptr, out.size());
   verify_written(img, out);
   return out;
+}
+
+// ---------------------------------------------------------------- lettura a fasce di righe
+
+namespace {
+
+template <class T>
+T load_big_endian(const std::uint8_t* p) {
+  using U = std::conditional_t<sizeof(T) == 1, std::uint8_t,
+            std::conditional_t<sizeof(T) == 2, std::uint16_t, std::conditional_t<sizeof(T) == 4, std::uint32_t, std::uint64_t>>>;
+  U raw = 0;
+  for (std::size_t i = 0; i < sizeof(U); ++i) raw = static_cast<U>((raw << 8) | p[i]);
+  T out;
+  std::memcpy(&out, &raw, sizeof(T));
+  return out;
+}
+
+// Stessa conversione di read_integers: valore r * bscale + bzero convertito al tipo dei campioni.
+template <class Raw, class Out>
+void integer_rows(const std::uint8_t* src, std::size_t count, double bscale, double bzero, double* values) {
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto r = static_cast<double>(load_big_endian<Raw>(src + i * sizeof(Raw)));
+    values[i] = static_cast<double>(static_cast<Out>(r * bscale + bzero));
+  }
+}
+
+template <class Raw>
+void float_rows(const std::uint8_t* src, std::size_t count, double* values) {
+  for (std::size_t i = 0; i < count; ++i) values[i] = static_cast<double>(load_big_endian<Raw>(src + i * sizeof(Raw)));
+}
+
+}  // namespace
+
+fits_row_layout plan_fits_rows(const fits_input& input) {
+  const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) { read_exact(input, offset, dst, n); };
+  const scan_result scan = analyse(input.size_bytes(), read);
+  const hdu_scan& p = scan.hdus[0];
+  if (p.planes() != 1) {
+    fail(error_category::unsupported, "fits.row_planes", "lettura a righe di un solo piano",
+         {{"piani", std::to_string(p.planes())}});
+  }
+  fits_row_layout l;
+  l.width = p.width();
+  l.height = p.height();
+  l.bitpix = p.bitpix;
+  l.bscale = p.bscale;
+  l.bzero = p.bzero;
+  l.type = scan.plan.type;
+  l.data_offset = p.data_offset;
+  if (scan.invalid_hdu >= 0) l.invalid_offset = scan.hdus[static_cast<std::size_t>(scan.invalid_hdu)].data_offset;
+  return l;
+}
+
+std::uint64_t fits_row_scratch_bytes(const fits_row_layout& layout, std::uint32_t rows) {
+  const std::uint64_t elem = static_cast<std::uint64_t>(std::max(std::abs(layout.bitpix) / 8, 2));
+  return std::uint64_t{layout.width} * rows * elem;
+}
+
+void read_fits_rows(const fits_input& input, const fits_row_layout& layout, std::uint32_t y0, std::uint32_t rows,
+                    std::byte* scratch, double* values, std::uint16_t* bits) {
+  ASTRO_ASSERT(y0 <= layout.height && rows <= layout.height - y0);
+  const std::size_t count = static_cast<std::size_t>(layout.width) * rows;
+  const std::size_t elem = static_cast<std::size_t>(std::abs(layout.bitpix) / 8);
+  const std::uint64_t first = std::uint64_t{y0} * layout.width;
+  auto* raw = reinterpret_cast<std::uint8_t*>(scratch);
+  read_exact(input, layout.data_offset + first * elem, raw, count * elem);
+  const bool f32 = layout.type == sample_type::f32;
+  switch (layout.bitpix) {
+    case 8:
+      f32 ? integer_rows<std::uint8_t, float>(raw, count, layout.bscale, layout.bzero, values)
+          : integer_rows<std::uint8_t, double>(raw, count, layout.bscale, layout.bzero, values);
+      break;
+    case 16:
+      f32 ? integer_rows<std::int16_t, float>(raw, count, layout.bscale, layout.bzero, values)
+          : integer_rows<std::int16_t, double>(raw, count, layout.bscale, layout.bzero, values);
+      break;
+    case 32: integer_rows<std::int32_t, double>(raw, count, layout.bscale, layout.bzero, values); break;
+    case 64: integer_rows<std::int64_t, double>(raw, count, layout.bscale, layout.bzero, values); break;
+    case -32: float_rows<float>(raw, count, values); break;
+    default: float_rows<double>(raw, count, values); break;
+  }
+  if (layout.invalid_offset) {
+    read_exact(input, *layout.invalid_offset + first * 2, raw, count * 2);
+    for (std::size_t i = 0; i < count; ++i) {
+      const auto b = static_cast<std::uint16_t>(load_big_endian<std::uint16_t>(raw + i * 2) ^ 0x8000u);
+      if ((b & invalid_reason::reserved_mask) != 0) {
+        fail(error_category::invalid_input, "fits.invalid_reserved_bits", "bit riservato acceso in INVALID",
+             {{"indice", std::to_string(first + i)}});
+      }
+      bits[i] = b;
+    }
+  } else {
+    std::fill(bits, bits + count, std::uint16_t{0});
+  }
+  for (std::size_t i = 0; i < count; ++i) {
+    if (!std::isfinite(values[i]) && bits[i] == 0) bits[i] = invalid_reason::source_nonfinite;
+  }
 }
 
 }  // namespace astro

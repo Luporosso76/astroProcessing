@@ -3,15 +3,15 @@ F-IO-01	T-M2A-02,T-M2A-03,T-M2A-07,T-M2A-13,T-M2R1-07,T-M2R1-09	M2-a.md, M2-R1.m
 F-IO-05	T-M2R1-01,T-M2R1-02,T-M2R1-03,T-M2R1-04,T-M2R1-10,T-M2R1-11,T-M2R1-12	M2-R1.md
 F-IO-10	T-M2R1-05,T-M2R1-06	M2-R1.md
 F-PRJ-01	T-M2C-01	M2-c.md
-F-PRJ-02	T-M2C-11	M2-c.md, M2-gate.md
+F-PRJ-02	T-M2C-11,MasterPipeline.T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibrated_light	M2-c.md, M2-gate.md, M2-R2.md
 F-PRJ-03	T-M2B-03,T-M2B-04,T-M2B-05,T-M2B-09	M2-b.md, M2-d.md
 F-PRJ-04	T-M2C-13,T-M2C-14,T-M2C-15,T-M2C-16,T-M2C-17,T-M2C-18	M2-c.md
 F-PRJ-06	T-M2C-02,T-M2C-03,T-M2C-10,T-M2C-12,T-M2R4-01,T-M2R4-02,T-M2R4-03,T-M2R4-04	M2-c.md, M2-R4.md, M2-R4b.md
 F-PRJ-07	T-M2B-10,T-M2C-19,T-M2C-20,T-M2C-21	M2-b.md, M2-c.md
-F-CAL-01.a		
-F-CAL-02.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-18,T-M2E-19	M2-e.md
-F-CAL-03.a	T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07	M2-e.md
-F-CAL-06.a	CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26	M2-e.md
+F-CAL-01.a	T-M2R2-01,T-M2R2-02,T-M2R2-03,T-M2R2-04,T-M2R2-05,T-M2R2-06,T-M2R2-07,T-M2R2-08,T-M2R2-09	M2-R2.md
+F-CAL-02.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-18,T-M2E-19,MasterPipeline.T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibrated_light,T-M2R2-09	M2-e.md, M2-R2.md
+F-CAL-03.a	T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,MasterPipeline.T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibrated_light,T-M2R2-09,CalibM2E.T_M2E_04_var_q_overflow_is_result_nonfinite_not_q_unreliable	M2-e.md, M2-R2.md
+F-CAL-06.a	CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,MasterPipeline.T_M2E_20_product_master_planes_propagate_as_the_rational_oracle,T-M2E-21.product_masters_monte_carlo,T-M2R2-09	M2-e.md, M2-R2.md
 F-RES-01	T-M2D-03	M2-d.md, M2-gate.md
 F-RES-02	T-M2D-01,T-M2D-02	M2-d.md
 F-RES-03	T-M2D-04,T-M2D-05,T-M2D-06,T-M2D-11,T-M2D-13,T-M2R3-02	M2-d.md, M2-R3.md
@@ -21,8 +21,8 @@ F-RES-06.a	T-M2D-09,T-M2D-10	M2-d.md
 F-RES-07.a	T-M2D-05,T-M2R3-04	M2-d.md, M2-R3.md
 F-RES-08.a	T-M2D-10,T-M2D-15,T-M2R3-09	M2-d.md, M2-R3.md
 NFR-EXP-01.a	T-M2A-02,T-M2A-09,T-M2A-10,T-M2C-19	M2-a.md, M2-c.md
-NFR-REP-01.a	T-M2E-12,T-M2E-26,T-M2R1-08,T-M2R4-03,T-M2R4-06	M2-e.md, M2-R1.md, M2-R4.md
-NFR-CPU-01.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-13,T-M2E-14,T-M2E-15,T-M2E-16,T-M2E-17,T-M2E-18,T-M2E-19,CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,T-M2E-27,T-M2E-28,T-M2E-29,T-M2E-30,T-M2E-31,T-M2E-32,T-M2F-01	M2-e.md, M2-f.md
+NFR-REP-01.a	T-M2E-12,T-M2E-26,T-M2R1-08,T-M2R4-03,T-M2R4-06,T-M2R2-06,T-M2R2-08	M2-e.md, M2-R1.md, M2-R4.md, M2-R2.md
+NFR-CPU-01.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-13,T-M2E-14,T-M2E-15,T-M2E-16,T-M2E-17,T-M2E-18,T-M2E-19,CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,T-M2E-27,T-M2E-28,T-M2E-29,T-M2E-30,T-M2E-31,T-M2E-32,T-M2F-01,MasterPipeline.T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibrated_light,T-M2R2-09,MasterPipeline.T_M2E_20_product_master_planes_propagate_as_the_rational_oracle	M2-e.md, M2-f.md, M2-R2.md
 NFR-SIMD-01		
 NFR-OFF-01.a	T-M2F-01,T-M2F-02	M2-f.md, M2-e.md
 NFR-SEC-01	T-M2A-05,T-M2A-06,T-M2A-11,T-M2A-12,T-M2R1-10	M2-a.md, M2-R1.md
@@ -43,10 +43,10 @@ ADR-07.a		ADR-M1-stack.md
 ADR-08.a	T-M2A-01,T-M2A-02,T-M2A-03,T-M2A-04,T-M2A-05,T-M2A-06,T-M2A-07,T-M2A-08,T-M2A-09,T-M2A-10,T-M2A-11,T-M2A-12,T-M2A-13	M2-a.md
 ADR-09.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-13,T-M2E-14,T-M2E-15,T-M2E-16,T-M2E-17,T-M2E-18,T-M2E-19,CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,T-M2E-27,T-M2E-28,T-M2E-29,T-M2E-30,T-M2E-31,T-M2E-32	contracts/ADR-16-stati-master.md, M2-e.md
 ADR-13.a	T-M2F-01,T-M2F-02	contracts/ADR-13-offline.md, M2-f.md
-ADR-16.a	T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-18	contracts/ADR-16-stati-master.md, M2-e.md
-ADR-17.a	CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26	contracts/ADR-17-varianza.md, M2-e.md
-C-01.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-13,T-M2E-14,T-M2E-15,T-M2E-16,T-M2E-17,T-M2E-18,T-M2E-19,CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,T-M2E-27,T-M2E-28,T-M2E-29,T-M2E-30,T-M2E-31,T-M2E-32	contracts/ADR-16-stati-master.md, M2-e.md
-C-02.a		
+ADR-16.a	T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-18,MasterPipeline.T_M2E_11_product_master_descriptor_or_file_mismatch_stops,Master.T_M2R2_06_node_is_canonical_and_descriptor_derives_from_it,CalibM2E.T_M2E_04_var_q_overflow_is_result_nonfinite_not_q_unreliable	contracts/ADR-16-stati-master.md, M2-e.md, M2-R2.md
+ADR-17.a	CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,MasterPipeline.T_M2E_20_product_master_planes_propagate_as_the_rational_oracle,T-M2E-21.product_masters_monte_carlo,T-M2R2-04	contracts/ADR-17-varianza.md, M2-e.md, M2-R2.md
+C-01.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-13,T-M2E-14,T-M2E-15,T-M2E-16,T-M2E-17,T-M2E-18,T-M2E-19,CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,T-M2E-27,T-M2E-28,T-M2E-29,T-M2E-30,T-M2E-31,T-M2E-32,MasterPipeline.T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibrated_light,T-M2R2-09,MasterPipeline.T_M2E_11_product_master_descriptor_or_file_mismatch_stops	contracts/ADR-16-stati-master.md, M2-e.md, M2-R2.md
+C-02.a	T-M2R2-01,T-M2R2-02,T-M2R2-03,T-M2R2-04,T-M2R2-05,T-M2R2-06,T-M2R2-07,T-M2R2-08,T-M2R2-09	contracts/C-02-master.md, M2-R2.md
 C-10.a	T-M2A-02,T-M2A-09,T-M2A-10,T-M2C-19,T-M2C-20,T-M2C-21,T-M2C-22,T-M2R0-03	M2-a.md, M2-c.md, M2-R0b.md
 D-03	T-M2F-01	ADR-M1-stack.md
 D-04	T-M2R0-04	ADR-M1-stack.md

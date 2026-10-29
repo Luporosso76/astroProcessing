@@ -31,6 +31,8 @@ enum class normalization_mode { global_median, cfa_channel_median };
 enum class temperature_policy { compare, not_applicable_declared };
 enum class variance_source { plane, noise_model };
 enum class covariance_model { diagonal_independent };
+enum class master_rejection { none, sigma_clip };
+enum class variance_estimator { empirical };
 
 constexpr const char* calibration_operator_id = "calib.dark_matched_flat_dark_flat";
 constexpr std::uint32_t calibration_algorithm_version = 1;
@@ -45,6 +47,10 @@ struct master_descriptor {
   std::optional<flat_state> flat;
   std::optional<std::uint32_t> combine_count;
   std::optional<combine_method> combine;
+  // Master del prodotto (ADR-16, aggiunte di R2): presenti nel descrittore derivato dal nodo del master.
+  std::optional<master_rejection> rejection;
+  std::optional<variance_estimator> estimator;
+  friend bool operator==(const master_descriptor&, const master_descriptor&) = default;
 };
 
 // Valori che il formato FITS di M2 non porta in frame_metadata e che la ricetta puo' dichiarare.
@@ -69,6 +75,8 @@ struct calibration_input_spec {
   declared_image_fields declared_fields;
   fits_read_options read_options;
   variance_spec variance;
+  // Master del prodotto: chiave del nodo del master, ingresso `from_node` del nodo di calibrazione.
+  std::optional<std::string> master_node_key;
 };
 
 struct calibration_recipe {
