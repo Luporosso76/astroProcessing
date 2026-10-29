@@ -159,11 +159,15 @@ TEST(Spill, resident_bytes_counts_cached_pages_and_drop_cache_keeps_the_content)
   EXPECT_EQ(back, block);
 }
 
-std::size_t mapping_count() {
+// Solo le mappature dei file di scratch in `dir`: l'allocatore (ASan compreso) aggiunge mappature proprie.
+std::size_t mapping_count(const fs::path& dir) {
+  const std::string prefix = fs::canonical(dir).string() + "/";
   std::ifstream in("/proc/self/maps");
   std::size_t n = 0;
   std::string line;
-  while (std::getline(in, line)) ++n;
+  while (std::getline(in, line)) {
+    if (line.find(prefix) != std::string::npos) ++n;
+  }
   return n;
 }
 
@@ -200,14 +204,14 @@ TEST(Spill, a_failed_allocation_in_resident_bytes_does_not_leak_the_mapping) {
   spill_area area(spill_config{dir, 16 * MiB});
   spill_file f = area.create_file();
   f.write(0, pattern(4 * MiB, 9));
-  const std::size_t before = mapping_count();
+  const std::size_t before = mapping_count(dir);
   EXPECT_THROW(
       {
         alloc_fault::arm();
         (void)f.resident_bytes();
       },
       std::bad_alloc);
-  EXPECT_EQ(mapping_count(), before);
+  EXPECT_EQ(mapping_count(dir), before);
 }
 
 }  // namespace
