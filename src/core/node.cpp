@@ -1,6 +1,8 @@
 #include "astro/node.hpp"
 
 #include <algorithm>
+#include <charconv>
+#include <limits>
 #include <set>
 #include <type_traits>
 
@@ -161,6 +163,70 @@ node_spec make_fits_decode_node(const content_digest& input, const fits_read_opt
   inputs.push_back(node_input::from_file("file", input));
   return node_spec("fits.decode", fits_decode_algorithm_version, fits_decode_serialization_version,
                    std::move(params), std::move(inputs), precision, std::move(backend), std::nullopt);
+}
+
+namespace {
+
+const json& require_field(const json& doc, const char* name, json::kind kind) {
+  const json* field = doc.find(name);
+  if (field == nullptr || field->type() != kind) bad_spec("campo del nodo assente o di tipo errato", {{"campo", name}});
+  return *field;
+}
+
+std::uint32_t require_version(const json& doc, const char* name) {
+  const std::int64_t v = require_field(doc, name, json::kind::integer).as_integer();
+  if (v < 1 || v > std::numeric_limits<std::uint32_t>::max()) bad_spec("versione fuori intervallo", {{"campo", name}});
+  return static_cast<std::uint32_t>(v);
+}
+
+node_input input_from_ref(const std::string& name, const std::string& ref) {
+  if (ref.rfind(file_ref_prefix, 0) != 0) return node_input::from_node(name, ref);
+  const std::size_t colon = ref.find(':', 6);
+  if (colon == std::string::npos) bad_spec("riferimento a file non valido", {{"ref", ref}});
+  std::uint64_t size = 0;
+  const char* first = ref.data() + colon + 1;
+  const char* last = ref.data() + ref.size();
+  const auto r = std::from_chars(first, last, size);
+  if (r.ec != std::errc() || r.ptr != last) bad_spec("dimensione del file non valida", {{"ref", ref}});
+  return node_input::from_file(name, content_digest{ref.substr(6, colon - 6), size});
+}
+
+std::optional<std::uint64_t> seed_from_json(const json& field) {
+  if (field.type() == json::kind::null) return std::nullopt;
+  if (field.type() != json::kind::string) bad_spec("seed non valido");
+  const std::string& text = field.as_string();
+  std::uint64_t seed = 0;
+  const auto r = std::from_chars(text.data(), text.data() + text.size(), seed);
+  if (text.empty() || r.ec != std::errc() || r.ptr != text.data() + text.size() || std::to_string(seed) != text) {
+    bad_spec("seed non valido", {{"seed", text}});
+  }
+  return seed;
+}
+
+}  // namespace
+
+node_spec node_from_json(const json& doc) {
+  if (doc.type() != json::kind::object || doc.keys().size() != 8) bad_spec("il nodo deve essere un oggetto di 8 campi");
+  const json& in = require_field(doc, "inputs", json::kind::array);
+  std::vector<node_input> inputs;
+  for (std::size_t i = 0; i < in.items().size(); ++i) {
+    const json& item = in.items()[i];
+    if (item.type() != json::kind::object || item.keys().size() != 3 ||
+        require_field(item, "ordinal", json::kind::integer).as_integer() != static_cast<std::int64_t>(i)) {
+      bad_spec("ingresso del nodo non valido", {{"posizione", std::to_string(i)}});
+    }
+    inputs.push_back(input_from_ref(require_field(item, "input_name", json::kind::string).as_string(),
+                                    require_field(item, "ref", json::kind::string).as_string()));
+  }
+  const std::string& precision = require_field(doc, "precision", json::kind::string).as_string();
+  if (precision != "f32" && precision != "f64") bad_spec("precisione sconosciuta", {{"precisione", precision}});
+  const json* seed = doc.find("seed");
+  if (seed == nullptr) bad_spec("campo del nodo assente o di tipo errato", {{"campo", "seed"}});
+  return node_spec(require_field(doc, "operator_id", json::kind::string).as_string(),
+                   require_version(doc, "algorithm_version"), require_version(doc, "serialization_version"),
+                   require_field(doc, "params", json::kind::object), std::move(inputs),
+                   precision == "f32" ? sample_type::f32 : sample_type::f64,
+                   require_field(doc, "backend", json::kind::string).as_string(), seed_from_json(*seed));
 }
 
 void recipe_graph::add(std::string local_id, recipe_entry entry) {

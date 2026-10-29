@@ -13,7 +13,8 @@ target_link_libraries(test_deps PRIVATE
   PkgConfig::FFTW3 PkgConfig::FFTW3F GTest::gtest_main)
 gtest_discover_tests(test_deps)
 
-foreach(t test_error test_image test_fits test_json test_hash test_dag test_job)
+foreach(t test_error test_image test_fits test_json test_hash test_dag test_job test_store test_store_history
+        test_store_contract test_store_crash test_export test_store_review)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main)
   target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
@@ -23,6 +24,9 @@ foreach(t test_error test_image test_fits test_json test_hash test_dag test_job)
   gtest_discover_tests(${t})
 endforeach()
 target_link_libraries(test_fits PRIVATE OpenSSL::Crypto)
+foreach(t test_store test_store_history test_store_contract test_store_crash test_export test_store_review)
+  target_link_libraries(${t} PRIVATE SQLite::SQLite3)
+endforeach()
 
 add_test(NAME T-M2F-01.offline
   COMMAND ${PROJECT_SOURCE_DIR}/tools/check_offline.sh
@@ -35,4 +39,10 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_json.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_hash.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dag.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_job.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_job.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_store.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_store_history.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_store_contract.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_store_crash.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_export.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_store_review.dir)

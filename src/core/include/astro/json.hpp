@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace astro {
@@ -52,6 +53,11 @@ class json {
 // Serializzazione JCS (RFC 8785): chiavi ordinate per unita' di codice UTF-16, numeri secondo
 // Number::toString di ECMAScript, escape minimi, nessuno spazio.
 std::string canonical_json(const json& value);
+
+// Analisi JSON (RFC 8259) rigorosa: UTF-8 valido, chiavi duplicate, profondita' > 64 e oggetti con piu' di 4096
+// chiavi rifiutati. Interi entro +-2^53 diventano `integer`, ogni altro numero `number` (finito).
+// Errori: invalid_input json.malformed, limit_exceeded json.depth / json.object_keys.
+json parse_json(std::string_view text);
 
 // Numero in forma ECMAScript (esposto per i vettori di prova RFC 8785 appendice B).
 std::string ecmascript_number(double value);

@@ -79,6 +79,10 @@ class node_spec {
 node_spec make_fits_decode_node(const content_digest& input, const fits_read_options& options,
                                 const frame_metadata& declared, sample_type precision, std::string backend);
 
+// Inverso di node_spec::to_json(): ricostruisce il nodo da un documento con esattamente i campi del contratto.
+// Documento malformato: invalid_input dag.bad_spec. La chiave non e' letta dal documento: la ricalcola il chiamante.
+node_spec node_from_json(const json& doc);
+
 struct recipe_input {
   std::string input_name;
   // Identificativo locale di un'altra voce della ricetta, oppure il digest di un file.

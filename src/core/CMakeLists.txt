@@ -36,10 +36,18 @@ add_library(astrocore STATIC
   fits_header.cpp
   hash.cpp
   json.cpp
+  json_parse.cpp
   node.cpp
   dag_store.cpp
   job.cpp
   provenance.cpp
+  sqlite_internal.cpp
+  sqlite_project.cpp
+  sqlite_dag_store.cpp
+  sqlite_files.cpp
+  sqlite_history.cpp
+  project_export.cpp
+  project_verify.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
 add_dependencies(astrocore astro_source_revision)

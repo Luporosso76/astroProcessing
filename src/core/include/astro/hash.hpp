@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -14,6 +15,23 @@ struct content_digest {
   std::string sha256;
   std::uint64_t size_bytes = 0;
   friend bool operator==(const content_digest&, const content_digest&) = default;
+};
+
+// SHA-256 incrementale (OpenSSL EVP) con memoria costante.
+class sha256_stream {
+ public:
+  sha256_stream();
+  ~sha256_stream();
+  sha256_stream(const sha256_stream&) = delete;
+  sha256_stream& operator=(const sha256_stream&) = delete;
+  void update(std::span<const std::uint8_t> bytes);
+  // Una sola volta; dopo finish() update() e' vietato.
+  content_digest finish();
+
+ private:
+  struct state;
+  std::unique_ptr<state> state_;
+  std::uint64_t size_ = 0;
 };
 
 // SHA-256 (OpenSSL EVP) a chunk da 1 MiB; esadecimale minuscolo.

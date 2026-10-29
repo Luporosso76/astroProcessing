@@ -15,7 +15,8 @@
 namespace astro {
 
 enum class freshness { current, stale, missing };
-enum class job_state { running, completed, failed, cancelled };
+// `interrupted`: job rimasto `running` alla chiusura del processo, marcato dalla recovery dello store durevole.
+enum class job_state { running, completed, failed, cancelled, interrupted };
 
 struct artifact_record {
   std::uint64_t id = 0;  // assegnato da add_artifact
@@ -25,6 +26,10 @@ struct artifact_record {
   std::uint64_t size_bytes = 0;
   std::string kind;
   bool present = true;
+  // Nome del file sotto artifacts/ (<sha256>.<estensione>); ignorato dallo store in memoria, obbligatorio su SQLite.
+  std::string rel_path;
+  // Ruolo dell'output del job; lo slot pubblica l'artefatto del proprio ruolo (default `primary`).
+  std::string output_role = "primary";
 };
 
 struct slot_record {
@@ -32,6 +37,8 @@ struct slot_record {
   std::uint64_t current_generation = 0;
   std::string target_node_key;
   std::optional<std::uint64_t> artifact_id;
+  // Slot escluso dalla ricetta corrente (undo oltre la sua creazione): target vuoto, sempre `missing`.
+  bool detached = false;
 };
 
 struct slot_view {
@@ -81,6 +88,11 @@ class dag_store {
   // del nodo del job (dag.artifact_node_mismatch). Se la generazione dello slot e' ancora quella del job lo slot
   // punta all'artefatto; altrimenti stale_generation dag.stale_publish, senza modificare lo slot.
   virtual void publish(std::uint64_t job_id, std::uint64_t artifact_id) = 0;
+  // Registra l'artefatto, lo pubblica come `publish` e chiude il job `completed`. Gli store durevoli lo fanno in
+  // un'unica transazione: dopo un crash non esiste un risultato corrente con job non completato.
+  // Generazione cambiata: stale_generation dag.stale_publish; il job resta `running` (memoria) o diventa `failed`
+  // con quel codice (durevole).
+  virtual artifact_record complete_job(std::uint64_t job_id, artifact_record artifact) = 0;
   virtual slot_view read_slot(const std::string& slot_name) const = 0;
 
   // Operazione unica (transazione): inserisce i nodi risolti (padri prima dei figli) e allinea gli slot.
@@ -107,6 +119,7 @@ class memory_dag_store : public dag_store {
   void set_artifact_present(std::uint64_t artifact_id, bool present) override;
   std::vector<artifact_record> artifacts_for(const std::string& node_key) const override;
   void publish(std::uint64_t job_id, std::uint64_t artifact_id) override;
+  artifact_record complete_job(std::uint64_t job_id, artifact_record artifact) override;
   slot_view read_slot(const std::string& slot_name) const override;
   std::vector<std::string> apply_recipe(const std::vector<resolved_node>& nodes,
                                         const std::map<std::string, std::string>& slot_targets) override;

@@ -13,6 +13,24 @@ Stadio: ADR-04.a (registro riga 3391). Decisione: SQLite autorità, JSON per man
 
 Gli originali stanno fuori dal progetto, referenziati per percorso e digest. Il progetto non li scrive mai (F-PRJ-02).
 
+## Modello di minaccia
+
+- Dentro: crash di processo (SIGKILL) in qualunque punto; modifiche accidentali o esterne ai file derivati, rilevate prima dell'uso (identita' dev/ino/dimensione/mtime/ctime, digest); symlink e percorsi negli input non fidati (file importati, manifest e contenuto dei bundle di export).
+- Fuori: un processo malevolo con lo stesso UID che manipola i file del progetto durante un'operazione (puo' comunque riscrivere `project.db`); perdita di corrente e guasti del dispositivo (la durabilita' fsync non e' verificata dai test).
+- Conseguenza: i controlli di identita' sono difese contro modifiche rilevabili, non contro una corsa deliberata fra controllo e uso. `SQLITE_OPEN_NOFOLLOW` non e' usabile con `/proc/self/fd`: l'identita' del temporaneo del backup si controlla subito prima dell'apertura e di nuovo (completa, ctime incluso) prima della pubblicazione.
+
+## Scelte di implementazione (M2.c)
+
+- La classe e' `astro::sqlite_dag_store` (implementa `dag_store`); `project_store` nel testo e' lo stesso concetto.
+- `node_edges` per gli ingressi file usa `input_sha256` e `input_size` (non `input_id`): `put_node` non conosce i record di `inputs`.
+- `job_state::queued` non e' prodotto in M2; la recovery tratta comunque `queued` come `running`. Aggiunto `interrupted`.
+- Tutte le operazioni sui file del progetto sono relative a un fd di directory verificato (`openat`, `O_NOFOLLOW`, `O_DIRECTORY`, `mkdirat`, `renameat`); temporanei con nome casuale (`getrandom`) e `O_EXCL`. `backups/` o `artifacts/` symlink: `security`, `store.symlink` (backup: `schema`, `store.backup_failed` con causa nel contesto).
+- `read`/`write` interrotti da segnale (EINTR) e trasferimenti parziali si riprendono: e' gestione POSIX del singolo trasferimento, non un retry dopo guasto. Un errore reale non si ripete.
+- `stored_file` porta l'id dell'istanza dello store e l'identita' del file scritto (dev, ino, dimensione, mtime); `commit_job`, `complete_job` e `add_artifact` accettano solo file scritti da `write_files` di questa istanza e ancora identici (`integrity`, `store.file_identity_changed`; altrimenti `invalid_input`, `store.file_not_written_by_store`). Ruoli ripetuti nel commit: `dag.duplicate_output_role`.
+- `set_publish_role` e' una mutazione della ricetta: ricollega lo slot, incrementa la generazione, crea uno snapshot (il ruolo e' in `snapshot_entries.publish_role`) e azzera il redo.
+- Il backup pre-migrazione e' creato con `O_CREAT|O_EXCL|O_NOFOLLOW` su nome casuale, fsync sullo stesso fd, identita' (dev/ino) verificata prima e dopo il rename (`store.backup_identity`).
+- I test di crash simulano la morte del processo (SIGKILL); non provano la durabilita' contro perdita di corrente.
+
 ## Database
 
 `PRAGMA user_version` è la versione di schema; M2 definisce la versione 1. Tabelle minime (nomi C++ dei record fra parentesi):
@@ -22,8 +40,8 @@ Gli originali stanno fuori dal progetto, referenziati per percorso e digest. Il 
 | `inputs` (`input_record`) | `id`, `path`, `size_bytes`, `sha256`, `role` | Digest e dimensione inseriti nella stessa transazione del record. |
 | `nodes` (`node_record`) | `node_key` (PK), `operator_id`, `algorithm_version`, `serialization_version`, `params_canonical`, `precision`, `backend`, `seed` | Riga mai aggiornata dopo l'inserimento. |
 | `node_edges` | `child_key`, `ordinal`, `input_name`, `parent_key` o `input_id` | `ordinal` è la posizione in `node_spec.inputs`; nessun ciclo (ADR-05). |
-| `artifacts` (`artifact_record`) | `id`, `node_key`, `generation`, `rel_path`, `size_bytes`, `sha256`, `kind`, `present` | Inserita solo dopo il passo 5 della scrittura atomica. |
-| `slots` (`slot_record`) | `slot_name`, `current_generation`, `target_node_key`, `artifact_id` | `artifact_id` cambia solo nella pubblicazione (ADR-05) e in undo/redo (sotto). |
+| `artifacts` (`artifact_record`) | `id`, `node_key`, `generation`, `rel_path`, `size_bytes`, `sha256`, `kind`, `present`, `output_role` | Inserita solo dopo il passo 5 della scrittura atomica, nella stessa transazione che chiude il job. `output_role` distingue gli output di un job (distinti fra loro). |
+| `slots` (`slot_record`) | `slot_name`, `current_generation`, `target_node_key` (nullo se `detached`), `artifact_id`, `publish_role` (default `primary`), `detached` | `artifact_id` cambia solo nella pubblicazione (ADR-05) e in undo/redo (sotto). La pubblicazione e il ricollegamento usano l'output il cui ruolo e' `publish_role`. |
 | `jobs` (`job_record`) | `id`, `slot_name`, `node_key`, `generation`, `state`, `stop_category`, `stop_code` | `state` ∈ `job_state`. |
 | `snapshots` (`snapshot_record`) | `id`, `parent_id` | Storia logica; non è cache. Mai aggiornata né cancellata. |
 | `snapshot_entries` | `snapshot_id`, `slot_name`, `node_key` | Inserite con lo snapshot, poi immutabili. |
@@ -46,6 +64,8 @@ Gli originali stanno fuori dal progetto, referenziati per percorso e digest. Il 
 6. `user_version` letto dalla connessione. Maggiore del noto: chiusura e riapertura come al punto 3, `open_mode = read_only_unknown_schema`; ogni scrittura produce `schema`, `store.read_only`. Minore: migrazione.
 7. Recovery, solo in `read_write`.
 
+Schema piu' recente con WAL non vuoto (anche solo scoperto dopo la connessione): `schema`, `store.wal_pending_future_schema`. Nessuna apertura puo' applicare o troncare il WAL (la connessione di sondaggio chiude senza checkpoint); `project.db` e WAL restano invariati.
+
 ## Scrittura atomica
 
 Ogni file derivato, report incluso:
@@ -55,7 +75,7 @@ Ogni file derivato, report incluso:
 3. `fsync` del file;
 4. `renameat2(..., RENAME_NOREPLACE)` verso `<sha256>.<estensione>`. Con `EEXIST`: apertura del file esistente con `O_NOFOLLOW`, `fstat` (file regolare), dimensione e SHA-256 ricalcolato. Uguali: il temporaneo si elimina e il file esistente si riusa. Diversi, o non regolare: `security`, `store.digest_name_conflict` (T-M2C-23);
 5. `fsync` della directory;
-6. transazione che inserisce `artifacts` e aggiorna `jobs` (e `slots` se pubblica). Più righe di `artifacts` possono puntare allo stesso file.
+6. un'unica transazione (`commit_job` / `dag_store::complete_job`, usata anche da `run_job`) inserisce `artifacts`, pubblica lo slot se la generazione coincide e chiude il job `completed`. Generazione cambiata: righe come cache, job `failed` con `dag.stale_publish`. Più righe di `artifacts` possono puntare allo stesso file. I file passati al passo 6 sono solo quelli prodotti dal writer atomico (`stored_file` non costruibile altrove); `complete_job` su un record esterno ricalcola digest e dimensione del file.
 
 Ogni chiamata di sistema con esito negativo produce `io` con `errno` nel contesto e lascia il job `failed`. Un `fsync` fallito non si ripete.
 
@@ -82,14 +102,15 @@ M2 ha una sola versione di schema: il test usa una migrazione sintetica 1→2 de
 
 ## Snapshot, undo e redo (F-PRJ-04)
 
-Uno snapshot è l'insieme immutabile delle coppie (`slot_name`, `node_key`) di tutti gli slot. Si crea in una transazione dopo ogni cambio di ricetta; `parent_id` è lo snapshot corrente; `redo_snapshot_id` diventa nullo. La generazione non si salva: non si ripristina mai un valore storico.
+Uno snapshot è l'insieme immutabile delle coppie (`slot_name`, `node_key`) di tutti gli slot attaccati. Si crea in una transazione dopo ogni cambio di ricetta (`apply_recipe` con almeno uno slot cambiato, `create_slot`, `retarget_slot`); `parent_id` è lo snapshot corrente; `redo_snapshot_id` diventa nullo. La generazione non si salva: non si ripristina mai un valore storico.
 
 Undo e redo spostano `current_snapshot_id`, in una sola transazione:
 
 - undo: verso `parent_id`; `redo_snapshot_id` = snapshot lasciato;
 - redo: verso `redo_snapshot_id`;
 - per ogni slot: `target_node_key` = `node_key` della coppia; `current_generation += 1`, così un job ancora in corso diventa stale (ADR-05);
-- per ogni slot: `artifact_id` = artefatto più recente con quel `node_key` e `present = 1`; nessuno: `artifact_id` nullo, slot `missing`, da ricostruire dalla ricetta del nodo con le versioni dichiarate;
+- gli slot esistenti ma assenti dallo snapshot diventano `detached`: `target_node_key` nullo, `artifact_id` nullo (slot `missing`), `current_generation += 1` (un job in corso diventa stale), `start_job` rifiutato con `dag.slot_detached`; ricompaiono con redo o con una nuova ricetta che li nomina;
+- per ogni slot: `artifact_id` = artefatto più recente con quel `node_key`, `present = 1` e `output_role = publish_role` dello slot; nessuno: `artifact_id` nullo, slot `missing`, da ricostruire dalla ricetta del nodo con le versioni dichiarate;
 - nessuna riga di `nodes`, `node_edges` o `snapshots` si scrive o si riscrive. Un nodo indipendente non si ricalcola.
 
 | Condizione | Categoria | Codice |
@@ -115,7 +136,7 @@ Export esplicito di slot `current` in una directory nuova indicata dall'utente:
 - `manifest.json` oltre 64 MiB: `limit_exceeded`, `export.manifest_size`; JSON non valido o campi mancanti: `invalid_input`, `export.manifest_malformed`;
 - `rel_path` valido solo se: non vuoto, ≤ 4096 byte, componenti ≤ 255 byte, nessun NUL, nessun `/` iniziale o finale, nessun componente vuoto, `.` o `..`, nessun duplicato. Altrimenti `security`, `export.manifest_path`;
 - ogni file si apre con `openat2` e `RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS`, poi `fstat` (file regolare). Symlink o non regolare: `security`, `export.manifest_path`;
-- completo solo se `COMMIT` esiste, il suo digest corrisponde a `manifest.json`, ogni file corrisponde a dimensione e digest e non ci sono altri file. Altrimenti `integrity`, `export.incomplete`. L'export non è atomico: il marker lo rende verificabile.
+- completo solo se `COMMIT` esiste, il suo digest corrisponde a `manifest.json`, ogni file corrisponde a dimensione e digest (calcolato in streaming, memoria costante) e non ci sono altri file. Altrimenti `integrity`, `export.incomplete`. Un file sostituito o modificato durante la verifica (identita' dev/ino/dimensione/mtime/ctime diversa a fine lettura): `integrity`, `export.changed_during_verify`. Il manifest deve avere `versions` completo (product, source_revision, source_dirty, cfitsio, sqlite, openssl), nodi unici e catena chiusa (ogni padre presente); altrimenti `export.manifest_malformed`. L'export non è atomico: il marker lo rende verificabile.
 
 | Condizione | Categoria | Codice |
 |---|---|---|

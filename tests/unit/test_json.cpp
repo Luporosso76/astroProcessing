@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <bit>
+#include <clocale>
 #include <cmath>
 #include <limits>
 
@@ -116,6 +117,39 @@ TEST(Json, T_M2B_02_invalid_utf8_and_duplicate_keys_are_rejected) {
   EXPECT_STOP(o.set("a", json::null()), error_category::invalid_input, "dag.param_duplicate_key");
   json k = json::object();
   EXPECT_STOP(k.set("\xFF", json::null()), error_category::invalid_input, "dag.param_invalid_utf8");
+}
+
+TEST(Json, parse_roundtrips_canonical_documents) {
+  const std::string text =
+      "{\"a\":[1,-2,0,1.5,1e+21,\"x\\ny\",true,false,null],\"b\":{\"c\":\"\\u00e9\\ud83d\\ude00\"},\"z\":9007199254740992}";
+  const json v = parse_json(text);
+  EXPECT_EQ(canonical_json(v), "{\"a\":[1,-2,0,1.5,1e+21,\"x\\ny\",true,false,null],\"b\":{\"c\":\"\xC3\xA9\xF0\x9F\x98\x80\"},\"z\":9007199254740992}");
+  EXPECT_EQ(parse_json(" [ ] ").items().size(), 0u);
+  EXPECT_EQ(parse_json("9007199254740993").type(), json::kind::number);
+}
+
+TEST(Json, parse_rejects_malformed_documents) {
+  for (const char* bad : {"", "{", "[1,]", "{\"a\":1,}", "01", "-", "1.", "1e", "+1", ".5", "\"abc", "\"\\x\"", "tru",
+                          "{\"a\":1}{}", "[1] x", "\"\\ud800\"", "\"\\udc00\"", "{'a':1}", "NaN", "1e999", "\"\t\"",
+                          "\xEF\xBB\xBF{}"}) {
+    SCOPED_TRACE(bad);
+    EXPECT_STOP(parse_json(bad), error_category::invalid_input, "json.malformed");
+  }
+  EXPECT_STOP(parse_json("{\"a\":1,\"a\":2}"), error_category::invalid_input, "dag.param_duplicate_key");
+  EXPECT_STOP(parse_json("\"\xFF\""), error_category::invalid_input, "dag.param_invalid_utf8");
+  EXPECT_STOP(parse_json(std::string(70, '[') + std::string(70, ']')), error_category::limit_exceeded, "json.depth");
+  std::string many = "{";
+  for (int i = 0; i < 5000; ++i) many += (i ? ",\"k" : "\"k") + std::to_string(i) + "\":0";
+  EXPECT_STOP(parse_json(many + "}"), error_category::limit_exceeded, "json.object_keys");
+}
+
+TEST(Json, parse_does_not_depend_on_the_process_locale) {
+  const char* previous = std::setlocale(LC_NUMERIC, nullptr);
+  const std::string saved = previous != nullptr ? previous : "C";
+  ASSERT_NE(std::setlocale(LC_NUMERIC, "it_IT.utf8"), nullptr) << "locale con virgola decimale non installata";
+  const json v = parse_json("[1.5,2.25e3,-0.125]");
+  std::setlocale(LC_NUMERIC, saved.c_str());
+  EXPECT_EQ(canonical_json(v), "[1.5,2250,-0.125]");
 }
 
 }  // namespace

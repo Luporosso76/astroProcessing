@@ -144,4 +144,18 @@ TEST(Hash, T_M2B_09_missing_file_is_io_input_missing) {
               error_category::io, "input.missing");
 }
 
+TEST(Hash, stream_matches_one_shot_for_any_chunking) {
+  std::vector<std::uint8_t> data(3 * 1024 * 1024 + 17);
+  for (std::size_t i = 0; i < data.size(); ++i) data[i] = static_cast<std::uint8_t>(i * 31 + (i >> 8));
+  for (const std::size_t chunk : {std::size_t{1}, std::size_t{4095}, std::size_t{1} << 20, data.size()}) {
+    sha256_stream s;
+    for (std::size_t off = 0; off < data.size(); off += chunk) {
+      s.update({data.data() + off, std::min(chunk, data.size() - off)});
+    }
+    EXPECT_EQ(s.finish(), digest_of(data));
+  }
+  sha256_stream empty;
+  EXPECT_EQ(empty.finish(), digest_of({}));
+}
+
 }  // namespace

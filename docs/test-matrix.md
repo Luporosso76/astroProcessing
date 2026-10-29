@@ -41,11 +41,11 @@ Definiti in `docs/contracts/`; stato per unità, non per singolo test. Un ID si 
 |---|---|---|---|
 | T-M2A-01…13 | ADR-03 | M2.a | ESEGUITO, PASS (`docs/evidence/M2-a.md`) |
 | T-M2B-01…08, 10, 13 | ADR-05 | M2.b | ESEGUITO (T-M2B-10: record e provenance del runner; ledger ADR-16 e varianza ADR-17 con M2.e, scrittura atomica con M2.c) |
-| T-M2B-09 | ADR-05 | M2.b | PARZIALE: errore dell'input, confine del job e `descendants`; il blocco dei soli dipendenti e' dello scheduler (M2.d) |
-| T-M2B-11 | ADR-05 | M2.b | PARZIALE: la chiave non ha altri ingressi oltre il JCS; l'assenza di `PRAGMA user_version` si prova con lo store SQLite (M2.c) |
-| T-M2B-12 | ADR-05 | M2.b | PARZIALE: exit 2/3 e job marcato eseguiti; il rilascio delle prenotazioni e' di M2.d |
+| T-M2B-09 | ADR-05 | M2.b | PARZIALE: errore dell'input, confine del job e `descendants`; il blocco dei soli dipendenti è dello scheduler (M2.d) |
+| T-M2B-11 | ADR-05 | M2.b, M2.c | ESEGUITO, PASS: chiave e forma canonica invariate dopo una migrazione dello schema SQLite (`Store.T_M2B_11`, `docs/evidence/M2-c.md`) |
+| T-M2B-12 | ADR-05 | M2.b | PARZIALE: exit 2/3 e job marcato eseguiti; il rilascio delle prenotazioni è di M2.d |
 | `io input.short_read` (ADR-05) | ADR-05 | M2.a | NON ESEGUITO: richiede un lettore iniettabile (pread che restituisce meno byte con dimensione invariata); il ramo esiste in `fits.cpp` (`unexpected_eof`) ma non ha test |
-| T-M2C-01…25 | ADR-04 | M2.c | PIANIFICATO |
+| T-M2C-01…25 | ADR-04 | M2.c | ESEGUITO, PASS (`docs/evidence/M2-c.md`); durabilità contro perdita di corrente e processo malevolo stesso UID fuori dal modello; `readdir` senza test di iniezione |
 | T-M2D-01…15 | ADR-06 | M2.d | PIANIFICATO |
 | T-M2E-01…27 | ADR-16, ADR-17 | M2.e | PIANIFICATO |
 | T-M2F-01 | ADR-13 | M2.f | ESEGUITO, PASS (`docs/evidence/M2-f.md`) |

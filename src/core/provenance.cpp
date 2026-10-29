@@ -22,6 +22,7 @@ const char* state_name(job_state state) {
     case job_state::completed: return "completed";
     case job_state::failed: return "failed";
     case job_state::cancelled: return "cancelled";
+    case job_state::interrupted: return "interrupted";
   }
   std::abort();
 }
@@ -51,7 +52,8 @@ json stop_json(const stop_error& e) {
 
 void validate(const provenance_record& r) {
   switch (r.state) {
-    case job_state::running: bad("stato finale richiesto");
+    case job_state::running:
+    case job_state::interrupted: bad("stato finale richiesto");
     case job_state::completed:
       if (r.stop) bad("job completed con arresto");
       return;

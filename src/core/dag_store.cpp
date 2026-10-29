@@ -196,6 +196,13 @@ void memory_dag_store::publish(std::uint64_t job_id, std::uint64_t artifact_id) 
   slot.artifact_id = artifact_id;
 }
 
+artifact_record memory_dag_store::complete_job(std::uint64_t job_id, artifact_record artifact) {
+  const artifact_record stored = add_artifact(std::move(artifact));
+  publish(job_id, stored.id);
+  finish_job(job_id, job_state::completed, std::nullopt, "");
+  return stored;
+}
+
 slot_view memory_dag_store::read_slot(const std::string& slot_name) const {
   std::lock_guard lock(mutex_);
   const slot_record& slot = slot_ref(slot_name);

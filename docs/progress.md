@@ -1,10 +1,10 @@
 # Stato del progetto astroProcessor
 
-Ultimo aggiornamento: 28 ottobre 2026. Unica fonte dello stato corrente; risultati e limiti nei record di evidenza.
+Ultimo aggiornamento: 29 ottobre 2026. Unica fonte dello stato corrente; risultati e limiti nei record di evidenza.
 
 ## Ora
 
-- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g, M2.f, M2.a, M2.b DONE (`docs/evidence/M2-{g,f,a,b}.md`). Core: errori, immagine, FITS da memoria, hash, JSON canonico, nodi DAG, slot e provenance; 122 test con ASan/UBSan.
+- **M0 PASS. M1 DONE. M2 IN PROGRESS** (`plans/M2.md`): M2.g, M2.f, M2.a, M2.b, M2.c DONE (`docs/evidence/M2-{g,f,a,b,c}.md`). Core: errori, immagine, FITS da memoria, hash, JSON canonico, nodi DAG, slot, provenance, store SQLite durevole, snapshot undo/redo, export con manifest; 190 test dev (ASan/UBSan), 189 release.
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
@@ -28,13 +28,13 @@ I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) rest
 
 ## Prossima unità
 
-M2.c: store SQLite durevole dietro l'interfaccia `dag_store`, scrittura atomica degli artefatti, recovery, migrazioni, snapshot e undo/redo, export con manifest (`docs/contracts/ADR-04-persistenza.md`, T-M2C-01…25; chiude anche T-M2B-11). Poi M2.d e M2.e.
+M2.d: scheduler, budget e spill (`docs/contracts/ADR-06-budget-scheduler.md`, T-M2D-01…15; chiude anche T-M2B-09 e T-M2B-12). Poi M2.e.
 
 ## Limiti aperti
 
 - Gate M4.a: latenza pan/zoom, accessibilità, IME, colore ICC, confronto con QML.
 - Gate M2.d: protocollo M1.d completo (40 GiB logici, spill fisico, page cache contabilizzata).
-- Gate M2.c: migrazione, backup e schema ignoto in SQLite.
+- M2.c: durabilità contro perdita di corrente non provata (fuori dal modello di minaccia); processo malevolo con lo stesso UID fuori dal modello; `readdir` in `read_directory` senza test di iniezione.
 - Nessun dataset CFA reale ridistribuibile trovato: debayer M3.d senza dato reale per ora.
 - Cataloghi: Gaia e ESA Tycho2 solo uso non commerciale; APASS senza grant di redistribuzione dimostrato. Nessun pack adottato.
 - M10 non autorizzato. CodeGraph/Graphify: indici assenti, non creati.
