@@ -8,7 +8,7 @@
 # Uso: tools/review.sh --selftest   prova il giudizio su artefatti sintetici e sulla fixture tests/fixtures/review/.
 # Criterio: FAIL se c'è almeno un rilievo BLOCCANTE o MED, PASS solo con LOW o senza rilievi; un verdetto che
 # contraddice i rilievi (PASS con BLOCCANTE/MED, FAIL con soli LOW) è incoerente (uscita 2).
-# Uscita: 0 PASS, 1 FAIL, 2 errore di Codex, artefatto incoerente o argomenti non validi.
+# Uscita: 0 PASS, 1 FAIL, 2 errore di Codex, artefatto incoerente o argomenti non validi, 3 limite di giri raggiunto.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -100,6 +100,19 @@ if [ -z "$codex_version" ] || [ "$(printf '%s\n0.164.0\n' "$codex_version" | sor
 fi
 
 mkdir -p .omc/artifacts/ask tmp
+# Tetto dei giri (AGENTS.md, ciclo di un'unità): lo slug finisce con -reviewN o -contractN; oltre il terzo giro
+# la review non parte e la decisione passa al coordinatore (arbitraggio).
+# Unità nuove: ...-roundN, 3 giri in tutto (1: contratto e test; 2-3: codice sul delta). Le unità avviate prima
+# della regola (R1, R3, R4) usano ancora ...-contractN / ...-reviewN, 3 ciascuno.
+if ! [[ "$slug" =~ -(round|review|contract)([0-9]+)$ ]]; then
+  echo "slug senza numero di giro: '$slug' (atteso ...-roundN)" >&2
+  exit 2
+fi
+round="${BASH_REMATCH[2]}"
+if [ "${#round}" -gt 2 ] || [ "$round" -gt 3 ]; then
+  echo "limite di 3 giri raggiunto per '$slug': fermati e consegna al coordinatore l'ultimo artefatto con i rilievi aperti (arbitraggio)" >&2
+  exit 3
+fi
 log="tmp/review-${slug}.log"
 out=".omc/artifacts/ask/codex-${slug}-$(date +%Y%m%d-%H%M).md"
 prompt="$(cat tools/review-template.md "$extra")"

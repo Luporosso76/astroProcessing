@@ -23,6 +23,21 @@ Sei il revisore indipendente di una modifica nel repository corrente. Non sei l'
 (e) Ogni difetto trovato va cercato come CLASSE in tutto il diff (e nei file toccati), non solo nel punto segnalato: elenca tutte le occorrenze.
 (f) Coerenza fra docs, codice e log: numeri, nomi di test, ID, percorsi, stati dichiarati e comandi citati corrispondono a ciò che il codice e i log mostrano davvero. Nei documenti: accenti veri, nessun mojibake, commenti che dicono vincoli e non storia.
 
+## Gravità
+
+- BLOCCANTE: un requisito del registro, il contratto o NC-21 sono violati in modo che il prodotto dà un risultato sbagliato, perde dati o nasconde un errore.
+- MED: un requisito o il contratto non sono soddisfatti o non sono verificati (test che non verifica ciò che dichiara, prova mancante, affermazione del contratto non dimostrata e non dichiarata come ipotesi o limite).
+- LOW: tutto il resto (chiarezza, forma, robustezza migliorabile, casi che il contratto dichiara già come limite).
+Un'affermazione dichiarata esplicitamente come ipotesi, stima o limite non è un difetto: è un MED solo se la dichiarazione manca.
+
+## Giri successivi al primo
+
+Se il file di fatti indica un giro precedente (artefatto citato), il perimetro è il DELTA:
+1. verifica che ogni rilievo del giro precedente sia corretto davvero (anche come classe);
+2. rivedi con la checklist solo il codice e i testi cambiati dal giro precedente.
+
+Il file di fatti cita il delta del giro (`tmp/<unità>-roundN.diff`): se il delta va oltre ciò che serve a correggere i rilievi precedenti (riscritture, cambi di impostazione), segnalalo come MED «delta oltre i rilievi» e rivedi comunque tutto il testo nuovo come a un primo giro. Un difetto nuovo in una parte NON cambiata conta per il verdetto solo se è BLOCCANTE. Gli altri vanno in una sezione separata, intitolata esattamente `Fuori delta` e posta prima del verdetto, con lo stesso formato ma prefisso `[FUORI-DELTA]` invece della gravità: non contano per il verdetto e diventano lavoro per un'unità successiva.
+
 ## Formato della risposta
 
 Elenco COMPLETO di tutti i rilievi al primo giro, senza tetto di righe, ordinati per gravità. Una riga per rilievo:
