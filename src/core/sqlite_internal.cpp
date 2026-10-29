@@ -188,11 +188,16 @@ struct temporary_file {
   unique_fd fd;
 };
 
+void observe(const atomic_options& o, std::string_view event, std::string_view name, std::string_view other = {}) {
+  if (o.observer != nullptr && *o.observer) (*o.observer)(event, name, other);
+}
+
 temporary_file write_temporary(const atomic_options& o, const std::string& tmp, const byte_reader& reader,
                                const std::optional<content_digest>& expected) {
   inject(o.injector, o.fault_prefix + ".create");
   unique_fd fd(::openat(o.dirfd, tmp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600));
   if (!fd) throw_errno(error_category::io, "store.open", "creazione del temporaneo fallita", errno, {{"file", tmp}});
+  observe(o, "create", tmp);
   try {
     inject(o.injector, o.fault_prefix + ".write");
     sha256_stream hasher;
@@ -209,6 +214,7 @@ temporary_file write_temporary(const atomic_options& o, const std::string& tmp, 
     }
     inject(o.injector, o.fault_prefix + ".fsync_file");
     if (::fsync(fd.get()) != 0) throw_errno(error_category::io, "store.fsync", "fsync del file fallita", errno, {{"file", tmp}});
+    observe(o, "fsync", tmp);
     return temporary_file{digest, std::move(fd)};
   } catch (...) {
     ::unlinkat(o.dirfd, tmp.c_str(), 0);
@@ -229,8 +235,26 @@ bool same_existing_content(const atomic_options& o, const std::string& name, con
   }
   struct stat st {};
   if (::fstat(fd.get(), &st) != 0) throw_errno(error_category::io, "store.fstat", "fstat fallita", errno, {{"file", name}});
+  if (o.managed && S_ISREG(st.st_mode)) check_managed_file(st, o.originals, name);
   if (!S_ISREG(st.st_mode) || static_cast<std::uint64_t>(st.st_size) != digest.size_bytes) return false;
-  return stream_digest(fd.get(), digest.size_bytes, name) == digest;
+  if (!(stream_digest(fd.get(), digest.size_bytes, name) == digest)) return false;
+  // Il file riusato diventa l'output del commit: il suo contenuto deve essere durevole come quello scritto.
+  inject(o.injector, o.fault_prefix + ".fsync_reused");
+  if (::fsync(fd.get()) != 0) throw_errno(error_category::io, "store.fsync", "fsync del file riusato fallita", errno, {{"file", name}});
+  observe(o, "fsync", name);
+  return true;
+}
+
+// Regola hardlink sul file gia' presente col nome finale, prima di creare il temporaneo.
+void precheck_existing(const atomic_options& o) {
+  const std::string& name = !o.final_name.empty() ? o.final_name : o.known_name;
+  if (!o.managed || name.empty()) return;
+  struct stat st {};
+  if (::fstatat(o.dirfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
+    if (errno == ENOENT) return;
+    throw_errno(error_category::io, "store.stat", "stat del nome finale fallita", errno, {{"file", name}});
+  }
+  if (S_ISREG(st.st_mode)) check_managed_file(st, o.originals, name);
 }
 
 }  // namespace
@@ -273,11 +297,16 @@ atomic_result atomic_write(const atomic_options& o, std::span<const std::uint8_t
     pos += n;
     return n;
   };
-  return atomic_write_stream(o, reader, expected);
+  if (!o.managed || !o.final_name.empty()) return atomic_write_stream(o, reader, expected);
+  // Nome finale noto prima del temporaneo: la regola hardlink si applica prima di ogni scrittura.
+  atomic_options named = o;
+  named.known_name = digest_of(bytes).sha256 + "." + o.extension;
+  return atomic_write_stream(named, reader, expected);
 }
 
 atomic_result atomic_write_stream(const atomic_options& o, const byte_reader& reader,
                                   const std::optional<content_digest>& expected) {
+  precheck_existing(o);
   const std::string tmp = ".tmp-" + random_hex(16);
   temporary_file written = write_temporary(o, tmp, reader, expected);
   const content_digest digest = written.digest;
@@ -310,10 +339,14 @@ atomic_result atomic_write_stream(const atomic_options& o, const byte_reader& re
     if (::unlinkat(o.dirfd, tmp.c_str(), 0) != 0) {
       throw_errno(error_category::io, "store.unlink", "rimozione del temporaneo fallita", errno, {{"file", tmp}});
     }
+    observe(o, "unlink", tmp);
     reused = true;
+  } else {
+    observe(o, "rename", tmp, name);
   }
   inject(o.injector, o.fault_prefix + ".fsync_dir");
   if (::fsync(o.dirfd) != 0) throw_errno(error_category::io, "store.fsync", "fsync della directory fallita", errno);
+  observe(o, "fsync_dir", "");
   atomic_result result{name, digest, reused, {}};
   const auto changed = [&](const char* why) {
     return stop_error(error_category::integrity, "store.file_identity_changed", why, {{"file", name}});

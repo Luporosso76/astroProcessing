@@ -15,21 +15,22 @@ Gli originali stanno fuori dal progetto, referenziati per percorso e digest. Il 
 
 ## Modello di minaccia
 
-- Dentro: crash di processo (SIGKILL) in qualunque punto; modifiche accidentali o esterne ai file derivati, rilevate prima dell'uso (identita' dev/ino/dimensione/mtime/ctime, digest); symlink e percorsi negli input non fidati (file importati, manifest e contenuto dei bundle di export).
-- Fuori: un processo malevolo con lo stesso UID che manipola i file del progetto durante un'operazione (puo' comunque riscrivere `project.db`); perdita di corrente e guasti del dispositivo (la durabilita' fsync non e' verificata dai test).
-- Conseguenza: i controlli di identita' sono difese contro modifiche rilevabili, non contro una corsa deliberata fra controllo e uso. `SQLITE_OPEN_NOFOLLOW` non e' usabile con `/proc/self/fd`: l'identita' del temporaneo del backup si controlla subito prima dell'apertura e di nuovo (completa, ctime incluso) prima della pubblicazione.
+- Dentro: crash di processo (SIGKILL) in qualunque punto; modifiche accidentali o esterne ai file derivati, rilevate prima dell'uso (identità dev/ino/dimensione/mtime/ctime, digest); symlink e percorsi negli input non fidati (file importati, manifest e contenuto dei bundle di export).
+- Fuori: un processo malevolo con lo stesso UID che manipola i file del progetto durante un'operazione (può comunque riscrivere `project.db`); un dispositivo che mente su `fsync` o che corrompe dati già sincronizzati.
+- Dentro dal R4 (D17): la perdita di energia secondo il modello POSIX di `fsync`, simulata in spazio utente (sezione «Perdita di energia»).
+- Conseguenza: i controlli di identità sono difese contro modifiche rilevabili, non contro una corsa deliberata fra controllo e uso. `SQLITE_OPEN_NOFOLLOW` non è usabile con `/proc/self/fd`: l'identità del temporaneo del backup si controlla subito prima dell'apertura e di nuovo (completa, ctime incluso) prima della pubblicazione.
 
 ## Scelte di implementazione (M2.c)
 
-- La classe e' `astro::sqlite_dag_store` (implementa `dag_store`); `project_store` nel testo e' lo stesso concetto.
+- La classe è `astro::sqlite_dag_store` (implementa `dag_store`); `project_store` nel testo è lo stesso concetto.
 - `node_edges` per gli ingressi file usa `input_sha256` e `input_size` (non `input_id`): `put_node` non conosce i record di `inputs`.
-- `job_state::queued` non e' prodotto in M2; la recovery tratta comunque `queued` come `running`. Aggiunto `interrupted`.
+- `job_state::queued` non è prodotto in M2; la recovery tratta comunque `queued` come `running`. Aggiunto `interrupted`.
 - Tutte le operazioni sui file del progetto sono relative a un fd di directory verificato (`openat`, `O_NOFOLLOW`, `O_DIRECTORY`, `mkdirat`, `renameat`); temporanei con nome casuale (`getrandom`) e `O_EXCL`. `backups/` o `artifacts/` symlink: `security`, `store.symlink` (backup: `schema`, `store.backup_failed` con causa nel contesto).
-- `read`/`write` interrotti da segnale (EINTR) e trasferimenti parziali si riprendono: e' gestione POSIX del singolo trasferimento, non un retry dopo guasto. Un errore reale non si ripete.
-- `stored_file` porta l'id dell'istanza dello store e l'identita' del file scritto (dev, ino, dimensione, mtime); `commit_job`, `complete_job` e `add_artifact` accettano solo file scritti da `write_files` di questa istanza e ancora identici (`integrity`, `store.file_identity_changed`; altrimenti `invalid_input`, `store.file_not_written_by_store`). Ruoli ripetuti nel commit: `dag.duplicate_output_role`.
-- `set_publish_role` e' una mutazione della ricetta: ricollega lo slot, incrementa la generazione, crea uno snapshot (il ruolo e' in `snapshot_entries.publish_role`) e azzera il redo.
-- Il backup pre-migrazione e' creato con `O_CREAT|O_EXCL|O_NOFOLLOW` su nome casuale, fsync sullo stesso fd, identita' (dev/ino) verificata prima e dopo il rename (`store.backup_identity`).
-- I test di crash simulano la morte del processo (SIGKILL); non provano la durabilita' contro perdita di corrente.
+- `read`/`write` interrotti da segnale (EINTR) e trasferimenti parziali si riprendono: è gestione POSIX del singolo trasferimento, non un retry dopo guasto. Un errore reale non si ripete.
+- `stored_file` porta l'id dell'istanza dello store e l'identità del file scritto (dev, ino, dimensione, mtime); `commit_job`, `complete_job` e `add_artifact` accettano solo file scritti da `write_files` di questa istanza e ancora identici (`integrity`, `store.file_identity_changed`; altrimenti `invalid_input`, `store.file_not_written_by_store`). Ruoli ripetuti nel commit: `dag.duplicate_output_role`.
+- `set_publish_role` è una mutazione della ricetta: ricollega lo slot, incrementa la generazione, crea uno snapshot (il ruolo è in `snapshot_entries.publish_role`) e azzera il redo.
+- Il backup pre-migrazione è creato con `O_CREAT|O_EXCL|O_NOFOLLOW` su nome casuale, fsync sullo stesso fd, identità (dev/ino) verificata prima e dopo il rename (`store.backup_identity`).
+- I test di crash simulano la morte del processo (SIGKILL); la perdita di energia ha un test proprio (T-M2R4-04) con il modello della sezione «Perdita di energia».
 
 ## Database
 
@@ -41,7 +42,7 @@ Gli originali stanno fuori dal progetto, referenziati per percorso e digest. Il 
 | `nodes` (`node_record`) | `node_key` (PK), `operator_id`, `algorithm_version`, `serialization_version`, `params_canonical`, `precision`, `backend`, `seed` | Riga mai aggiornata dopo l'inserimento. |
 | `node_edges` | `child_key`, `ordinal`, `input_name`, `parent_key` o `input_id` | `ordinal` è la posizione in `node_spec.inputs`; nessun ciclo (ADR-05). |
 | `artifacts` (`artifact_record`) | `id`, `node_key`, `generation`, `rel_path`, `size_bytes`, `sha256`, `kind`, `present`, `output_role` | Inserita solo dopo il passo 5 della scrittura atomica, nella stessa transazione che chiude il job. `output_role` distingue gli output di un job (distinti fra loro). |
-| `slots` (`slot_record`) | `slot_name`, `current_generation`, `target_node_key` (nullo se `detached`), `artifact_id`, `publish_role` (default `primary`), `detached` | `artifact_id` cambia solo nella pubblicazione (ADR-05) e in undo/redo (sotto). La pubblicazione e il ricollegamento usano l'output il cui ruolo e' `publish_role`. |
+| `slots` (`slot_record`) | `slot_name`, `current_generation`, `target_node_key` (nullo se `detached`), `artifact_id`, `publish_role` (default `primary`), `detached` | `artifact_id` cambia solo nella pubblicazione (ADR-05) e in undo/redo (sotto). La pubblicazione e il ricollegamento usano l'output il cui ruolo è `publish_role`. |
 | `jobs` (`job_record`) | `id`, `slot_name`, `node_key`, `generation`, `state`, `stop_category`, `stop_code` | `state` ∈ `job_state`. |
 | `snapshots` (`snapshot_record`) | `id`, `parent_id` | Storia logica; non è cache. Mai aggiornata né cancellata. |
 | `snapshot_entries` | `snapshot_id`, `slot_name`, `node_key` | Inserite con lo snapshot, poi immutabili. |
@@ -64,7 +65,7 @@ Gli originali stanno fuori dal progetto, referenziati per percorso e digest. Il 
 6. `user_version` letto dalla connessione. Maggiore del noto: chiusura e riapertura come al punto 3, `open_mode = read_only_unknown_schema`; ogni scrittura produce `schema`, `store.read_only`. Minore: migrazione.
 7. Recovery, solo in `read_write`.
 
-Schema piu' recente con WAL non vuoto (anche solo scoperto dopo la connessione): `schema`, `store.wal_pending_future_schema`. Nessuna apertura puo' applicare o troncare il WAL (la connessione di sondaggio chiude senza checkpoint); `project.db` e WAL restano invariati.
+Schema più recente con WAL non vuoto (anche solo scoperto dopo la connessione): `schema`, `store.wal_pending_future_schema`. Nessuna apertura può applicare o troncare il WAL (la connessione di sondaggio chiude senza checkpoint); `project.db` e WAL restano invariati.
 
 ## Scrittura atomica
 
@@ -136,7 +137,7 @@ Export esplicito di slot `current` in una directory nuova indicata dall'utente:
 - `manifest.json` oltre 64 MiB: `limit_exceeded`, `export.manifest_size`; JSON non valido o campi mancanti: `invalid_input`, `export.manifest_malformed`;
 - `rel_path` valido solo se: non vuoto, ≤ 4096 byte, componenti ≤ 255 byte, nessun NUL, nessun `/` iniziale o finale, nessun componente vuoto, `.` o `..`, nessun duplicato. Altrimenti `security`, `export.manifest_path`;
 - ogni file si apre con `openat2` e `RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS`, poi `fstat` (file regolare). Symlink o non regolare: `security`, `export.manifest_path`;
-- completo solo se `COMMIT` esiste, il suo digest corrisponde a `manifest.json`, ogni file corrisponde a dimensione e digest (calcolato in streaming, memoria costante) e non ci sono altri file. Altrimenti `integrity`, `export.incomplete`. Un file sostituito o modificato durante la verifica (identita' dev/ino/dimensione/mtime/ctime diversa a fine lettura): `integrity`, `export.changed_during_verify`. Il manifest deve avere `versions` completo (product, source_revision, source_dirty, cfitsio, sqlite, openssl), nodi unici e catena chiusa (ogni padre presente); altrimenti `export.manifest_malformed`. L'export non è atomico: il marker lo rende verificabile.
+- completo solo se `COMMIT` esiste, il suo digest corrisponde a `manifest.json`, ogni file corrisponde a dimensione e digest (calcolato in streaming, memoria costante) e non ci sono altri file. Altrimenti `integrity`, `export.incomplete`. Un file sostituito o modificato durante la verifica (identità dev/ino/dimensione/mtime/ctime diversa a fine lettura): `integrity`, `export.changed_during_verify`. Il manifest deve avere `versions` completo (product, source_revision, source_dirty, cfitsio, sqlite, openssl), nodi unici e catena chiusa (ogni padre presente); altrimenti `export.manifest_malformed`. L'export non è atomico: il marker lo rende verificabile.
 
 | Condizione | Categoria | Codice |
 |---|---|---|
@@ -178,7 +179,7 @@ Export esplicito di slot `current` in una directory nuova indicata dall'utente:
 
 ### Disco pieno sull'export (C-10.a campo 10, D13)
 
-ENOSPC si prova iniettando il guasto nelle chiamate di scrittura del prodotto (fault injector), non su un filesystem pieno (una modifica di sistema, vietata dall'`AGENTS.md`). Per l'export i punti di scrittura sono `export.file.{create,write,fsync_file,rename,fsync_dir}`, `export.manifest.*` e `export.commit.*`, più `export.mkdir`. Con ENOSPC iniettato a ciascuno: stop `io`, `export.write` (anche per `mkdir`, la cui causa iniettata resta nel contesto), `errno = 28` nel contesto; nessun file temporaneo residuo; la destinazione non contiene `COMMIT` e `verify_export` non la dichiara completa (assente o `integrity`, `export.incomplete`); gli originali e lo stato dello store restano invariati (T-M2R0-03). Nessun retry e nessun percorso alternativo.
+ENOSPC si prova iniettando il guasto nelle chiamate di scrittura del prodotto (fault injector), non su un filesystem pieno (una modifica di sistema, vietata dall'`AGENTS.md`). Per l'export i punti di scrittura sono `export.file.{create,write,fsync_file,rename,fsync_dir}`, `export.report.*` (report di export, estensione R4), `export.manifest.*` e `export.commit.*`, più `export.mkdir`. Con ENOSPC iniettato a ciascuno: stop `io`, `export.write` (anche per `mkdir`, la cui causa iniettata resta nel contesto), `errno = 28` nel contesto; nessun file temporaneo residuo; la destinazione non contiene `COMMIT` e `verify_export` non la dichiara completa (assente o `integrity`, `export.incomplete`); gli originali e lo stato dello store restano invariati (T-M2R0-03). Nessun retry e nessun percorso alternativo.
 
 ### Report di import come artefatto (NFR-REP-01.a, F-IO-10)
 
@@ -210,6 +211,103 @@ Job: `run_thumbnail_job` calcola o riusa la voce e pubblica un riferimento (`thu
 | T-M2R1-08 | Il report di import riletto dopo la riapertura è coerente con l'inventario. |
 | T-M2R1-11 | `cache.rebuild` sulla voce corrotta: nuova voce identica byte per byte all'originale, provenance con job, causa e voce sostituita; la richiesta successiva dà `cache_hit`. Esatta. |
 | T-M2R1-12 | Voce assente: `computed`; valida: `cache_hit` senza ricalcolo (contatore); quota superata, symlink e hardlink nella cache: stop. Cleanup confinato. |
+## Estensione R4: recovery, resume, report di export, hardlink, perdita di energia
+
+Unità R4 di `plans/M2-residui.md` (D15, D16, D17, D18). Requisiti F-PRJ-06, NFR-REP-01.a (recovery, export), NFR-SEC-03. Schema 1 esteso prima di ogni rilascio: nessun progetto esistente da migrare.
+
+### Schema
+
+- `inputs` ha in più `dev` e `ino` (interi non nulli): identità `(st_dev, st_ino)` dell'originale, letta con `stat` da `add_input` sul percorso registrato. Percorso assente: `io`, `input.missing`; non regolare: `invalid_input`, `store.bad_input`.
+- `artifacts` ha in più `job_id` (riferimento a `jobs`, nullo per le righe registrate con `add_artifact` fuori da un commit): il job che ha inserito la riga con `commit_job` o `complete_job`. La generazione è per slot, quindi `(node_key, generazione)` non identifica un job; `job_id` sì.
+- `recovery_reports(id, report_canonical)`: report persistiti, in JSON canonico. Righe mai aggiornate né cancellate (trigger come `snapshots`).
+- `settings` con chiave `workflow.<nome>`: definizione del workflow (sotto).
+
+### Fase sicura (D16)
+
+Uno slot attaccato ha una **fase** se il suo artefatto pubblicato (`artifact_id`) esiste ed è del nodo target, `present` o no: è il risultato completato della ricetta corrente. Il **job produttore** è il job registrato nella riga dell'artefatto pubblicato (`job_id`); i suoi **output** sono tutte le righe di `artifacts` con quel `job_id`, inserite dalla stessa transazione di commit, provenance compresa, `present` o no. Se `job_id` è nullo, l'unico output è l'artefatto pubblicato. Ogni output si controlla leggendo il file con `openat` e `O_NOFOLLOW` sotto `artifacts/` e con la regola hardlink:
+
+- file assente: difetto `absent` (riga già `present = 0`, o marcata dalla recovery nella stessa apertura), trovato vuoto. Il nome è libero e il nodo si può ricostruire;
+- riga `present = 0` e file presente con dimensione e digest registrati (per esempio un file ripristinato dopo la recovery): difetto `absent`, trovato uguale all'atteso. La riga non si aggiorna (nessuna riparazione); il nodo si ricostruisce e la scrittura atomica riusa il nome (passo 4, contenuto uguale);
+- file presente con dimensione o digest diversi da quelli registrati, anche se la riga è `present = 0` (la recovery marca le dimensioni diverse senza rimuovere il file): difetto `digest`, con digest atteso e trovato. Il nome è occupato da un contenuto diverso;
+- file presente, di dimensione e digest registrati, e riga `present`: output verificato.
+
+La fase è **sicura** se ogni output è verificato, altrimenti è **danneggiata**, con un difetto per ogni output non verificato. Uno slot senza fase (mai pubblicato per il nodo target, o pubblicato per un altro nodo) è da calcolare.
+
+Seconda forma di D16, il checkpoint valido di un nodo: vale per i job che dichiarano checkpoint con risultati parziali durevoli (scheduler, T-M2D-09). In M2 nessun job di prodotto li ha (la calibrazione tiene le righe parziali in memoria): un job interrotto dentro un nodo riparte da capo, e il report non ha un campo per i checkpoint.
+
+### Report di recovery (D15)
+
+A ogni apertura in `read_write`, in quest'ordine:
+
+1. **Analisi senza scritture.** Scansione di `artifacts/` con la regola hardlink, prima della connessione SQLite (sotto); poi, con la connessione, lettura dei job `running` o `queued`, delle righe il cui file manca o ha dimensione diversa, dei file senza riga.
+2. **Rimozioni.** `unlink` dei temporanei e degli orfani trovati, poi `fsync` della directory. Il report elenca solo le rimozioni riuscite: se il processo muore prima della transazione, quei file sono già spariti e la recovery successiva non li ritrova.
+3. **Transazione.** Job marcati `interrupted`, righe marcate `present = 0`, calcolo delle fasi (sopra) per ogni slot attaccato, persistenza del report.
+
+`recovery_report` (in memoria con `recovery()`, persistito in `recovery_reports`):
+
+| Campo | Contenuto |
+|---|---|
+| `interrupted_jobs` | Job marcati `interrupted` da questa recovery |
+| `removed_temporaries`, `removed_orphans` | Nomi rimossi da questa recovery |
+| `artifacts_marked_absent` | Righe marcate `present = 0` da questa recovery |
+| `incomplete_results` | Ogni job `interrupted` (anche di aperture precedenti) il cui slot non ha ancora un artefatto `current` del suo nodo: job, slot, `node_key`, generazione. Sono i risultati incompleti, mai pubblicati |
+| `safe_phases` | Slot, `node_key`, generazione e id degli output verificati, per slot |
+| `damaged_phases` | Slot, `node_key`, generazione e difetti (`artifact_id`, `rel_path`, causa `absent` o `digest`, digest atteso e trovato) |
+
+Il report si persiste se almeno un campo diverso da `safe_phases` non è vuoto e se differisce dall'ultimo report persistito (riaperture ripetute dello stesso stato non aggiungono righe). Un progetto chiuso in modo pulito e intatto non produce righe. `recovery_reports()` li restituisce in ordine di id. Formato `astro.recovery.v1`. Il calcolo delle fasi rilegge gli output di ogni fase a ogni apertura: è un costo lineare nella dimensione dei risultati correnti, scelto per non dichiarare sicura una fase senza averla verificata.
+
+All'apertura non riparte nulla: la recovery propone (report) e il resume è un comando separato.
+
+### Workflow e resume (D15, D16)
+
+Un workflow è un elenco ordinato di passi `(slot, nodo)`: ogni passo esegue un job sullo slot. `run_workflow` richiede che il target di ogni slot sia il nodo del passo (`invalid_input`, `workflow.slot_target`), registra la definizione in `settings` (`workflow.<nome>`, JSON canonico `astro.workflow.v1` con slot e `node_key` in ordine) ed esegue i passi in ordine. Il primo passo fermato chiude il workflow con il suo codice di uscita; i passi successivi non partono. Nome del workflow `[a-z0-9_-]{1,64}`, almeno un passo, slot distinti (`invalid_input`, `workflow.definition`). Un passo deve eseguire il job del proprio slot e del proprio nodo (`invalid_input`, `workflow.step_job`).
+
+`resume_workflow` è il solo modo di riprendere. Prima di eseguire qualunque passo:
+
+1. definizione registrata assente: `resume_mismatch`, `resume.unknown_workflow`;
+2. definizione diversa da quella data (passi, ordine, slot, nodi, quindi parametri, versioni, precisione e backend, che entrano nella chiave): `resume_mismatch`, `resume.recipe`, con passo, atteso e trovato nel contesto;
+3. target di uno slot diverso dal nodo del passo, o slot staccato o assente: `resume_mismatch`, `resume.recipe`;
+4. per ogni passo, classificazione della fase (sopra), per tutti i passi prima di eseguirne uno. Una fase danneggiata con almeno un difetto `digest`, su un output primario o secondario: `integrity`, `resume.artifact_digest` (il nome del file è occupato da un contenuto diverso e il nodo non si può riscrivere). File di una riga `present` sparito dopo la recovery: `io`, `resume.artifact_missing`.
+
+Nessuno di questi errori esegue un passo né apre un job. Poi le fasi sicure si riusano senza job; le altre (slot senza fase, o fase danneggiata solo da difetti `absent`: file mancanti, nomi liberi, o file ripristinati col contenuto registrato, nomi riusabili) si eseguono in ordine, con la stessa regola di arresto di `run_workflow`. La provenance di ogni job eseguito dal resume dichiara il resume (ADR-05). Un resume con ricetta diversa non diventa mai un'esecuzione nuova: per quella serve `run_workflow`.
+
+### Regola hardlink (D18, NFR-SEC-03)
+
+Un file gestito dal progetto con `st_nlink ≠ 1`: `security`, `fs.hardlink`. Una destinazione di export esistente, o un file gestito, con lo stesso `(st_dev, st_ino)` di un originale registrato: `security`, `fs.original_inode`, controllato prima di `fs.hardlink` dove gli originali sono già leggibili. Ogni controllo avviene prima della prima scrittura o rimozione dell'operazione:
+
+- apertura: `project.lock` (sul descrittore), `project.db`, `project.db-wal`, `project.db-shm` e ogni voce di `artifacts/`, prima della connessione SQLite (che crea `-wal` e `-shm`). Qui gli originali non sono ancora leggibili: un hardlink di un originale ha comunque `st_nlink ≥ 2` e si ferma come `fs.hardlink`;
+- scrittura atomica: se il nome finale è noto prima del temporaneo (digest dei byte in memoria, o nome dato), il file esistente con quel nome si controlla prima di creare il temporaneo; il controllo si ripete sul file riusato al passo 4 (`EEXIST`);
+- export: destinazione esistente (`fs.original_inode`, poi `export.target_exists`) e ogni artefatto da copiare, tutti prima di creare la directory; ogni artefatto si ricontrolla all'apertura per la copia;
+- fasi e resume: ogni output riletto per la verifica del digest.
+
+Il controllo vale per i file che il progetto scrive, rimuove, riusa o pubblica; gli originali restano fuori dal progetto e si leggono soltanto. Un rifiuto lascia invariati `project.db`, il contenuto di `artifacts/` e l'originale (digest, inode, `nlink`, `mtime`, permessi).
+
+### Report di export (NFR-REP-01.a, C-10 campo 7)
+
+L'export scrive `export_report.json` (JSON canonico, `astro.export_report.v1`) con il protocollo atomico, dopo i file e prima di `manifest.json`. Il report elenca per ogni file `rel_path`, `size_bytes`, `sha256`, `slot_name`, `generation`, `node_key`, `kind` e `representation` = `artifact_copy` (copia byte per byte dell'artefatto: maschere, varianza e metadati restano quelli dell'artefatto). `non_representable` è l'elenco dei metadati che il formato di destinazione non rappresenta: vuoto, perché l'export non converte formati, con il motivo in `non_representable_reason`. Il manifest ha un quinto campo `report` con `rel_path` = `export_report.json`, `size_bytes` e `sha256`. `verify_export` richiede il campo con quel nome (`invalid_input`, `export.manifest_malformed`), verifica il file come gli altri (assente o digest diverso: `integrity`, `export.incomplete`) e richiede che il report sia JSON canonico con formato noto, lo stesso elenco di file del manifest nello stesso ordine e con gli stessi sei campi (`rel_path`, `size_bytes`, `sha256`, `slot_name`, `generation`, `node_key`), `kind` stringa non vuota, `representation` = `artifact_copy`, `non_representable` vuoto e `non_representable_reason` non vuoto (`integrity`, `export.report_mismatch`). Il nome è riservato: uno slot che lo produrrebbe è rifiutato (`invalid_input`, `export.slot_name`).
+
+### Perdita di energia (D17)
+
+Modello POSIX di `fsync`, simulato in spazio utente dal test T-M2R4-04:
+
+- database: un VFS SQLite di test, sovrapposto a `unix` e scelto con `open_options.vfs`, ricorda per ogni file il contenuto all'ultimo `xSync`. Le scritture non sincronizzate si perdono. Un file mai sincronizzato non esiste; `xDelete` è durevole subito; `-shm` non è durevole (SQLite lo ricostruisce dal WAL);
+- artefatti: lo store notifica a un osservatore di test (`open_options.observer`) gli eventi `create`, `fsync`, `rename`, `unlink` e `fsync_dir` della scrittura atomica. Il file riusato al passo 4 (`EEXIST`, contenuto uguale) si sincronizza con `fsync` prima del commit, come il temporaneo, ed emette `fsync`; Il contenuto di un file è durevole all'ultimo `fsync`, vuoto se non c'è; un nome è durevole all'ultimo `fsync` della directory;
+- a ogni `xSync`, a ogni `xDelete`, a ogni `fsync` e dopo la chiusura si costruisce lo stato durevole, lo si riapre con il VFS normale e si verificano gli invarianti: `PRAGMA integrity_check` = `ok`; ogni riga `present` ha un file durevole col suo digest; ogni job `completed` ha i suoi output `present`; l'artefatto pubblicato da ogni slot `current` ha un job produttore (`job_id`) `completed` dello stesso nodo; nessun `.tmp-*` né orfano dopo la recovery.
+
+Limiti dichiarati: un dispositivo che mente su `fsync`, il riordino dei metadati del filesystem oltre il modello e la directory del progetto stessa, creata prima della misura, restano fuori. I percorsi d'errore della scrittura atomica non sono nel giornale (li copre T-M2C-04).
+
+### Test dell'estensione
+
+| ID | Clausola |
+|---|---|
+| T-M2R4-01 | SIGKILL del figlio a ogni punto (confini di passo, hook della calibrazione, scrittura atomica, commit) di un workflow di K nodi di calibrazione. Dopo la riapertura nessun job nuovo; il report elenca come fasi sicure esattamente i passi già pubblicati, anche con il kill fra due passi; un job interrotto è un risultato incompleto. Dopo `resume_workflow` i passi sicuri non hanno job né provenance nuovi (una sola esecuzione conclusa per nodo, tentativi contati dai job), e i digest di immagine e report coincidono con quelli di un progetto separato eseguito senza kill. Esatta. Un passo fermato (exit 2) o annullato (exit 3), in `run_workflow` e in `resume_workflow`, chiude il workflow con il suo codice e la sua causa: i passi successivi restano `not_reached` e non aprono job. |
+| T-M2R4-02 | Resume con passi, ordine, parametri o backend diversi, o con un target di slot cambiato: `resume_mismatch`, nessun job nuovo, nessun file nuovo. Workflow mai registrato: `resume.unknown_workflow`. Fase danneggiata da un difetto `digest` (primario alterato; primario mancante più secondario di dimensione diversa, che la recovery marca `present = 0` lasciando il file): `resume.artifact_digest`, nessun job. Fase danneggiata solo da difetti `absent` (file mancante, o file ripristinato con riga `present = 0`): il passo si riesegue. |
+| T-M2R4-03 | Interventi provocati (job in corso, temporaneo, orfano, file mancante, digest alterato, provenance mancante di un job completato): il report della prima riapertura coincide con l'atteso costruito dal test; la seconda riapertura, dopo il ripristino del file mancante, non rimuove né marca nulla e persiste l'analisi cambiata (difetto `absent` con trovato uguale all'atteso); una terza riapertura non aggiunge righe. Il kill fra due passi committati (nessun intervento, nessuna riga persistita, fasi sicure elencate in `recovery()`) è in T-M2R4-01. |
+| T-M2R4-04 | Perdita di energia a ogni punto di sync, dopo ogni `xDelete` e dopo la chiusura dello store, con gli invarianti sopra; lo stato durevole finale ha tutti gli slot `current`. Invariante esatto. |
+| T-M2R4-05 | Hardlink di un originale in `artifacts/` (orfano alla riapertura e nome riusato in scrittura), come destinazione di export, un artefatto con `nlink` 2 (riapertura, export, fase, scrittura), `project.db` con `nlink` 2: stop `security`, nessuna scrittura né rimozione (nella scrittura atomica nessun punto `create`, `write` o `fsync` precede il rifiuto); dell'originale invariati digest, inode, `nlink`, `mtime` e permessi. |
+| T-M2R4-06 | Report di export presente, elencato nel manifest con il digest e verificato da `verify_export`; report alterato, assente, fuori dal manifest, con un altro nome, con un elemento in meno o con un solo campo diverso (manifest e `COMMIT` coerenti col report alterato): stop. |
+
+**Integrazione con R1 (unità R4.b).** Il piano chiede in T-M2R4-01 il job di import di R1 su K file più la calibrazione, e in T-M2R4-05 anche la cache delle thumbnails di R1. R4 è stato sviluppato in parallelo a R1: il suo workflow ha solo nodi di calibrazione e la sua cache è `artifacts/`. R1 è ora nel branch; l'estensione dei due test con i passi di import e con la cache delle thumbnails (che applica già `st_nlink = 1`, `cache.hardlink`) è l'unità R4.b, e solo dopo quella esecuzione F-PRJ-06 e NFR-SEC-03 possono essere chiusi. Fino ad allora le due parti R1 sono prove pianificate, non eseguite.
 
 ## Fuori da M2
 

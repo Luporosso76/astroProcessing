@@ -50,7 +50,7 @@ void check_rel_path(const std::string& rel, std::set<std::string>& seen) {
     if (slash == std::string::npos) break;
     start = slash + 1;
   }
-  if (rel == "manifest.json" || rel == "COMMIT") bad_path(rel, "rel_path riservato");
+  if (rel == "manifest.json" || rel == "COMMIT" || rel == export_report_name) bad_path(rel, "rel_path riservato");
   if (!seen.insert(rel).second) bad_path(rel, "rel_path duplicato");
 }
 
@@ -116,10 +116,15 @@ node_spec parse_node(const json& n) {
 
 export_manifest parse_manifest(const std::string& text) {
   const json doc = parse_json(text);
-  if (doc.type() != json::kind::object || doc.keys().size() != 4) malformed("il manifest deve avere 4 campi");
+  if (doc.type() != json::kind::object || doc.keys().size() != 5) malformed("il manifest deve avere 5 campi");
   if (field(doc, "format", json::kind::string).as_string() != export_format) malformed("formato sconosciuto");
   check_versions(field(doc, "versions", json::kind::object));
   export_manifest out;
+  const json& report = field(doc, "report", json::kind::object);
+  if (report.keys().size() != 3 || field(report, "rel_path", json::kind::string).as_string() != export_report_name) {
+    malformed("campo report non valido");
+  }
+  out.report = content_digest{hex_field(report, "sha256"), unsigned_field(report, "size_bytes")};
   std::set<std::string> seen;
   for (const auto& f : field(doc, "files", json::kind::array).items()) {
     out.files.push_back(parse_file(f));
@@ -143,6 +148,55 @@ export_manifest parse_manifest(const std::string& text) {
     if (node_keys.count(f.node_key) == 0) malformed("file con nodo assente dal manifest", {{"node_key", f.node_key}});
   }
   return out;
+}
+
+[[noreturn]] void report_mismatch(const std::string& why) {
+  throw stop_error(error_category::integrity, "export.report_mismatch", "il report di export non corrisponde al manifest",
+                   {{"motivo", why}});
+}
+
+// Report di export (ADR-04, estensione R4): JSON canonico, formato noto, stesso elenco del manifest campo per campo.
+void check_report(const std::string& text, const export_manifest& manifest) {
+  json doc;
+  try {
+    doc = parse_json(text);
+  } catch (const stop_error& e) {
+    report_mismatch("JSON non valido: " + e.code());
+  }
+  if (canonical_json(doc) != text) report_mismatch("report non canonico");
+  const auto get = [](const json& o, const char* key, json::kind kind) -> const json& {
+    const json* f = o.type() == json::kind::object ? o.find(key) : nullptr;
+    if (f == nullptr || f->type() != kind) report_mismatch(std::string("campo assente o di tipo errato: ") + key);
+    return *f;
+  };
+  if (doc.type() != json::kind::object || doc.keys().size() != 4) report_mismatch("il report deve avere 4 campi");
+  if (get(doc, "format", json::kind::string).as_string() != export_report_format) report_mismatch("formato sconosciuto");
+  if (!get(doc, "non_representable", json::kind::array).items().empty()) {
+    report_mismatch("metadati non rappresentabili dichiarati per una copia byte per byte");
+  }
+  if (get(doc, "non_representable_reason", json::kind::string).as_string().empty()) report_mismatch("motivo vuoto");
+  const std::vector<json>& files = get(doc, "files", json::kind::array).items();
+  if (files.size() != manifest.files.size()) report_mismatch("numero di file diverso dal manifest");
+  for (std::size_t i = 0; i < files.size(); ++i) {
+    const json& f = files[i];
+    const export_file_entry& m = manifest.files[i];
+    if (f.type() != json::kind::object || f.keys().size() != 8) report_mismatch("voce di file non valida");
+    const auto u64 = [&](const char* key) {
+      const std::int64_t v = get(f, key, json::kind::integer).as_integer();
+      if (v < 0) report_mismatch(std::string("intero negativo: ") + key);
+      return static_cast<std::uint64_t>(v);
+    };
+    if (get(f, "rel_path", json::kind::string).as_string() != m.rel_path || u64("size_bytes") != m.size_bytes ||
+        get(f, "sha256", json::kind::string).as_string() != m.sha256 ||
+        get(f, "slot_name", json::kind::string).as_string() != m.slot_name || u64("generation") != m.generation ||
+        get(f, "node_key", json::kind::string).as_string() != m.node_key) {
+      report_mismatch("voce diversa dal manifest: " + m.rel_path);
+    }
+    if (get(f, "kind", json::kind::string).as_string().empty()) report_mismatch("kind vuoto: " + m.rel_path);
+    if (get(f, "representation", json::kind::string).as_string() != "artifact_copy") {
+      report_mismatch("rappresentazione diversa dalla copia dell'artefatto: " + m.rel_path);
+    }
+  }
 }
 
 // Apre `rel` sotto `dirfd`. -ENOENT/-ENOTDIR: assente. Symlink o uscita dalla directory: security.
@@ -276,12 +330,21 @@ export_manifest verify_export(const fs::path& dir, const fault_injector& hook) {
     incomplete("COMMIT non corrisponde a manifest.json", "COMMIT");
   }
   if (!missing.empty()) incomplete("file mancante", missing);
+  const auto report_file = open_regular(root.get(), export_report_name);
+  if (!report_file) incomplete("report di export assente", export_report_name);
+  if (static_cast<std::uint64_t>(report_file->id.size) != manifest.report.size_bytes) {
+    incomplete("dimensione diversa", export_report_name);
+  }
+  const std::vector<std::uint8_t> report_bytes =
+      read_all(report_file->fd.get(), export_manifest_max_bytes, "export.manifest_size", export_report_name);
+  if (!(digest_of(report_bytes) == manifest.report)) incomplete("digest diverso", export_report_name);
+  check_report(std::string(report_bytes.begin(), report_bytes.end()), manifest);
   for (auto& [entry, file] : opened) {
     if (static_cast<std::uint64_t>(file.id.size) != entry->size_bytes) incomplete("dimensione diversa", entry->rel_path);
     const content_digest actual = stream_digest(file.fd.get(), entry->size_bytes, entry->rel_path);
     if (actual.size_bytes != entry->size_bytes || actual.sha256 != entry->sha256) incomplete("digest diverso", entry->rel_path);
   }
-  std::set<std::string> files{"manifest.json", "COMMIT"};
+  std::set<std::string> files{"manifest.json", "COMMIT", export_report_name};
   std::set<std::string> dirs;
   for (const auto& f : manifest.files) {
     files.insert(f.rel_path);
@@ -307,6 +370,7 @@ export_manifest verify_export(const fs::path& dir, const fault_injector& hook) {
   }
   expect_unchanged(root.get(), "manifest.json", *manifest_file);
   expect_unchanged(root.get(), "COMMIT", *commit);
+  expect_unchanged(root.get(), export_report_name, *report_file);
   for (const auto& [entry, file] : opened) expect_unchanged(root.get(), entry->rel_path, file);
   return manifest;
 }

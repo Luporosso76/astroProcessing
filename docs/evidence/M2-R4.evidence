@@ -1,0 +1,19 @@
+# Sorgente del blocco generato di M2-R4.md (tools/evidence.py)
+file docs/contracts/ADR-04-persistenza.md
+file docs/contracts/ADR-05-dag-provenance.md
+file src/core/include/astro/workflow.hpp
+file src/core/include/astro/sqlite_dag_store.hpp
+file src/core/workflow.cpp
+file src/core/sqlite_recovery.cpp
+file src/core/sqlite_project.cpp
+file src/core/sqlite_files.cpp
+file src/core/sqlite_internal.cpp
+file src/core/project_export.cpp
+file src/core/project_verify.cpp
+file src/core/job.cpp
+file tests/unit/test_recovery.cpp
+file tests/unit/powerloss_vfs.hpp
+file tests/trace/M2.tsv
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

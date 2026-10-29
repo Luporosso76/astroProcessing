@@ -5,7 +5,9 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -84,6 +86,24 @@ class transaction {
 
 void exec(sqlite3* db, const char* sql);
 
+// Identita' (st_dev, st_ino) degli originali registrati (ADR-04, regola hardlink).
+using inode_set = std::set<std::pair<std::uint64_t, std::uint64_t>>;
+inode_set original_inodes(sqlite3* db);
+
+// Regola hardlink su un file gestito dal progetto: (dev, ino) di un originale (se `originals` non e' nullo):
+// security fs.original_inode; st_nlink diverso da 1: security fs.hardlink. Nessun effetto sul file.
+void check_managed_file(const struct stat& st, const inode_set* originals, std::string_view name);
+
+struct artifact_entry {
+  bool temporary = false;
+  std::uint64_t size = 0;
+  std::uint64_t dev = 0;
+  std::uint64_t ino = 0;
+};
+// Voci di artifacts/ senza scritture: symlink (security store.symlink), voci inattese (security
+// store.unexpected_entry), regola hardlink senza originali (security fs.hardlink).
+std::map<std::string, artifact_entry> scan_artifacts(int dirfd);
+
 // Sorgente di byte a blocchi: restituisce i byte scritti nel buffer, 0 a fine flusso.
 using byte_reader = std::function<std::size_t(std::span<std::uint8_t>)>;
 
@@ -100,6 +120,13 @@ struct atomic_options {
   // Il nome finale esistente viene sostituito (rename atomico) invece di essere un conflitto.
   bool replace = false;
   const fault_injector* injector = nullptr;
+  // File gestiti dal progetto: regola hardlink sul file esistente col nome finale, prima del temporaneo se il nome e'
+  // noto (final_name, o known_name calcolato da atomic_write) e di nuovo sul file riusato (EEXIST).
+  bool managed = false;
+  const inode_set* originals = nullptr;
+  std::string known_name;
+  // Eventi della scrittura riuscita (solo test di perdita di energia).
+  const fs_observer* observer = nullptr;
 };
 struct atomic_result {
   std::string name;

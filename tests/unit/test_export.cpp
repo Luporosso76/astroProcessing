@@ -61,6 +61,13 @@ std::string manifest_text(const std::vector<export_file_entry>& files, const std
     node_array.push(std::move(o));
   }
   json doc = json::object();
+  // Campo `report` ben formato (ADR-04, estensione R4): questi manifest si fermano prima della verifica del report.
+  const content_digest report = digest_of(bytes_of("{}"));
+  json report_entry = json::object();
+  report_entry.set("rel_path", json::string(export_report_name));
+  report_entry.set("sha256", json::string(report.sha256));
+  report_entry.set("size_bytes", json::uinteger(report.size_bytes));
+  doc.set("report", std::move(report_entry));
   doc.set("format", json::string("astro.export.v1"));
   json versions = json::object();
   for (const char* k : {"product", "source_revision", "cfitsio", "sqlite", "openssl"}) versions.set(k, json::string("x"));
@@ -176,7 +183,12 @@ TEST(Export, T_M2R0_03_enospc_at_every_export_write_point_stops_io_and_leaves_no
     dry.store->export_slots(dry.project.parent_path() / "r0b03_dry_export", {"sb", "sd"});
   });
   dry.store.reset();
-  ASSERT_GE(points.size(), 16u);
+  // 5 file (2 artefatti, report di export, manifest, COMMIT) con 5 punti ciascuno, piu' mkdir.
+  ASSERT_GE(points.size(), 21u);
+  for (const char* p : {"export.report.create", "export.report.write", "export.report.fsync_file", "export.report.rename",
+                        "export.report.fsync_dir"}) {
+    EXPECT_NE(std::find(points.begin(), points.end(), p), points.end()) << "punto del report di export non provato: " << p;
+  }
   const auto stored_files = [](const fs::path& project) {
     std::map<std::string, std::string> out;
     for (const auto& e : fs::directory_iterator(project / "artifacts")) out[e.path().filename().string()] = read_text(e.path());
@@ -321,6 +333,7 @@ TEST(Export, T_M2C_24_malicious_manifests_are_refused_without_reading_outside_th
   expect_path_refused(std::string(4097, 'a'), "percorso lungo");
   expect_path_refused("manifest.json", "riservato");
   expect_path_refused("COMMIT", "riservato");
+  expect_path_refused(export_report_name, "riservato (report di export)");
   expect_path_refused("link", "symlink verso fuori", [&](const fs::path& d) { fs::create_symlink(outside / "secret", d / "link"); });
   expect_path_refused("d/secret", "directory symlink", [&](const fs::path& d) { fs::create_directory_symlink(outside, d / "d"); });
   expect_path_refused("fifo", "fifo", [](const fs::path& d) { ASSERT_EQ(::mkfifo((d / "fifo").c_str(), 0600), 0); });

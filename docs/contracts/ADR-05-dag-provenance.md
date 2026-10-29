@@ -85,7 +85,10 @@ Ogni risultato pubblicabile ha uno slot (tabella `slots` di ADR-04) con `current
 - ledger delle correzioni applicate e omesse ([ADR-16](ADR-16-stati-master.md)) e modello di varianza ([ADR-17](ADR-17-varianza.md)), per i nodi di calibrazione;
 - avvisi;
 - digest degli output, solo se `completed`;
-- arresto: categoria, codice, messaggio, contesto (provenance dell'arresto, NFR-FBK-01).
+- arresto: categoria, codice, messaggio, contesto (provenance dell'arresto, NFR-FBK-01);
+- resume (estensione R4, F-PRJ-06): solo per un job eseguito da `resume_workflow` ([ADR-04](ADR-04-persistenza.md#workflow-e-resume-d15-d16)), campo `resume` con `workflow` (nome), `definition_sha256` (SHA-256 della definizione registrata) e `reused`: per ogni passo riusato, slot, `node_key`, generazione e digest degli artefatti riverificati. Un job eseguito fuori da un resume non ha il campo, quindi la sua provenance resta byte per byte quella di prima.
+
+Il riuso di un passo sicuro non apre un job e non scrive provenance. Le esecuzioni concluse di un nodo (riuscite o fermate) sono le sue provenance; i tentativi avviati sono i suoi job, compresi quelli `interrupted` (T-M2R4-01). Un job ucciso prima del commit non lascia provenance: resta `interrupted` nella tabella `jobs` ed entra nel report di recovery. Un job ucciso dopo il commit è `completed` e ha la sua provenance.
 
 Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita resta 2 (3 per `cancelled`); non si scrive provenance altrove.
 
@@ -106,6 +109,7 @@ Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita re
 | T-M2B-11 | Versione di schema esclusa dalla chiave. |
 | T-M2B-12 | Ogni categoria al confine: exit 2 (3 per `cancelled`), job marcato, prenotazioni rilasciate. |
 | T-M2B-13 | `fits.decode`: cambiare `fits_read_options` o un valore `declare_metadata` cambia `node_key`; stessi parametri, stessa chiave. Da implementare in M2.b. |
+| T-M2R4-01 | Estensione R4: la provenance di un job eseguito da un resume ha il campo `resume` con i passi riusati; un passo riusato non aggiunge provenance. |
 
 ## Aggiunte di R1: nodi di import, thumbnail e rebuild; fase e linearità nella provenance
 

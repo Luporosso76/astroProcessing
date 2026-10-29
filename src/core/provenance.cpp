@@ -107,6 +107,7 @@ json provenance_json(const provenance_record& r) {
   if (r.stop) doc.set("stop", stop_json(*r.stop));
   if (r.budget) doc.set("budget", budget_json(*r.budget));
   if (r.details) doc.set("details", *r.details);
+  if (r.resume) doc.set("resume", *r.resume);
   return doc;
 }
 

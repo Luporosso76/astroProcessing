@@ -91,6 +91,7 @@ job_outcome stopped(dag_store& store, sqlite_dag_store* durable, const job_recor
     if (cause.category() != e.category() || cause.code() != e.code()) subsequent = e;
     provenance_record provenance{spec, current_library_versions(), job.generation, after.state,
                                  std::move(warnings), {}, cause, budget};
+    if (durable != nullptr) provenance.resume = durable->resume_context();
     std::optional<stop_error> not_persisted;
     if (durable != nullptr) {
       try {
@@ -125,6 +126,7 @@ job_outcome stopped(dag_store& store, sqlite_dag_store* durable, const job_recor
     if (durable != nullptr && after.state != job_state::completed) {
       provenance_record provenance{spec, current_library_versions(), job.generation, after.state,
                                    std::move(warnings), {}, persisted_cause(after, nullptr), budget};
+      provenance.resume = durable->resume_context();
       persist_provenance(*durable, job, provenance);
     }
   } catch (...) {
@@ -183,6 +185,7 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
     for (const stored_file& f : result.files) digests.push_back(f.digest());
     provenance.emplace(provenance_record{spec, current_library_versions(), job.generation, job_state::completed, warnings,
                                          std::move(digests), std::nullopt, budget, std::move(result.details)});
+    provenance->resume = store.resume_context();
     std::vector<stored_file> files = std::move(result.files);
     files.push_back(write_provenance(store, *provenance));
     store.commit_job(job.id, files);

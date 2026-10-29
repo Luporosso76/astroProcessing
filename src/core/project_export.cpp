@@ -68,6 +68,12 @@ void check_destination(int parent_fd, const std::string& name, const fs::path& d
   }
   struct stat st {};
   if (::fstatat(parent_fd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0) {
+    for (const auto& in : inputs) {
+      if (in.dev == static_cast<std::uint64_t>(st.st_dev) && in.ino == static_cast<std::uint64_t>(st.st_ino)) {
+        throw stop_error(error_category::security, "fs.original_inode", "la destinazione e' lo stesso inode di un originale",
+                         {{"destinazione", dir.string()}, {"originale", in.path}});
+      }
+    }
     throw stop_error(error_category::security, "export.target_exists", "la destinazione esiste gia'",
                      {{"destinazione", dir.string()}});
   }
@@ -109,7 +115,33 @@ json versions_object() {
   return o;
 }
 
-std::string manifest_text(const std::vector<export_item>& items, const std::map<std::string, node_spec>& chain) {
+// Report di export (ADR-04, estensione R4): ogni file e' la copia byte per byte dell'artefatto, nessun metadato perso.
+std::string report_text(const std::vector<export_item>& items) {
+  json files = json::array();
+  for (const auto& it : items) {
+    json f = json::object();
+    f.set("rel_path", json::string(it.rel_path));
+    f.set("size_bytes", json::uinteger(it.artifact.size_bytes));
+    f.set("sha256", json::string(it.artifact.sha256));
+    f.set("slot_name", json::string(it.slot_name));
+    f.set("generation", json::uinteger(it.artifact.generation));
+    f.set("node_key", json::string(it.artifact.node_key));
+    f.set("kind", json::string(it.artifact.kind));
+    f.set("representation", json::string("artifact_copy"));
+    files.push(std::move(f));
+  }
+  json doc = json::object();
+  doc.set("format", json::string(export_report_format));
+  doc.set("files", std::move(files));
+  doc.set("non_representable", json::array());
+  doc.set("non_representable_reason",
+          json::string("nessuna conversione di formato: ogni file è la copia byte per byte dell'artefatto, con maschere, "
+                       "varianza e metadati dell'artefatto"));
+  return canonical_json(doc);
+}
+
+std::string manifest_text(const std::vector<export_item>& items, const std::map<std::string, node_spec>& chain,
+                          const content_digest& report) {
   json files = json::array();
   for (const auto& it : items) {
     json f = json::object();
@@ -131,6 +163,11 @@ std::string manifest_text(const std::vector<export_item>& items, const std::map<
   doc.set("versions", versions_object());
   doc.set("files", std::move(files));
   doc.set("nodes", std::move(nodes));
+  json report_entry = json::object();
+  report_entry.set("rel_path", json::string(export_report_name));
+  report_entry.set("sha256", json::string(report.sha256));
+  report_entry.set("size_bytes", json::uinteger(report.size_bytes));
+  doc.set("report", std::move(report_entry));
   return canonical_json(doc);
 }
 
@@ -151,13 +188,15 @@ void write_export_file(int dirfd, const std::string& prefix, const std::string& 
 }
 
 // Copia in streaming l'artefatto nel bundle; il digest del record e' verificato mentre si scrive.
-void copy_artifact(int artifacts_fd, int out_fd, const export_item& item, const fault_injector& injector) {
+void copy_artifact(int artifacts_fd, int out_fd, const export_item& item, const inode_set& originals,
+                   const fault_injector& injector) {
   unique_fd src(::openat(artifacts_fd, item.artifact.rel_path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
   if (!src) throw_errno(error_category::io, "store.artifact_missing", "apertura dell'artefatto fallita", errno, {{"rel_path", item.artifact.rel_path}});
   struct stat st {};
   if (::fstat(src.get(), &st) != 0) {
     throw_errno(error_category::io, "export.artifact_stat", "fstat dell'artefatto fallita", errno, {{"rel_path", item.artifact.rel_path}});
   }
+  if (S_ISREG(st.st_mode)) check_managed_file(st, &originals, item.artifact.rel_path);
   if (!S_ISREG(st.st_mode) || static_cast<std::uint64_t>(st.st_size) != item.artifact.size_bytes) {
     throw stop_error(error_category::integrity, "export.artifact_corrupt", "il file dell'artefatto non corrisponde al record",
                      {{"rel_path", item.artifact.rel_path}});
@@ -201,7 +240,10 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
   const fs::path parent = dir.has_parent_path() ? dir.parent_path() : fs::path(".");
   const unique_fd parent_fd(::open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));
   if (!parent_fd) throw_errno(error_category::io, "export.write", "apertura della directory padre fallita", errno, {{"padre", parent.string()}});
-  check_destination(parent_fd.get(), leaf, dir, root_fd_, inputs());
+  const std::vector<input_record> registered = inputs();
+  inode_set originals;
+  for (const auto& in : registered) originals.insert({in.dev, in.ino});
+  check_destination(parent_fd.get(), leaf, dir, root_fd_, registered);
   const unique_fd artifacts = open_dir_nofollow(root_fd_, "artifacts", "store.symlink");
   std::vector<export_item> items;
   std::map<std::string, node_spec> chain;
@@ -212,14 +254,25 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
                        {{"slot", name}, {"stato", view.state == freshness::stale ? "stale" : "missing"}});
     }
     export_item item{name, *view.artifact, name + view.artifact->rel_path.substr(64)};
-    if (item.rel_path == "manifest.json" || item.rel_path == "COMMIT") {
+    if (item.rel_path == "manifest.json" || item.rel_path == "COMMIT" || item.rel_path == export_report_name) {
       throw stop_error(error_category::invalid_input, "export.slot_name", "il nome dello slot collide con un file riservato",
                        {{"slot", name}});
     }
     add_ancestors(*this, item.artifact.node_key, chain);
     items.push_back(std::move(item));
   }
-  const std::string manifest = manifest_text(items, chain);
+  // Regola hardlink su ogni artefatto da copiare, prima di creare la destinazione.
+  for (const auto& it : items) {
+    struct stat st {};
+    if (::fstatat(artifacts.get(), it.artifact.rel_path.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
+      throw_errno(error_category::io, "store.artifact_missing", "stat dell'artefatto fallita", errno,
+                  {{"rel_path", it.artifact.rel_path}});
+    }
+    if (S_ISREG(st.st_mode)) check_managed_file(st, &originals, it.artifact.rel_path);
+  }
+  const std::string report = report_text(items);
+  const std::span<const std::uint8_t> report_bytes(reinterpret_cast<const std::uint8_t*>(report.data()), report.size());
+  const std::string manifest = manifest_text(items, chain, digest_of(report_bytes));
   const std::span<const std::uint8_t> manifest_bytes(reinterpret_cast<const std::uint8_t*>(manifest.data()), manifest.size());
   const std::string manifest_digest = sha256_hex(manifest_bytes);
 
@@ -235,7 +288,8 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
     throw_errno(error_category::io, "export.write", "mkdir della destinazione fallita", errno, {{"destinazione", dir.string()}});
   }
   const unique_fd out = open_dir_nofollow(parent_fd.get(), leaf.c_str(), "export.target_exists");
-  for (const auto& it : items) copy_artifact(artifacts.get(), out.get(), it, fault_);
+  for (const auto& it : items) copy_artifact(artifacts.get(), out.get(), it, originals, fault_);
+  write_export_file(out.get(), "export.report", export_report_name, report_bytes, fault_);
   write_export_file(out.get(), "export.manifest", "manifest.json", manifest_bytes, fault_);
   try {
     write_export_file(out.get(), "export.commit", "COMMIT",

@@ -51,6 +51,7 @@ add_library(astrocore STATIC
   sqlite_dag_store.cpp
   sqlite_files.cpp
   sqlite_history.cpp
+  sqlite_recovery.cpp
   project_export.cpp
   project_verify.cpp
   calibration.cpp
@@ -60,6 +61,7 @@ add_library(astrocore STATIC
   inventory.cpp
   thumbnail_cache.cpp
   import_job.cpp
+  workflow.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
 add_dependencies(astrocore astro_source_revision)

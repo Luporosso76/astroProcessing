@@ -37,6 +37,8 @@ struct provenance_record {
   std::optional<budget_snapshot> budget = std::nullopt;  // fotografato nel preflight e fisso per tutto il job
   // Osservazioni del job (file letti, esito della cache): serializzate come `details` solo se presenti (ADR-05, R1).
   std::optional<json> details = std::nullopt;
+  // Solo per un job eseguito da resume_workflow (ADR-05, estensione R4); assente, il campo non compare nel JSON.
+  std::optional<json> resume = std::nullopt;
 };
 
 json provenance_json(const provenance_record& record);

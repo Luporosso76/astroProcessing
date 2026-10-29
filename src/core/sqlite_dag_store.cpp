@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <set>
 
 #include "astro/sqlite_dag_store.hpp"
@@ -43,7 +44,7 @@ error_category category_from(const std::string& text) {
   throw stop_error(error_category::integrity, "store.stop_category", "categoria di arresto sconosciuta", {{"categoria", text}});
 }
 
-constexpr const char* artifact_columns = "id, node_key, generation, rel_path, size_bytes, sha256, kind, present, output_role";
+constexpr const char* artifact_columns = "id, node_key, generation, rel_path, size_bytes, sha256, kind, present, output_role, job_id";
 constexpr const char* slot_columns = "slot_name, current_generation, target_node_key, artifact_id, detached";
 
 artifact_record artifact_from(const statement& st, int first = 0) {
@@ -57,6 +58,7 @@ artifact_record artifact_from(const statement& st, int first = 0) {
   a.kind = st.text(first + 6);
   a.present = st.integer(first + 7) == 1;
   a.output_role = st.text(first + 8);
+  a.job_id = st.opt_u64(first + 9);
   return a;
 }
 
@@ -486,10 +488,23 @@ input_record sqlite_dag_store::add_input(input_record input) {
     throw stop_error(error_category::invalid_input, "store.bad_input", "record di input non valido",
                      {{"path", input.path}});
   }
+  struct stat st {};
+  if (::stat(input.path.c_str(), &st) != 0) {
+    if (errno == ENOENT || errno == ENOTDIR) {
+      throw stop_error(error_category::io, "input.missing", "originale assente", {{"path", input.path}});
+    }
+    throw_errno(error_category::io, "store.stat", "stat dell'originale fallita", errno, {{"path", input.path}});
+  }
+  if (!S_ISREG(st.st_mode)) {
+    throw stop_error(error_category::invalid_input, "store.bad_input", "l'originale non e' un file regolare", {{"path", input.path}});
+  }
+  input.dev = static_cast<std::uint64_t>(st.st_dev);
+  input.ino = static_cast<std::uint64_t>(st.st_ino);
   std::lock_guard lock(mutex_);
   transaction tx(db_);
-  statement ins(db_, "INSERT INTO inputs(path, size_bytes, sha256, role) VALUES(?1,?2,?3,?4)");
-  ins.bind(1, input.path).bind_u64(2, input.size_bytes).bind(3, input.sha256).bind(4, input.role).run();
+  statement ins(db_, "INSERT INTO inputs(path, size_bytes, sha256, role, dev, ino) VALUES(?1,?2,?3,?4,?5,?6)");
+  ins.bind(1, input.path).bind_u64(2, input.size_bytes).bind(3, input.sha256).bind(4, input.role);
+  ins.bind_u64(5, input.dev).bind_u64(6, input.ino).run();
   input.id = static_cast<std::uint64_t>(sqlite3_last_insert_rowid(db_));
   tx.commit();
   return input;
@@ -497,9 +512,9 @@ input_record sqlite_dag_store::add_input(input_record input) {
 
 std::vector<input_record> sqlite_dag_store::inputs() const {
   std::lock_guard lock(mutex_);
-  statement st(db_, "SELECT id, path, size_bytes, sha256, role FROM inputs ORDER BY id");
+  statement st(db_, "SELECT id, path, size_bytes, sha256, role, dev, ino FROM inputs ORDER BY id");
   std::vector<input_record> out;
-  while (st.step()) out.push_back(input_record{st.u64(0), st.text(1), st.u64(2), st.text(3), st.text(4)});
+  while (st.step()) out.push_back(input_record{st.u64(0), st.text(1), st.u64(2), st.text(3), st.text(4), st.u64(5), st.u64(6)});
   return out;
 }
 

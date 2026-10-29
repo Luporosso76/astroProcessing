@@ -23,7 +23,7 @@ namespace {
 
 constexpr const char* schema_v1[] = {
     "CREATE TABLE inputs(id INTEGER PRIMARY KEY, path TEXT NOT NULL, size_bytes INTEGER NOT NULL, "
-    "sha256 TEXT NOT NULL CHECK(length(sha256)=64), role TEXT NOT NULL) STRICT",
+    "sha256 TEXT NOT NULL CHECK(length(sha256)=64), role TEXT NOT NULL, dev INTEGER NOT NULL, ino INTEGER NOT NULL) STRICT",
     "CREATE TABLE nodes(node_key TEXT PRIMARY KEY, operator_id TEXT NOT NULL, algorithm_version INTEGER NOT NULL, "
     "serialization_version INTEGER NOT NULL, params_canonical TEXT NOT NULL, precision TEXT NOT NULL, "
     "backend TEXT NOT NULL, seed TEXT) STRICT",
@@ -33,7 +33,8 @@ constexpr const char* schema_v1[] = {
     "CHECK((parent_key IS NOT NULL) <> (input_sha256 IS NOT NULL))) STRICT",
     "CREATE TABLE artifacts(id INTEGER PRIMARY KEY, node_key TEXT NOT NULL REFERENCES nodes(node_key), "
     "generation INTEGER NOT NULL, rel_path TEXT NOT NULL, size_bytes INTEGER NOT NULL, sha256 TEXT NOT NULL, "
-    "kind TEXT NOT NULL, present INTEGER NOT NULL CHECK(present IN (0,1)), output_role TEXT NOT NULL) STRICT",
+    "kind TEXT NOT NULL, present INTEGER NOT NULL CHECK(present IN (0,1)), output_role TEXT NOT NULL, "
+    "job_id INTEGER REFERENCES jobs(id)) STRICT",
     "CREATE TABLE slots(slot_name TEXT PRIMARY KEY, current_generation INTEGER NOT NULL, "
     "target_node_key TEXT REFERENCES nodes(node_key), artifact_id INTEGER REFERENCES artifacts(id), "
     "publish_role TEXT NOT NULL DEFAULT 'primary', detached INTEGER NOT NULL DEFAULT 0 CHECK(detached IN (0,1)), "
@@ -48,6 +49,7 @@ constexpr const char* schema_v1[] = {
     "CREATE TABLE history_cursor(id INTEGER PRIMARY KEY CHECK(id=1), "
     "current_snapshot_id INTEGER REFERENCES snapshots(id), redo_snapshot_id INTEGER REFERENCES snapshots(id)) STRICT",
     "CREATE TABLE settings(key TEXT PRIMARY KEY, value_canonical TEXT NOT NULL) STRICT",
+    "CREATE TABLE recovery_reports(id INTEGER PRIMARY KEY, report_canonical TEXT NOT NULL) STRICT",
     "INSERT INTO history_cursor(id, current_snapshot_id, redo_snapshot_id) VALUES(1, NULL, NULL)",
     "CREATE TRIGGER nodes_immutable_update BEFORE UPDATE ON nodes BEGIN SELECT RAISE(ABORT,'nodes e immutabile'); END",
     "CREATE TRIGGER nodes_immutable_delete BEFORE DELETE ON nodes BEGIN SELECT RAISE(ABORT,'nodes e immutabile'); END",
@@ -57,6 +59,8 @@ constexpr const char* schema_v1[] = {
     "CREATE TRIGGER snapshots_immutable_delete BEFORE DELETE ON snapshots BEGIN SELECT RAISE(ABORT,'snapshots e immutabile'); END",
     "CREATE TRIGGER entries_immutable_update BEFORE UPDATE ON snapshot_entries BEGIN SELECT RAISE(ABORT,'snapshot_entries e immutabile'); END",
     "CREATE TRIGGER entries_immutable_delete BEFORE DELETE ON snapshot_entries BEGIN SELECT RAISE(ABORT,'snapshot_entries e immutabile'); END",
+    "CREATE TRIGGER recovery_reports_immutable_update BEFORE UPDATE ON recovery_reports BEGIN SELECT RAISE(ABORT,'recovery_reports e immutabile'); END",
+    "CREATE TRIGGER recovery_reports_immutable_delete BEFORE DELETE ON recovery_reports BEGIN SELECT RAISE(ABORT,'recovery_reports e immutabile'); END",
 };
 
 struct header_fields {
@@ -249,12 +253,19 @@ std::unique_ptr<sqlite_dag_store> sqlite_dag_store::open(const fs::path& root, o
     throw_errno(error_category::io, "store.open", "apertura di project.lock fallita", errno, {{"progetto", root.string()}});
   }
   lock_exclusive(s->lock_fd_, root);
+  s->observer_ = options.observer;
   s->open_database(intent, options);
   return s;
 }
 
 void sqlite_dag_store::open_database(open_intent intent, const open_options& options) {
   const header_fields header = read_header(root_fd_, root_);
+  // Regola hardlink prima di ogni connessione (la connessione in lettura-scrittura crea -wal e -shm).
+  check_database_links();
+  if (intent == open_intent::read_write) {
+    const unique_fd dir = open_dir_nofollow(root_fd_, "artifacts", "store.symlink");
+    (void)scan_artifacts(dir.get());
+  }
   const bool wal = wal_pending();
   auto connect_readonly = [&](open_mode mode) {
     if (wal) {
@@ -282,7 +293,8 @@ void sqlite_dag_store::open_database(open_intent intent, const open_options& opt
     return;
   }
   const std::string db_path = (root_ / "project.db").string();
-  const int rc = sqlite3_open_v2(db_path.c_str(), &db_, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, nullptr);
+  const int rc = sqlite3_open_v2(db_path.c_str(), &db_, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX,
+                                 options.vfs.empty() ? nullptr : options.vfs.c_str());
   if (rc != SQLITE_OK) throw_sql(db_, rc, "apertura in lettura-scrittura fallita");
   // Finche' la versione non e' nota, la chiusura non deve applicare il WAL al database.
   sqlite3_db_config(db_, SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, 1, nullptr);
@@ -390,59 +402,6 @@ void sqlite_dag_store::migrate(std::uint32_t from_version, const open_options& o
   } catch (const stop_error& e) {
     rethrow_as(e, error_category::schema, "store.migration_failed", "migrazione fallita, versione precedente intatta");
   }
-}
-
-void sqlite_dag_store::recover() {
-  struct found {
-    bool temporary = false;
-    std::uint64_t size = 0;
-  };
-  std::map<std::string, found> entries;
-  const unique_fd dir = open_dir_nofollow(root_fd_, "artifacts", "store.symlink");
-  for (const std::string& name : read_directory(dir.get(), "store.opendir")) {
-    struct stat st {};
-    if (::fstatat(dir.get(), name.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
-      throw_errno(error_category::io, "store.stat", "fstatat fallita", errno, {{"file", name}});
-    }
-    if (S_ISLNK(st.st_mode)) {
-      throw stop_error(error_category::security, "store.symlink", "symlink in artifacts/: recovery fermata", {{"file", name}});
-    }
-    const bool temporary = name.rfind(".tmp-", 0) == 0;
-    if (!S_ISREG(st.st_mode) || (!temporary && !valid_artifact_name(name))) {
-      throw stop_error(error_category::security, "store.unexpected_entry", "voce inattesa in artifacts/", {{"file", name}});
-    }
-    entries[name] = found{temporary, static_cast<std::uint64_t>(st.st_size)};
-  }
-
-  std::set<std::string> referenced;
-  {
-    transaction tx(db_);
-    statement running(db_, "SELECT id FROM jobs WHERE state IN ('running','queued') ORDER BY id");
-    while (running.step()) recovery_.interrupted_jobs.push_back(running.u64(0));
-    exec(db_, "UPDATE jobs SET state='interrupted' WHERE state IN ('running','queued')");
-    statement rows(db_, "SELECT id, rel_path, size_bytes, present FROM artifacts ORDER BY id");
-    statement mark(db_, "UPDATE artifacts SET present=0 WHERE id=?1");
-    while (rows.step()) {
-      const std::string rel = rows.text(1);
-      referenced.insert(rel);
-      const auto it = entries.find(rel);
-      const bool intact = it != entries.end() && !it->second.temporary && it->second.size == rows.u64(2);
-      if (!intact && rows.integer(3) == 1) {
-        mark.bind(1, rows.integer(0));
-        mark.run();
-        recovery_.artifacts_marked_absent.push_back(rows.u64(0));
-      }
-    }
-    tx.commit();
-  }
-  for (const auto& [name, info] : entries) {
-    if (!info.temporary && referenced.count(name) != 0) continue;
-    if (::unlinkat(dir.get(), name.c_str(), 0) != 0) {
-      throw_errno(error_category::io, "store.unlink", "rimozione dell'orfano fallita", errno, {{"file", name}});
-    }
-    (info.temporary ? recovery_.removed_temporaries : recovery_.removed_orphans).push_back(name);
-  }
-  if (!entries.empty()) fsync_fd(dir.get(), "store.fsync", "artifacts");
 }
 
 }  // namespace astro

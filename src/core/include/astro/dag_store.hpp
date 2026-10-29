@@ -30,6 +30,8 @@ struct artifact_record {
   std::string rel_path;
   // Ruolo dell'output del job; lo slot pubblica l'artefatto del proprio ruolo (default `primary`).
   std::string output_role = "primary";
+  // Job che ha inserito la riga con un commit (store durevole, ADR-04 estensione R4); nullo fuori da un commit.
+  std::optional<std::uint64_t> job_id;
 };
 
 struct slot_record {

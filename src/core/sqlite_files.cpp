@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <set>
 
 #include "astro/sqlite_dag_store.hpp"
@@ -75,6 +76,17 @@ std::vector<stored_file> sqlite_dag_store::write_files(const std::vector<artifac
     }
   }
   const unique_fd dir = open_dir_nofollow(root_fd_, "artifacts", "store.symlink");
+  const inode_set originals = original_inodes(db_);
+  // Regola hardlink su tutti i nomi finali prima della prima scrittura: un rifiuto non lascia file degli altri output.
+  for (const auto& f : files) {
+    const std::string name = digest_of(f.bytes).sha256 + "." + f.extension;
+    struct stat st {};
+    if (::fstatat(dir.get(), name.c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
+      if (errno == ENOENT) continue;
+      throw_errno(error_category::io, "store.stat", "stat del nome finale fallita", errno, {{"file", name}});
+    }
+    if (S_ISREG(st.st_mode)) check_managed_file(st, &originals, name);
+  }
   std::vector<stored_file> out;
   for (const auto& f : files) {
     atomic_options options;
@@ -83,6 +95,9 @@ std::vector<stored_file> sqlite_dag_store::write_files(const std::vector<artifac
     options.conflict_code = "store.digest_name_conflict";
     options.extension = f.extension;
     options.injector = &fault_;
+    options.managed = true;
+    options.originals = &originals;
+    options.observer = &observer_;
     const atomic_result r = atomic_write(options, f.bytes, f.expected);
     const std::uint64_t token = next_token_++;
     out.push_back(stored_file(r.name, r.digest, f.kind, f.role, store_id_, file_identity(r.final_stat), token));
@@ -134,14 +149,14 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
   role_q.bind(1, slot_name).step();
   const std::string publish_role = role_q.text(0);
   std::vector<artifact_record> records;
-  statement ins(db_, "INSERT INTO artifacts(node_key, generation, rel_path, size_bytes, sha256, kind, present, output_role) "
-                     "VALUES(?1,?2,?3,?4,?5,?6,1,?7)");
+  statement ins(db_, "INSERT INTO artifacts(node_key, generation, rel_path, size_bytes, sha256, kind, present, output_role, job_id) "
+                     "VALUES(?1,?2,?3,?4,?5,?6,1,?7,?8)");
   const artifact_record* published = nullptr;
   const bool current = !slot.detached && slot.current_generation == generation;
   for (const auto& f : files) {
     if (!current && f.role() == provenance_output_role) continue;
     ins.bind(1, node_key).bind_u64(2, generation).bind(3, f.rel_path()).bind_u64(4, f.digest().size_bytes);
-    ins.bind(5, f.digest().sha256).bind(6, f.kind()).bind(7, f.role()).run();
+    ins.bind(5, f.digest().sha256).bind(6, f.kind()).bind(7, f.role()).bind_u64(8, job_id).run();
     artifact_record a;
     a.id = static_cast<std::uint64_t>(sqlite3_last_insert_rowid(db_));
     a.node_key = node_key;
@@ -151,6 +166,7 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
     a.kind = f.kind();
     a.rel_path = f.rel_path();
     a.output_role = f.role();
+    a.job_id = job_id;
     records.push_back(std::move(a));
     check_fault("commit.row");
   }
