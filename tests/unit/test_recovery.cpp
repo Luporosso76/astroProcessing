@@ -5,6 +5,7 @@
 
 #include <set>
 
+#include "astro/import_job.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/workflow.hpp"
 #include "calib_support.hpp"
@@ -26,6 +27,12 @@ struct frames {
 };
 
 std::string slot_of(std::size_t k) { return "cal" + std::to_string(k); }
+std::string import_slot_of(std::size_t k) { return "imp" + std::to_string(k); }
+
+// Passi del workflow: prima `imports` passi di import (sui primi light), poi un passo di calibrazione per ricetta.
+std::string step_slot(std::size_t step, std::size_t imports) {
+  return step < imports ? import_slot_of(step) : slot_of(step - imports);
+}
 
 frames make_frames(const std::string& name, std::size_t k_count) {
   const fs::path dir = st::fresh_dir(name + "_frames");
@@ -58,12 +65,25 @@ frames make_frames(const std::string& name, std::size_t k_count) {
 
 content_digest file_digest(const fs::path& p) { return digest_of(st::bytes_of(st::read_text(p))); }
 
-// Progetto con gli originali registrati, un nodo e uno slot per passo.
-void setup_project(const fs::path& dir, const frames& f) {
+import_request import_request_of(const frames& f, std::size_t k, const fault_injector& hook) {
+  import_request r;
+  r.path = f.files[k].string();
+  r.digest = file_digest(f.files[k]);
+  if (hook) r.hook = [hook](std::string_view p) { (void)hook("import." + std::string(p)); };
+  return r;
+}
+
+// Progetto con gli originali registrati, un nodo e uno slot per passo (prima gli `imports` passi di import).
+void setup_project(const fs::path& dir, const frames& f, std::size_t imports = 0) {
   auto store = sqlite_dag_store::create(dir);
   for (const fs::path& p : f.files) {
     const content_digest d = file_digest(p);
     store->add_input(input_record{0, p.string(), d.size_bytes, d.sha256, "frame"});
+  }
+  for (std::size_t k = 0; k < imports; ++k) {
+    const node_spec node = make_import_node(import_request_of(f, k, {}));
+    store->put_node(node);
+    store->create_slot(import_slot_of(k), node.key());
   }
   for (std::size_t k = 0; k < f.recipes.size(); ++k) {
     const node_spec node = make_calibration_node(f.recipes[k]);
@@ -77,10 +97,17 @@ struct runner_env {
   cancel_token cancel;
 };
 
-workflow make_workflow(sqlite_dag_store& store, const frames& f, runner_env& env, const fault_injector& hook) {
+workflow make_workflow(sqlite_dag_store& store, const frames& f, runner_env& env, const fault_injector& hook,
+                       std::size_t imports = 0) {
   workflow wf;
   wf.name = "calib";
   wf.hook = hook;
+  for (std::size_t k = 0; k < imports; ++k) {
+    const import_request req = import_request_of(f, k, hook);
+    wf.steps.push_back(workflow_step{import_slot_of(k), make_import_node(req), [&store, &env, req, k] {
+                                       return run_import_job(store, import_slot_of(k), req, env.pool, env.cancel);
+                                     }});
+  }
   for (std::size_t k = 0; k < f.recipes.size(); ++k) {
     calibration_job_options opt;
     opt.worker_count = 2;
@@ -119,29 +146,33 @@ std::vector<artifact_record> with_role(const sqlite_dag_store& store, const std:
 }
 
 // Digest di immagine e report pubblicati, per slot e ruolo.
-std::map<std::string, std::string> output_digests(const sqlite_dag_store& store, std::size_t k_count) {
+std::map<std::string, std::string> output_digests(const sqlite_dag_store& store, std::size_t k_count, std::size_t imports = 0) {
   std::map<std::string, std::string> out;
-  for (std::size_t k = 0; k < k_count; ++k) {
-    const slot_view v = store.read_slot(slot_of(k));
+  const auto collect = [&](const std::string& slot, std::initializer_list<const char*> roles) {
+    const slot_view v = store.read_slot(slot);
     if (v.state != freshness::current) {
-      ADD_FAILURE() << slot_of(k) << " non current";
-      continue;
+      ADD_FAILURE() << slot << " non current";
+      return;
     }
-    for (const char* role : {calibration_image_role, calibration_report_role, calibration_report_text_role}) {
+    for (const char* role : roles) {
       for (const auto& a : with_role(store, v.artifact->node_key, role)) {
-        if (a.generation == v.artifact->generation) out[slot_of(k) + "/" + role] = a.sha256;
+        if (a.generation == v.artifact->generation) out[slot + "/" + role] = a.sha256;
       }
     }
+  };
+  for (std::size_t k = 0; k < imports; ++k) collect(import_slot_of(k), {import_report_role, import_report_text_role});
+  for (std::size_t k = 0; k < k_count; ++k) {
+    collect(slot_of(k), {calibration_image_role, calibration_report_role, calibration_report_text_role});
   }
   return out;
 }
 
-void child_workflow(const fs::path& dir, const frames& f, const fault_injector& injector) {
+void child_workflow(const fs::path& dir, const frames& f, const fault_injector& injector, std::size_t imports = 0) {
   open_options options;
   options.fault = injector;
   auto store = sqlite_dag_store::open(dir, open_intent::read_write, options);
   runner_env env;
-  const workflow wf = make_workflow(*store, f, env, injector);
+  const workflow wf = make_workflow(*store, f, env, injector, imports);
   if (run_workflow(*store, wf).exit_code != 0) throw std::runtime_error("workflow fermato");
 }
 
@@ -158,41 +189,46 @@ json read_json_artifact(const sqlite_dag_store& store, const artifact_record& a)
   return parse_json(st::read_text(store.artifact_path(a.rel_path)));
 }
 
-TEST(Recovery, T_M2R4_01_sigkill_at_every_point_then_explicit_resume_reuses_only_safe_phases_and_matches_the_oracle) {
-  constexpr std::size_t k_count = 3;
-  const frames f = make_frames("r401", k_count);
+// SIGKILL a ogni punto di un workflow di `imports` passi di import seguiti da `k_count` calibrazioni, poi resume.
+void sigkill_matrix(const std::string& name, std::size_t imports, std::size_t k_count) {
+  const std::size_t steps = imports + k_count;
+  const frames f = make_frames(name, k_count);
+  const auto make_wf_node = [&](std::size_t step) {
+    return step < imports ? make_import_node(import_request_of(f, step, {})) : make_calibration_node(f.recipes[step - imports]);
+  };
   std::map<std::string, std::string> oracle;
   {
-    const fs::path dir = st::fresh_dir("r401_oracle");
-    setup_project(dir, f);
+    const fs::path dir = st::fresh_dir(name + "_oracle");
+    setup_project(dir, f, imports);
     auto store = sqlite_dag_store::open(dir, open_intent::read_write);
     runner_env env;
-    ASSERT_EQ(run_workflow(*store, make_workflow(*store, f, env, {})).exit_code, 0);
-    oracle = output_digests(*store, k_count);
-    ASSERT_EQ(oracle.size(), 3 * k_count);
+    ASSERT_EQ(run_workflow(*store, make_workflow(*store, f, env, {}, imports)).exit_code, 0);
+    oracle = output_digests(*store, k_count, imports);
+    ASSERT_EQ(oracle.size(), 2 * imports + 3 * k_count);
   }
   std::vector<std::string> points;
   {
-    const fs::path dir = st::fresh_dir("r401_dry");
-    setup_project(dir, f);
-    points = st::record_points([&](const fault_injector& inj) { child_workflow(dir, f, inj); });
+    const fs::path dir = st::fresh_dir(name + "_dry");
+    setup_project(dir, f, imports);
+    points = st::record_points([&](const fault_injector& inj) { child_workflow(dir, f, inj, imports); });
   }
   const std::vector<std::size_t> begins = positions(points, "workflow.step_begin");
   const std::vector<std::size_t> commits = positions(points, "commit.after_commit");
-  ASSERT_EQ(begins.size(), k_count);
-  ASSERT_EQ(commits.size(), k_count);
-  ASSERT_EQ(positions(points, "workflow.step_end").size(), k_count);
+  ASSERT_EQ(begins.size(), steps);
+  ASSERT_EQ(commits.size(), steps);
+  ASSERT_EQ(positions(points, "workflow.step_end").size(), steps);
   ASSERT_EQ(positions(points, "calib.preflight.done").size(), k_count);
+  ASSERT_EQ(positions(points, "import.digest.done").size(), imports);
 
   for (std::size_t i = 1; i <= points.size(); ++i) {
     SCOPED_TRACE("kill al punto " + std::to_string(i) + " (" + points[i - 1] + ")");
-    const fs::path dir = st::fresh_dir("r401_run");
-    setup_project(dir, f);
-    const st::child_outcome out = st::run_child([&](const fault_injector& inj) { child_workflow(dir, f, inj); }, static_cast<int>(i));
+    const fs::path dir = st::fresh_dir(name + "_run");
+    setup_project(dir, f, imports);
+    const st::child_outcome out = st::run_child([&](const fault_injector& inj) { child_workflow(dir, f, inj, imports); }, static_cast<int>(i));
     ASSERT_TRUE(out.killed) << "exit " << out.exit_code;
     std::set<std::size_t> safe;
     std::optional<std::size_t> interrupted;
-    for (std::size_t k = 0; k < k_count; ++k) {
+    for (std::size_t k = 0; k < steps; ++k) {
       if (commits[k] <= i) safe.insert(k);
       if (begins[k] < i && i < commits[k]) interrupted = k;
     }
@@ -204,16 +240,17 @@ TEST(Recovery, T_M2R4_01_sigkill_at_every_point_then_explicit_resume_reuses_only
     std::set<std::string> safe_slots;
     for (const auto& p : rep.safe_phases) {
       safe_slots.insert(p.slot_name);
-      EXPECT_EQ(p.artifact_ids.size(), 4u) << "immagine, due report e provenance verificati";
+      const bool is_import = p.slot_name.rfind("imp", 0) == 0;
+      EXPECT_EQ(p.artifact_ids.size(), is_import ? 3u : 4u) << "report (immagine) e provenance verificati";
       EXPECT_TRUE(p.defects.empty());
     }
     std::set<std::string> expected_slots;
-    for (const std::size_t k : safe) expected_slots.insert(slot_of(k));
+    for (const std::size_t k : safe) expected_slots.insert(step_slot(k, imports));
     EXPECT_EQ(safe_slots, expected_slots) << "fasi sicure elencate anche senza interventi";
     if (interrupted) {
       ASSERT_EQ(rep.incomplete_results.size(), 1u);
-      EXPECT_EQ(rep.incomplete_results[0].slot_name, slot_of(*interrupted));
-      EXPECT_EQ(rep.incomplete_results[0].node_key, make_calibration_node(f.recipes[*interrupted]).key());
+      EXPECT_EQ(rep.incomplete_results[0].slot_name, step_slot(*interrupted, imports));
+      EXPECT_EQ(rep.incomplete_results[0].node_key, make_wf_node(*interrupted).key());
     } else {
       EXPECT_TRUE(rep.incomplete_results.empty());
     }
@@ -221,7 +258,14 @@ TEST(Recovery, T_M2R4_01_sigkill_at_every_point_then_explicit_resume_reuses_only
     EXPECT_TRUE(rep.damaged_phases.empty());
     // Provenance attesa del resume: le fasi sicure del report, ciascuna con i digest dei suoi output in ordine di id.
     json reused_items = json::array();
-    for (const auto& p : rep.safe_phases) {
+    std::vector<phase_record> in_step_order;
+    for (std::size_t k = 0; k < steps; ++k) {
+      for (const auto& p : rep.safe_phases) {
+        if (p.slot_name == step_slot(k, imports)) in_step_order.push_back(p);
+      }
+    }
+    ASSERT_EQ(in_step_order.size(), rep.safe_phases.size());
+    for (const auto& p : in_step_order) {
       json digests = json::array();
       for (const auto& a : store->artifacts_for(p.node_key)) {
         if (std::find(p.artifact_ids.begin(), p.artifact_ids.end(), a.id) != p.artifact_ids.end()) digests.push(json::string(a.sha256));
@@ -236,31 +280,39 @@ TEST(Recovery, T_M2R4_01_sigkill_at_every_point_then_explicit_resume_reuses_only
     const std::string expected_reused = canonical_json(reused_items);
 
     runner_env env;
-    const workflow wf = make_workflow(*store, f, env, {});
+    const workflow wf = make_workflow(*store, f, env, {}, imports);
     const workflow_result r = resume_workflow(*store, wf);
     ASSERT_EQ(r.exit_code, 0);
-    ASSERT_EQ(r.steps.size(), k_count);
-    for (std::size_t k = 0; k < k_count; ++k) {
+    ASSERT_EQ(r.steps.size(), steps);
+    for (std::size_t k = 0; k < steps; ++k) {
       const std::string key = wf.steps[k].node.key();
-      EXPECT_EQ(r.steps[k].action, safe.count(k) != 0 ? step_action::reused : step_action::executed) << slot_of(k);
+      EXPECT_EQ(r.steps[k].action, safe.count(k) != 0 ? step_action::reused : step_action::executed) << step_slot(k, imports);
       const auto provenance = with_role(*store, key, provenance_output_role);
-      ASSERT_EQ(provenance.size(), 1u) << "esecuzioni del nodo " << slot_of(k);
-      EXPECT_EQ(jobs_of(*store, key), safe.count(k) != 0 || interrupted != k ? 1u : 2u) << slot_of(k);
+      ASSERT_EQ(provenance.size(), 1u) << "esecuzioni del nodo " << step_slot(k, imports);
+      EXPECT_EQ(jobs_of(*store, key), safe.count(k) != 0 || interrupted != k ? 1u : 2u) << step_slot(k, imports);
       const json doc = read_json_artifact(*store, provenance[0]);
       const json* resume = doc.find("resume");
       if (safe.count(k) != 0) {
         EXPECT_EQ(resume, nullptr) << "un passo riusato conserva la provenance dell'esecuzione originale";
       } else {
-        ASSERT_NE(resume, nullptr) << slot_of(k);
+        ASSERT_NE(resume, nullptr) << step_slot(k, imports);
         EXPECT_EQ(resume->keys(), (std::vector<std::string>{"definition_sha256", "reused", "workflow"}));
         EXPECT_EQ(resume->find("workflow")->as_string(), "calib");
         const std::string definition = *store->get_setting("workflow.calib");
         EXPECT_EQ(resume->find("definition_sha256")->as_string(), sha256_hex(st::bytes_of(definition)));
-        EXPECT_EQ(canonical_json(*resume->find("reused")), expected_reused) << "passi riusati: tutti e solo i sicuri, in ordine";
+        EXPECT_EQ(canonical_json(*resume->find("reused")), expected_reused) << "passi riusati: tutti e solo i sicuri, nell'ordine dei passi";
       }
     }
-    EXPECT_EQ(output_digests(*store, k_count), oracle);
+    EXPECT_EQ(output_digests(*store, k_count, imports), oracle);
   }
+}
+
+TEST(Recovery, T_M2R4_01_sigkill_at_every_point_then_explicit_resume_reuses_only_safe_phases_and_matches_the_oracle) {
+  sigkill_matrix("r401", 0, 3);
+}
+
+TEST(Recovery, T_M2R4_01_sigkill_at_every_point_of_a_workflow_of_import_and_calibration_steps_then_resume_matches_the_oracle) {
+  sigkill_matrix("r401_imp", 2, 2);
 }
 
 void expect_stopped_at(const workflow_result& r, const workflow& wf, const sqlite_dag_store& store, std::size_t at,
@@ -663,7 +715,10 @@ void materialize(const fs::path& dir, const durable_state& s) {
   for (const auto& [n, bytes] : s.artifacts) st::write_text(dir / "artifacts" / n, bytes);
 }
 
-void check_durable_invariants(const fs::path& dir, std::size_t k_count) {
+void check_durable_invariants(const fs::path& dir, const frames& f, std::size_t imports) {
+  const std::size_t steps = imports + f.recipes.size();
+  std::set<std::string> import_nodes;
+  for (std::size_t k = 0; k < imports; ++k) import_nodes.insert(make_import_node(import_request_of(f, k, {})).key());
   std::set<std::string> referenced;
   {
     auto store = sqlite_dag_store::open(dir, open_intent::read_write);
@@ -675,15 +730,19 @@ void check_durable_invariants(const fs::path& dir, std::size_t k_count) {
       for (const auto& a : store->artifacts_for(j.node_key)) {
         if (a.job_id == j.id && a.present) roles.insert(a.output_role);
       }
-      EXPECT_EQ(roles, (std::set<std::string>{"primary", "report", "report_text", "provenance"})) << "job " << j.id;
+      const std::set<std::string> expected = import_nodes.count(j.node_key) != 0
+                                                  ? std::set<std::string>{"primary", "report_text", "provenance"}
+                                                  : std::set<std::string>{"primary", "report", "report_text", "provenance"};
+      EXPECT_EQ(roles, expected) << "job " << j.id;
     }
-    for (std::size_t k = 0; k < k_count; ++k) {
-      const slot_view v = store->read_slot(slot_of(k));
+    for (std::size_t k = 0; k < steps; ++k) {
+      const std::string slot = step_slot(k, imports);
+      const slot_view v = store->read_slot(slot);
       if (v.state != freshness::current) continue;
-      ASSERT_TRUE(v.artifact->job_id.has_value()) << slot_of(k);
+      ASSERT_TRUE(v.artifact->job_id.has_value()) << slot;
       const auto producer = store->get_job(*v.artifact->job_id);
-      ASSERT_TRUE(producer.has_value()) << slot_of(k);
-      EXPECT_EQ(producer->state, job_state::completed) << slot_of(k) << " current senza job produttore completed";
+      ASSERT_TRUE(producer.has_value()) << slot;
+      EXPECT_EQ(producer->state, job_state::completed) << slot << " current senza job produttore completed";
       EXPECT_EQ(producer->node_key, v.artifact->node_key);
     }
   }
@@ -706,26 +765,28 @@ void check_durable_invariants(const fs::path& dir, std::size_t k_count) {
   }
 }
 
-TEST(Recovery, T_M2R4_04_simulated_power_loss_at_every_sync_point_keeps_the_project_consistent) {
-  constexpr std::size_t k_count = 2;
-  const frames f = make_frames("r404", k_count);
+// Perdita di energia a ogni punto di sync di un workflow di `imports` passi di import e `k_count` calibrazioni.
+void powerloss_matrix(const std::string& name, std::size_t imports, std::size_t k_count) {
+  const std::size_t steps = imports + k_count;
+  const frames f = make_frames(name, k_count);
   // Un output del passo 0, ricavato da un progetto separato: lo si ripristina in artifacts/ senza fsync durante il
   // workflow, cosi' la scrittura atomica lo riusa (EEXIST) e deve renderlo durevole prima del commit.
   std::string reused_name;
   std::string reused_bytes;
   {
-    const fs::path oracle = st::fresh_dir("r404_oracle");
-    setup_project(oracle, f);
+    const fs::path oracle = st::fresh_dir(name + "_oracle");
+    setup_project(oracle, f, imports);
     auto store = sqlite_dag_store::open(oracle, open_intent::read_write);
     runner_env env;
-    ASSERT_EQ(run_workflow(*store, make_workflow(*store, f, env, {})).exit_code, 0);
-    const auto texts = with_role(*store, make_calibration_node(f.recipes[0]).key(), calibration_report_text_role);
+    ASSERT_EQ(run_workflow(*store, make_workflow(*store, f, env, {}, imports)).exit_code, 0);
+    const auto texts = imports > 0 ? with_role(*store, make_import_node(import_request_of(f, 0, {})).key(), import_report_text_role)
+                                   : with_role(*store, make_calibration_node(f.recipes[0]).key(), calibration_report_text_role);
     ASSERT_EQ(texts.size(), 1u);
     reused_name = texts[0].rel_path;
     reused_bytes = st::read_text(store->artifact_path(reused_name));
   }
-  const fs::path dir = st::fresh_dir("r404_run");
-  setup_project(dir, f);
+  const fs::path dir = st::fresh_dir(name + "_run");
+  setup_project(dir, f, imports);
   powerloss::recorder rec;
   for (const char* n : {"project.db", "project.db-wal"}) {
     if (fs::exists(dir / n)) rec.durable[n] = st::read_text(dir / n);
@@ -764,26 +825,26 @@ TEST(Recovery, T_M2R4_04_simulated_power_loss_at_every_sync_point_keeps_the_proj
       }
       return 0;
     };
-    ASSERT_EQ(run_workflow(*store, make_workflow(*store, f, env, plant)).exit_code, 0);
+    ASSERT_EQ(run_workflow(*store, make_workflow(*store, f, env, plant, imports)).exit_code, 0);
     ASSERT_TRUE(planted);
   }
   capture();  // stato durevole dopo la chiusura (checkpoint e cancellazione del WAL)
   powerloss::install(nullptr);
-  // Eventi obbligatori per passo: 4 file con fsync del file e della directory; almeno avvio del job e commit nel WAL
+  // Eventi obbligatori per passo: 4 file (calibrazione) o 3 (import) con fsync del file e della directory; almeno avvio del job e commit nel WAL
   // (db_syncs conta xSync e xDelete).
-  EXPECT_EQ(file_syncs, 4 * k_count + 1) << "piu' il fsync del file riusato";
-  EXPECT_EQ(dir_syncs, 4 * k_count);
-  EXPECT_GE(db_syncs, 2 * k_count);
+  EXPECT_EQ(file_syncs, 4 * k_count + 3 * imports + 1) << "piu' il fsync del file riusato";
+  EXPECT_EQ(dir_syncs, 4 * k_count + 3 * imports);
+  EXPECT_GE(db_syncs, 2 * steps);
   ASSERT_GE(states.size(), 2u);
   std::size_t with_all_current = 0;
   for (std::size_t i = 0; i < states.size(); ++i) {
     SCOPED_TRACE("stato durevole " + std::to_string(i) + " di " + std::to_string(states.size()));
-    const fs::path state_dir = st::fresh_dir("r404_state");
+    const fs::path state_dir = st::fresh_dir(name + "_state");
     materialize(state_dir, states[i]);
-    check_durable_invariants(state_dir, k_count);
+    check_durable_invariants(state_dir, f, imports);
     auto store = sqlite_dag_store::open(state_dir, open_intent::read_only);
     bool all = true;
-    for (std::size_t k = 0; k < k_count; ++k) all = all && store->read_slot(slot_of(k)).state == freshness::current;
+    for (std::size_t k = 0; k < steps; ++k) all = all && store->read_slot(step_slot(k, imports)).state == freshness::current;
     with_all_current += all ? 1 : 0;
     if (i + 1 == states.size()) {
       EXPECT_TRUE(all) << "lo stato durevole finale, dopo la chiusura, deve avere tutti gli slot pubblicati";
@@ -791,6 +852,14 @@ TEST(Recovery, T_M2R4_04_simulated_power_loss_at_every_sync_point_keeps_the_proj
     }
   }
   EXPECT_LT(with_all_current, states.size()) << "gli stati intermedi devono precedere la pubblicazione";
+}
+
+TEST(Recovery, T_M2R4_04_simulated_power_loss_at_every_sync_point_keeps_the_project_consistent) {
+  powerloss_matrix("r404", 0, 2);
+}
+
+TEST(Recovery, T_M2R4_04_simulated_power_loss_in_a_workflow_of_import_and_calibration_steps_keeps_the_project_consistent) {
+  powerloss_matrix("r404_imp", 2, 2);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -971,6 +1040,142 @@ TEST(Recovery, T_M2R4_05_hardlinks_of_originals_or_project_files_stop_as_securit
                 error_category::io, "input.missing");
     EXPECT_STOP(store->add_input(input_record{0, (dir / "artifacts").string(), 1, std::string(64, 'a'), "light"}),
                 error_category::invalid_input, "store.bad_input");
+  }
+}
+
+// Cache delle miniature di R1 (`cache/thumbnails/`): la regola hardlink vale come per i file gestiti (ADR-04, R1 e R4).
+TEST(Recovery, T_M2R4_05_hardlinks_in_the_thumbnail_cache_stop_as_security_without_writes_or_removals) {
+  const frames f = make_frames("r405t", 1);
+  const fs::path source = f.files[0];
+  const content_digest digest = file_digest(source);
+  const preview_request req{8, 4};
+  std::vector<std::string> cache_points;
+  cache_options opt;
+  opt.quota_bytes = 1 << 20;
+  opt.fault = [&cache_points](std::string_view p) {
+    cache_points.emplace_back(p);
+    return 0;
+  };
+  memory_pool pool(std::uint64_t{64} << 20);
+  const cancel_token cancel;
+  const std::string entry_prefix = thumbnail_cache::key_of(digest, req) + ".";
+
+  struct fixture {
+    fs::path project;
+    fs::path cache_dir;
+    std::unique_ptr<sqlite_dag_store> store;
+    std::unique_ptr<thumbnail_cache> cache;
+  };
+  const auto make = [&](const std::string& name) {
+    fixture x;
+    x.project = st::fresh_dir(name);
+    x.store = sqlite_dag_store::create(x.project);
+    const node_spec node = make_thumbnail_node(digest, req);
+    x.store->put_node(node);
+    x.store->create_slot("thumb", node.key());
+    const node_spec rebuild_node = make_cache_rebuild_node(digest, req, cache_rebuild_cause_user);
+    x.store->put_node(rebuild_node);
+    x.store->create_slot("rebuild", rebuild_node.key());
+    x.cache = std::make_unique<thumbnail_cache>(x.project, opt);
+    x.cache_dir = x.project / "cache" / "thumbnails";
+    return x;
+  };
+  const auto thumbnail = [&](fixture& x) { return run_thumbnail_job(*x.store, "thumb", source.string(), digest, req, *x.cache, pool, cancel); };
+  const auto rebuild = [&](fixture& x) {
+    return run_cache_rebuild_job(*x.store, "rebuild", source.string(), digest, req, cache_rebuild_cause_user, *x.cache, pool, cancel);
+  };
+  const auto expect_security = [](const job_outcome& out, const std::string& code) {
+    ASSERT_TRUE(out.stop.has_value());
+    EXPECT_EQ(out.stop->category(), error_category::security);
+    EXPECT_EQ(out.stop->code(), code);
+    EXPECT_NE(out.exit_code, 0);
+  };
+  // Stato osservabile della cache e dello store: un rifiuto non deve cambiarne nulla.
+  struct snapshot {
+    std::vector<std::string> listing;
+    std::pair<timespec, timespec> dir_times;
+    std::uint64_t computations = 0;
+    std::size_t artifacts = 0;
+    std::optional<std::uint64_t> thumb_artifact;
+  };
+  const auto snapshot_of = [&](fixture& x) {
+    snapshot snap;
+    snap.listing = st::list_dir(x.cache_dir);
+    snap.dir_times = dir_times(x.cache_dir);
+    snap.computations = x.cache->computations();
+    for (const node_spec& n : {make_thumbnail_node(digest, req), make_cache_rebuild_node(digest, req, cache_rebuild_cause_user)}) {
+      for (const artifact_record& a : x.store->artifacts_for(n.key())) snap.artifacts += a.output_role == provenance_output_role ? 0 : 1;
+    }
+    const slot_view v = x.store->read_slot("thumb");
+    if (v.artifact) snap.thumb_artifact = v.artifact->id;
+    return snap;
+  };
+  const auto expect_unchanged = [&](fixture& x, const snapshot& before) {
+    const snapshot after = snapshot_of(x);
+    EXPECT_EQ(after.listing, before.listing) << "nessuna voce scritta o rimossa";
+    EXPECT_TRUE(same_times(after.dir_times, before.dir_times)) << "directory della cache non modificata (nemmeno un temporaneo creato e rimosso)";
+    EXPECT_EQ(after.computations, before.computations) << "nessun calcolo";
+    EXPECT_EQ(after.artifacts, before.artifacts) << "nessun output pubblicato dai due slot (la provenance dello stop e' l'unico artefatto aggiunto)";
+    EXPECT_EQ(after.thumb_artifact, before.thumb_artifact);
+    EXPECT_EQ(x.store->read_slot("rebuild").state, freshness::missing) << "nulla pubblicato dallo slot rebuild";
+    for (const std::string& p : cache_points) EXPECT_NE(p.rfind("cache.entry.", 0), 0u) << "scrittura della cache: " << p;
+  };
+
+  {
+    SCOPED_TRACE("originale collegato nella cache con il nome di una voce");
+    fixture x = make("r405t_a");
+    const fs::path link = x.cache_dir / (entry_prefix + digest.sha256 + ".thm");
+    ASSERT_EQ(::link(source.c_str(), link.c_str()), 0);
+    const file_facts before = facts_of(source);
+    EXPECT_EQ(before.nlink, 2u);
+    const snapshot snap = snapshot_of(x);
+    cache_points.clear();
+    expect_security(thumbnail(x), "cache.hardlink");
+    expect_security(rebuild(x), "cache.hardlink");
+    EXPECT_EQ(facts_of(source), before);
+    EXPECT_EQ(facts_of(link), before);
+    expect_unchanged(x, snap);
+    EXPECT_EQ(x.store->read_slot("thumb").state, freshness::missing) << "nulla pubblicato dallo slot thumb";
+  }
+  if (HasFailure()) return;
+  {
+    SCOPED_TRACE("originale collegato nella cache come temporaneo, accanto a un temporaneo regolare");
+    fixture x = make("r405t_b");
+    const fs::path link = x.cache_dir / ".tmp-original";
+    const fs::path regular = x.cache_dir / ".tmp-aa-regular";
+    st::write_text(regular, "temporaneo regolare");
+    ASSERT_EQ(::link(source.c_str(), link.c_str()), 0);
+    const file_facts before = facts_of(source);
+    const file_facts regular_before = facts_of(regular);
+    const snapshot snap = snapshot_of(x);
+    cache_points.clear();
+    EXPECT_STOP(x.cache->cleanup_temporaries(), error_category::security, "cache.hardlink");
+    EXPECT_EQ(facts_of(source), before);
+    EXPECT_EQ(facts_of(regular), regular_before) << "il controllo precede ogni rimozione";
+    expect_unchanged(x, snap);
+  }
+  if (HasFailure()) return;
+  {
+    SCOPED_TRACE("voce della cache con nlink 2");
+    fixture x = make("r405t_c");
+    ASSERT_EQ(thumbnail(x).exit_code, 0);
+    const auto names = st::list_dir(x.cache_dir);
+    ASSERT_EQ(names.size(), 1u);
+    const fs::path entry = x.cache_dir / names[0];
+    const fs::path extra = x.project / "entry_alias";
+    ASSERT_EQ(::link(entry.c_str(), extra.c_str()), 0);
+    const file_facts entry_before = facts_of(entry);
+    const file_facts original_before = facts_of(source);
+    EXPECT_EQ(entry_before.nlink, 2u);
+    const snapshot snap = snapshot_of(x);
+    cache_points.clear();
+    expect_security(thumbnail(x), "cache.hardlink");
+    expect_security(rebuild(x), "cache.hardlink");
+    EXPECT_EQ(facts_of(entry), entry_before);
+    EXPECT_EQ(facts_of(extra), entry_before);
+    EXPECT_EQ(facts_of(source), original_before);
+    expect_unchanged(x, snap);
+    EXPECT_EQ(x.store->read_slot("thumb").state, freshness::current) << "la pubblicazione precedente resta";
   }
 }
 
