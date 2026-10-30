@@ -88,7 +88,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `d7bd08eb722c826d25e89f436742dc3f3bb21ab1ff1e2dfd31d391447d61221c` |
+| `docs/contracts/BASE-confini.md` | `42e71a3ae24e99fe26b0edf8006d9b1737b8621cde9d04dde2e63d02c93235a4` |
 | `src/core/calibration_job.cpp` | `2df6c380778cd9d89fe255edfa0f019369122f2b46d781b7abc172a294f8959e` |
 | `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
 | `src/core/include/astro/sqlite_dag_store.hpp` | `83e225a4f173a1cfc3001b46b22394338edd1d6519130ada960957dec48b9505` |
@@ -100,6 +100,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 
-- Test release (`tmp/release-junit.xml`): totali 611, fast 604, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 605, fast 605, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 622, fast 615, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 616, fast 616, slow 0, falliti 0
 <!-- evidence:end -->

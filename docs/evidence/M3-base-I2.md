@@ -96,7 +96,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `d7bd08eb722c826d25e89f436742dc3f3bb21ab1ff1e2dfd31d391447d61221c` |
+| `docs/contracts/BASE-confini.md` | `42e71a3ae24e99fe26b0edf8006d9b1737b8621cde9d04dde2e63d02c93235a4` |
 | `src/core/calibration_blocks.cpp` | `52ef8cb2d248f4f2905ec2dbbd4ca3dbfe7912a828326bffee8b496db76d58c5` |
 | `src/core/calibration_job.cpp` | `2df6c380778cd9d89fe255edfa0f019369122f2b46d781b7abc172a294f8959e` |
 | `src/core/fits_blocks.cpp` | `d8c0d71a430957157b7c8895ded765db1c7d8455dd074d11818a51e87b5a74f1` |
@@ -113,6 +113,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 
-- Test release (`tmp/release-junit.xml`): totali 611, fast 604, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 605, fast 605, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 622, fast 615, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 616, fast 616, slow 0, falliti 0
 <!-- evidence:end -->

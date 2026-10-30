@@ -9,12 +9,12 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-04-persistenza.md` | `6681f95533f13d72b158069994c9a7e71e8e948b3af409e40cfd76c1d3b29a7a` |
+| `docs/contracts/ADR-04-persistenza.md` | `83861d7d5db28b2f45b7748a0af91044e2cd56565c3fa9295733c0561163401c` |
 | `src/core/project_export.cpp` | `6b67fa9bb3fdd89b747e55d0faec1106a503f79ff8ea9ad2d10c8906080c7d00` |
 | `tests/unit/test_export.cpp` | `c0aea6beac546120af806e9c9c1bbcfa3067f339fcea357ce7e515d4c22b68ff` |
 
-- Test release (`tmp/release-junit.xml`): totali 611, fast 604, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 605, fast 605, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 622, fast 615, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 616, fast 616, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

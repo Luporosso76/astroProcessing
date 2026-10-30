@@ -21,3 +21,8 @@ Contratti di M3.entry (ID di test `T-M3<slice>-<tema>-NN`):
 Base comune di M3 (ID di test `T-M3BASE-NN`):
 
 - [BASE-confini.md](BASE-confini.md): obblighi trasversali dei job `OB-01`…`OB-19` (arresto e provenance, ambiente FP, cancel, budget e pool, identità del nodo, verifica e sola lettura degli input, nessun fallback, nessuna pubblicazione su errore, checkpoint e resume, temporanei, offline), ciascuno con un solo confine proprietario e lo stato nel codice; suite di conformità sul registro dei tipi di job; debiti.
+
+Contratti delle slice di M3 (ID di test `T-M3<slice>-NN`):
+
+- [F-IO-03-classificazione.md](F-IO-03-classificazione.md): classificazione batch (M3.a): proposta da `IMAGETYP` e stato «da classificare» per i RAW, revisioni append-only con la correzione dell'utente che prevale, gruppi di light, scelta fra più candidati dello stesso ruolo, proposta di sole ricette ammissibili, binning e filtro espliciti, ripartizione del mismatch dopo la scelta fra M3.a, M3.b e M3.c (`CL-01`…`CL-12`).
+- [F-IO-08-ricollegamento.md](F-IO-08-ricollegamento.md): originali mancanti, spostati e ricollegamento (M3.a), estensione di ADR-04: stato degli originali solo sui percorsi registrati e solo a richiesta, nessuna ricerca né ricollegamento automatico, verifica del candidato per dimensione e SHA-256 nel confine, posizione corrente unica con storia append-only, slot bloccati con motivo e sblocco senza ricalcolo, undo, redo e recovery invariati (`RL-01`…`RL-08`).

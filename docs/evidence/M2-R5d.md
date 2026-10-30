@@ -13,7 +13,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-05-dag-provenance.md` | `a8696aa524e860dae2c1ff6d984530fe90963fef5ad9dee6a3b0254547da7cc4` |
+| `docs/contracts/ADR-05-dag-provenance.md` | `7b4b4d4a0610799ae5e405e7d8e50fb28061f2100e9441b9b33a65ea48b01bcb` |
 | `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
 | `src/core/calibration_job.cpp` | `2df6c380778cd9d89fe255edfa0f019369122f2b46d781b7abc172a294f8959e` |
 | `src/core/import_job.cpp` | `f524e0c1b79a5b1525845ab9615abb8dffc8abec6380e3d174c161192a57e123` |
@@ -29,8 +29,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 | `tests/unit/test_store_review.cpp` | `23e1dc408879523e5fe06725dd029ee0968f07ef21d7ee76aac76381987d034e` |
 
-- Test release (`tmp/release-junit.xml`): totali 611, fast 604, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 605, fast 605, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 622, fast 615, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 616, fast 616, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

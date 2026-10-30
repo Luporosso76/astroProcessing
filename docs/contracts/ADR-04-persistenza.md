@@ -314,6 +314,10 @@ Limiti dichiarati: un dispositivo che mente su `fsync`, il riordino dei metadati
 
 Limite dichiarato: la cache applica la propria regola `st_nlink = 1` (`cache.hardlink`, `cache.symlink`, `cache.not_regular`) e non conosce gli inode degli originali registrati, quindi non emette `fs.original_inode`. Un originale collegato nella cache ha sempre `st_nlink ≥ 2` e si ferma come `cache.hardlink`. Un file con lo stesso `(st_dev, st_ino)` di un originale e `st_nlink` 1 (originale spostato nella cache) non è coperto né provato da un test (l'originale non è più al suo percorso registrato).
 
+## Estensione F-IO-08 (M3.a): originali mancanti, spostati e ricollegamento
+
+Contratto in [F-IO-08-ricollegamento.md](F-IO-08-ricollegamento.md) (`RL-01`…`RL-08`). Estende lo schema 1 prima di ogni rilascio: `inputs.format`, trigger su `inputs` (identità immutabile, posizione cambiata solo con la sua riga di storia) e tabella append-only `input_relinks`. Il ricollegamento non è una mutazione della ricetta: undo, redo e recovery restano quelli di questo contratto.
+
 ## Fuori da M2
 
 Branch e migrazioni reali (ADR-04.b); asset utente e event log delle maschere dipinte; garbage collection con lease; branch della storia (redo multipli); export di slot non correnti.
