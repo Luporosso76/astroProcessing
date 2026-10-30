@@ -23,6 +23,8 @@ namespace store_test {
 using namespace astro;
 namespace fs = std::filesystem;
 
+// Cancella anche le directory sorelle `<name>_*` del test: un nome non deve essere prefisso + "_" del nome di un altro
+// test, altrimenti a ctest parallelo uno cancella la directory in uso dall'altro.
 inline fs::path fresh_dir(const std::string& name) {
   const fs::path dir = fs::path(ASTRO_TEST_TMP) / "m2c" / name;
   fs::create_directories(dir.parent_path());

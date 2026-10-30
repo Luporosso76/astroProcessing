@@ -49,7 +49,7 @@ using namespace store_test;
 // Senza la correzione la diagnosi secondaria costruiva una std::string dentro una funzione noexcept: con le
 // allocazioni fallite il bad_alloc causava std::terminate e il test andava in crash invece di vedere l'originale.
 TEST(JobAlloc, secondary_failure_with_exhausted_memory_still_rethrows_the_original_exception) {
-  auto store = sqlite_dag_store::create(fresh_dir("jalloc"));
+  auto store = sqlite_dag_store::create(fresh_dir("jalloc_rethrow"));
   store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
   store->set_fault_injector([](std::string_view p) -> int {
     if (p != "artifact.fsync_file") return 0;
