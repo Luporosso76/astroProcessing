@@ -1,7 +1,10 @@
 #include "astro/raw_decode.hpp"
 
 #include <libraw/libraw.h>
+#include <omp.h>
 
+#include <cstdlib>
+#include <ctime>
 #include <memory>
 #include <optional>
 #include <string>
@@ -9,6 +12,7 @@
 #include <vector>
 
 #include "astro/hash.hpp"
+#include "astro/memory_pool.hpp"
 
 namespace astro {
 namespace {
@@ -19,7 +23,12 @@ using context = stop_error::context_list;
   throw stop_error(error_category::unsupported, code, message, std::move(ctx));
 }
 
-// Codice di ritorno non nullo di open_buffer o unpack (ADR-08.b §2.5): funzione, valore e testo di LibRaw nel contesto.
+// Contesto comune degli stop da codice di ritorno (ADR-08.b §2.5): funzione, valore e testo di LibRaw.
+context rc_context(const char* function, int rc) {
+  return {{"funzione", function}, {"valore", std::to_string(rc)}, {"libraw", libraw_strerror(rc)}};
+}
+
+// Codice di ritorno non nullo di open_buffer o unpack (ADR-08.b §2.5).
 [[noreturn]] void libraw_stop(const char* function, int rc) {
   error_category category = error_category::invalid_input;
   const char* code = "raw.libraw_error";
@@ -47,8 +56,93 @@ using context = stop_error::context_list;
     default:
       break;
   }
-  throw stop_error(category, code, "LibRaw ha restituito un errore",
-                   {{"funzione", function}, {"valore", std::to_string(rc)}, {"libraw", libraw_strerror(rc)}});
+  throw stop_error(category, code, "LibRaw ha restituito un errore", rc_context(function, rc));
+}
+
+// Stato dei gestori installati in LibRaw (§2.5). LibRaw li chiama dal thread della decodifica.
+struct unpack_watch {
+  const cancel_token* cancel = nullptr;
+  bool data_error = false;
+  std::optional<std::string> file;  // assente se LibRaw passa un nome nullo (sorgente in memoria)
+  int offset = 0;
+};
+
+// Si registra la prima segnalazione; lo stop avviene dopo il ritorno di unpack, qualunque sia il suo codice.
+void on_data_error(void* data, const char* file, const int offset) {
+  auto& w = *static_cast<unpack_watch*>(data);
+  if (w.data_error) return;
+  w.data_error = true;
+  if (file != nullptr) w.file = file;
+  w.offset = offset;
+}
+
+// Valore non nullo: LibRaw interrompe con LIBRAW_CANCELLED_BY_CALLBACK.
+int on_progress(void* data, LibRaw_progress, int, int) {
+  const auto& w = *static_cast<const unpack_watch*>(data);
+  return w.cancel != nullptr && w.cancel->requested() ? 1 : 0;
+}
+
+// Avvisi di §2.5 ammessi: non toccano i campioni grezzi.
+constexpr unsigned allowed_warnings =
+    LIBRAW_WARN_BAD_CAMERA_WB | LIBRAW_WARN_NO_METADATA | LIBRAW_WARN_NO_EMBEDDED_PROFILE | LIBRAW_WARN_NO_INPUT_PROFILE |
+    LIBRAW_WARN_BAD_OUTPUT_PROFILE | LIBRAW_WARN_NO_BADPIXELMAP | LIBRAW_WARN_BAD_DARKFRAME_FILE |
+    LIBRAW_WARN_BAD_DARKFRAME_DIM | LIBRAW_WARN_PARSEFUJI_PROCESSED;
+
+// Nomi di libraw_const.h per i bit non ammessi; NO_JASPER (1 << 11) è dichiarato solo sotto una macro di LibRaw.
+constexpr std::pair<unsigned, const char*> warning_names[] = {
+    {LIBRAW_WARN_NO_JPEGLIB, "NO_JPEGLIB"},
+    {1u << 11, "NO_JASPER"},
+    {LIBRAW_WARN_RAWSPEED_PROBLEM, "RAWSPEED_PROBLEM"},
+    {LIBRAW_WARN_RAWSPEED_UNSUPPORTED, "RAWSPEED_UNSUPPORTED"},
+    {LIBRAW_WARN_RAWSPEED_PROCESSED, "RAWSPEED_PROCESSED"},
+    {LIBRAW_WARN_FALLBACK_TO_AHD, "FALLBACK_TO_AHD"},
+    {LIBRAW_WARN_DNGSDK_PROCESSED, "DNGSDK_PROCESSED"},
+    {LIBRAW_WARN_DNG_IMAGES_REORDERED, "DNG_IMAGES_REORDERED"},
+    {LIBRAW_WARN_DNG_STAGE2_APPLIED, "DNG_STAGE2_APPLIED"},
+    {LIBRAW_WARN_DNG_STAGE3_APPLIED, "DNG_STAGE3_APPLIED"},
+    {LIBRAW_WARN_RAWSPEED3_PROBLEM, "RAWSPEED3_PROBLEM"},
+    {LIBRAW_WARN_RAWSPEED3_UNSUPPORTED, "RAWSPEED3_UNSUPPORTED"},
+    {LIBRAW_WARN_RAWSPEED3_PROCESSED, "RAWSPEED3_PROCESSED"},
+    {LIBRAW_WARN_RAWSPEED3_NOTLISTED, "RAWSPEED3_NOTLISTED"},
+};
+
+// Ogni bit fuori da `allowed_warnings`, noto o sconosciuto, ferma con il suo nome nel contesto.
+void check_warnings(unsigned warnings) {
+  const unsigned rejected = warnings & ~allowed_warnings;
+  if (rejected == 0) return;
+  std::string names;
+  for (unsigned bit = 0; bit < 32; ++bit) {
+    const unsigned mask = 1u << bit;
+    if ((rejected & mask) == 0) continue;
+    std::string name = "bit_" + std::to_string(bit);
+    for (const auto& [value, known] : warning_names)
+      if (value == mask) name = known;
+    names += names.empty() ? name : " " + name;
+  }
+  unsupported("raw.warning", "avviso di LibRaw non ammesso", {{"avvisi", names}, {"bit", std::to_string(rejected)}});
+}
+
+// §2.6: fuso del processo verificato nel worker prima di open_buffer. Un esito diverso è un difetto dell'eseguibile.
+void check_process_tz() {
+  const char* tz = std::getenv("TZ");
+  ASTRO_ASSERT(tz != nullptr && std::string_view(tz) == "UTC0");
+  // timegm di 2026-01-15 12:00:00 e di 2026-07-15 12:00:00: mktime deve coincidere su entrambi.
+  for (const auto& [month, expected] : {std::pair<int, std::time_t>{0, 1768478400}, {6, 1784116800}}) {
+    std::tm t{};
+    t.tm_year = 126;
+    t.tm_mon = month;
+    t.tm_mday = 15;
+    t.tm_hour = 12;
+    t.tm_isdst = -1;
+    ASTRO_ASSERT(std::mktime(&t) == expected);
+  }
+}
+
+// §2.1: M = max(1, ceil(2 * raw_width * (raw_height + 8) / 2^20)) MiB, misurato come minimo accettato da unpack.
+std::uint64_t raw_memory_mib(std::uint64_t raw_width, std::uint64_t raw_height) {
+  constexpr std::uint64_t mib = std::uint64_t{1} << 20;
+  const std::uint64_t m = (2 * raw_width * (raw_height + 8) + mib - 1) / mib;
+  return m < 1 ? 1 : m;
 }
 
 // Convenzione di LibRaw::FC (libraw.h): indice di colore del sito (r, c) codificato in `filters`.
@@ -161,6 +255,8 @@ void set_metadata(frame_metadata& m, const libraw_data_t& d, const raw_unpack_fi
     m.exposure_s = metadata_value<double>{static_cast<double>(d.other.shutter), from_libraw("other.shutter")};
   if (d.other.iso_speed > 0)
     m.gain = metadata_value<double>{static_cast<double>(d.other.iso_speed), from_libraw("other.iso_speed")};
+  // §2.6: sotto TZ=UTC0 (verificata prima di open_buffer) il mktime di LibRaw è timegm dei campi civili del file; -1 o
+  // 0 (errore o ora assente) lasciano il campo assente.
   if (d.other.timestamp > 0)
     m.capture_time_libraw =
         metadata_value<std::int64_t>{static_cast<std::int64_t>(d.other.timestamp), from_libraw("other.timestamp")};
@@ -171,10 +267,28 @@ void set_metadata(frame_metadata& m, const libraw_data_t& d, const raw_unpack_fi
 
 }  // namespace
 
-image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks) {
+image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks,
+                        const raw_decode_context& ctx) {
+  // §2.1: il limite si decide dalla sola dimensione, senza leggere un byte.
+  if (bytes.size() > raw_limits::max_file_bytes)
+    throw stop_error(error_category::limit_exceeded, "raw.max_file_bytes", "file RAW oltre il limite",
+                     {{"byte", std::to_string(bytes.size())}, {"limite", std::to_string(raw_limits::max_file_bytes)}});
+  check_process_tz();
+  // §2.7: le regioni OpenMP di LibRaw in questo thread usano un solo thread.
+  omp_set_num_threads(1);
+  const auto returned = [&hooks](const char* function, int rc) {
+    return hooks.libraw_return ? hooks.libraw_return(function, rc) : rc;
+  };
+
+  // Dichiarati prima di LibRaw: la prenotazione si rilascia e i gestori smettono di esistere solo dopo che l'oggetto
+  // LibRaw ha liberato raw_image.
+  reservation held;
+  unpack_watch watch{ctx.cancel, false, std::nullopt, 0};
   // Un oggetto per decodifica, sullo heap, mai condiviso (ADR-08.b §2.1).
   auto lr = std::make_unique<LibRaw>();
   libraw_data_t& d = lr->imgdata;
+  lr->set_dataerror_handler(on_data_error, &watch);
+  lr->set_progress_handler(on_progress, &watch);
 
   // §2.2: il bit e' attivo per default e con esso LibRaw convertirebbe in silenzio i DNG in virgola mobile in interi.
   d.rawparams.options &= ~static_cast<unsigned>(LIBRAW_RAWOPTIONS_CONVERTFLOAT_TO_INT);
@@ -191,7 +305,8 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   ASTRO_ASSERT(d.params.user_black == -1 && d.params.user_sat == -1);
   for (int v : d.params.user_cblack) ASTRO_ASSERT(v == -1000001);
 
-  if (const int rc = lr->open_buffer(bytes.data(), bytes.size()); rc != LIBRAW_SUCCESS) libraw_stop("open_buffer", rc);
+  if (const int rc = returned("open_buffer", lr->open_buffer(bytes.data(), bytes.size())); rc != LIBRAW_SUCCESS)
+    libraw_stop("open_buffer", rc);
 
   raw_probe_fields probe{d.idata.filters,
                          d.idata.colors,
@@ -199,12 +314,52 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
                          d.idata.raw_count,
                          d.sizes.pixel_aspect,
                          lr->is_fuji_rotated(),
-                         lr->is_floating_point()};
+                         lr->is_floating_point(),
+                         d.sizes.raw_width,
+                         d.sizes.raw_height};
   if (hooks.after_open) hooks.after_open(probe);
   const std::optional<cfa_pattern> pattern = check_probe(probe);
+  // §2.1: prodotto a 64 bit, limite incluso.
+  if (const std::uint64_t pixels = std::uint64_t{probe.raw_width} * probe.raw_height; pixels > ctx.max_pixels)
+    throw stop_error(error_category::limit_exceeded, "raw.max_pixels", "dimensioni dichiarate oltre il limite",
+                     {{"pixel", std::to_string(pixels)}, {"limite", std::to_string(ctx.max_pixels)}});
+
+  // §2.1, §2.8: il limite di LibRaw coincide con la parte della prenotazione per raw_image; il resto copre i campioni f32
+  // dell'area visibile e la maschera di invalidità (uint16 per pixel). I byte del file li ha prenotati la lettura.
+  const std::uint64_t m = raw_memory_mib(probe.raw_width, probe.raw_height);
+  d.rawparams.max_raw_memory_mb = static_cast<unsigned>(m);
+  raw_unpack_plan plan{m << 20, 0, 0};
+  const std::uint64_t needed = plan.raw_image_bytes + 6 * std::uint64_t{d.sizes.width} * d.sizes.height;
+  if (ctx.pool != nullptr) {
+    // Il job tiene già i byte del file: se file e prenotazione insieme superano il budget, l'attesa nel pool non
+    // finirebbe mai.
+    if (bytes.size() + needed > ctx.pool->budget_bytes())
+      throw stop_error(error_category::budget, "sched.job_exceeds_budget", "budget sotto la prenotazione del decoder",
+                       {{"minimo", std::to_string(bytes.size() + needed)},
+                        {"file", std::to_string(bytes.size())},
+                        {"budget", std::to_string(ctx.pool->budget_bytes())}});
+    held = ctx.pool->reserve(needed, "raw_decode", ctx.cancel);
+    plan.reserved_bytes = held.bytes();
+  }
+  plan.max_raw_memory_mb = d.rawparams.max_raw_memory_mb;
+  if (hooks.before_unpack_plan) hooks.before_unpack_plan(plan);
+  if (hooks.with_handlers)
+    hooks.with_handlers(raw_unpack_callbacks{
+        [&watch](const char* file, int offset) { on_data_error(&watch, file, offset); },
+        [&watch](int stage, int iteration, int expected) {
+          return on_progress(&watch, static_cast<LibRaw_progress>(stage), iteration, expected);
+        }});
 
   if (hooks.before_unpack) hooks.before_unpack();
-  if (const int rc = lr->unpack(); rc != LIBRAW_SUCCESS) libraw_stop("unpack", rc);
+  const int unpack_rc = returned("unpack", lr->unpack());
+  // §2.5: un errore di dati segnalato ferma la decodifica anche con unpack riuscito.
+  if (watch.data_error) {
+    context c = rc_context("unpack", unpack_rc);
+    if (watch.file) c.emplace_back("file", *watch.file);
+    c.emplace_back("offset", std::to_string(watch.offset));
+    throw stop_error(error_category::integrity, "raw.data_error", "LibRaw ha segnalato un errore di dati", std::move(c));
+  }
+  if (unpack_rc != LIBRAW_SUCCESS) libraw_stop("unpack", unpack_rc);
 
   // §2.3: stop valutati prima di ogni lettura di raw_image.
   if (d.rawdata.float_image != nullptr) unsupported("raw.float_data", "dati raw in virgola mobile");
@@ -214,8 +369,10 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   raw_unpack_fields levels{{d.color.cblack[0], d.color.cblack[1], d.color.cblack[2], d.color.cblack[3]},
                            d.color.data_maximum,
                            {d.color.linear_max[0], d.color.linear_max[1], d.color.linear_max[2], d.color.linear_max[3]},
-                           d.makernotes.common.SensorTemperature};
+                           d.makernotes.common.SensorTemperature,
+                           d.process_warnings};
   if (hooks.after_unpack) hooks.after_unpack(levels);
+  check_warnings(levels.process_warnings);
 
   decoder_state st;
   st.source = from_libraw("");
@@ -246,6 +403,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
                                                 levels.linear_max[3]};
   st.curve_sha256 = curve_digest(d.color.curve);
   st.linearization = st.curve_sha256 ? decoder_linearization::decoder_curve : decoder_linearization::identity;
+  st.process_warnings = levels.process_warnings;
 
   image img = make_image(image_geometry(sz.width, sz.height), sample_type::f32, plane_layout::cfa,
                          cfa_layout{*pattern, 0, 0});

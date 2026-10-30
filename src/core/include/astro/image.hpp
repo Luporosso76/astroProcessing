@@ -210,13 +210,15 @@ struct decoder_state {
   std::optional<std::array<std::int64_t, 4>> linear_max;
   decoder_linearization linearization = decoder_linearization::identity;
   std::optional<std::array<std::uint8_t, 32>> curve_sha256;
+  // Bit di `process_warnings` di LibRaw dopo `unpack`, tutti fra quelli ammessi da ADR-08.b §2.5; 0 se nessuno.
+  std::uint32_t process_warnings = 0;
   metadata_source source;
   // `source` e' provenienza (origine e keyword): l'uguaglianza non la confronta.
   friend bool operator==(const decoder_state& a, const decoder_state& b) {
     const auto content = [](const decoder_state& s) {
       return std::tie(s.raw_width, s.raw_height, s.window, s.black, s.cfa_color_index, s.black_per_color,
                       s.black_pattern_rows, s.black_pattern_cols, s.black_pattern, s.white, s.data_maximum,
-                      s.linear_max, s.linearization, s.curve_sha256);
+                      s.linear_max, s.linearization, s.curve_sha256, s.process_warnings);
     };
     return content(a) == content(b);
   }

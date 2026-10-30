@@ -91,6 +91,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/D-17-covarianza.md` | `8b00d0073612808ecb91d7731d60ab2ae30513536fdd8a04cc4ae9d81c41368d` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
-| `docs/test-matrix.md` | `e4b5c8d30854c61d040e84dc2f61a5961bbf3092572780d8782ec4bcb1393d39` |
+| `docs/test-matrix.md` | `b02ba9fc0df97c4347e39938cf498475ab00f8930e8559c6e39a7ad9aa80663d` |
 
 <!-- evidence:end -->

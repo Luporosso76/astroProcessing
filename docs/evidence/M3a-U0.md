@@ -107,7 +107,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
 | `src/core/include/astro/fits.hpp` | `37d4c4a21797c3a54c1d1bdc80c2e12b383d00d729571a3e41ef8fe07976abd7` |
 | `src/core/include/astro/hash.hpp` | `35127c7ac5255cc715ad016da94c4958136dd39a2342ee716324f3db2d3d4a24` |
-| `src/core/include/astro/input_format.hpp` | `3233bca740f279460e24f6e25ef0e4bced89c7dd4c62f47f2a140dac29afdf3f` |
+| `src/core/include/astro/input_format.hpp` | `e30c81080600aec605fd3730bad533e1b77774d531a26441e4269990b986831f` |
 | `src/core/include/astro/job_types.hpp` | `98d1f80ede5ecb0da92cdb55f2aa8cec050b0cb163b6df1c7968b7367ace70e6` |
 | `src/core/input_format.cpp` | `343f626aebe72b9496007a01d144a40fd24613d94b58f814a9afcdd608570704` |
 | `src/core/job_types.cpp` | `fda920302c2e974237f08f4ff6c1a0a86f7da20548d419fdfed899937b5d5255` |
@@ -115,6 +115,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 805, fast 798, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 799, fast 799, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 867, fast 851, slow 16, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 852, fast 852, slow 0, falliti 0
 <!-- evidence:end -->

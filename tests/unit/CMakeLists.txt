@@ -167,10 +167,16 @@ target_compile_definitions(test_pack PRIVATE
 gtest_discover_tests(test_pack NO_PRETTY_VALUES PROPERTIES LABELS fast)
 
 # U2 (M3.a): decoder RAW puro. T-M3A-RAW-01…04 su decode_raw_buffer (src/core/raw_decode.cpp), fixture FIX-SYN-DNG-01.
-add_executable(test_raw_decode test_raw_decode.cpp)
-target_link_libraries(test_raw_decode PRIVATE astrocore GTest::gtest_main)
+add_executable(test_raw_decode test_raw_decode.cpp main_utc0.cpp)
+target_link_libraries(test_raw_decode PRIVATE astrocore GTest::gtest)
 target_include_directories(test_raw_decode PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_raw_decode PROPERTIES LABELS fast)
+
+# U2b (M3.a): fuso del processo e avviso PARSEFUJI_PROCESSED (ADR-08.b §2.5, §2.6).
+add_executable(test_raw_decode_u2b test_raw_decode_u2b.cpp main_utc0.cpp)
+target_link_libraries(test_raw_decode_u2b PRIVATE astrocore GTest::gtest)
+target_include_directories(test_raw_decode_u2b PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_raw_decode_u2b PROPERTIES LABELS fast)
 
 # U1b (M3.a): capacità di misura `measure` (ADR-03.b §b.13).
 add_executable(test_measure test_measure.cpp)
@@ -185,6 +191,42 @@ target_link_libraries(test_pack_index PRIVATE astrocore GTest::gtest_main SQLite
 target_include_directories(test_pack_index PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 target_compile_definitions(test_pack_index PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_pack_index NO_PRETTY_VALUES PROPERTIES LABELS fast)
+
+# U3 (M3.a): decoder RAW robusto. T-M3A-RAW-05, 06 (test_raw_robust), T-M3A-RAW-08 (raw_threads) e T-M3A-RAW-10 (fuzz_raw_decode, label slow, un
+# processo per seme: ctest -j non oltre 4 per restare nel 70% delle CPU). PUB-RAW-01 in sola lettura da data/public.
+set(ASTRO_RAW_PIXLS_ENV "ASTRO_RAW_PIXLS_DIR=${PROJECT_SOURCE_DIR}/data/public/raw-pixls-us")
+add_executable(test_raw_robust test_raw_robust.cpp main_utc0.cpp)
+target_link_libraries(test_raw_robust PRIVATE astrocore GTest::gtest PkgConfig::LIBRAW OpenMP::OpenMP_CXX ${CMAKE_DL_LIBS})
+target_include_directories(test_raw_robust PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_raw_robust PROPERTIES LABELS fast TIMEOUT 600)
+
+add_executable(fuzz_raw_decode fuzz_raw_decode.cpp)
+target_link_libraries(fuzz_raw_decode PRIVATE astrocore)
+target_include_directories(fuzz_raw_decode PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+add_test(NAME T-M3A-RAW-10.fuzz_synthetic COMMAND fuzz_raw_decode --synthetic)
+set(ASTRO_U3_FUZZ_TESTS T-M3A-RAW-10.fuzz_synthetic)
+foreach(i RANGE 0 7)
+  add_test(NAME T-M3A-RAW-10.fuzz_real_${i} COMMAND fuzz_raw_decode --real ${i})
+  list(APPEND ASTRO_U3_FUZZ_TESTS T-M3A-RAW-10.fuzz_real_${i})
+endforeach()
+set_tests_properties(${ASTRO_U3_FUZZ_TESTS} PROPERTIES LABELS slow TIMEOUT 14400
+  ENVIRONMENT "OMP_NUM_THREADS=1;${ASTRO_RAW_PIXLS_ENV}")
+
+# T-M3A-RAW-08: un processo nuovo per campione e per fase; (a) prima di (b), (c) dopo tutti (ADR-08.b §2.7).
+add_executable(raw_threads raw_threads.cpp)
+target_link_libraries(raw_threads PRIVATE astrocore PkgConfig::LIBRAW OpenMP::OpenMP_CXX ${CMAKE_DL_LIBS})
+target_include_directories(raw_threads PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+set(ASTRO_U3_THREAD_B_TESTS "")
+foreach(sample syn 0 1 2 3 4 5 6 7)
+  add_test(NAME T-M3A-RAW-08.a_product.${sample} COMMAND raw_threads --product ${sample})
+  add_test(NAME T-M3A-RAW-08.b_libraw2.${sample} COMMAND raw_threads --libraw2 ${sample})
+  set_tests_properties(T-M3A-RAW-08.b_libraw2.${sample} PROPERTIES DEPENDS T-M3A-RAW-08.a_product.${sample})
+  list(APPEND ASTRO_U3_THREAD_B_TESTS T-M3A-RAW-08.b_libraw2.${sample})
+  set_tests_properties(T-M3A-RAW-08.a_product.${sample} T-M3A-RAW-08.b_libraw2.${sample}
+    PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
+endforeach()
+add_test(NAME T-M3A-RAW-08.c_control COMMAND raw_threads --control)
+set_tests_properties(T-M3A-RAW-08.c_control PROPERTIES LABELS fast TIMEOUT 120 DEPENDS "${ASTRO_U3_THREAD_B_TESTS}")
 
 add_test(NAME T-M2F-01.offline
   COMMAND ${PROJECT_SOURCE_DIR}/tools/check_offline.sh
@@ -231,7 +273,11 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_pack.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_measure.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_pack_index.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_pack_index.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode_u2b.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_robust.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/fuzz_raw_decode.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_threads.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.

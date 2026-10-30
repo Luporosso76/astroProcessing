@@ -1,0 +1,20 @@
+# Sorgente del blocco generato di M3a-U3.md (tools/evidence.py)
+file docs/contracts/ADR-08-decoder-pack.md
+file CMakeLists.txt
+file src/core/CMakeLists.txt
+file src/core/include/astro/image.hpp
+file src/core/include/astro/input_format.hpp
+file src/core/include/astro/raw_decode.hpp
+file src/core/raw_decode.cpp
+file tests/unit/CMakeLists.txt
+file tests/unit/main_utc0.cpp
+file tests/unit/test_raw_decode.cpp
+file tests/unit/test_raw_decode_u2b.cpp
+file tests/unit/test_raw_robust.cpp
+file tests/unit/raw_threads.cpp
+file tests/unit/fuzz_raw_decode.cpp
+file tests/unit/pub_raw_01.hpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+junit release-giro2 tmp/release-junit-r2.xml
+junit fuzz-asan tmp/u3-fuzz-asan-junit.xml

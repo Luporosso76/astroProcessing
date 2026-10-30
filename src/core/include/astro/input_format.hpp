@@ -18,6 +18,7 @@ struct input_format {
 namespace raw_limits {
 // ADR-08.b §2.1: stima non misurata.
 constexpr std::uint64_t max_file_bytes = 1073741824;
+constexpr std::uint64_t max_pixels = 268435456;
 }  // namespace raw_limits
 
 const input_format& fits_input_format();

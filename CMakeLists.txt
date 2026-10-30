@@ -21,6 +21,8 @@ add_compile_options(${ASTRO_WARNING_FLAGS} ${ASTRO_FP_FLAGS})
 find_package(PkgConfig REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+# ADR-08.b §2.7: omp_set_num_threads(1) nel worker del decoder; libgomp è già caricata da LibRaw.
+find_package(OpenMP REQUIRED COMPONENTS CXX)
 pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
 pkg_check_modules(FFTW3 REQUIRED IMPORTED_TARGET fftw3)
 pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)

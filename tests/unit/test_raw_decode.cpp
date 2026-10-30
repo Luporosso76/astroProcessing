@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <optional>
@@ -249,9 +250,9 @@ TEST(RawDecode, T_M3A_RAW_01_metadata_present) {
   EXPECT_EQ(img.metadata.gain->source.origin, metadata_origin::decoder);
   ASSERT_TRUE(img.metadata.capture_time_libraw.has_value());
   EXPECT_EQ(img.metadata.capture_time_libraw->source.origin, metadata_origin::decoder);
-  // Fuso orario non dichiarato (§b.1): l'istante scritto e' 2026-10-30 12:34:56 in un fuso ignoto, entro +-14 h da UTC.
+  // Il main di test imposta TZ=UTC0 (ADR-08.b §2.6): il valore e' timegm dei campi scritti, esatto.
   constexpr std::int64_t as_utc = 1793363696;  // timegm(2026-10-30 12:34:56), calcolato con calendar.timegm di Python
-  EXPECT_NEAR(static_cast<double>(img.metadata.capture_time_libraw->value), static_cast<double>(as_utc), 14.0 * 3600.0);
+  EXPECT_EQ(img.metadata.capture_time_libraw->value, as_utc);
 }
 
 // T-M3A-RAW-01 (orientamento, §2.3): l'orientamento del file si registra e non si applica.
@@ -841,20 +842,47 @@ TEST(RawDecode, T_M3A_RAW_03_cell_with_adjacent_greens_stops) {
   EXPECT_STOP(decode(s, hooks), error_category::unsupported, "raw.cfa_pattern");
 }
 
-// T-M3A-RAW-01 (§2.6, aggiunto dall'autore del codice): `capture_time_libraw` e' `other.timestamp` copiato senza
-// alterazioni. LibRaw converte `DateTimeOriginal` nell'ora locale del processo: con TZ=UTC il valore atteso e' esatto,
-// 2026-10-30 12:34:56 UTC = 1793363696 (calendar.timegm di Python), e un troncamento dei secondi o dei minuti cambia il valore.
-TEST(RawDecode, T_M3A_RAW_01_timestamp_copied_exactly) {
+// timegm indipendente dei campi civili "AAAA:MM:GG hh:mm:ss" (non passa dal decoder ne' da LibRaw).
+std::int64_t timegm_of(const char* civil) {
+  std::tm t{};
+  int y = 0, mo = 0, d = 0, h = 0, mi = 0, sec = 0;
+  EXPECT_EQ(std::sscanf(civil, "%d:%d:%d %d:%d:%d", &y, &mo, &d, &h, &mi, &sec), 6);
+  t.tm_year = y - 1900;
+  t.tm_mon = mo - 1;
+  t.tm_mday = d;
+  t.tm_hour = h;
+  t.tm_min = mi;
+  t.tm_sec = sec;
+  return static_cast<std::int64_t>(timegm(&t));
+}
+
+std::optional<std::int64_t> decoded_capture_time(const char* civil) {
   fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
-  s.datetime_original = "2026:10:30 12:34:56";
-  const char* old_tz = std::getenv("TZ");
-  const std::optional<std::string> saved = old_tz ? std::optional<std::string>(old_tz) : std::nullopt;
-  ASSERT_EQ(setenv("TZ", "UTC", 1), 0);
-  tzset();
+  s.datetime_original = civil;
   const image img = decode(s);
-  if (saved) setenv("TZ", saved->c_str(), 1);
-  else unsetenv("TZ");
-  tzset();
-  ASSERT_TRUE(img.metadata.capture_time_libraw.has_value());
-  EXPECT_EQ(img.metadata.capture_time_libraw->value, 1793363696);
+  if (!img.metadata.capture_time_libraw.has_value()) return std::nullopt;
+  return img.metadata.capture_time_libraw->value;
+}
+
+// T-M3A-RAW-01 (§2.6): `capture_time_libraw` e' `other.timestamp` copiato senza alterazioni. Con TZ=UTC0 impostata dal
+// main di test il valore atteso e' esatto: 2026-10-30 12:34:56 = 1793363696 (calendar.timegm di Python); un troncamento
+// dei secondi o dei minuti cambia il valore.
+TEST(RawDecode, T_M3A_RAW_01_timestamp_copied_exactly) {
+  EXPECT_EQ(timegm_of("2026:10:30 12:34:56"), 1793363696);
+  const auto t = decoded_capture_time("2026:10:30 12:34:56");
+  ASSERT_TRUE(t.has_value());
+  EXPECT_EQ(*t, 1793363696);
+}
+
+// T-M3A-RAW-01 (§2.6): sotto UTC0 l'ora che in Europe/Rome non esiste (salto del 29 marzo 2026) e quella che vi e' doppia
+// (25 ottobre 2026) restano timegm dei campi scritti.
+TEST(RawDecode, T_M3A_RAW_01_timestamp_nonexistent_and_repeated_local_hours) {
+  EXPECT_EQ(timegm_of("2026:03:29 02:30:00"), 1774751400);
+  EXPECT_EQ(timegm_of("2026:10:25 02:30:00"), 1792895400);
+  const auto missing = decoded_capture_time("2026:03:29 02:30:00");
+  ASSERT_TRUE(missing.has_value());
+  EXPECT_EQ(*missing, 1774751400);
+  const auto repeated = decoded_capture_time("2026:10:25 02:30:00");
+  ASSERT_TRUE(repeated.has_value());
+  EXPECT_EQ(*repeated, 1792895400);
 }
