@@ -140,6 +140,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
                                 const calibration_recipe& recipe, memory_pool& pool,
                                 const calibration_job_options& options, const cancel_token& cancel,
                                 const std::optional<budget_snapshot>& budget) {
+  require_fp_environment();  // prima di serializzare le risorse nel budget e di avviare il job (ADR-07)
   const auto work = [&](const job_record& job) -> job_files_result {
     require_fp_environment();
     validate_calibration_recipe(recipe);

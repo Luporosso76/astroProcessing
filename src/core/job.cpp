@@ -4,6 +4,8 @@
 #include <exception>
 #include <span>
 
+#include "astro/cpu_dispatch.hpp"
+
 namespace astro {
 
 int exit_code_for(error_category category) noexcept {
@@ -146,6 +148,7 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
     throw stop_error(error_category::invalid_input, "job.durable_store_requires_run_job_files",
                      "uno store durevole richiede run_job_files: run_job non persiste la provenance");
   }
+  require_fp_environment();  // prima di avviare il job e di leggere il nodo (ADR-07)
   const job_record job = store.start_job(slot_name);
   const node_spec spec = *store.get_node(job.node_key);
   std::vector<std::string> warnings;
@@ -171,6 +174,9 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
 job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
                           const std::function<job_files_result(const job_record&)>& work,
                           const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
+  // Prima di avviare il job: leggere il nodo analizza i parametri numerici, anche subnormali, e la provenance
+  // dell'arresto li riscriverebbe (ADR-07).
+  require_fp_environment();
   const job_record job = store.start_job(slot_name);
   const node_spec spec = *store.get_node(job.node_key);
   std::vector<std::string> warnings;

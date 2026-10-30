@@ -88,6 +88,8 @@ struct job_spec {
   const node_spec& node;
   std::uint64_t task_count = 0;
   // Esegue il task e restituisce il digest SHA-256 esadecimale del risultato parziale (richiesto se checkpoint_every > 0).
+  // Il worker lo chiama solo dopo require_fp_environment nel proprio thread (ADR-07): un modo vietato ferma il task
+  // con numeric cpu.fp_mode prima che legga i dati.
   std::function<std::string(task_context&)> run_task;
   // Solo per il resume: ricalcola il digest del risultato parziale gia' salvato del task.
   // Chiamato dopo `prepare` e prima del primo task.

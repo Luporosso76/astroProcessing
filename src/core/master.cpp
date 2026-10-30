@@ -959,6 +959,7 @@ calibration_input_spec product_master_input(const sqlite_dag_store& store, const
 job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name, const master_recipe& recipe,
                            memory_pool& pool, const master_job_options& options, const cancel_token& cancel,
                            const std::optional<budget_snapshot>& budget) {
+  require_fp_environment();  // prima di serializzare le risorse nel budget e di avviare il job (ADR-07)
   const auto work = [&](const job_record& job) -> job_files_result {
     master_plan p = make_plan(recipe);
     const node_spec node = make_master_node(recipe);

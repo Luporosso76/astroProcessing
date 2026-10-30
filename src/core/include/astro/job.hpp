@@ -39,7 +39,9 @@ struct job_outcome {
   std::optional<stop_error> subsequent_error;
 };
 
-// Confine del job: avvia il job sullo slot (se non parte, l'errore si propaga: nessun job esiste), esegue `work`,
+// Confine del job: controlla l'ambiente FP prima di avviare il job e di leggerne il nodo (require_fp_environment,
+// ADR-07: lo stop numeric cpu.fp_mode si propaga e nessun job esiste), avvia il job sullo slot (se non parte,
+// l'errore si propaga: nessun job esiste), esegue `work`,
 // registra e pubblica l'artefatto. Uno stop_error marca il job `failed` (`cancelled` per la categoria cancelled),
 // scrive la diagnosi su stderr e restituisce 2 (3 per cancelled). Ogni altra eccezione marca il job `failed` e si
 // rilancia. Nessun percorso alternativo. `budget`, se presente, entra nella provenance (riuscito o fermato).

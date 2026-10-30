@@ -1,0 +1,13 @@
+# Sorgente del blocco generato di M2-R5c.md (tools/evidence.py)
+file docs/contracts/ADR-07-cpu-simd.md
+file src/core/include/astro/job.hpp
+file src/core/job.cpp
+file src/core/calibration_job.cpp
+file src/core/master.cpp
+file src/core/include/astro/scheduler.hpp
+file src/core/scheduler.cpp
+file tests/unit/test_simd.cpp
+file tests/trace/M2.tsv
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

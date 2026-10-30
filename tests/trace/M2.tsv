@@ -32,14 +32,14 @@ NFR-LIC-01.c	T-M2R0-01	docs/licenses.md, M2-gate.md
 NFR-TEST-01.a	T-M2F-01	M2-f.md, M2-gate.md
 NFR-PERF-01	T-M2R3-08	M2-gate.md, M2-R3.md
 NFR-DATA-01.a	T-M2B-07,T-M2B-08,T-M2C-02,T-M2C-20,T-M2C-21,T-M2R1-04,T-M2R1-11,T-M2R1-12	M2-b.md, M2-c.md, M2-R1.md, M2-R4b.md, M2-gate.md
-NFR-FBK-01.a	T-FBK-01,T-M2D-09	M2-d.md, M2-e.md, M2-R32.md, M2-gate.md
+NFR-FBK-01.a	T-FBK-01,T-M2D-09,Simd.T_M2R5_07_job_with_ftz_stops_before_any_kernel_and_publishes_nothing,Simd.T_M2R5_07_denormal_mask_off_stops_run_job_files_before_the_job_and_the_node,Simd.T_M2R5_07_denormal_mask_off_stops_run_job_before_the_job_and_the_work,Simd.T_M2R5_07_denormal_mask_off_in_the_workers_stops_each_block_before_decoding,Simd.T_M2R5_07_denormal_mask_off_in_the_workers_stops_each_master_band_before_reading	M2-d.md, M2-e.md, M2-R32.md, M2-R5c.md, M2-gate.md
 ADR-01	T-M2F-01	ADR-M1-stack.md, M1-a.md, M2-gate.md
 ADR-02	T-M2R0-04	ADR-M1-stack.md, M1-closure-001.md, M2-gate.md
 ADR-03.a	T-M2A-01,T-M2A-02,T-M2A-03,T-M2A-04,T-M2A-05,T-M2A-06,T-M2A-07,T-M2A-08,T-M2A-09,T-M2A-10,T-M2A-11,T-M2A-12,T-M2A-13	contracts/ADR-03-pixel-maschere.md, M2-a.md, M2-gate.md
 ADR-04.a	T-M2C-01,T-M2C-02,T-M2C-03,T-M2C-04,T-M2C-05,T-M2C-06,T-M2C-07,T-M2C-08,T-M2C-09,T-M2C-10,T-M2C-11,T-M2C-12,T-M2C-13,T-M2C-14,T-M2C-15,T-M2C-16,T-M2C-17,T-M2C-18,T-M2C-19,T-M2C-20,T-M2C-21,T-M2C-22,T-M2C-23,T-M2C-24,T-M2C-25	ADR-M1-stack.md, contracts/ADR-04-persistenza.md, M2-c.md, M2-gate.md
 ADR-05.a	T-M2B-01,T-M2B-02,T-M2B-03,T-M2B-04,T-M2B-05,T-M2B-06,T-M2B-07,T-M2B-08,T-M2B-09,T-M2B-10,T-M2B-11,T-M2B-12,T-M2B-13	contracts/ADR-05-dag-provenance.md, M2-b.md, M2-gate.md
 ADR-06.a	T-M2D-01,T-M2D-02,T-M2D-03,T-M2D-04,T-M2D-05,T-M2D-06,T-M2D-07,T-M2D-08,T-M2D-09,T-M2D-10,T-M2D-11,T-M2D-12,T-M2D-13,T-M2D-14,T-M2D-15	contracts/ADR-06-budget-scheduler.md, M2-d.md, M2-gate.md
-ADR-07.a	T-M2R5-01,T-M2R5-02,T-M2R5-03,T-M2R5-04,T-M2R5-05,T-M2R5-06,T-M2R5-07	ADR-M1-stack.md, contracts/ADR-07-cpu-simd.md, M2-R5.md, M2-gate.md
+ADR-07.a	T-M2R5-01,T-M2R5-02,T-M2R5-03,T-M2R5-04,T-M2R5-05,T-M2R5-06,T-M2R5-07	ADR-M1-stack.md, contracts/ADR-07-cpu-simd.md, M2-R5.md, M2-R5c.md, M2-gate.md
 ADR-08.a	T-M2A-01,T-M2A-02,T-M2A-03,T-M2A-04,T-M2A-05,T-M2A-06,T-M2A-07,T-M2A-08,T-M2A-09,T-M2A-10,T-M2A-11,T-M2A-12,T-M2A-13	M2-a.md, M2-gate.md
 ADR-09.a	T-M2E-01,T-M2E-02,T-M2E-03,T-M2E-04,CalibM2E.T_M2E_04_05_q_bits_separate_and_together,T-M2E-06,T-M2E-07,T-M2E-08,T-M2E-09,T-M2E-10,T-M2E-11,T-M2E-12,T-M2E-13,T-M2E-14,T-M2E-15,T-M2E-16,T-M2E-17,T-M2E-18,T-M2E-19,CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n,T-M2E-21,T-M2E-22,T-M2E-23,T-M2E-24,T-M2E-25,T-M2E-26,T-M2E-27,T-M2E-28,T-M2E-29,T-M2E-30,T-M2E-31,T-M2E-32,MasterPipeline.T_M2E_20_product_master_planes_propagate_as_the_rational_oracle	contracts/ADR-16-stati-master.md, M2-e.md, M2-gate.md
 ADR-13.a	T-M2F-01,T-M2F-02	contracts/ADR-13-offline.md, M2-f.md, M2-gate.md
@@ -61,4 +61,4 @@ M2.d		M2-gate.md
 M2.e		M2-gate.md
 M2.f		M2-f.md, M2-gate.md
 M2.g		M2-g.md, M2-gate.md
-G-STOP	T-FBK-01	M2-e.md, M2-R32.md, M2-gate.md
+G-STOP	T-FBK-01,Simd.T_M2R5_07_job_with_ftz_stops_before_any_kernel_and_publishes_nothing,Simd.T_M2R5_07_denormal_mask_off_stops_run_job_files_before_the_job_and_the_node,Simd.T_M2R5_07_denormal_mask_off_stops_run_job_before_the_job_and_the_work,Simd.T_M2R5_07_denormal_mask_off_in_the_workers_stops_each_block_before_decoding,Simd.T_M2R5_07_denormal_mask_off_in_the_workers_stops_each_master_band_before_reading	M2-e.md, M2-R32.md, M2-R5c.md, M2-gate.md
