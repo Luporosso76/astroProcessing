@@ -231,6 +231,10 @@ Conseguenza: i test esistenti che si aspettano true per immagini senza `measure`
 - Le sonde dei fatti LibRaw di ADR-08 (H3, origine dispari, float, curva, `cblack`, memoria M, thread, TZ, Fuji) si rifanno sulla nuova versione prima del codice; ogni differenza è un emendamento del contratto.
 - `docs/licenses.md`: licenza di ogni dipendenza diretta letta dal LICENSE upstream, non dal `copyright` Debian.
 
+### U13, in M3.a dopo U12: DNG intero deflate e JPEG XL
+- Fatto di U12: LibRaw 0.22.3 decodifica il deflate solo in virgola mobile («Only float deflated supported»); il DNG intero deflate e il JPEG XL richiedono l'Adobe DNG SDK, la cui licenza (indennizzo §5, legge della California §8) non è compatibile con GPL-3.0-or-later ed è esclusa.
+- Scelta: decoder indipendente scritto dal progetto dalla specifica DNG 1.7 pubblica, con zlib per il deflate e libjxl (implementazione di riferimento, BSD-3-Clause) per il JPEG XL, compilata in `third_party/` con le regole di U12. Contratto e test prima del codice; avviso di brevetto DNG di Adobe nella documentazione (M5).
+
 ### Emendamenti alle slice successive (prima del loro codice)
 - M3.d: debayer edge-aware (RCD) come default più CFA/Bayer drizzle per lo stacking; il bilineare a pesi fissi resta per la varianza esatta (ADR-09).
 - M3.q: colore del prodotto da Gaia DR3 anche nel footprint SDSS; SDSS solo come riferimento indipendente nei test.
