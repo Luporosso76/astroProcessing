@@ -221,14 +221,14 @@ Dalla tabella «Decisioni del coordinatore» di `docs/datasets/M3-candidates.md`
 
 | Uso | Catalogo | Stato |
 |---|---|---|
-| Astrometria del solver assistito (C-18, M3.p) | 2MASS Point Source Catalog (Skrutskie et al. 2006), bande J, H, Ks | Scelto. Audit dell'estratto prima dell'adozione in M3.p: alla fonte primaria IRSA si legge solo «no usage restrictions»; il «public domain» compare in una fonte secondaria. Se l'audit fallisce, M3.p torna BLOCKED |
+| Astrometria del solver assistito (C-18, M3.p) | Gaia DR3 (Gaia Collaboration 2023): posizioni, moti propri e parallassi all'epoca J2016.0 | Scelto (proprietario, 30 ottobre 2026). Licenza CC BY-NC 3.0 IGO alla fonte primaria ESA, con attribuzione; il pack è un componente dati separato dal codice GPL e ne porta la licenza. Distribuzione non commerciale; una release commerciale (M10) richiede prima l'autorizzazione scritta di ESA |
 | Colore relativo nel footprint SDSS (C-16, M3.q) | Catalogo fotometrico SDSS, bande u, g, r, i, z | Scelto. Pubblico dominio alla fonte primaria; rilascio fissato nel record `PUB-*` all'adozione |
-| Colore relativo fuori dal footprint SDSS | nessuno | BLOCKED: nessun catalogo broadband ridistribuibile copre tutto il cielo. Sblocco solo con autorizzazione scritta ESA o conferma USNO per UCAC4; decide il proprietario |
-| Scartati | Gaia DR3, Hipparcos e Tycho-2 (NC), APASS DR10 (nessuna concessione), ATLAS-REFCAT2 (componenti ereditati), UCAC4 e Pan-STARRS DR2 (licenza non dichiarata), Yale BSC (nessuna licenza), index astrometry.net serie 4200 (non necessari: l'indice si costruisce dal pack) | Non adottabili o non necessari |
+| Colore relativo su tutto il cielo (C-16, M3.q) | Gaia DR3: G, BP, RP e fotometria sintetica GSPC dagli spettri XP | Scelto (proprietario, 30 ottobre 2026), stessa licenza e stesso vincolo della riga dell'astrometria. SDSS resta riferimento indipendente di confronto nel suo footprint |
+| Scartati | Hipparcos e Tycho-2 (sostituiti da Gaia DR3), 2MASS PSC (solo vicino infrarosso, senza moti propri; resta come confronto), APASS DR10 (nessuna concessione), ATLAS-REFCAT2 (componenti ereditati), UCAC4 e Pan-STARRS DR2 (licenza non dichiarata), Yale BSC (nessuna licenza), index astrometry.net serie 4200 (non necessari: l'indice si costruisce dal pack) | Non adottabili o non necessari |
 
-Limiti dichiarati della scelta, da trattare nei contratti C-18 e C-16: 2MASS è nel vicino infrarosso, epoca 1997–2001 e senza moti propri (l'errore di posizione cresce con l'intervallo di epoca); SDSS copre circa un terzo del cielo e satura intorno a r ≈ 14. Dimensione dei pack: solo la stima progettuale di `M3-candidates.md` (circa 0,1 GB fino a mag 12, 0,6–0,8 GB fino a mag 14), non misurata.
+Limiti dichiarati della scelta, da trattare nei contratti C-18 e C-16: Gaia DR3 ha precisione ridotta per G < 6 (stelle saturate nel satellite) e le posizioni vanno propagate dall'epoca J2016.0 con i moti propri; licenza non commerciale finché ESA non autorizza; SDSS copre circa un terzo del cielo e satura intorno a r ≈ 14. Dimensione dei pack: solo la stima progettuale di `M3-candidates.md` (circa 0,1 GB fino a mag 12, 0,6–0,8 GB fino a mag 14), non misurata.
 
-G-PACK in M3.a si costruisce e si prova solo con pack sintetici generati dal test (seed fisso, componente `synthetic`, licenza `CC0-1.0`). Gli estratti 2MASS e SDSS si costruiscono e si adottano in M3.p e M3.q, dopo il loro audit.
+G-PACK in M3.a si costruisce e si prova solo con pack sintetici generati dal test (seed fisso, componente `synthetic`, licenza `CC0-1.0`). Gli estratti Gaia DR3 e SDSS si costruiscono e si adottano in M3.p e M3.q, dopo il loro audit.
 
 ### 3.6 Scelte fissate dai test di U10 (coordinatore, 30 ottobre 2026)
 
@@ -250,7 +250,7 @@ Prima dell'adozione di una libreria nuova (prima build di un binario che la coll
 
 1. Libreria: riga in `docs/licenses.md` con versione, pacchetto, file reale, SHA-256 del file caricato, licenza letta dal file `copyright` del pacchetto installato (con lo SHA-256 del file `copyright`), compatibilità con GPL-3.0-or-later, moduli usati; le dipendenze transitive caricate (`ldd`) con le stesse colonne. T-M2R0-01 (`tools/check_licenses.py`) fallisce se un binario carica una libreria senza riga.
 2. Pack: un record `docs/datasets/PUB-*.md` per ogni componente con fonte primaria, testo della licenza citato con data di lettura, rilascio, URL, hash dei file acquisiti; licenza nel manifest uguale a quella del record (T-M3A-LIC-01).
-3. Licenze ammesse per un componente di pack distribuito con il prodotto: `LicenseRef-public-domain` (dichiarazione alla fonte primaria), `CC0-1.0`, `CC-BY-4.0` (con `attribution` non vuota), `GPL-2.0-or-later`, `GPL-3.0-or-later`. Ogni altra licenza, comprese le clausole NC, ND e SA, richiede una revisione di questo contratto con review.
+3. Licenze ammesse per un componente di pack distribuito con il prodotto: `LicenseRef-public-domain` (dichiarazione alla fonte primaria), `CC0-1.0`, `CC-BY-4.0` (con `attribution` non vuota), `GPL-2.0-or-later`, `GPL-3.0-or-later`, `CC-BY-NC-3.0-IGO` (solo Gaia DR3, decisione del proprietario del 30 ottobre 2026: `attribution` non vuota con il credito ESA/Gaia/DPAC; il pack è un componente dati separato dal codice GPL, con il proprio file di licenza in `licenses/`; distribuzione non commerciale, una release commerciale richiede prima l'autorizzazione scritta di ESA). Ogni altra licenza, comprese le altre clausole NC, ND e SA, richiede una revisione di questo contratto con review. Limite dichiarato: il G-PACK consegnato in M3.a ammette solo le prime cinque; l'ammissione di `CC-BY-NC-3.0-IGO` entra nel codice con l'unità di M3.p che adotta l'estratto Gaia, test rosso prima del codice, e fino ad allora un pack Gaia è rifiutato con `pack.license_not_allowed`.
 4. Un audit non è dichiarato finito finché il record non esiste (piano riga 2018).
 
 Audit eseguito in questa unità per LibRaw, libtiff e le loro dipendenze transitive: `docs/licenses.md`, sezione «NFR-LIC-01.d». Esito: nessuna incompatibilità con GPL-3.0-or-later.
@@ -310,5 +310,5 @@ Test del piano che questi alimentano: T-IO-01 (import RAW, M3.s), T-AST-ASSIST01
 - Allocazioni interne di LibRaw non prenotate.
 - Un crash di LibRaw su input malformato non è contenuto nel processo.
 - Linearità `linear` dei RAW è una dichiarazione del decoder, non una misura.
-- Gli audit degli estratti 2MASS e SDSS non sono fatti: G-PACK si prova su pack sintetici. Il colore fuori dal footprint SDSS è BLOCKED.
+- Gli audit degli estratti Gaia DR3 e SDSS non sono fatti: G-PACK si prova su pack sintetici. Distribuzione del pack Gaia solo non commerciale finché ESA non autorizza per iscritto.
 - Dimensione dei pack e costo dell'hash completo nel preflight: stime non misurate.
