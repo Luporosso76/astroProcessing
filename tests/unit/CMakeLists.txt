@@ -192,7 +192,8 @@ add_test(NAME T-M2R5-07.no_crtfastmath_negative
 set_tests_properties(T-M2R5-05.kernel_instructions T-M2R5-05.kernel_instructions_negative
   T-M2R5-07.no_crtfastmath T-M2R5-07.no_crtfastmath_negative PROPERTIES LABELS fast TIMEOUT 120)
 
-# Self-test degli strumenti di processo (tools/trace.py, tools/lint.sh) su dati sintetici in tmp/.
+# Self-test degli strumenti di processo (tools/trace.py, tools/lint.sh, tools/check_m2_trace.py) su dati sintetici in tmp/.
 add_test(NAME TOOLS.trace_selftest COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tools/trace.py selftest)
 add_test(NAME TOOLS.lint_selftest COMMAND ${PROJECT_SOURCE_DIR}/tools/lint.sh --selftest)
-set_tests_properties(TOOLS.trace_selftest TOOLS.lint_selftest PROPERTIES LABELS fast TIMEOUT 120)
+add_test(NAME TOOLS.check_m2_trace COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tests/tools/test_check_m2_trace.py)
+set_tests_properties(TOOLS.trace_selftest TOOLS.lint_selftest TOOLS.check_m2_trace PROPERTIES LABELS fast TIMEOUT 120)
