@@ -1,15 +1,15 @@
 # Stato del progetto astroProcessor
 
-Ultimo aggiornamento: 29 ottobre 2026. Unica fonte dello stato corrente; risultati e limiti nei record di evidenza.
+Ultimo aggiornamento: 30 ottobre 2026. Unica fonte dello stato corrente; risultati e limiti nei record di evidenza.
 
 ## Ora
 
-- **M0 PASS. M1 DONE. M2 IN PROGRESS, Gate M2 RIAPERTO (manca F-IO-10, residuo di M2.c)** (`plans/M2.md`, `docs/evidence/M2-gate.md`: giri 1-6 FAIL con correzioni, giro 7 PASS): M2.g, M2.f, M2.a, M2.b, M2.c, M2.d, M2.e DONE (`docs/evidence/M2-{g,f,a,b,c,d,e}.md`). Core: errori, immagine, FITS da memoria, hash, JSON canonico, nodi DAG, slot, provenance, store SQLite durevole, snapshot undo/redo, export con manifest, budget di memoria, pool, scheduler con cancel, checkpoint/resume e spill, calibrazione FITS `dark_matched_flat_dark_flat` (L−D, Q, maschere, varianza, report; dato reale PUB-LFC-01); test dev (ASan/UBSan, fast) e release (fast + 3 slow: T-M2D-13, T-M2E-13, T-M2E-21/26) — conteggi: dev 328/328, release 330/330 (327 fast + 3 slow) al giro 5; dev 329/329, release 331/331 (328 fast + 3 slow) al giro 6; dev 330/330, release 332/332 (329 fast + 3 slow) al giro 7 (log del giro 5 del gate, `docs/evidence/M2-gate.md`).
+- **M0 PASS. M1 DONE. M2 IN PROGRESS, Gate M2 RIAPERTO e rifatto** dal registro dell'appendice D (`plans/M2-residui.md`): R0–R5 chiuse (`docs/evidence/M2-R0.md` … `M2-R5.md`); R6 in corso. Esecuzione finale provata prima del commit (giro 8 di `docs/evidence/M2-gate.md`): build pulita, dev 501/501 (slow compresi, preset `dev-full`) e release 500/500, `tools/check_m2_trace.py` uscita 0 sui 63 ID, matrice con stati finali. Il gate passa dopo la riesecuzione sul commit del gate e la review Codex del record (clausola 4).
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
 - D-19/D-20 approvate P0. D-21: preferenza per pack inclusi, subordinata alle verifiche di licenza.
-- Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: `c788a17` (M2.e).
+- Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: `60a6cc8` (R6, `tools/check_m2_trace.py`).
 - Review indipendenti: Codex `gpt-6-astra` in sola lettura finché ha token, poi revisori Claude; Gemini 4 Argon non disponibile; Gemini Flash via `agy` solo per testi e lingue (`AGENTS.md`).
 
 ## Evidenze principali
@@ -28,13 +28,13 @@ I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) rest
 
 ## Prossima unità
 
-M3 (`plans/M3.md`, stato PLANNED): fase `M3.entry` (contratti C-01.b…C-19 e stadi ADR prima del codice), poi M3.a import RAW/FITS RGB. Prima di M4 (GUI) ci si ferma col proprietario. Gate M2 PASS (giro 7 di Codex, `docs/evidence/M2-gate.md`): Slice FITS con L−D, Q, maschere, metadati, incertezza e report; DAG durevole, recovery, cancel e worker; dato reale. M2.e chiusa con `docs/evidence/M2-e.md` (T-M2E-01…32, T-FBK-01 parte M2 e T-M2F-02 ESEGUITI).
+Gate M2: commit delle modifiche del giro 8, riesecuzione identica sul commit (`plans/M2.md`, «Prossimo comando»), review indipendente. Dopo il PASS: M3 (`plans/M3.md`, stato PLANNED), fase `M3.entry` (contratti C-01.b…C-19 e stadi ADR prima del codice), poi M3.a import RAW/FITS RGB. Prima di M4 (GUI) ci si ferma col proprietario.
 
 Ritmo misurato di M2 (solo informazione): avviata il 28 ottobre 2026; M2.g, M2.f, M2.a e M2.b chiuse il 28 ottobre; M2.c, M2.d e M2.e il 29 ottobre (date dei commit e dei record).
 
 ## Limiti aperti
 
-- M2.e: checkpoint/resume non collegato alla calibrazione (`checkpoint_every` 0); master non combinati dal prodotto (le medie sul dato reale le costruisce il test); overscan non ritagliato (`L − D` ≈ −73 ADU registrato senza soglia); input letti due volte (riverifica del digest dopo il preflight); alcune guardie protette solo insieme (mutazione su T_M2E_29, quoziente f64 non isolabile); stima di N non valida su flat vignettato (rapporto 8,33, nessun gate, ADR-17 `iid_gaussian_fc`); T-M2E-13 e T-M2E-21/26 non eseguiti sotto ASan/UBSan.
+- M2.e: checkpoint/resume non collegato alla calibrazione (`checkpoint_every` 0); master non combinati dal prodotto (le medie sul dato reale le costruisce il test); overscan non ritagliato (`L − D` ≈ −73 ADU registrato senza soglia); input letti due volte (riverifica del digest dopo il preflight); alcune guardie protette solo insieme (mutazione su T_M2E_29, quoziente f64 non isolabile); stima di N non valida su flat vignettato (rapporto 8,33, nessun gate, ADR-17 `iid_gaussian_fc`); T-M2E-13 e T-M2E-21/26 eseguiti sotto ASan/UBSan solo dal giro 8 del gate (preset `dev-full`, circa 29 minuti).
 - Gate M4.a: latenza pan/zoom, accessibilità, IME, colore ICC, confronto con QML.
 - M2.d: soglie F-RES-01 dal gate M2 (`docs/evidence/M2-gate.md`): frazione normale 0.375 CONFERMATA sul PC di sviluppo; frazione sotto pressione 0.25 e soglia PSI 10.0 invariate e confermate (S4 quinquies); misura su un solo PC; costo per task (alloc/free di 3 buffer da 2 MiB) con 1 worker lento e variabile (60-102 s per 40 GiB), non indagato; cancel cooperativo; resume riesegue i task dopo l'ultimo checkpoint; page cache dello spill fuori dal budget (misura per cgroup assente); TSan non nei preset (eseguito a mano durante lo sviluppo); un `pwrite` fallito lascia l'estensione addebitata fino alla distruzione dell'area; `ctest --preset release` esegue anche lo slow (circa 107 s).
 - M2.c: durabilità contro perdita di corrente non provata (fuori dal modello di minaccia); processo malevolo con lo stesso UID fuori dal modello; `readdir` in `read_directory` coperto da `Export.T_M2A_readdir_failure_while_verifying_stops_as_io_and_names_errno`.

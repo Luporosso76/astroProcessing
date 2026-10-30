@@ -19,14 +19,14 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/include/astro/resources.hpp` | `74b04a71563aa738636ae48a224c634b063058fe0d6269a80034329e4ecfc030` |
 | `src/core/master.cpp` | `9877bba1d872fa849d28caf7dc043c4c8947d71785b5a7dc42378ccfb4f7197c` |
 | `src/core/resources.cpp` | `b4cec8995f8457d770c2ce47ff6afc1c282c804b5709c291973473c26b3006de` |
-| `tests/trace/M2.tsv` | `f8d9705c42609e86abcbd277e0267be38db6102204d4cb6541e96ea33baa39a7` |
+| `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
 | `tests/unit/test_calibration_real.cpp` | `4d6dbaf66b1b6f70d88516acb1a425e7c23917eccc06c4c39d8a1e71d25434c5` |
 | `tests/unit/test_master.cpp` | `ead7cd1bcbf9c7063a86b6bff2749d88d5a2444c9a507869af797484d04a1650` |
 | `tests/unit/test_resources.cpp` | `6fc874ef4942a393e2cac3e8331174f9b2eb2aa6334b8844dc02be7b03108cab` |
 | `tests/unit/test_simd.cpp` | `9d91a0a47de646c3fc9fd74b6b3928c8248bff26ccd7f0535fb47802dbe96f9e` |
 
-- Test release (`tmp/release-junit.xml`): totali 499, fast 492, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 493, fast 493, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 500, fast 493, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 501, fast 494, slow 7, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

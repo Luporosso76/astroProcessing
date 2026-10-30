@@ -1,0 +1,9 @@
+# Sorgente del blocco generato di M2-gate.md (tools/evidence.py): esecuzione finale del gate rifatto (R6)
+file docs/test-matrix.md
+file tests/trace/M2.tsv
+file tools/check_m2_trace.py
+file tools/trace.py
+junit dev tmp/dev-junit.xml
+junit release tmp/release-junit.xml
+trace M2 tests/trace/M2.tsv build/dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

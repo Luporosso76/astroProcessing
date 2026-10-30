@@ -39,6 +39,14 @@
                       "TEST_TMPDIR": "${sourceDir}/build/dev/test_tmp/sys", "TMPDIR": "${sourceDir}/build/dev/test_tmp/sys"}
     },
     {
+      "name": "dev-full",
+      "configurePreset": "dev",
+      "output": {"outputOnFailure": true},
+      "filter": {"include": {"label": "^(fast|slow)$"}},
+      "environment": {"ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1",
+                      "TEST_TMPDIR": "${sourceDir}/build/dev/test_tmp/sys", "TMPDIR": "${sourceDir}/build/dev/test_tmp/sys"}
+    },
+    {
       "name": "release",
       "configurePreset": "release",
       "output": {"outputOnFailure": true},

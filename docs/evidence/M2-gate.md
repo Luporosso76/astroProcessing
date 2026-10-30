@@ -2,6 +2,80 @@
 
 Stato: **RIAPERTO**, 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è revocato: manca F-IO-10 (import prestacked e calibrato tipizzato), che il registro dell'appendice D impone a M2.c (`M2.c requires_all F-IO-10`, piano attivo riga 4415; foglia a riga 1821). Lo ha rilevato la review del piano M3 (`.omc/artifacts/ask/codex-m3plan-review1-20261029-1424.md`); i sette giri del gate non l'avevano visto. Storico del gate: Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
 
+Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Il gate passa solo dopo la riesecuzione identica sul commit `<COMMIT-GATE>` e la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7.
+
+## Giro 8: esecuzione finale del gate rifatto (R6)
+
+- Unità: M2, R6 (`plans/M2-residui.md`, sezione 6, clausole 1-3).
+- Scopo: un'unica esecuzione completa dev e release, slow compresi, e stato finale della tracciabilità dei 63 ID a stadio `M2.*` e `M2.entry`.
+- Commit: `<COMMIT-GATE>` (da registrare dopo il commit e la riesecuzione). Base del working tree: `60a6cc8`; modifiche del giro solo a documenti, `tests/trace/M2.tsv` e `CMakePresets.json` (preset `dev-full`), nessun codice di prodotto né test.
+- Versioni: piano attivo SHA-256 `95abbb1a…4094`; GCC 15.2.0, CMake e CTest 4.2.3, Ninja 1.13.2, ccache 4.12.3, Python 3.14.4; CFITSIO 4.6.3, SQLite 3.46.1, OpenSSL 3.5.5, FFTW 3.3.10.
+- Ambiente: Linux 7.0.0-38-generic x86_64, AMD Ryzen 7 6800H, 16 CPU, 30 GiB RAM; 4 job per build e test (sotto il tetto del 70%); `ulimit -c 0`; temporanei in `tmp/` e `build/<preset>/test_tmp/sys`; `data` collegamento simbolico non versionato ai dati pubblici del progetto.
+
+### Comandi
+
+1. Build pulita in directory nuove (`tmp/gate-final.sh`): `rm -rf build/dev build/release`; per `dev` e `release`: `cmake --preset <p>` e `cmake --build --preset <p>` con `CMAKE_BUILD_PARALLEL_LEVEL=4` e `CCACHE_DIR=tmp/cache/ccache-gate` nuovo. Log `tmp/gate-final-dev-build.log`, `tmp/gate-final-release-build.log`: zero warning.
+2. Release: `ctest --preset release -j4 --output-junit tmp/release-junit.xml` (log `tmp/gate-final-release-test.log`): 500/500, 155,7 s.
+3. Lint: `CMAKE_BUILD_PARALLEL_LEVEL=4 CTEST_PARALLEL_LEVEL=4 tools/check.sh` (log `tmp/gate-final-check.log`): uscita 0, `lint: ok`, dev fast 494/494. Rigenera `source_revision.cpp` dallo stato di Git e ricollega i binari dev (39 passi): l'esecuzione dev del punto 4 gira su quei binari.
+4. Dev: `ctest --preset dev-full -j4 --output-junit tmp/dev-junit.xml` (`tmp/gate-devfull.sh`, log `tmp/gate-final-devfull-test.log`): 501/501, 1726,7 s. Il preset `dev` filtra `fast`, e `-L` da riga di comando si somma al filtro invece di sostituirlo (`ctest --preset dev -L 'fast|slow' -N` elenca 494 test): `dev-full` è il preset `dev` con filtro `^(fast|slow)$`, stesso ambiente ASan, UBSan e temporanei.
+5. Gate: `python3 -S tools/check_m2_trace.py --run build/dev:tmp/dev-junit.xml --run build/release:tmp/release-junit.xml` (uscita in `tmp/gate-final-check-m2-trace.txt`): **uscita 0**, `check_m2_trace: 63 ID nello stadio M2, 0 con problemi, 0 problemi di esecuzione`. Prova negativa: con la matrice di prima del giro (`--matrix tmp/test-matrix.before-r6.md`) uscita 1, 63 ID con problemi.
+6. `python3 -S tools/trace.py check --stage M2 --map tests/trace/M2.tsv` su `build/dev` e su `build/release` con il junit della propria build: 63 ID, 0 non coperti in entrambe. Matrice e mappa risolvono gli stessi test per ogni ID (`tmp/r6-compare.py`, 0 righe diverse).
+
+Conteggi e hash generati:
+
+<!-- evidence:begin -->
+Blocco generato da `tools/evidence.py`; non modificare a mano.
+
+| File | SHA-256 |
+|---|---|
+| `docs/test-matrix.md` | `afe57cdb79486768ac3bcde70c4de8e8d34abcd1f3a171d62c1781fb076dca3b` |
+| `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
+| `tools/check_m2_trace.py` | `e4d581a595eaec6b322f2f5294aa48fed59603c424c44bae14c0cd6bbb207682` |
+| `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
+
+- Test dev (`tmp/dev-junit.xml`): totali 501, fast 494, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 500, fast 493, slow 7, falliti 0
+- Tracciabilità (`tests/trace/M2.tsv`, build `build/dev`, junit `tmp/dev-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
+- Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
+<!-- evidence:end -->
+
+Il test presente solo in dev è `BuildInfo.SanitizersAreActiveInDevBuild`. I sette `slow` girano ora anche sotto ASan e UBSan: T-M2E-13 1578 s, T-M2R2-09 1622 s, T-M2D-13 417 s, T-M2R2-04 308 s, T-M2E-21 (master del prodotto) 254 s, T-M2E-21-26 102 s, T-M2R1-09 11 s.
+
+### Tracciabilità: correzioni del giro
+
+- Stati: i 63 ID passano a `CHIUSO` (funzionali, NFR, G, consegne, aggregati) o `VERIFICATO` (ADR, C, D, già `APPROVATO` in R0); ogni riga della matrice cita `M2-gate.md`. Un ID è salito solo con i test della riga esistenti in `ctest -N` e passati in entrambi i junit.
+- C-02.a: la riga nominava i test solo fra i pianificati. Ora T-M2R2-01…09 e T-M2R2R-02…05 (R2 e R2.r), come `tests/trace/M2.tsv`.
+- D-03: «come ADR-01» diventa T-M2F-01 (build C++20 del core headless, arco 4078), come la mappa e il verbale `docs/decisions/M2-entry.md` (riga 18).
+- D-09.a: la riga diceva «tolleranze derivate prima della misura in T-M2E». Ora nomina i test del verbale (T-M2E-01, `CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n`, che contiene la prova di T-M2E-20, T-M2E-21, 26) e quelli delle tolleranze preregistrate di R1 (T-M2R1-03), R2 (T-M2R2-01…04, 09, C-02 §9) e R5 (T-M2R5-01, 02, 06, ADR-07). La mappa è aggiornata.
+- F-PRJ-06: `T-PRJ-01` è l'ID di un test del registro (riga 3547, stadio M3.s, «incrementale da M2»; F-PRJ-06 `verified_by` T-PRJ-01, arco 3715), non un nome di ctest. La sua parte M2 è T-M2R4-01…04, già nominati nella riga. Il riferimento passa dalla colonna dei test a quella dello stato; il test completo resta di M3.s.
+- Sette righe nominavano test diversi da quelli di `tests/trace/M2.tsv` (F-CAL-06.a, NFR-CPU-01.a, ADR-09.a, ADR-16.a, ADR-17.a, C-01.a, D-17.a). Ognuna ora nomina l'unione delle due, tutta passata in entrambe le esecuzioni.
+
+### Clausola 3 (§21.4, riga 2675): test che la provano
+
+| Parte | Test (passati in dev e release) |
+|---|---|
+| Slice FITS, `L − D` con dark matched | T-M2E-01, 02, 03; `CalibM2E.T_M2E_02_nondyadic_cancellation_even_and_odd_n` |
+| `Q = Fc/N(Fc)` | T-M2E-04…07 (`CalibM2E.T_M2E_04_05_*`, `CalibM2E.T_M2E_04_var_q_overflow_*`) |
+| Maschere | T-M2E-04, 05, 24; T-M2A-01…13 (ADR-03); T-M2R5-06 (bit identici fra i percorsi) |
+| Metadati | T-M2A-03 (card conservate in ordine, non interpretate elencate), T-M2A-07 (pattern CFA e offset); T-M2R1-07 (keyword non interpretate in report e provenance) |
+| Incertezza | T-M2E-21…26 (`T-M2E-21-26.monte_carlo`), `MasterPipeline.T_M2E_20_*`, `T-M2E-21.product_masters_monte_carlo`, T-M2R2-04 |
+| Report | T-M2E-12, 26; T-M2R1-08; T-M2R4-03, 06; T-M2R2-06, 08 |
+| DAG durevole | T-M2B-01…13; T-M2C-01…25 |
+| Recovery | T-M2C-02, 03, 10, 12; T-M2R4-01…04 (SIGKILL a ogni punto, perdita di energia simulata) |
+| Cancel | T-M2D-08; T-M2R3-07 (stop con checkpoint sotto pressione) |
+| Worker | T-M2D-04, 07, 15; T-M2R3-09 (worker su insieme di CPU); T-M2R3-06 (checkpoint e resume nel job) |
+| Dato astronomico reale | T-M2E-13 (PUB-LFC-01, calibrazione), T-M2R2-09 (master del prodotto su PUB-LFC-01), T-M2R1-09 (campioni pubblici PUB-LFC-01 e PUB-CFA-01) |
+
+Nessuna parte della clausola resta senza test.
+
+### Esito e limiti
+
+- Esito: PARZIALE fino alla riesecuzione sul commit `<COMMIT-GATE>` e alla review (clausola 4); sul working tree le clausole 1-3 sono soddisfatte.
+- L'esecuzione è sul working tree, non su un commit: i binari portano la revisione sporca in `source_revision.cpp`.
+- Release e dev non sono simultanee: release prima di `tools/check.sh`, dev dopo, ciascuna sui binari della propria build.
+- Limiti degli ID, nella colonna di stato della matrice: F-IO-01 (RGB e multi-plane solo sintetici), F-IO-05 (HDU compressi rifiutati), F-RES-07.a (ENOSPC sulla cache delle miniature non provato), NFR-SEC-03 (inode degli originali non confrontati nella cache), NFR-PERF-01 e F-RES-01 (soglie misurate su un solo PC), F-PRJ-06 (T-PRJ-01 completo in M3.s).
+- Autore e data: agente general-purpose su Claude Opus 5.5, 30 ottobre 2026. Review indipendente: da fare.
+
 ## Clausola del gate e record
 
 Il gate non ripete le prove delle unità: le richiama. Ogni riga rimanda al record dove sono comando, ambiente, esito e limiti.
