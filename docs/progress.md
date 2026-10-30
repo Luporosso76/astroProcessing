@@ -39,6 +39,6 @@ Ritmo misurato di M2 (solo informazione): avviata il 28 ottobre 2026; M2.g, M2.f
 - M2.d: soglie F-RES-01 dal gate M2 (`docs/evidence/M2-gate.md`): frazione normale 0.375 CONFERMATA sul PC di sviluppo; frazione sotto pressione 0.25 e soglia PSI 10.0 invariate e confermate (S4 quinquies); misura su un solo PC; costo per task (alloc/free di 3 buffer da 2 MiB) con 1 worker lento e variabile (60-102 s per 40 GiB), non indagato; cancel cooperativo; resume riesegue i task dopo l'ultimo checkpoint; page cache dello spill fuori dal budget (misura per cgroup assente); TSan non nei preset (eseguito a mano durante lo sviluppo); un `pwrite` fallito lascia l'estensione addebitata fino alla distruzione dell'area; `ctest --preset release` esegue anche lo slow (circa 107 s).
 - M2.c: durabilità contro perdita di corrente non provata (fuori dal modello di minaccia); processo malevolo con lo stesso UID fuori dal modello; `readdir` in `read_directory` coperto da `Export.T_M2A_readdir_failure_while_verifying_stops_as_io_and_names_errno`.
 - Vincolo: prima di qualsiasi lavoro sulla GUI ci si ferma col proprietario (`AGENTS.md`).
-- Nessun dataset CFA reale ridistribuibile trovato: debayer M3.d senza dato reale per ora.
-- Cataloghi: Gaia e ESA Tycho2 solo uso non commerciale; APASS senza grant di redistribuzione dimostrato. Nessun pack adottato.
-- M10 non autorizzato. CodeGraph/Graphify: indici assenti, non creati.
+- Dato CFA reale per M3.d: PUB-CFA-01, sub Seestar di Zenodo 17843622 (CC BY 4.0), acquisito nei residui M2.
+- Cataloghi: Gaia DR3 per astrometria e colore (decisione del proprietario, 30 ottobre 2026; CC BY-NC 3.0 IGO, distribuzione non commerciale, release commerciale solo con autorizzazione scritta ESA). Estratto non ancora acquisito: si adotta in M3.p.
+- M10 non autorizzato.

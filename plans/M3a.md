@@ -35,6 +35,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 | U8a, U8b, U9 | Sonnet | Sonnet | Codex |
 | U10 | Sonnet (5 casi aggiunti dall'autore del codice: deviazione dichiarata) | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U11 | Opus (oracolo HEALPix) | Sonnet | Codex |
+| U12 (librerie migliori) | Sonnet (Opus per rifare le sonde dei fatti di ADR-08 su LibRaw 0.22) | Sonnet | Codex |
 
 Ricognizione, allineamento di piani e record, controlli di stato: Haiku. Testi e lingue: Gemini via `agy`. Il coordinatore copia il modello da questa tabella nella chiamata di delega. Una mutazione sopravvissuta o un caso mancante trovato dall'autore del codice non diventa un test suo: lo riporta, e i casi li scrive l'agente dei test (regola ripetuta nei prompt da U3 in poi).
 
@@ -220,3 +221,19 @@ Intervento a sé nella base comune, proprietario unico. Test già scritti (tmp/t
 6. `demosaic` con `variance_propagation = linear_weights`, `measure` = {`samples.interpolated`}: true.
 (Casi 3-6 dipendono anche dai tipi `demosaic` e `variance_scope` di M3.d.)
 Conseguenza: i test esistenti che si aspettano true per immagini senza `measure` (`test_image.cpp:108,118`, `test_fits.cpp:823`, test_calibration*, test_master, test_import*, m2e_workflow) vanno aggiornati nello stesso intervento.
+
+## Correzioni dall'audit dei componenti (30 ottobre 2026, regola «Componenti» di AGENTS.md)
+
+### U12, in M3.a dopo U2b+U3 e U11, prima di U4: librerie migliori compilate nel progetto
+- LibRaw 0.22.x corrente con zlib (DNG deflate), sorgente in `third_party/libraw/` a versione fissa con SHA-256, LICENSE e PROVENANCE. Adobe DNG SDK (DNG JPEG-XL) solo dopo la lettura della sua licenza alla fonte primaria e la verifica di compatibilità con GPL-3.0-or-later.
+- CFITSIO corrente compilata senza curl: nessuna libreria di rete nel processo (ADR-13).
+- WCSLIB corrente nel prodotto (M3.g, M3.p), non solo come oracolo dei test.
+- Le sonde dei fatti LibRaw di ADR-08 (H3, origine dispari, float, curva, `cblack`, memoria M, thread, TZ, Fuji) si rifanno sulla nuova versione prima del codice; ogni differenza è un emendamento del contratto.
+- `docs/licenses.md`: licenza di ogni dipendenza diretta letta dal LICENSE upstream, non dal `copyright` Debian.
+
+### Emendamenti alle slice successive (prima del loro codice)
+- M3.d: debayer edge-aware (RCD) come default più CFA/Bayer drizzle per lo stacking; il bilineare a pesi fissi resta per la varianza esatta (ADR-09).
+- M3.q: colore del prodotto da Gaia DR3 anche nel footprint SDSS; SDSS solo come riferimento indipendente nei test.
+- PUB-DEEP-01: stack Seestar di Zenodo 17843622 (CC BY 4.0) al posto del cutout HST (licenza non dichiarata alla fonte).
+- M3.p: licenza di Hipparcos e Tycho-2 letta alla fonte prima di escluderli come complemento di Gaia per le stelle brillanti.
+- Chiuso: RawSpeed assente da LibRaw di sistema (`libraw_capabilities()` = 0x80, nessun dato `cameras.xml` nel binario).
