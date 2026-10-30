@@ -17,3 +17,7 @@ Contratti di M3.entry (ID di test `T-M3<slice>-<tema>-NN`):
 - [ADR-08-decoder-pack.md](ADR-08-decoder-pack.md): decoder RAW con LibRaw da memoria (§9.6), catalog pack (schema, manifest, G-PACK, pack mancante, corrotto o fuori copertura), cataloghi scelti, regola NFR-LIC-01.d (ADR-08.b).
 - [ADR-09-algoritmi.md](ADR-09-algoritmi.md): algoritmi P0 (ADR-09.b): una sola formulazione P0 per famiglia di M3, regola delle soglie del campo 9 (classi B, E, D, S, P, R, C; D-09.b), verifica dei campi 9 di C-01.b e C-02.b, normalizzazione e metodi robusti dei flat assegnati a F-CAL-01.b; ADR-09.a resta nella parte `.a` di ADR-16.
 - [C-01-calibrazione-light.md](C-01-calibrazione-light.md): calibrazione del light, forma completa (C-01.b): nero del decoder mai sottratto e usato come sentinella, voce `light_offset` e residuo dichiarato del percorso parziale (G-OFFSET), dominio del light, coverage attraverso la calibrazione, metriche e test; C-01.a resta nella parte `.a` di ADR-16.
+
+Base comune di M3 (ID di test `T-M3BASE-NN`):
+
+- [BASE-confini.md](BASE-confini.md): obblighi trasversali dei job `OB-01`…`OB-19` (arresto e provenance, ambiente FP, cancel, budget e pool, identità del nodo, verifica e sola lettura degli input, nessun fallback, nessuna pubblicazione su errore, checkpoint e resume, temporanei, offline), ciascuno con un solo confine proprietario e lo stato nel codice; suite di conformità sul registro dei tipi di job; debiti.
