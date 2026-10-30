@@ -1,0 +1,13 @@
+# Sorgente del blocco generato di M3-base-I5.md (tools/evidence.py)
+file docs/contracts/BASE-confini.md
+file docs/evidence/M3-base-I2.md
+file docs/evidence/M3-base-I3.md
+file tests/unit/CMakeLists.txt
+file tests/unit/test_conformance.cpp
+file tests/unit/test_conformance_gaps.cpp
+file src/core/hash.cpp
+file src/core/import_job.cpp
+file src/core/master.cpp
+file src/core/calibration_blocks.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
