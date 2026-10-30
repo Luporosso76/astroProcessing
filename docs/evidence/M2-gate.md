@@ -28,7 +28,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `ba3087d3207d2b203257cfa4023c158778f9e81f0ea5b592d8eb0fab1de1b155` |
+| `docs/test-matrix.md` | `50b6b3d613bc0cccd309b470e365d8df3e3006bd2569c3e5deb924e3b698c7a6` |
 | `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
 | `tools/check_m2_trace.py` | `e4d581a595eaec6b322f2f5294aa48fed59603c424c44bae14c0cd6bbb207682` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |

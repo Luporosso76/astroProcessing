@@ -129,6 +129,23 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10, con criteri fissat
 | T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
 | T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
 
+## M3.entry: ID di lavoro di ADR-16.b e D-16
+
+Definiti in `docs/contracts/ADR-16-stati-master.md` §b.13, con tolleranze e criteri fissati prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3A-CAL-01 | G-CAL, P-DFB000…111, P-DF-*, P-FLAT-*; ADR-16.b §b.1–b.6 | ADR-16.b, D-16 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-CAL-02 | D-16; ADR-16.b §b.5 (controllo termico), §b.6 | ADR-16.b, D-16 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-CAL-03 | F-CAL-02.b, F-CAL-03.b; ADR-16.b §b.5 (doppia sottrazione), §b.12 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-CAL-04 | F-CAL-02.b, D-16; ADR-16.b §b.10 | ADR-16.b, D-16 | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-CAL-05 | G-STOP, P-LOST, NC-21; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-CAL-06 | G-STOP, P-FLAT-UNKNOWN, G-OFFSET, P-OFFSET; ADR-16.b §b.9 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-CAL-07 | G-CAL, F-IO-04; ADR-16.b §b.7 (master da RAW) | ADR-16.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | PIANIFICATO — non eseguito |
+| T-M3A-CAL-10 | G-STOP, resume; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. Stati finali assegnati il 30 ottobre 2026 dall'esecuzione finale del giro 8 di `M2-gate.md` (`tools/check_m2_trace.py`, uscita 0); vanno riconfermati dalla riesecuzione sul commit del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.

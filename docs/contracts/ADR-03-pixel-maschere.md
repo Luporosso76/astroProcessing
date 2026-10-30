@@ -420,7 +420,7 @@ Test del piano che questi alimentano: T-IO-01 (import RAW, M3.s), i test di deba
 
 - Ordine dei piani R, G, B: regola del prodotto, non verificabile su un RGB esterno.
 - `capture_time_libraw` non è un istante UTC: il fuso orario non è noto.
-- `decoder_state` non si scrive in FITS; dove lo porta un master costruito da RAW non è deciso (ADR-16.b).
+- `decoder_state` non si scrive in FITS; un master costruito da RAW lo porta nei parametri del suo nodo (ADR-16.b §b.7).
 - Il piano di varianza di un RGB da debayer contiene solo varianze marginali; covarianze fra campioni e fra canali assenti fino ad ADR-17.b. Un operatore che assume l'indipendenza si ferma su questi ingressi.
 - `fixed_weight_approximation` è un'approssimazione di errore non misurato: C-03 lo misura prima di usarla in P0.
 - Alpha e capability di misura non sono tipi di questa estensione.

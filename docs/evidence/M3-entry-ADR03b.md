@@ -49,9 +49,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-03-pixel-maschere.md` | `7cecba27d4bffb488c5051295f065c4c29a964d3d41769eca030a0d64fbebbfd` |
-| `docs/contracts/README.md` | `c499031f6a4b10f6153781f416059556a93f36405c85538ccef124811eace09f` |
-| `docs/decisions/README.md` | `5ac8a33f3235d67fdc0a113243e90fddd50866d3fd5170b5343fb8a4ca935a76` |
-| `docs/test-matrix.md` | `ba3087d3207d2b203257cfa4023c158778f9e81f0ea5b592d8eb0fab1de1b155` |
+| `docs/contracts/ADR-03-pixel-maschere.md` | `1f3b93005dda978d3b99619369acda1d9a89a3ffe9257eb44f71255eeedc4b59` |
+| `docs/contracts/README.md` | `5399c6ed773cbb6164a8df5b1db8fe2154ead68d3b120434f01c24ff1726fff5` |
+| `docs/decisions/README.md` | `623cc43bc9e14ddc0cb60ef0daf014549c15bd700b2d11cb2645f2254fbac687` |
+| `docs/test-matrix.md` | `50b6b3d613bc0cccd309b470e365d8df3e3006bd2569c3e5deb924e3b698c7a6` |
 
 <!-- evidence:end -->

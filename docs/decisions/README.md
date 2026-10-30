@@ -27,7 +27,7 @@ Le decisioni D-19, D-20 e D-21 non aggiungono ADR. Si riflettono in ADR-09 (deco
 | ADR-13 | Offline, cataloghi e AI | M2, M8 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); proposto per cataloghi e AI: core e Advisor offline, funzioni online opt-in, pack locali con licenza verificata |
 | ADR-14 | Confini deep sky, planetario e scientifico | M0, M9 | Proposto: core condiviso, workflow e test separati |
 | ADR-15 | Motore di analisi e Advisor | M3, M4 | Proposto come soluzione tecnica; il requisito P0 è vincolante, default e costo da decidere |
-| ADR-16 | Calibrazione incompleta | Minimo M2 ingresso; estensioni M3 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); proposto come matrice e default; il requisito P0 è vincolante |
+| ADR-16 | Calibrazione incompleta | Minimo M2 ingresso; estensioni M3 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); `.b` (matrice completa, P-LOST, stato del decoder nei master da RAW): contratto [ADR-16-stati-master](../contracts/ADR-16-stati-master.md) §«Estensione ADR-16.b», default nel verbale [D-16](D-16-calibrazione-incompleta.md), review in `docs/evidence/M3-entry-ADR16b.md`; il requisito P0 è vincolante |
 | ADR-17 | Covarianza opzionale | Minimo M2 ingresso; estensioni M3 e M6 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); proposto per le estensioni: diagonale più NPS locale, correlazioni dei master, nessuna matrice densa globale |
 
 ## Licenza del prodotto
