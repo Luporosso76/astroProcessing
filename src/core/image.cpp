@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <new>
+#include <string>
 
 namespace astro {
 
@@ -74,6 +76,17 @@ void validate_decoder_state(const image& img) {
     const int channel = cfa_site_channel(*img.cfa, site / 2, site % 2);
     const std::uint8_t index = s.cfa_color_index[site];
     if (channel == 1 ? index != 1 && index != 3 : index != channel) bad_decoder_state("cfa_color_index");
+  }
+}
+
+void validate_measure(const image& img) {
+  if (!img.measure) return;
+  const std::vector<measure_limit>& l = img.measure->limits;
+  for (std::size_t i = 0; i < l.size(); ++i) {
+    if (is_derived_limit(l[i]) || (i > 0 && l[i] <= l[i - 1])) {
+      throw stop_error(error_category::invalid_input, "image.measure",
+                       "measure: codice derivato, duplicato o fuori ordine canonico", {{"codice", to_string(l[i])}});
+    }
   }
 }
 
@@ -191,7 +204,7 @@ std::uint64_t allocated_sample_bytes() noexcept { return g_allocated_bytes.load(
 
 bool equivalent_content(const image& a, const image& b) {
   return a.geometry == b.geometry && a.layout == b.layout && a.type == b.type && a.unit == b.unit &&
-         a.lin == b.lin && a.phase == b.phase && a.cfa == b.cfa && a.decoder_state == b.decoder_state &&
+         a.lin == b.lin && a.phase == b.phase && a.cfa == b.cfa && a.decoder_state == b.decoder_state && a.measure == b.measure &&
          a.samples == b.samples && a.invalid == b.invalid && a.variance == b.variance && a.metadata == b.metadata;
 }
 
@@ -240,6 +253,7 @@ void validate_image(const image& img) {
   }
   if (!ok) fail(error_category::invalid_input, "image.layout", "plane_layout incoerente con planes e cfa");
   validate_decoder_state(img);
+  validate_measure(img);
 }
 
 bool operator_output_invariants_hold(const image& img) {
@@ -263,6 +277,88 @@ bool operator_output_invariants_hold(const image& img) {
     }
   }
   return true;
+}
+
+const char* to_string(measure_limit limit) noexcept {
+  switch (limit) {
+    case measure_limit::history_unknown: return "history.unknown";
+    case measure_limit::calib_omitted_dark_subtraction: return "calib.omitted.dark_subtraction";
+    case measure_limit::calib_omitted_bias_subtraction: return "calib.omitted.bias_subtraction";
+    case measure_limit::calib_omitted_dark_flat_subtraction: return "calib.omitted.dark_flat_subtraction";
+    case measure_limit::calib_omitted_flat_bias_subtraction: return "calib.omitted.flat_bias_subtraction";
+    case measure_limit::calib_omitted_flat_normalization: return "calib.omitted.flat_normalization";
+    case measure_limit::calib_omitted_flat_division: return "calib.omitted.flat_division";
+    case measure_limit::calib_offset_known_not_removed: return "calib.offset.known_not_removed";
+    case measure_limit::calib_offset_unknown: return "calib.offset.unknown";
+    case measure_limit::calib_assumption_h_dprime: return "calib.assumption.h_dprime";
+    case measure_limit::calib_assumption_flat_thermal: return "calib.assumption.flat_thermal";
+    case measure_limit::calib_assumption_decoder_black: return "calib.assumption.decoder_black";
+    case measure_limit::linearity_nonlinear: return "linearity.nonlinear";
+    case measure_limit::linearity_unknown: return "linearity.unknown";
+    case measure_limit::variance_absent: return "variance.absent";
+    case measure_limit::variance_scope_unknown: return "variance.scope_unknown";
+    case measure_limit::variance_marginal: return "variance.marginal";
+    case measure_limit::variance_fixed_weight_approximation: return "variance.fixed_weight_approximation";
+    case measure_limit::samples_interpolated: return "samples.interpolated";
+  }
+  std::abort();
+}
+
+bool is_derived_limit(measure_limit limit) noexcept {
+  return limit >= measure_limit::linearity_nonlinear && limit <= measure_limit::variance_marginal;
+}
+
+std::vector<measure_limit> history_limits(const image& img) {
+  if (img.measure) return img.measure->limits;
+  if (img.phase && img.phase->value == process_phase::raw) return {};
+  return {measure_limit::history_unknown};
+}
+
+std::vector<measure_limit> measure_limits(const image& img) {
+  std::vector<measure_limit> out = history_limits(img);
+  if (img.lin == linearity::nonlinear) out.push_back(measure_limit::linearity_nonlinear);
+  if (!img.lin) out.push_back(measure_limit::linearity_unknown);
+  if (!img.variance) out.push_back(measure_limit::variance_absent);
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+measure_capability merge_measure(const std::vector<const image*>& inputs, const std::vector<measure_limit>& own) {
+  measure_capability m;
+  for (const image* in : inputs) {
+    const std::vector<measure_limit> h = history_limits(*in);
+    m.limits.insert(m.limits.end(), h.begin(), h.end());
+  }
+  for (measure_limit l : own) {
+    if (is_derived_limit(l)) {
+      throw stop_error(error_category::invalid_input, "image.measure", "codice derivato tra quelli aggiunti dall'operatore",
+                       {{"codice", to_string(l)}});
+    }
+    m.limits.push_back(l);
+  }
+  std::sort(m.limits.begin(), m.limits.end());
+  m.limits.erase(std::unique(m.limits.begin(), m.limits.end()), m.limits.end());
+  return m;
+}
+
+measure_assessment assess_measure(const image& img, const measure_acceptance& acceptance) {
+  measure_assessment r;
+  r.limits = measure_limits(img);
+  for (measure_limit l : r.limits) {
+    if (std::find(acceptance.accepted.begin(), acceptance.accepted.end(), l) == acceptance.accepted.end()) {
+      r.blocking.push_back(l);
+    }
+  }
+  return r;
+}
+
+void require_measure_ready(const image& img, const measure_acceptance& acceptance) {
+  const measure_assessment r = assess_measure(img, acceptance);
+  if (r.blocking.empty()) return;
+  std::string codes;
+  for (measure_limit l : r.blocking) codes += std::string(codes.empty() ? "" : ", ") + to_string(l);
+  throw stop_error(error_category::incompatible, "measure.limit_blocked", "limitazione non accettata dalla misura",
+                   {{"codici", codes}});
 }
 
 }  // namespace astro

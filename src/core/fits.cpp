@@ -673,6 +673,7 @@ image decode_fits(std::span<const std::uint8_t> bytes, std::uint64_t budget_byte
   img.lin = info.lin;
   if (info.lin) img.lin_origin.value = info.lin_origin;
   img.phase = info.phase;
+  img.measure = info.measure;
   img.metadata = info.metadata;
   img.header_cards = info.header_cards;
   img.uninterpreted_keywords = info.uninterpreted_keywords;

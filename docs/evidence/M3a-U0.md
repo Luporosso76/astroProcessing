@@ -103,7 +103,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
-| `src/core/fits.cpp` | `043760d83d7a03067169f0d0523be43a26556985f1f8f342fb79c2d975afe46d` |
+| `src/core/fits.cpp` | `f6f18576e927dcedd3c8c920f9923058fb2c9e8d7dc5523114272f75ad046967` |
 | `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
 | `src/core/include/astro/fits.hpp` | `37d4c4a21797c3a54c1d1bdc80c2e12b383d00d729571a3e41ef8fe07976abd7` |
 | `src/core/include/astro/hash.hpp` | `35127c7ac5255cc715ad016da94c4958136dd39a2342ee716324f3db2d3d4a24` |
@@ -115,6 +115,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 719, fast 712, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 713, fast 713, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 769, fast 762, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 763, fast 763, slow 0, falliti 0
 <!-- evidence:end -->

@@ -162,6 +162,7 @@ fits_block_source::fits_block_source(const std::string& path, const content_dige
   img.lin = info.lin;
   if (info.lin) img.lin_origin.value = info.lin_origin;
   img.phase = info.phase;
+  img.measure = info.measure;
   img.metadata = info.metadata;
   img.header_cards = info.header_cards;
   img.uninterpreted_keywords = info.uninterpreted_keywords;
@@ -429,6 +430,7 @@ fits_stream_writer::fits_stream_writer(const image& header_only, bool with_inval
   t.lin = header_only.lin;
   t.lin_origin = header_only.lin_origin;
   t.phase = header_only.phase;
+  t.measure = header_only.measure;
   t.metadata = header_only.metadata;
   t.header_cards = header_only.header_cards;
   t.uninterpreted_keywords = header_only.uninterpreted_keywords;

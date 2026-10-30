@@ -1,0 +1,12 @@
+# Sorgente del blocco generato di M3a-U1b.md (tools/evidence.py)
+file docs/contracts/ADR-03-pixel-maschere.md
+file src/core/include/astro/image.hpp
+file src/core/image.cpp
+file src/core/fits.cpp
+file src/core/fits_blocks.cpp
+file src/core/fits_internal.hpp
+file src/core/fits_header.cpp
+file tests/unit/test_measure.cpp
+file tests/unit/CMakeLists.txt
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

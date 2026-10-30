@@ -31,6 +31,8 @@ void for_each_field(F&& f) {
   f(&frame_metadata::roi_y, "YORGSUBF");
 }
 
+constexpr std::size_t max_measure_cards = 99;
+
 constexpr const char* other_keys[] = {"BUNIT",    "LINEAR",   "BAYERPAT", "XBAYROFF", "YBAYROFF",
                                       "XBINNING", "YBINNING", "ASTRPHAS", "ASTRTSTP"};
 
@@ -251,8 +253,59 @@ void interpret_cfa(const card_index& idx, std::uint32_t planes, const fits_read_
   info.layout = plane_layout::cfa;
 }
 
+std::string measure_key(std::size_t n) {
+  char b[32];
+  std::snprintf(b, sizeof b, "ASTRML%02zu", n);
+  return b;
+}
+
+[[noreturn]] void bad_measure_keywords(const char* what) {
+  fail(error_category::invalid_input, "fits.measure_keywords", "keyword della capacità di misura incoerenti",
+       {{"motivo", what}});
+}
+
+measure_limit parse_measure_limit(const std::string& text) {
+  for (int i = 0; i <= static_cast<int>(measure_limit::samples_interpolated); ++i) {
+    const auto l = static_cast<measure_limit>(i);
+    if (!is_derived_limit(l) && text == to_string(l)) return l;
+  }
+  fail(error_category::unsupported, "fits.measure_code", "codice di limitazione derivato o ignoto", {{"valore", text}});
+}
+
+std::optional<measure_capability> read_measure(const card_index& idx) {
+  const auto cap = idx.find("ASTRMCAP");
+  std::vector<located> codes;
+  for (std::size_t n = 1; n <= max_measure_cards; ++n) {
+    if (auto l = idx.find(measure_key(n))) {
+      if (codes.size() != n - 1) bad_measure_keywords("numerazione con buchi");
+      codes.push_back(*l);
+    }
+  }
+  if (!cap) {
+    if (!codes.empty()) bad_measure_keywords("ASTRMLnn senza ASTRMCAP");
+    return std::nullopt;
+  }
+  if (!as_logical(*cap)) bad_measure_keywords("ASTRMCAP = F");
+  measure_capability m;
+  for (const located& c : codes) {
+    const measure_limit l = parse_measure_limit(as_string(c));
+    if (!m.limits.empty() && l <= m.limits.back()) bad_measure_keywords("ordine non canonico o codice duplicato");
+    m.limits.push_back(l);
+  }
+  return m;
+}
+
+bool is_measure_key(const std::string& key) {
+  if (key == "ASTRMCAP") return true;
+  for (std::size_t n = 1; n <= max_measure_cards; ++n) {
+    if (key == measure_key(n)) return true;
+  }
+  return false;
+}
+
 bool is_interpreted(const std::string& key, bool rgb) {
   if (rgb && key == "CTYPE3") return true;
+  if (is_measure_key(key)) return true;
   if (std::any_of(std::begin(other_keys), std::end(other_keys), [&](const char* k) { return key == k; })) return true;
   bool found = false;
   for_each_field([&](auto, const char* k) { found = found || key == k; });
@@ -310,6 +363,7 @@ header_info interpret_header(const std::vector<std::string>& cards, std::uint32_
            {{"campo", "phase"}});
     }
   }
+  info.measure = read_measure(idx);
   info.binning_x = read_binning(idx, "XBINNING");
   info.binning_y = read_binning(idx, "YBINNING");
 
@@ -348,6 +402,12 @@ std::vector<std::string> missing_cards(const image& img, const std::vector<std::
   if (img.unit) add("BUNIT", std::string(unit_text(*img.unit)));
   if (img.lin) add("LINEAR", *img.lin == linearity::linear);
   if (img.phase) add("ASTRPHAS", std::string(phase_text(img.phase->value)));
+  if (img.measure) {
+    add("ASTRMCAP", true);
+    for (std::size_t i = 0; i < img.measure->limits.size(); ++i) {
+      add(measure_key(i + 1).c_str(), std::string(to_string(img.measure->limits[i])));
+    }
+  }
   if (img.cfa) {
     add("BAYERPAT", std::string(pattern_text(img.cfa->pattern)));
     add("XBAYROFF", static_cast<std::int64_t>(img.cfa->x_offset));
@@ -368,6 +428,7 @@ void check_header_matches(const image& img, const header_info& info) {
   if (img.lin != info.lin) bad("lin");
   if (img.phase != info.phase) bad("phase");
   if (img.cfa != info.cfa) bad("cfa");
+  if (img.measure != info.measure) bad("measure");
   if (img.layout != info.layout) bad("layout");
   if (img.geometry.binning_x != info.binning_x || img.geometry.binning_y != info.binning_y) bad("binning");
   for_each_field([&](auto member, const char* key) {

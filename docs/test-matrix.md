@@ -138,8 +138,8 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 | T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi; coppia «solo provenienza» di §b.15) | ADR-03.b | M3.a | verde (U1) |
 | T-M3A-TYP-13 | §8.6.2, C-10.b; ADR-03.b §b.12 (`alpha_plane`, tipi distinti) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
 | T-M3A-TYP-14 | NFR-EXP-01.b, C-10.b; ADR-03.b §b.12 (`derive_alpha`) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
-| T-M3A-TYP-15 | §9.8; ADR-03.b §b.13 (`measure`, keyword `ASTRMCAP`/`ASTRMLnn`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-TYP-16 | §7.3, §9.8; ADR-03.b §b.13 (limitazioni, unione, idoneità per misura) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-15 | §9.8; ADR-03.b §b.13 (`measure`, keyword `ASTRMCAP`/`ASTRMLnn`) | ADR-03.b | M3.a | verde (U1b; parte M3.d di TYP-16 aperta) |
+| T-M3A-TYP-16 | §7.3, §9.8; ADR-03.b §b.13 (limitazioni, unione, idoneità per misura) | ADR-03.b | M3.a | verde (U1b; parte M3.d di TYP-16 aperta) |
 | T-M3A-TYP-17 | §9.8, F-CAL-02.b, F-CAL-03.b; ADR-03.b §b.13 (codici della calibrazione `.b`) | ADR-03.b, ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-TYP-18 | G-CAL; ADR-03.b §b.14 (tabella delle operazioni, ADR-16.b §b.2) | ADR-03.b, ADR-16.b | M3.a | PIANIFICATO — non eseguito |
 

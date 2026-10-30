@@ -109,16 +109,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
 | `src/core/calibration_internal.hpp` | `9e536cf219d574cfae3959259d9396228b21e48bee8bc481034dca6106a83a4c` |
-| `src/core/fits.cpp` | `043760d83d7a03067169f0d0523be43a26556985f1f8f342fb79c2d975afe46d` |
-| `src/core/fits_blocks.cpp` | `86235fb0f71ae2246a95926d162fa283478d7e33d2cf67fcc41545cf1c6ba40b` |
-| `src/core/fits_header.cpp` | `f6bd0075814e9a04582bb8ceaf267486c0a1faba282ee0a1456d7207bc67a3a7` |
-| `src/core/fits_internal.hpp` | `dc624f44bff2b325fa129b23dc2be0dd8e7969a90c1c7bb0d193932ff4fd6355` |
-| `src/core/image.cpp` | `0bf364c331bc3ac121092ebaf5de0a54e65417db2799da583fcd71ccf1cd64cf` |
+| `src/core/fits.cpp` | `f6f18576e927dcedd3c8c920f9923058fb2c9e8d7dc5523114272f75ad046967` |
+| `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
+| `src/core/fits_header.cpp` | `d07ef32366ccae41790f4e45567ba416ff9bcc5a0f6ecc2934b55d20d85cb592` |
+| `src/core/fits_internal.hpp` | `49820516e090503b4950b7c97a18b7513d7645a8096eb1f8cc8f6c9877ade4e0` |
+| `src/core/image.cpp` | `a563aaebbf3523e1ebd7d0c60d660267268d373bbb6f81ceb010d9db92bd959f` |
 | `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
-| `src/core/include/astro/image.hpp` | `ae2b9a16b24e01f1b8873bd5da28d0447cabe02b5941e5d8dd05c8e8a5302637` |
-| `tests/unit/CMakeLists.txt` | `4267f6971ca4151314880728172f5ceaa9c6fdd21a9f569aed2605d03a386e10` |
+| `src/core/include/astro/image.hpp` | `3a9a629e910612d85f424f5e327057920028b251067f33467d2a130767cc4e67` |
+| `tests/unit/CMakeLists.txt` | `c49c893b1cbe379af40808e62ac8b35375f8a8b26391892420a4bb55e114a239` |
 | `tests/unit/test_decoder_types.cpp` | `63adee44ced66be345321731e77d2b4a352d9055410f057890ae82a1c457dc46` |
 
-- Test release (`tmp/release-junit.xml`): totali 719, fast 712, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 713, fast 713, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 769, fast 762, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 763, fast 763, slow 0, falliti 0
 <!-- evidence:end -->

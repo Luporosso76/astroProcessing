@@ -28,7 +28,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 |---|---|---|---|
 | U0 | Sonnet | Opus (confine della base) | Codex `gpt-6-astra` |
 | U1 | Sonnet | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
-| U1b | Sonnet | Sonnet | Codex |
+| U1b | Sonnet (6 casi aggiunti dall'autore del codice per mutazioni sopravvissute, deviazione dichiarata) | Sonnet | Codex |
 | U2, U3 | Sonnet (U2: 3 casi aggiunti dall'autore del codice su rilievi della review, deviazione dichiarata) | Opus (numerica del decoder, fuzz) | Codex |
 | U4, U5 | Sonnet | Sonnet | Codex |
 | U6, U7 | Opus (predicati e compatibilità) | Opus | Codex |
@@ -36,7 +36,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 | U10 | Sonnet (5 casi aggiunti dall'autore del codice: deviazione dichiarata) | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U11 | Opus (oracolo HEALPix) | Sonnet | Codex |
 
-Ricognizione, allineamento di piani e record, controlli di stato: Haiku. Testi e lingue: Gemini via `agy`. Il coordinatore copia il modello da questa tabella nella chiamata di delega.
+Ricognizione, allineamento di piani e record, controlli di stato: Haiku. Testi e lingue: Gemini via `agy`. Il coordinatore copia il modello da questa tabella nella chiamata di delega. Una mutazione sopravvissuta o un caso mancante trovato dall'autore del codice non diventa un test suo: lo riporta, e i casi li scrive l'agente dei test (regola ripetuta nei prompt da U3 in poi).
 
 ### U0. Lettura degli input RAW nel confine (base, non slice) — ~120 righe
 

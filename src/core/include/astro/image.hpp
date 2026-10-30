@@ -237,6 +237,27 @@ struct source_encoding {
   friend bool operator==(const source_encoding&, const source_encoding&) = default;
 };
 
+// Limitazioni note di una misura (ADR-03.b §b.13), nell'ordine canonico della tabella. Memorizzate: dalla storia
+// dell'immagine, in `image.measure`; derivate: calcolate dai campi dell'immagine, mai memorizzate.
+enum class measure_limit {
+  history_unknown, calib_omitted_dark_subtraction, calib_omitted_bias_subtraction, calib_omitted_dark_flat_subtraction,
+  calib_omitted_flat_bias_subtraction, calib_omitted_flat_normalization, calib_omitted_flat_division,
+  calib_offset_known_not_removed, calib_offset_unknown, calib_assumption_h_dprime, calib_assumption_flat_thermal,
+  calib_assumption_decoder_black, linearity_nonlinear, linearity_unknown, variance_absent, variance_scope_unknown,
+  variance_marginal, variance_fixed_weight_approximation, samples_interpolated
+};
+const char* to_string(measure_limit limit) noexcept;
+// Vero per i cinque codici derivati (linearity.*, variance.absent, variance.scope_unknown, variance.marginal).
+bool is_derived_limit(measure_limit limit) noexcept;
+
+// Soli codici memorizzati, in ordine canonico, senza duplicati (violazione: invalid_input image.measure).
+struct measure_capability {
+  std::vector<measure_limit> limits;
+  friend bool operator==(const measure_capability&, const measure_capability&) = default;
+};
+struct measure_acceptance { std::vector<measure_limit> accepted; };
+struct measure_assessment { std::vector<measure_limit> limits; std::vector<measure_limit> blocking; };
+
 struct image {
   image_geometry geometry;
   plane_layout layout = plane_layout::mono;
@@ -250,6 +271,8 @@ struct image {
   std::optional<cfa_layout> cfa;
   // Solo nelle immagini prodotte dal decoder RAW; lo scrittore FITS non lo rappresenta (ADR-03.b §b.2).
   std::optional<astro::decoder_state> decoder_state;
+  // Assente = capacità non valutata, mai «nessuna limitazione».
+  std::optional<astro::measure_capability> measure;
   aligned_buffer samples;
   invalid_mask invalid;
   std::optional<variance_plane> variance;
@@ -291,7 +314,7 @@ struct image {
 };
 
 // Contenuto scientifico: geometria, layout, tipo, unita', linearita', fase (valore, senza origine), cfa, decoder_state (senza
-// `source`), campioni, maschera, varianza e valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine
+// `source`), measure, campioni, maschera, varianza e valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine
 // dei metadati.
 bool equivalent_content(const image& a, const image& b);
 
@@ -308,5 +331,17 @@ void validate_image(const image& img);
 // Invarianti di un'immagine prodotta da un operatore: un campione non finito ha almeno un bit acceso;
 // un pixel con un bit acceso ha campione e varianza NaN.
 bool operator_output_invariants_hold(const image& img);
+
+// `measure->limits` se presente; altrimenti `{history.unknown}` se la fase non è `raw` o è assente, vuoto se è `raw`.
+std::vector<measure_limit> history_limits(const image& img);
+// Unione, in ordine canonico, di `history_limits` e dei codici derivati veri.
+std::vector<measure_limit> measure_limits(const image& img);
+// Unione, in ordine canonico e senza duplicati, di `history_limits` degli ingressi e dei codici memorizzati propri.
+// Un codice proprio derivato: invalid_input image.measure.
+measure_capability merge_measure(const std::vector<const image*>& inputs, const std::vector<measure_limit>& own);
+// `blocking` = i codici di `limits` assenti da `accepted`.
+measure_assessment assess_measure(const image& img, const measure_acceptance& acceptance);
+// `blocking` non vuoto: incompatible `measure.limit_blocked`, codici nel contesto.
+void require_measure_ready(const image& img, const measure_acceptance& acceptance);
 
 }  // namespace astro

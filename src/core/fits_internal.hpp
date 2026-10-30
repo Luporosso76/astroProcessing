@@ -77,6 +77,7 @@ struct header_info {
   std::optional<metadata_origin> lin_origin;
   std::optional<metadata_value<process_phase>> phase;
   std::optional<cfa_layout> cfa;
+  std::optional<measure_capability> measure;
   std::optional<std::uint32_t> binning_x;
   std::optional<std::uint32_t> binning_y;
   plane_layout layout = plane_layout::mono;

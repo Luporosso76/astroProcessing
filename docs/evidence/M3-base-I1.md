@@ -101,6 +101,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tools/lint-allowlist.txt` | `8c0deba2fa1011e5938f8b50a9633acedb5652e513e35080b3bb9bae2ff444b4` |
 
-- Test release (`tmp/release-junit.xml`): totali 719, fast 712, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 713, fast 713, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 769, fast 762, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 763, fast 763, slow 0, falliti 0
 <!-- evidence:end -->

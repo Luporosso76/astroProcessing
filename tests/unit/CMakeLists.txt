@@ -172,6 +172,13 @@ target_link_libraries(test_raw_decode PRIVATE astrocore GTest::gtest_main)
 target_include_directories(test_raw_decode PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_raw_decode PROPERTIES LABELS fast)
 
+# U1b (M3.a): capacità di misura `measure` (ADR-03.b §b.13).
+add_executable(test_measure test_measure.cpp)
+target_link_libraries(test_measure PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_measure PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_measure PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_measure PROPERTIES LABELS fast)
+
 add_test(NAME T-M2F-01.offline
   COMMAND ${PROJECT_SOURCE_DIR}/tools/check_offline.sh
     $<TARGET_FILE:astrocore>
@@ -215,7 +222,8 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conformance_network.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_decoder_types.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_pack.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_measure.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.

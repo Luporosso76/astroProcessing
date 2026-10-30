@@ -99,7 +99,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
-| `src/core/fits_blocks.cpp` | `86235fb0f71ae2246a95926d162fa283478d7e33d2cf67fcc41545cf1c6ba40b` |
+| `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
 | `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/include/astro/fits_blocks.hpp` | `49c32447622cdf9f0f2fb5122679e474a36ca492f296cf44e1e7a87d96e4860c` |
 | `src/core/include/astro/import_job.hpp` | `58eaa1d71c185f33248804cf2970db132418b5d28bbd9c170b49bc927541bc17` |
@@ -113,6 +113,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 
-- Test release (`tmp/release-junit.xml`): totali 719, fast 712, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 713, fast 713, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 769, fast 762, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 763, fast 763, slow 0, falliti 0
 <!-- evidence:end -->
