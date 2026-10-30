@@ -128,7 +128,9 @@ if [ "$round" = 2 ]; then
   prev="tmp/review-snap/${unit}-${BASH_REMATCH[1]}1"
   [ -d "$prev" ] || { echo "manca l'istantanea del giro 1 ($prev): il giro 1 non è passato da questo strumento" >&2; exit 2; }
   delta="tmp/review-delta-${unit}-round2.diff"
-  diff -ruN "$prev" "$snap" > "$delta" || true
+  rc=0
+  diff -ruN "$prev" "$snap" > "$delta" || rc=$?
+  [ "$rc" -le 1 ] || { echo "diff delle istantanee fallito (uscita $rc)" >&2; exit 2; }
   prompt="${prompt}
 
 Delta del giro 2 rispetto al giro 1, calcolato dallo strumento: \`${delta}\`."
