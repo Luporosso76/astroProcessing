@@ -72,9 +72,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-08-decoder-pack.md` | `7185d48dae3ef3f8a524afaccbc965f0187a0d478a4ebd9f887cad27a88b4d1b` |
-| `docs/contracts/README.md` | `5399c6ed773cbb6164a8df5b1db8fe2154ead68d3b120434f01c24ff1726fff5` |
-| `docs/decisions/README.md` | `623cc43bc9e14ddc0cb60ef0daf014549c15bd700b2d11cb2645f2254fbac687` |
+| `docs/contracts/README.md` | `75a636a03c37773fa5f34e335427c15a864df9d80bbeab1d521bd024672048b1` |
+| `docs/decisions/README.md` | `dd6dfd5ba219f73206b060b3e5d692a851e325f567bc63c7fdcbbedf5863810b` |
 | `docs/licenses.md` | `737e288a42d54f0c367084a08b68e7a9effbc92aeb95e6951b679de698586c21` |
-| `docs/test-matrix.md` | `50b6b3d613bc0cccd309b470e365d8df3e3006bd2569c3e5deb924e3b698c7a6` |
+| `docs/test-matrix.md` | `0f74934a8525a795e0b5a2688ee1cbc847a59f4afcf4cb976c56558b707f59d9` |
 
 <!-- evidence:end -->

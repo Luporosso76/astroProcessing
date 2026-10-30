@@ -424,3 +424,132 @@ Test del piano che questi alimentano: T-IO-01 (import RAW, M3.s), i test di deba
 - Il piano di varianza di un RGB da debayer contiene solo varianze marginali; covarianze fra campioni e fra canali assenti fino ad ADR-17.b. Un operatore che assume l'indipendenza si ferma su questi ingressi.
 - `fixed_weight_approximation` è un'approssimazione di errore non misurato: C-03 lo misura prima di usarla in P0.
 - Alpha e capability di misura non sono tipi di questa estensione.
+
+### b.12 Alpha
+
+Grandezza (§7.3 righe 697-704, §8.6.2): canale di composizione o di trasparenza per il display e per l'export. Non è una maschera di invalidità, né una coverage, né una maschera fotografica. Serve all'export TIFF di C-10.b (NFR-EXP-01.b, M3.s).
+
+Dipendenza: §§b.12–b.18 citano ADR-16.b nella versione in scrittura in `.claude/worktrees/agent-ae93e7a97ecbe3a23/docs/contracts/ADR-16-stati-master.md` (SHA-256 `320218d1dc2c689c77afd0141e990e937b066395886dd3f4402d9a9097a5681a`), non ancora nel repository. Un cambio dei paragrafi citati riapre i punti che li citano.
+
+`alpha_plane`: un valore f32 per pixel, un solo piano, buffer allineato a 64 byte. Non è un campo di `image`, non entra in `equivalent_content` e nessun operatore che produce campioni, varianza, `invalid` o `coverage` lo riceve. Invarianti (`validate_alpha(const image&, const alpha_plane&)`, T-M3A-TYP-13): `width` e `height` uguali a quelli dell'immagine, altrimenti `invalid_input`, `alpha.geometry`; ogni valore finito in `[0, 1]`, altrimenti `invalid_input`, `alpha.range`.
+
+Semantica: alpha **non associato**. I campioni di colore non si moltiplicano mai per alpha, né in memoria né all'export: sarebbe una trasformazione dei pixel non dichiarata (C-10 campo 1). Fatto: libtiff 4.7.0 definisce per il tag `ExtraSamples` (338) i valori `EXTRASAMPLE_ASSOCALPHA = 1` (alpha associato) ed `EXTRASAMPLE_UNASSALPHA = 2` (alpha non associato) (`/usr/include/x86_64-linux-gnu/tiff.h` righe 328-331). Regola: l'export che scrive un `alpha_plane` in TIFF lo dichiara con il valore 2. Profondità, quantizzazione e regole offerte sono di C-10.b. La specifica TIFF 6.0 che definisce il tag non è riletta in questa unità.
+
+Alpha esiste solo come uscita di `derive_alpha(const image&, alpha_rule, const edit_mask*)`, con la regola dichiarata nella ricetta dell'export. Non c'è una regola di default: senza regola il file non ha alpha. `inv(x, y)` è vero se il pixel ha almeno un bit di `invalid_reason` acceso in almeno un piano.
+
+| `alpha_rule` | `α(x, y)` | Prerequisito |
+|---|---|---|
+| `validity` | 0 se `inv(x, y)`, altrimenti 1 | — |
+| `coverage` | 0 se `inv(x, y)`, altrimenti `min_p coverage(x, y, p)` arrotondato a f32 | `coverage` presente (§b.5) |
+| `edit_mask` | 0 se `inv(x, y)`, altrimenti `m(x, y)` | maschera passata, `check_edit_mask` superato (§b.7) |
+
+Regole (T-M3A-TYP-14):
+
+- Un solo verso: `derive_alpha` legge immagine e maschera e non le modifica; alpha non scrive bit di invalidità, coverage o maschere. α = 0 non rende invalido un pixel; α = 1 non rende valido un pixel invalido.
+- Esattezza: `validity` ed `edit_mask` producono 0, 1 o la copia di un f32, senza arrotondamenti. `coverage` è esatta con campioni f32; con campioni f64 è un solo arrotondamento al più vicino del minimo in f32. Il risultato resta in `[0, 1]`: 0 e 1 sono rappresentabili in f32, quindi il float più vicino a un valore in `[0, 1]` non supera 1 e non scende sotto 0.
+- Prerequisiti, controllati prima di allocare il piano: regola `coverage` senza coverage, `incompatible`, `alpha.coverage_missing`; regola `edit_mask` senza maschera, o maschera passata con un'altra regola, `invalid_input`, `alpha.mask_argument`; maschera di geometria diversa, `mask.edit_geometry`.
+- Provenienza: `alpha_info` = regola e, per `edit_mask`, `node_id` e `revision` della maschera (`mask_info`, §b.7). Entra nei parametri del nodo di export e nel manifest (C-10.b).
+- Tipi distinti: `alpha_plane` si aggiunge ai quattro tipi di §b.7, senza conversioni implicite né esplicite con `invalid_mask`, `edit_mask`, `coverage_plane`, `variance_plane`, in entrambe le direzioni (T-M3A-TYP-13).
+- FITS: lo scrittore di ADR-03 non ha un HDU per alpha. Un FITS porta già `INVALID` e `COVERAGE`, da cui alpha si ricava con una regola della tabella.
+- Memoria: 4 byte per pixel, prenotati dal job di export (ADR-06, C-10.b).
+
+### b.13 Capability di misura
+
+Grandezza (§7.3 righe 699 e 706, §7.13 riga 852, §9.8 riga 1312): che cosa l'immagine può sostenere in una misura. Non c'è un booleano di validità scientifica: la capability è l'elenco delle limitazioni note, e l'idoneità si decide per misura, insieme ai motivi.
+
+Codici di limitazione, lista chiusa nell'ordine canonico della tabella. Un codice **memorizzato** viene dalla storia dell'immagine e si conserva in `image.measure`; un codice **derivato** si calcola dai campi dell'immagine e non si memorizza mai.
+
+| Codice | Classe | Condizione |
+|---|---|---|
+| `history.unknown` | memorizzato | Un ingresso dell'operatore aveva `measure` assente e fase diversa da `raw`, o assente |
+| `calib.omitted.dark_subtraction`, `calib.omitted.bias_subtraction`, `calib.omitted.dark_flat_subtraction`, `calib.omitted.flat_bias_subtraction`, `calib.omitted.flat_normalization`, `calib.omitted.flat_division` | memorizzato | Voce omonima del ledger di ADR-16.b §b.10 con `status = omitted` |
+| `calib.offset.known_not_removed`, `calib.offset.unknown` | memorizzato | Voce `light_offset` di ADR-16.b §b.10 con quello stato |
+| `calib.assumption.h_dprime` | memorizzato | Ricetta con `D'` o `DF'` (ipotesi H-D', ADR-16.b §b.2) |
+| `calib.assumption.flat_thermal` | memorizzato | Ricetta con `flat.bias` (limite termico dichiarato, ADR-16.b §b.5) |
+| `calib.assumption.decoder_black` | memorizzato | Ricetta con ingressi dotati di stato del decoder (nero come sentinella, ADR-16.b §b.7; ipotesi H3 di ADR-08.b §2.4) |
+| `linearity.nonlinear` | derivato | `lin = nonlinear` |
+| `linearity.unknown` | derivato | `lin` assente |
+| `variance.absent` | derivato | `variance` assente |
+| `variance.scope_unknown` | derivato | `variance` presente e `variance_scope` assente |
+| `variance.marginal` | derivato | `variance_scope = marginal` (§b.4) |
+| `variance.fixed_weight_approximation` | memorizzato | Aggiunto dal debayer con `variance_propagation = fixed_weight_approximation` (§b.3) e da ogni operatore che dichiara un'approssimazione della propagazione della varianza |
+| `samples.interpolated` | memorizzato | Aggiunto dal debayer (§b.4: ogni RGB da debayer ha campioni `interpolated`) e da ogni operatore il cui campione di uscita è stimato da più posizioni di ingresso (resampling, convoluzione) |
+
+`measure_capability`: `limits` (`std::vector<measure_limit>`), soli codici memorizzati, in ordine canonico, senza duplicati (`validate_image`, `invalid_input`, `image.measure`). `image.measure` è `std::optional<measure_capability>`: assente significa «non valutata», mai «nessuna limitazione».
+
+Funzioni (T-M3A-TYP-16):
+
+- `history_limits(const image&)`: `measure->limits` se `measure` è presente; altrimenti `{history.unknown}` se la fase non è `raw` o è assente, vuoto se è `raw`. La fase `raw` è una dichiarazione dell'import (R1) che il prodotto non verifica: la capability la eredita.
+- `measure_limits(const image&)`: unione di `history_limits` e dei codici derivati veri, in ordine canonico.
+- `merge_measure(ingressi, propri)`: unione, in ordine canonico, di `history_limits` di ogni ingresso e dei codici memorizzati che l'operatore aggiunge. Ogni operatore la usa per la propria uscita, quindi un codice memorizzato non sparisce lungo il DAG. Nessun operatore di ADR-03.b rimuove un codice. La funzione si verifica in T-M3A-TYP-16; che un operatore la usi si verifica nei test dell'operatore, nella sua unità (calibrazione `.b` in T-M3A-TYP-17).
+- `assess_measure(const image&, const measure_acceptance&)` → `measure_assessment {limits, blocking}`: `limits` = `measure_limits`, `blocking` = i codici di `limits` assenti da `measure_acceptance`. L'insieme accettato lo dichiara il contratto di ciascuna misura, non questo. `require_measure_ready` con `blocking` non vuoto: `incompatible`, `measure.limit_blocked`, codici nel contesto, prima di ogni calcolo della misura. Una misura eseguita riporta `limits` nel suo report: sono i motivi e le limitazioni che §7.3 riga 706 chiede accanto a `measure_ready`.
+
+Regole:
+
+- `operator_output_invariants_hold`: `measure` presente e valido in ogni immagine prodotta da un operatore.
+- Calibrazione `.b`: aggiunge i codici `calib.*` della tabella dal ledger e dalla ricetta del nodo (T-M3A-TYP-17). La ricetta `.a` di ADR-16.a non aggiunge codici. Debayer e resampling aggiungono `samples.interpolated` e, quando la dichiarano, `variance.fixed_weight_approximation`: memorizzati, i due codici restano anche dopo un'operazione che toglie `demosaic` (§b.3). `operator_output_invariants_hold` verifica che un'uscita con `demosaic` li porti (il secondo se `variance_propagation = fixed_weight_approximation`); che resampling e convoluzione aggiungano `samples.interpolated` si verifica nei test dell'operatore, nella sua unità (C-06 in M3.g, C-09 in M3.k).
+- FITS (T-M3A-TYP-15): `ASTRMCAP` (logico, `T`) scritta quando `measure` è presente; `ASTRML01`…`ASTRML99` (stringhe), un codice memorizzato per card, numerate da `01` senza buchi, nell'ordine canonico. I codici memorizzati sono 14: due cifre bastano. In lettura: `ASTRMCAP = F`, card `ASTRMLnn` senza `ASTRMCAP`, numerazione con buchi, ordine non canonico o codice duplicato: `invalid_input`, `fits.measure_keywords`; codice derivato o ignoto: `unsupported`, `fits.measure_code`. Senza `ASTRMCAP`, `measure` è assente.
+
+Le altre capability elencate al §7.3 riga 699 hanno già un tipo: CFA è `plane_layout`/`cfa`; calibrazione, stacking e analisi sono righe della tabella delle operazioni (§b.14), che i contratti di stacking e di analisi estendono; il display è sempre ammesso (`inventory`, `preview`, `export_bundle`). Di §7.13, `linear` è `lin` e `wcs_valid` è di ADR-10. Tile e piramide sono opzioni dell'aggregato ADR-03 (riga 2564, colonna «Opzioni»), non parte della proposta, e non sono tipi di `.b`.
+
+### b.14 Tabella delle operazioni e ADR-16.b §b.2
+
+Le righe di R1 restano. `calibrate` resta la riga della ricetta `.a` (ADR-16.a: quattro ingressi `raw`). La calibrazione `.b` usa tre righe nuove, assegnate a ogni ingresso dal suo ruolo e dal suo stato dichiarato secondo ADR-16.b §b.2:
+
+| Operazione | Ingressi (ADR-16.b §b.2) | Fase ammessa | Linearità ammessa |
+|---|---|---|---|
+| `calibrate_light` | light | `raw` | `linear` |
+| `calibrate_master_raw` | bias, `D`, `DF`, flat `raw` | `raw` | `linear` |
+| `calibrate_master_prepared` | `D'`, `DF'`, flat `corrected_unnormalized`, flat `calibrated` | `raw`, `calibrated` | `linear` |
+
+Regole (T-M3A-TYP-18):
+
+- `prestacked` non è ammessa in nessuna delle tre righe.
+- Esito di `require_operation_allowed`: codici di R1, la fase prima della linearità (`op.phase_blocked`, `op.linearity_blocked`), con il ruolo dell'ingresso nel contesto.
+- Nell'analisi (G-CAL, ADR-16.b §b.1) un master fuori dalla sua riga è `excluded` con motivo `phase` o `linearity` (ADR-16.b §b.3), non uno stop. Un light fuori dalla sua riga ferma l'analisi con quei codici, perché senza light non esiste alcuna ricetta. Nel preflight del nodo valgono ADR-16.b §b.8 e §b.9.
+- Un master di stato `unknown`, `scaled` o incompleto non ha riga: è `excluded` per stato (ADR-16.b §b.2) prima del controllo di fase.
+- `master_create` resta come in R1. Se i master `bias_subtracted` di C-02.b hanno ingressi in un'altra fase, la riga la aggiunge C-02.b.
+- Le misure applicano `linear_ancestor_required`, poi `require_measure_ready` (§b.13). `derive_alpha` è parte dell'export, già sempre ammesso.
+
+### b.15 Modifiche a §b.1–b.11 e ad ADR-03.a
+
+- Introduzione dell'estensione, «Fuori da ADR-03.b»: alpha e capability di misura escono dall'elenco (§b.12, §b.13). Unità che implementano le parti nuove: M3.a (capability, FITS, righe di §b.14 nell'analisi G-CAL), M3.c (codici della calibrazione `.b`), M3.s (alpha).
+- §b.7, ultimo paragrafo: le regole per ricavare alpha sono in §b.12; C-10.b sceglie quali offrire e come codificarle. Alpha resta fuori da `image`.
+- §b.8: `equivalent_content` non confronta `decoder_state.source` (origine e `keyword`, provenienza come in §b.1); sostituisce «salvo l'origine di `decoder_state.source`». Confronta `measure` (presenza ed elenco dei codici).
+- §b.10, T-M3A-TYP-12: la coppia «solo origine», non costruibile perché §b.2 ammette solo `source.origin = decoder`, diventa «solo provenienza»: lo stesso `decoder_state` con `source.keyword` diverso (per esempio `color.black` e `color.maximum`), origine `decoder` in entrambe; criterio `true`. Le coppie che differiscono in `measure` sono in T-M3A-TYP-15.
+- §b.11, ultimo punto: decade.
+- ADR-03.a: keyword interpretate in più `ASTRMCAP` e `ASTRML01`…`ASTRML99` (tipo verificato senza coercizione, duplicati e `CONTINUE` come le altre); `operator_output_invariants_hold` richiede `measure`; tabella delle operazioni con le righe di §b.14. `max_file_bytes` non cambia: alpha non va in FITS e le keyword nuove sono al più 15 card, entro `max_header_cards`.
+
+### b.16 Errori aggiunti
+
+| Condizione | Categoria | Codice |
+|---|---|---|
+| Alpha di geometria diversa dall'immagine; valore non finito o fuori da `[0, 1]` | `invalid_input` | `alpha.geometry`; `alpha.range` |
+| Regola `coverage` senza coverage | `incompatible` | `alpha.coverage_missing` |
+| Regola `edit_mask` senza maschera, o maschera con un'altra regola | `invalid_input` | `alpha.mask_argument` |
+| `measure` con codici derivati, duplicati o fuori ordine | `invalid_input` | `image.measure` |
+| `ASTRMCAP = F`, `ASTRMLnn` senza `ASTRMCAP`, numerazione con buchi, ordine non canonico, duplicati | `invalid_input` | `fits.measure_keywords` |
+| Codice derivato o ignoto in `ASTRMLnn` | `unsupported` | `fits.measure_code` |
+| Limitazione non accettata dalla misura | `incompatible` | `measure.limit_blocked` |
+
+### b.17 Test pianificati
+
+Criteri fissati qui, prima di ogni misura; oracle scritti a mano nel test.
+
+| ID | Verifica | Criterio |
+|---|---|---|
+| T-M3A-TYP-13 | `static_assert` di non convertibilità e non costruibilità fra `alpha_plane` e ciascuno dei quattro tipi di §b.7, in entrambe le direzioni; `validate_alpha` con valori 0, 1, `−0`, `nextafter(1, 2)`, `nextafter(0, −1)`, `NaN`, ±Inf e con larghezza o altezza diverse | Compilazione; confini e `−0` accettati, gli altri `alpha.range`; `alpha.geometry` |
+| T-M3A-TYP-14 | `derive_alpha` su una griglia 3×3 a 2 piani, per ogni regola, contro una tabella scritta a mano: pixel invalido su un solo piano; coverage diversa fra i piani; coverage f64 `0.1` (atteso il float più vicino, `13421773 · 2^-27`); maschera con 0 su un pixel valido. Immagine e maschera prima e dopo: campioni, `invalid`, `coverage`, `variance` e maschera bit-identici. Prerequisiti mancanti, uno alla volta | Esatta: 0 differenze bit a bit; `alpha.coverage_missing`, `alpha.mask_argument`, `mask.edit_geometry`, nessun piano allocato (contatore del pool) |
+| T-M3A-TYP-15 | `measure`: `validate_image` con codice derivato, duplicato, fuori ordine; FITS con 0, 1 e 14 codici memorizzati scritto e riletto; ogni caso di lettura di §b.16 uno alla volta; `ASTRMCAP` stringa; `equivalent_content` su una coppia che differisce solo per un codice e su una con `measure` presente contro assente | `image.measure`; rilettura identica; `fits.measure_keywords`, `fits.measure_code`, `fits.keyword_value`; `false` per entrambe le coppie |
+| T-M3A-TYP-16 | `history_limits` con `measure` assente e fase `raw`, `calibrated`, `prestacked`, assente; `measure_limits` su un'immagine di base senza codici (`lin = linear`, `variance` presente, `variance_scope = independent`, `measure` vuota) con una condizione derivata accesa alla volta, e sulle combinazioni costruibili {`lin` assente, `variance` assente} → `linearity.unknown`, `variance.absent`; {`nonlinear`, `variance` senza `variance_scope`} → `linearity.nonlinear`, `variance.scope_unknown`; {`nonlinear`, `marginal`, `measure` con `samples.interpolated`} → `linearity.nonlinear`, `variance.marginal`, `samples.interpolated`, nell'ordine canonico; `merge_measure` con due ingressi a codici sovrapposti e un codice proprio; `assess_measure` con accettazione vuota, completa e parziale; `require_measure_ready` con `blocking` non vuoto, e con `blocking` vuoto sia sull'immagine di base sia con limitazioni tutte accettate; `operator_output_invariants_hold` su uscite altrimenti valide: senza `measure`; con `demosaic` senza `samples.interpolated`; con `variance_propagation = fixed_weight_approximation`, `samples.interpolated` presente e `variance.fixed_weight_approximation` assente; con `fixed_weight_approximation` ed entrambi i codici; con `linear_weights` e il solo `samples.interpolated` | Esatta contro la tabella; ordine canonico; `measure.limit_blocked` con i codici nel contesto; con `blocking` vuoto nessuno stop; invariante falso nei primi tre casi, vero negli ultimi due |
+| T-M3A-TYP-17 | Uscita della calibrazione `.b` per la ricetta di default e per una esperta di ogni riga di ADR-16.b §b.6 (le configurazioni di T-M3A-CAL-04), più `D'`, `flat.bias` e un light RAW: `measure.limits` contro l'oracle ricavato dal ledger e dalla ricetta; ricetta `.a`: nessun codice proprio; un ingresso `calibrated` senza `measure`. Per la ricetta `.a` e per una `.b` con codici propri: light e master con `measure` che porta codici memorizzati distinti (per esempio `history.unknown` sul light, `samples.interpolated` sul flat) e sovrapposti (lo stesso codice su due ingressi, e un codice uguale a uno proprio della ricetta) | Esatta, codice per codice; `history.unknown` presente nel caso dell'ingresso senza `measure`; codici degli ingressi conservati, uniti ai propri, senza duplicati e in ordine canonico |
+| T-M3A-TYP-18 | Le tre righe di §b.14 × fase (`raw`, `calibrated`, `prestacked`) × linearità (`linear`, `nonlinear`, `unknown`); nell'analisi un master fuori riga per ciascun ruolo e un light `calibrated`; T-M2R1-05 rieseguito sulle sei righe di R1 | Ammesse solo le celle della tabella, fase prima della linearità; master: `excluded` con motivo `phase` o `linearity`, nessuno stop; light: `op.phase_blocked`; T-M2R1-05 invariato |
+
+### b.18 Limiti dichiarati
+
+- Alpha esiste solo come derivato per l'export: la lettura di un TIFF con alpha non è coperta. La specifica TIFF 6.0 non è riletta; vale il fatto dell'header di libtiff.
+- La regola `coverage` usa il minimo fra i piani: è una regola dichiarata, non una misura di qualità.
+- I codici di limitazione coprono solo ciò che i contratti di M3 definiscono. Il «master di qualità dubbia» di §9.8 non ha un codice: ADR-16.b classifica i master solo come `usable` o `excluded`.
+- `history.unknown` si basa sulla fase dichiarata: un file dichiarato `raw` ma elaborato fuori dal prodotto non si riconosce.
+- Gli insiemi accettati dalle misure appartengono ai contratti delle misure, non ancora scritti.
+- I riferimenti ad ADR-16.b valgono per la versione indicata in §b.12, non ancora nel repository.

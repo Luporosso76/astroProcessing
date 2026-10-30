@@ -112,7 +112,7 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 
 ## M3.entry: ID di lavoro di ADR-03.b
 
-Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10, con criteri fissati prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
+Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 (13–18), con criteri fissati prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
@@ -127,7 +127,13 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10, con criteri fissat
 | T-M3A-TYP-09 | C-11, F-POST-08.a.1; ADR-03.b §b.7 (tipi distinti) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-10 | C-11, §7.14; ADR-03.b §b.7 (`mask_info`) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
-| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi; coppia «solo provenienza» di §b.15) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-13 | §8.6.2, C-10.b; ADR-03.b §b.12 (`alpha_plane`, tipi distinti) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
+| T-M3A-TYP-14 | NFR-EXP-01.b, C-10.b; ADR-03.b §b.12 (`derive_alpha`) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
+| T-M3A-TYP-15 | §9.8; ADR-03.b §b.13 (`measure`, keyword `ASTRMCAP`/`ASTRMLnn`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-16 | §7.3, §9.8; ADR-03.b §b.13 (limitazioni, unione, idoneità per misura) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-17 | §9.8, F-CAL-02.b, F-CAL-03.b; ADR-03.b §b.13 (codici della calibrazione `.b`) | ADR-03.b, ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-TYP-18 | G-CAL; ADR-03.b §b.14 (tabella delle operazioni, ADR-16.b §b.2) | ADR-03.b, ADR-16.b | M3.a | PIANIFICATO — non eseguito |
 
 ## M3.entry: ID di lavoro di ADR-16.b e D-16
 
