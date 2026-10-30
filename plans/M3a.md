@@ -57,7 +57,8 @@ Test: T-M3A-TYP-01, 02, 03, 12 (solo le coppie `decoder_state`). Uscita: test ve
 ### U1b. Capacità di misura `measure` (ADR-03.b §b.13) — ~200 righe
 
 ID: tipi di §9.8 usati da G-CAL (stadio M3.a in `docs/test-matrix.md`). Proprietari: `image.hpp`/`image.cpp` (`measure`, `history_limits`, `measure_limits`, `merge_measure`), scrittore e lettore FITS (`ASTRMCAP`, `ASTRMLnn`).
-Test: T-M3A-TYP-15, 16. Uscita: test verdi, mutazioni rilevate.
+Test: T-M3A-TYP-15; T-M3A-TYP-16 per `history_limits`, `measure_limits` senza i tipi di M3.d, `merge_measure`, `assess_measure`, `require_measure_ready`. Uscita: test verdi, mutazioni rilevate.
+Spostati dall'arbitraggio del 30 ottobre: i casi di T-M3A-TYP-16 con `variance_scope` e `demosaic` vanno a M3.d (elenco in fondo a questo piano, da copiare nel piano di M3.d); `measure` obbligatoria in `operator_output_invariants_hold` è un obbligo trasversale su tutti gli operatori e va nella base comune come intervento I6 con un proprietario unico (OB-20 da scrivere in `docs/contracts/BASE-confini.md`; casi attesi in fondo a questo piano), prima che un operatore nuovo pubblichi immagini.
 
 ### U2. Decoder puro: geometria, pattern, livelli (ADR-08.b §2.2–2.4, §2.6) — ~380 righe
 
@@ -177,3 +178,40 @@ Test: T-M3A-PACK-06, 08; T-M3A-PACK-09 sulla parte dell'indice (in U10 il fuzz d
 ## Prossimo comando
 
 `python3 -S tools/trace.py ids --stage M3.a`; poi, in parallelo: emendamento di BASE §2.5 per L1 (U0) e test rossi di U1 (T-M3A-TYP-01, 02, 03) scritti da un agente diverso dall'autore del codice. Contratti per L2, L3, L4, L5 prima di U8 e U9.
+
+## Casi spostati da U1b (arbitraggio del 30 ottobre)
+
+### A M3.d (`variance_scope`, `demosaic`)
+
+### Parti di T-M3A-TYP-16 passate a M3.d (richiedono `image::variance_scope` e `image::demosaic`, tipi di §b.3/§b.4)
+
+Immagine di base completa del contratto: `lin = linear`, `variance` presente, `variance_scope = independent`, `measure` vuota (limitazioni attese: nessuna). In U1b la base è senza varianza (limitazioni attese: `variance.absent`).
+
+measure_limits (attesi scritti dal contratto):
+1. Base completa: `measure_limits` = {}.
+2. `variance` presente e `variance_scope` assente da sola: {`variance.scope_unknown`}.
+3. `variance_scope = marginal` da solo: {`variance.marginal`}.
+4. `variance` assente da sola sulla base completa (con `variance_scope` reimpostato): {`variance.absent`} (in U1b coperto dalla base senza varianza).
+5. `lin = nonlinear` da solo sulla base completa: {`linearity.nonlinear`}; `lin` assente da solo: {`linearity.unknown`} (in U1b coperti, con in più `variance.absent`).
+6. Combinazione {`nonlinear`, `variance` senza `variance_scope`}: {`linearity.nonlinear`, `variance.scope_unknown`}.
+7. Combinazione {`nonlinear`, `variance_scope = marginal`, `measure` con `samples.interpolated`}: {`linearity.nonlinear`, `variance.marginal`, `samples.interpolated`} nell'ordine canonico.
+8. Unione memorizzati e derivati: `measure` {`history.unknown`, `calib.assumption.h_dprime`, `variance.fixed_weight_approximation`} + `nonlinear` + `marginal`: {history.unknown, h_dprime, linearity.nonlinear, variance.marginal, variance.fixed_weight_approximation}.
+La combinazione {`lin` assente, `variance` assente} → {`linearity.unknown`, `variance.absent`} resta in U1b.
+
+merge_measure: nel caso «mai un codice perso, nessun derivato aggiunto» l'ingresso aveva anche `variance_scope = marginal` (resta in U1b senza quella riga: stessa asserzione).
+
+assess_measure / require_measure_ready: l'immagine di prova aveva `variance_scope = marginal` (limitazioni {h_dprime, nonlinear, variance.marginal, samples.interpolated}); in U1b usa `variance.absent` al posto di `variance.marginal`. Variante con `marginal` e il caso `require_measure_ready` su immagine di base senza limitazioni (base completa, accettazione vuota: nessuno stop) passano a M3.d.
+
+### Alla base comune, intervento I6 (`measure` obbligatoria)
+
+### Casi di `operator_output_invariants_hold` tolti da U1b (obbligo trasversale: `measure` presente in ogni uscita di operatore)
+
+Intervento a sé nella base comune, proprietario unico. Test già scritti (tmp/test_measure.before, sezione «operator_output_invariants_hold»). Asserzioni attese, uscite altrimenti valide (`validate_image` passa):
+1. Uscita mono con `measure` vuota: `operator_output_invariants_hold` = true.
+2. Stessa uscita con `measure` assente: false.
+3. Uscita RGB con `demosaic` (variance_scope marginal, varianza presente) con `measure` priva di `samples.interpolated` (vuota, oppure solo `history.unknown`): false.
+4. `demosaic` con `variance_propagation = fixed_weight_approximation`, `measure` = {`samples.interpolated`} senza `variance.fixed_weight_approximation`: false.
+5. Stessa uscita con `measure` = {`variance.fixed_weight_approximation`, `samples.interpolated`}: true.
+6. `demosaic` con `variance_propagation = linear_weights`, `measure` = {`samples.interpolated`}: true.
+(Casi 3-6 dipendono anche dai tipi `demosaic` e `variance_scope` di M3.d.)
+Conseguenza: i test esistenti che si aspettano true per immagini senza `measure` (`test_image.cpp:108,118`, `test_fits.cpp:823`, test_calibration*, test_master, test_import*, m2e_workflow) vanno aggiornati nello stesso intervento.
