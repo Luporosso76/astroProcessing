@@ -28,9 +28,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `0f74934a8525a795e0b5a2688ee1cbc847a59f4afcf4cb976c56558b707f59d9` |
+| `docs/test-matrix.md` | `14b9cbe609ee7f0357d78985cdf4fa6056d0882da09f1d69f91d8323112a04eb` |
 | `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
-| `tools/check_m2_trace.py` | `e4d581a595eaec6b322f2f5294aa48fed59603c424c44bae14c0cd6bbb207682` |
+| `tools/check_m2_trace.py` | `2ff5df7acdcc07ef45edd4c80fdb6ed7c7d5decd9e5f4629cc1751842c216a9b` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
 
 - Test dev (`tmp/dev-junit.xml`): totali 501, fast 494, slow 7, falliti 0
@@ -62,7 +62,7 @@ Il test presente solo in dev è `BuildInfo.SanitizersAreActiveInDevBuild`. I set
 | Report | T-M2E-12, 26; T-M2R1-08; T-M2R4-03, 06; T-M2R2-06, 08 |
 | DAG durevole | T-M2B-01…13; T-M2C-01…25 |
 | Recovery | T-M2C-02, 03, 10, 12; T-M2R4-01…04 (SIGKILL a ogni punto, perdita di energia simulata) |
-| Cancel | T-M2D-08; T-M2R3-07 (stop con checkpoint sotto pressione) |
+| Cancel | T-M2D-08; T-M2R3-07 (attesa e annullamento sotto pressione PSI prima dell'ammissione) |
 | Worker | T-M2D-04, 07, 15; T-M2R3-09 (worker su insieme di CPU); T-M2R3-06 (checkpoint e resume nel job) |
 | Dato astronomico reale | T-M2E-13 (PUB-LFC-01, calibrazione), T-M2R2-09 (master del prodotto su PUB-LFC-01), T-M2R1-09 (campioni pubblici PUB-LFC-01 e PUB-CFA-01) |
 
@@ -83,7 +83,7 @@ Il blocco generato sopra riporta i conteggi e gli hash di questa esecuzione.
 
 - Esito: clausole 1-3 soddisfatte sul commit `cb35d89`; clausola 4 (review indipendente del record) nella sezione «Review del giro 8».
 - La prova preliminare era sul working tree (revisione sporca in `source_revision.cpp`); la riesecuzione sul commit `cb35d89` ha working tree pulito, salvo il collegamento simbolico `data` non versionato.
-- Release e dev non sono simultanee: release prima di `tools/check.sh`, dev dopo, ciascuna sui binari della propria build.
+- Release e dev non sono simultanee, ciascuna sui binari della propria build: nella prova preliminare release prima di `tools/check.sh` e dev dopo; nella riesecuzione sul commit `tools/check.sh`, poi dev, poi release.
 - Limiti degli ID, nella colonna di stato della matrice: F-IO-01 (RGB e multi-plane solo sintetici), F-IO-05 (HDU compressi rifiutati), F-RES-07.a (ENOSPC sulla cache delle miniature non provato), NFR-SEC-03 (inode degli originali non confrontati nella cache), NFR-PERF-01 e F-RES-01 (soglie misurate su un solo PC), F-PRJ-06 (T-PRJ-01 completo in M3.s).
 - Autore e data: agente general-purpose su Claude Opus 5.5, 30 ottobre 2026. Review indipendente: da fare.
 
@@ -178,6 +178,17 @@ Altro nel giro: i death test (`test_error`, `test_image`) generavano report di c
 ### Giro 7
 
 Build: dev 330/330, release 332/332 (329 fast + 3 slow), zero warning (`tmp/gate7-dev.log`, `tmp/gate7-rel.log`). Review: **PASS**, 4 LOW (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`): l'harness accettava il ritorno della PSI entro 120 s invece dei 60 preregistrati (la prova registrata, 29,9 s, è conforme; l'harness resta fuori da Git); intestazione e riferimenti aggiornati; attribuzione dei vecchi massimi distinta dal difetto accertato; prossimo comando di `plans/M2.md` aggiornato.
+
+## Correzioni dopo la review del giro 8
+
+### R6.c: ogni membro di un intervallo deve avere un test
+
+Rilievo MED (`.omc/artifacts/ask/codex-m2gate-round8-20261030-0347.md`, punto 2): `tools/check_m2_trace.py` teneva dei token di un intervallo solo i membri con un test e dava errore solo a intervallo interamente vuoto, quindi `T-M2R2-01…10` passava con `01…09`.
+
+- Strumento: `expand_range` segnala ogni membro senza test in `ctest -N` (`intervallo X: membri senza test in ctest -N: <membri>`); l'intervallo invertito resta un errore. Test in `tests/tools/test_check_m2_trace.py`: membro mancante, intervallo completo, più membri mancanti, intervallo interamente mancante, invertito; scritti prima della correzione e rossi (2 errori, 1 fallimento).
+- Stato reale: il controllo severo ha trovato un solo buco, T-M2E-05, senza test proprio (la prova è in `CalibM2E.T_M2E_04_05_q_bits_separate_and_together`). Celle riscritte in `docs/test-matrix.md`: F-CAL-03.a, NFR-CPU-01.a, ADR-09.a, C-01.a (`T-M2E-01…04, 06…32` o `T-M2E-04, 06, 07` più il nome completo). T-M2E-20 ha un test proprio (`MasterPipeline.T_M2E_20_*`) e resta nell'intervallo. `tests/trace/M2.tsv` già elencava membri e nome completo: invariato.
+- Prove: `python3 -S tools/check_m2_trace.py --run build/dev:tmp/dev-junit.xml --run build/release:tmp/release-junit.xml` sulle build e i junit dell'esecuzione finale: uscita 0, 63 ID, 0 con problemi. 10 mutazioni manuali sul controllo, tutte rilevate (`tmp/r6c-mutations.log`). `tools/check.sh` dev: uscita 0, 494 test fast. Review: `r6c-round1` PASS senza rilievi (`.omc/artifacts/ask/codex-r6c-round1-20261030-0404.md`).
+- I blocchi generati di `M2-gate.md` e `M3-entry-ADR{03,08,16}b.md` sono rigenerati (cambiano gli hash di matrice e strumento). Limite: la riesecuzione completa di ctest sul commit non è rifatta per questa correzione; i junit sono quelli dell'esecuzione finale `cb35d89`.
 
 ## Misura F-RES-01
 

@@ -171,9 +171,21 @@ class GateTest(unittest.TestCase):
         _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-X-01, T-Q-77", GATE, "CHIUSO")}))
         self.assertTrue(any("T-Q-77" in p and "ctest -N" in p for p in pr["F-A"]))
 
-    def test_range_gap_is_tolerated_but_needs_one(self):
-        _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-X-01…09", GATE, "CHIUSO")}))
+    def test_range_with_one_missing_member_is_error(self):
+        _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-X-01…05", GATE, "CHIUSO")}))
+        self.assertEqual([p for p in pr["F-A"] if "T-X-01…05" in p],
+                         ["intervallo T-X-01…05: membri senza test in ctest -N: T-X-05"])
+
+    def test_range_with_all_members_present(self):
+        _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-X-01…04", GATE, "CHIUSO")}))
         self.assertNotIn("F-A", pr)
+
+    def test_range_with_several_missing_members_names_all(self):
+        _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-X-01…09", GATE, "CHIUSO")}))
+        self.assertEqual([p for p in pr["F-A"] if "T-X-01…09" in p],
+                         ["intervallo T-X-01…09: membri senza test in ctest -N: T-X-05, T-X-06, T-X-07, T-X-08"])
+
+    def test_range_fully_missing_has_no_test(self):
         _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-Q-01…09", GATE, "CHIUSO")}))
         self.assertTrue(any("nessun test" in p for p in pr["F-A"]))
 
@@ -241,7 +253,8 @@ class GateTest(unittest.TestCase):
     def test_empty_range_next_to_valid_token(self):
         mx = matrix(**{"F-A": row("F-A", "M2.a", "T-X-01, T-Q-01…09", GATE, "CHIUSO")})
         _, pr = self.gate(mx)
-        self.assertEqual([p for p in pr["F-A"] if "T-Q-01…09" in p], ["intervallo T-Q-01…09 senza test in ctest -N"])
+        self.assertEqual([p for p in pr["F-A"] if "T-Q-01…09" in p], ["intervallo T-Q-01…09: membri senza test in ctest -N: "
+                          + ", ".join(f"T-Q-{k:02d}" for k in range(1, 10))])
 
     def test_inverted_range(self):
         _, pr = self.gate(matrix(**{"F-A": row("F-A", "M2.a", "T-X-01, T-X-04…03", GATE, "CHIUSO")}))

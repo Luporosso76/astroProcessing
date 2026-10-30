@@ -126,7 +126,7 @@ def extract_tokens(cell, listed):
 
 
 def expand_range(token, listed):
-    """(membri esistenti, problema) di un token: un intervallo `T-XXX-NN…MM` vuoto o invertito è un problema."""
+    """(membri esistenti, problema) di un token: in un intervallo `T-XXX-NN…MM` ogni membro deve avere un test; un membro mancante o un intervallo invertito è un problema."""
     m = re.fullmatch(r"(T-[A-Z][A-Z0-9]*-)(\d+)…(\d+)", token)
     if not m:
         return [token], None
@@ -134,12 +134,13 @@ def expand_range(token, listed):
     if int(lo) > int(hi):
         return [], f"intervallo {token} invertito"
     width = len(lo)
-    out = []
+    out, missing = [], []
     for k in range(int(lo), int(hi) + 1):
         tok = f"{prefix}{k:0{width}d}"
-        if TRACE.match_tests(tok, listed):
-            out.append(tok)
-    return out, (None if out else f"intervallo {token} senza test in ctest -N")
+        (out if TRACE.match_tests(tok, listed) else missing).append(tok)
+    if missing:
+        return out, f"intervallo {token}: membri senza test in ctest -N: {', '.join(missing)}"
+    return out, None
 
 
 def cited_records(cell):
