@@ -3,6 +3,7 @@
 # l'abbonamento. Solo Haiku e Sonnet: Opus e il coordinamento restano sull'abbonamento.
 # Uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json> [budget-usd, default 10]
 # La directory di lavoro sta dentro il progetto (di norma un worktree); il prompt arriva da file su stdin.
+# Tempo massimo in secondi da ASTRO_API_TIMEOUT (default 7200).
 # Uscita: 0 esito scritto e senza errore; 2 argomenti o chiave non validi; 4 credito API esaurito (il coordinatore
 # rilancia il compito sull'abbonamento e lo registra); 5 errore riportato da claude (dettaglio nell'esito).
 set -euo pipefail
@@ -36,7 +37,7 @@ print(json.dumps({"apiKeyHelper": "cat " + k, "permissions": {"deny": [f"Read({s
   "$key" "$root/.secrets")"
 
 rc=0
-(cd "$workdir" && env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN TMPDIR="$root/tmp" timeout 7200 claude -p \
+(cd "$workdir" && env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN TMPDIR="$root/tmp" timeout "${ASTRO_API_TIMEOUT:-7200}" claude -p \
   --model "$model" --settings "$settings" --permission-mode auto --max-budget-usd "$budget" --output-format json \
   < "$prompt") > "$out" 2> "$out.stderr" || rc=$?
 
