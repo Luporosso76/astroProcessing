@@ -100,17 +100,15 @@ if [ -z "$codex_version" ] || [ "$(printf '%s\n0.164.0\n' "$codex_version" | sor
 fi
 
 mkdir -p .omc/artifacts/ask tmp
-# Tetto dei giri (AGENTS.md, ciclo di un'unità): lo slug finisce con -reviewN o -contractN; oltre il terzo giro
-# la review non parte e la decisione passa al coordinatore (arbitraggio).
-# Unità nuove: ...-roundN, 3 giri in tutto (1: contratto e test; 2-3: codice sul delta). Le unità avviate prima
-# della regola (R1, R3, R4) usano ancora ...-contractN / ...-reviewN, 3 ciascuno.
+# Tetto dei giri (AGENTS.md, ciclo di un'unità): 2 giri in tutto per unità, slug ...-roundN (o -reviewN, -contractN);
+# oltre il secondo giro la review non parte e la decisione passa al coordinatore (arbitraggio).
 if ! [[ "$slug" =~ -(round|review|contract)([0-9]+)$ ]]; then
   echo "slug senza numero di giro: '$slug' (atteso ...-roundN)" >&2
   exit 2
 fi
 round="${BASH_REMATCH[2]}"
-if [ "${#round}" -gt 2 ] || [ "$round" -gt 3 ]; then
-  echo "limite di 3 giri raggiunto per '$slug': fermati e consegna al coordinatore l'ultimo artefatto con i rilievi aperti (arbitraggio)" >&2
+if [ "${#round}" -gt 2 ] || [ "$round" -gt 2 ]; then
+  echo "limite di 2 giri raggiunto per '$slug': fermati e consegna al coordinatore l'ultimo artefatto con i rilievi aperti (arbitraggio)" >&2
   exit 3
 fi
 log="tmp/review-${slug}.log"
