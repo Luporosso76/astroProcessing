@@ -21,11 +21,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/import_job.cpp` | `6595e6bf51c4fad0b9e6ac2737c28120c07fe3fdf8c9888805b23430d85a3a6d` |
 | `src/core/thumbnail_cache.cpp` | `8261ee4c333a6d8227ba696c0c7e75d5ae805369ad809aa48d30a6b297ecbd1e` |
 | `src/core/workflow.cpp` | `8ce82489db3416b44396cca59bce06f6d4ab6af7d4bacc33e62fdd77204e1d82` |
-| `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
+| `tests/trace/M2.tsv` | `94527d5b4ed6c5e0675999398974bc97c433be16b5f25741c32e092deefa335b` |
 | `tests/unit/test_recovery.cpp` | `884b87b25700b53ff9263a0b20b26139e798ed92d8368866e5ca3c08fee0ccaf` |
 
-- Test release (`tmp/release-junit.xml`): totali 500, fast 493, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 501, fast 494, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 504, fast 497, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 505, fast 498, slow 7, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

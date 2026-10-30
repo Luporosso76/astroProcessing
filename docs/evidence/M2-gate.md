@@ -4,6 +4,21 @@ Stato: **RIAPERTO**, 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è r
 
 Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Riesecuzione identica sul commit del gate `cb35d89` con uscita 0 (sezione «Riesecuzione sul commit del gate»); il gate passa con la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7.
 
+## Giro 9: correzioni della review del giro 8 e riesecuzione
+
+- Review del giro 8 (Codex `gpt-6-astra`, sola lettura, `.omc/artifacts/ask/codex-m2gate-round8-20261030-0347.md`): FAIL, 1 BLOCCANTE, 1 MED, 2 LOW.
+  - BLOCCANTE: con DM spenta e parametri subnormali il job riceveva SIGFPE nel confine `run_job_files`, prima del controllo dell'ambiente FP; NFR-FBK-01.a, ADR-07.a e G-STOP non potevano chiudersi con quel limite. Corretto da R5.c (`463ccf9`, `docs/evidence/M2-R5c.md`): controllo all'ingresso di `run_job`, `run_job_files`, `run_calibration_job`, `run_master_job` e in ogni task dello scheduler prima della lettura dei dati; review PASS al giro 2.
+  - MED: `check_m2_trace.py` tollerava membri inesistenti degli intervalli. Corretto da R6.c (`e55c512`, sezione «Correzioni dopo la review del giro 8»); review PASS al giro 1.
+  - LOW: descrizione di T-M2R3-07 nella tabella della clausola 3 e ordine delle esecuzioni nei limiti; corretti nel testo (`e55c512`).
+- Commit del gate: `463ccf9` (`git status` pulito, salvo il collegamento simbolico `data` non versionato).
+- Riesecuzione del coordinatore, 30 ottobre 2026, 6 job, `ulimit -c 0`, build pulite in directory nuove:
+  1. `tools/check.sh` (log `tmp/gate9-check.log`): uscita 0, `lint: ok`.
+  2. `ctest --preset dev-full -j6 --output-junit tmp/dev-junit.xml` (log `tmp/gate9-dev.log`): 505/505, 1738,5 s.
+  3. `cmake --preset release`, `cmake --build --preset release -j6`, `ctest --preset release -j6 --output-junit tmp/release-junit.xml` (log `tmp/gate9-rel.log`): 504/504, 121,0 s.
+  4. `python3 -S tools/check_m2_trace.py --run build/dev:tmp/dev-junit.xml --run build/release:tmp/release-junit.xml` (`tmp/gate9-trace.txt`): **uscita 0**, `check_m2_trace: 63 ID nello stadio M2, 0 con problemi, 0 problemi di esecuzione`.
+- Il blocco generato del giro 8 riporta conteggi e hash di questa esecuzione.
+- Esito: clausole 1-3 soddisfatte sul commit `463ccf9`; clausola 4 nella review del giro 9.
+
 ## Giro 8: esecuzione finale del gate rifatto (R6)
 
 - Unità: M2, R6 (`plans/M2-residui.md`, sezione 6, clausole 1-3).
@@ -28,13 +43,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `14b9cbe609ee7f0357d78985cdf4fa6056d0882da09f1d69f91d8323112a04eb` |
-| `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
+| `docs/test-matrix.md` | `88f49d622fec06c7961711712eb22598f7b460546da351f35b78452d1d39d29a` |
+| `tests/trace/M2.tsv` | `94527d5b4ed6c5e0675999398974bc97c433be16b5f25741c32e092deefa335b` |
 | `tools/check_m2_trace.py` | `2ff5df7acdcc07ef45edd4c80fdb6ed7c7d5decd9e5f4629cc1751842c216a9b` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
 
-- Test dev (`tmp/dev-junit.xml`): totali 501, fast 494, slow 7, falliti 0
-- Test release (`tmp/release-junit.xml`): totali 500, fast 493, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 505, fast 498, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 504, fast 497, slow 7, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/dev`, junit `tmp/dev-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
@@ -81,7 +96,7 @@ Il blocco generato sopra riporta i conteggi e gli hash di questa esecuzione.
 
 ### Esito e limiti
 
-- Esito: clausole 1-3 soddisfatte sul commit `cb35d89`; clausola 4 (review indipendente del record) nella sezione «Review del giro 8».
+- Esito: clausole 1-3 soddisfatte sul commit `cb35d89`; la review del giro 8 è FAIL (sezione «Giro 9»), quindi il commit del gate passa a `463ccf9`.
 - La prova preliminare era sul working tree (revisione sporca in `source_revision.cpp`); la riesecuzione sul commit `cb35d89` ha working tree pulito, salvo il collegamento simbolico `data` non versionato.
 - Release e dev non sono simultanee, ciascuna sui binari della propria build: nella prova preliminare release prima di `tools/check.sh` e dev dopo; nella riesecuzione sul commit `tools/check.sh`, poi dev, poi release.
 - Limiti degli ID, nella colonna di stato della matrice: F-IO-01 (RGB e multi-plane solo sintetici), F-IO-05 (HDU compressi rifiutati), F-RES-07.a (ENOSPC sulla cache delle miniature non provato), NFR-SEC-03 (inode degli originali non confrontati nella cache), NFR-PERF-01 e F-RES-01 (soglie misurate su un solo PC), F-PRJ-06 (T-PRJ-01 completo in M3.s).
