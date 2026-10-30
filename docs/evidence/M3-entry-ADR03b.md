@@ -50,8 +50,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
-| `docs/contracts/README.md` | `daae6f7fca26bd5ecc648e5f7e9fe2ba81c0a2b227478e9c61385e4fff0410e0` |
+| `docs/contracts/README.md` | `496c611387d092c9c6e88a02df05b01a0edf2a1c79a85d4f83040443c0df0c53` |
 | `docs/decisions/README.md` | `867ee555140e2581eb9754fdabc9d14d31aebc53661a5379b8b8f0ad4f85b961` |
-| `docs/test-matrix.md` | `8b6b9c68689dfee1048eb9e1121f7599ecadf3b6c2b0020326ce8463c8f10dba` |
+| `docs/test-matrix.md` | `ae4950eb8715bec20553b0c2c8ae38701cfa5fac4e60f3f154267a5c856714c5` |
 
 <!-- evidence:end -->

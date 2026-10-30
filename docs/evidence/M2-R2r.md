@@ -14,7 +14,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-06-budget-scheduler.md` | `4c24c69f4559e3ddc9db4de78358c58326790438f350e1b286f8e2988f53b44e` |
-| `docs/contracts/C-02-master.md` | `c84b43754eb09d7e9250a13b6f3e2cdd7e1548d71626c64b2f992c94c5b18c16` |
+| `docs/contracts/C-02-master.md` | `7f9c0d34d41da5c97a6a587fa46e9675d7f47fe87ac042671c7bf73bcdd15c4e` |
 | `src/core/include/astro/master.hpp` | `f6214e982869003b763d78c8098bccbaed28c527ef6197fad68907f83f42815f` |
 | `src/core/include/astro/resources.hpp` | `74b04a71563aa738636ae48a224c634b063058fe0d6269a80034329e4ecfc030` |
 | `src/core/master.cpp` | `3697bf2ae016289ee76728cef972b334eb78d4a52f10a781ddf89567cd128fa7` |

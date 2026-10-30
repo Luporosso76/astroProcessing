@@ -9,7 +9,7 @@ Parti degli ADR usate da M2.a–e. Errori: modello comune in ADR-05. ID di test 
 - [ADR-13-offline.md](ADR-13-offline.md): core senza API di rete, CFITSIO solo da memoria, verifica su simboli e syscall (M2.f).
 - [ADR-16-stati-master.md](ADR-16-stati-master.md): stati dei master, compatibilità, ricetta `L − D`, `Q`, maschere, ledger e report (M2.e); estensione ADR-16.b: analisi G-CAL, otto combinazioni con gli assi dark-flat e flat, catene e default (D-16), P-LOST, stato del decoder nei master da RAW (M3).
 - [ADR-17-varianza.md](ADR-17-varianza.md): sorgenti di varianza e propagazione al primo ordine (M2.e); estensione ADR-17.b: sensibilità sulle sorgenti, covarianza light/flat e bias in due catene, master comuni fra light, rappresentazione P0 (diagonale e blocco fra canali memorizzati, fuori diagonale per riferimento), resampling `R C Rᵀ`, combinazione di frame, Jacobiano del non lineare, ingressi `marginal`, offset del modello di rumore per i RAW (M3).
-- [C-02-master.md](C-02-master.md): generazione dei master, slice minima: metodi, rejection, normalizzazione del flat, varianza per metodo, tolleranze di R2 (C-02.a).
+- [C-02-master.md](C-02-master.md): generazione dei master, slice minima: metodi, rejection, normalizzazione del flat, varianza per metodo, tolleranze di R2 (C-02.a); estensione C-02.b: analisi del set candidato con esclusioni e gruppi, media pesata, mediana, winsorized e `sigma_clip` con il piano di varianza di ciascuno, proposta a priori secondo `n`, flat CFA per canale, report di frame usati e scartati (M3).
 - [ADR-07-cpu-simd.md](ADR-07-cpu-simd.md): percorsi `cpu_scalar` e `cpu_avx2`, dispatch nel preflight, ambiente in virgola mobile, tolleranze di R5 (ADR-07.a).
 
 Contratti di M3.entry (ID di test `T-M3<slice>-<tema>-NN`):

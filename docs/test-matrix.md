@@ -201,6 +201,29 @@ Definiti in `docs/contracts/ADR-17-varianza.md` §b.12, con tolleranze, soglie M
 | T-M3C-VAR-10 | F-REG-03; ADR-17.b §b.5 (geometria non propagata) | ADR-17.b, D-17.b | M3.g | PIANIFICATO — non eseguito |
 | T-M3C-VAR-11 | NC-21; ADR-17.b §b.8 (ammissione degli ingressi `marginal`) | ADR-17.b, D-17.b | M3.g, M3.h, M3.k | PIANIFICATO — non eseguito |
 
+## M3.entry: ID di lavoro di C-02.b
+
+Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli statistici e criteri fissati prima di ogni misura. T-M3B-C02-06 e 07 sono caratterizzazioni senza soglia, a sostegno dei limiti dichiarati. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3B-C02-01 | F-CAL-01.b; C-02.b §b.1, §b.6, regola I di ADR-17.b §b.10 (valori dei metodi) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-02 | F-CAL-01.b; C-02.b §b.1 (`sigma_clip`, appartenenza all'insieme rifiutato, Samuelson) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-03 | F-CAL-01.b; C-02.b §b.6 (piano della media pesata) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-04 | F-CAL-01.b; C-02.b §b.6 (piano `gaussian_reference` di mediana e winsorized) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-05 | F-CAL-01.b; C-02.b §b.6 (accuratezza di `κ`) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-06 | F-CAL-01.b; C-02.b §b.6, ADR-17.b §b.1 (selezione congelata, caratterizzazione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-07 | F-CAL-01.b; C-02.b §b.3 (quantizzazione della mediana, caratterizzazione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-08 | F-CAL-01.b, F-IO-03; C-02.b §b.2 (analisi, gruppi, frame incompatibile escluso prima della scelta) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-09 | F-CAL-01.b; C-02.b §b.2, §b.4 (proposta secondo `n`, domini) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-10 | F-CAL-01.b; C-02.b §b.8 (master riproducibili bit-esatti dal progetto) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-11 | F-CAL-01.b; C-02.b §b.7 (report di frame usati e scartati, rumore, artefatti, stato) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-12 | F-CAL-01.b; C-02.b §b.13 punto 1, ADR-03 R1 (codici di fase e linearità) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-13 | F-CAL-01.b; C-02.b §b.6 (`single`, modello di rumore) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-14 | F-CAL-01.b; C-02.b §b.6 (flat CFA per canale) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. Stati finali assegnati il 30 ottobre 2026 dall'esecuzione finale del giro 8 di `M2-gate.md` (`tools/check_m2_trace.py`, uscita 0); vanno riconfermati dalla riesecuzione sul commit del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.

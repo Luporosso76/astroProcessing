@@ -43,7 +43,7 @@ Stati, ruoli, unità, fasi e compatibilità dei master: ADR-16.b §b.2, §b.3, �
 Prerequisiti aggiunti da questo contratto:
 
 - coverage assente su ogni ingresso (§7, regola C7.3);
-- `pedestal_adu` del light presente e diverso da zero: stop come in ADR-16.a §2 (`calib.pedestal`). Il piedistallo non è un offset noto. Per un master con piedistallo ADR-16.b §b.3 non ha un motivo di esclusione: questione aperta in `plans/M3.md`.
+- `pedestal_adu` del light presente e diverso da zero: stop come in ADR-16.a §2 (`calib.pedestal`). Il piedistallo non è un offset noto. Un master con piedistallo è `excluded` nell'analisi con motivo `pedestal` (ADR-16.b §b.3).
 
 Verifica: T-M3A-C01-06 (dominio), T-M3A-C01-07 (coverage).
 
@@ -203,4 +203,3 @@ Ammesse senza cambiare il contratto: blocchi di righe e streaming (ADR-06), perc
 - I riferimenti di §5 non sono riletti in questa unità.
 - ADR-09.b non è scritto.
 - C-14 e C-16 devono dichiarare l'accettazione di `calib.offset.known_not_removed`.
-- Esito nell'analisi di un master con `pedestal_adu ≠ 0` non definito (questione aperta).
