@@ -28,7 +28,7 @@ Le decisioni D-19, D-20 e D-21 non aggiungono ADR. Si riflettono in ADR-09 (deco
 | ADR-14 | Confini deep sky, planetario e scientifico | M0, M9 | Proposto: core condiviso, workflow e test separati |
 | ADR-15 | Motore di analisi e Advisor | M3, M4 | Proposto come soluzione tecnica; il requisito P0 è vincolante, default e costo da decidere |
 | ADR-16 | Calibrazione incompleta | Minimo M2 ingresso; estensioni M3 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); `.b` (matrice completa, P-LOST, stato del decoder nei master da RAW): contratto [ADR-16-stati-master](../contracts/ADR-16-stati-master.md) §«Estensione ADR-16.b», default nel verbale [D-16](D-16-calibrazione-incompleta.md), review in `docs/evidence/M3-entry-ADR16b.md`; il requisito P0 è vincolante |
-| ADR-17 | Covarianza opzionale | Minimo M2 ingresso; estensioni M3 e M6 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); proposto per le estensioni: diagonale più NPS locale, correlazioni dei master, nessuna matrice densa globale |
+| ADR-17 | Covarianza opzionale | Minimo M2 ingresso; estensioni M3 e M6 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); `.b` (modelli P0: light/flat e bias in due catene, master comuni, resampling `R C Rᵀ`, combinazione di frame, Jacobiano del non lineare; diagonale e blocco fra canali memorizzati, fuori diagonale per riferimento): contratto [ADR-17-varianza](../contracts/ADR-17-varianza.md) §«Estensione ADR-17.b», decisione nel verbale [D-17.b](D-17-covarianza.md) (APPROVATO per arbitraggio dopo il giro 3), review in `docs/evidence/M3-entry-ADR17b.md`; nessuna matrice densa |
 
 ## Licenza del prodotto
 

@@ -51,11 +51,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-03-pixel-maschere.md` | `329060121da7e443bd06917a9a8bd2dfa2e1857f8cb5fec97c5580030857150e` |
-| `docs/contracts/ADR-16-stati-master.md` | `40f8e14cbbd44a13a217207cff3c56db27355f32fbe4672d89a0d6a9a65d8d9a` |
-| `docs/contracts/README.md` | `a6315733e2d302ab8fc1607b3ed81ffbc80430c938bfa2bcab33ab69abf3a0e6` |
+| `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
+| `docs/contracts/ADR-16-stati-master.md` | `3167ba1bff55bfceb572da8df6b3ce18663ebcc6e393a8aeec339da5bdf9593e` |
+| `docs/contracts/README.md` | `daae6f7fca26bd5ecc648e5f7e9fe2ba81c0a2b227478e9c61385e4fff0410e0` |
 | `docs/decisions/D-16-calibrazione-incompleta.md` | `17d99880649e716815e5a57741c71362fee41710535c0e2b99662a392649abb7` |
-| `docs/decisions/README.md` | `dd6dfd5ba219f73206b060b3e5d692a851e325f567bc63c7fdcbbedf5863810b` |
-| `docs/test-matrix.md` | `2d179f1dece0f5bc4bed7b4e3926e4dd12918e8099e5df0b793cb9da9cbcca80` |
+| `docs/decisions/README.md` | `867ee555140e2581eb9754fdabc9d14d31aebc53661a5379b8b8f0ad4f85b961` |
+| `docs/test-matrix.md` | `8b6b9c68689dfee1048eb9e1121f7599ecadf3b6c2b0020326ce8463c8f10dba` |
 
 <!-- evidence:end -->

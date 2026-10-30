@@ -322,7 +322,7 @@ Una ricetta fuori dall'insieme di §b.5 si ferma prima del calcolo, senza nodo:
 - Voci del ledger: `dark_subtraction`, `bias_subtraction`, `dark_flat_subtraction`, `flat_bias_subtraction`, `flat_normalization`, `flat_division`, con `status` ∈ {`applied`, `omitted`, `not_applicable`}, digest del master e motivo. Motivi (lista chiusa): `master_absent`, `master_excluded` (con il motivo di §b.3), `user_omitted`, `light_offset_not_removed`, `dark_flat_sub_requires_bias`, `flat_offset_not_removable`, `flat_thermal_not_declared`, `flat_thermal_budget`, `bias_in_matched_dark`, `flat_already_corrected`, `double_offset`.
 - Voce `light_offset`: stato (`removed`, `known_not_removed`, `unknown`), master che lo rimuove, nero effettivo del light per posizione del periodo se il light è RAW.
 - Report: esito dell'analisi (candidati con stato e motivo, predicati, insieme ammissibile, default), ricetta scelta e se coincide con il default, ledger, ipotesi (H-D', limite termico con `β_c`, nero come sentinella, H3), avvisi con livello, residuo del percorso parziale. Il resto come `.a` §10.
-- Varianza: ogni termine sottratto aggiunge la sua varianza a `Var(Lc)` o a `Var(Fc)` (ADR-17.a, ingressi distinti); `flat.given_q` prende `Var(Q)` dal piano `VARIANCE` del flat (`variance_source = noise_model` non si applica a un'immagine adimensionale: `invalid_input`, `var.q_noise_model`). Un master usato in due catene (`B` in `light.bias*` e `flat.bias*`) e la covarianza light/flat sono di ADR-17.b: le ricette con `B` in entrambe le catene non hanno un modello di varianza finché ADR-17.b non lo fissa, e il codice di M3.c che le esegue parte dopo ADR-17.b.
+- Varianza: ogni termine sottratto aggiunge la sua varianza a `Var(Lc)` o a `Var(Fc)` (ADR-17.a, ingressi distinti); `flat.given_q` prende `Var(Q)` dal piano `VARIANCE` del flat (`variance_source = noise_model` non si applica a un'immagine adimensionale: `invalid_input`, `var.q_noise_model`). Un master usato in due catene (`B` in `light.bias*` e `flat.bias*`) e la covarianza light/flat hanno il modello di [ADR-17.b](ADR-17-varianza.md#estensione-adr-17b-modelli-di-covarianza-p0-m3) §b.2.
 
 ### b.11 Modifiche ad ADR-16.a
 
@@ -369,6 +369,5 @@ Test del piano che questi alimentano: T-CAL-08 (otto combinazioni e dark-flat, M
 - Master esterni e light RAW non si combinano: la calibrazione di un light RAW richiede master costruiti dal prodotto da frame RAW.
 - Un candidato per ruolo: la scelta fra più master compatibili non è di questo contratto.
 - `corrected_unnormalized` non ha un predicato nel registro (D.5); è trattato come flat preparato, con dark-flat non applicabile.
-- Le ricette con `B` in due catene attendono il modello di ADR-17.b.
 - Il bound generale di §b.12 è più largo di `γ_m` anche dove la catena del flat ha una sola sottrazione; non si stringe dopo la misura.
 - Dimensione di `frame_decoder_states`: fino a 4098 valori del motivo per frame, stimata in qualche decina di kB per frame nel caso peggiore, non misurata.

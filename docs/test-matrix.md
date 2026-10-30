@@ -183,6 +183,24 @@ Definiti in `docs/decisions/D-08-dataset.md` §6, con criteri fissati prima di o
 | T-M3A-DAT-05 | NFR-TEST-02, F-ANA-05.a; D-08 §4 regola 9 (corpus separato) | D-08 | M3.r | PIANIFICATO — non eseguito |
 | T-M3A-DAT-06 | NFR-TEST-02; D-08 §5 (copertura delle fixture sintetiche) | D-08 | Gate M3 (M3.s) | PIANIFICATO — non eseguito |
 
+## M3.entry: ID di lavoro di ADR-17.b e D-17.b
+
+Definiti in `docs/contracts/ADR-17-varianza.md` §b.12, con tolleranze, soglie Monte Carlo (protocollo MC-lin) e potenza fissate prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3C-VAR-01 | F-CAL-06.b; ADR-17.b §b.2, §b.10 (regola I) | ADR-17.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3C-VAR-02 | F-CAL-06.b; ADR-17.b §b.2 (bias in due catene), §b.12 (MC-lin) | ADR-17.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3C-VAR-03 | F-CAL-06.b; ADR-17.b §b.3 (master comuni fra light) | ADR-17.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3C-VAR-04 | F-CAL-06.b, G-CAL; ADR-17.b §b.3, §b.9, §b.11 | ADR-17.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3C-VAR-05 | F-CAL-08; ADR-17.b §b.4 (blocco fra canali) | ADR-17.b, D-17.b | M3.d | PIANIFICATO — non eseguito |
+| T-M3C-VAR-06 | F-REG-03; ADR-17.b §b.1, §b.4, §b.5 (pullback) | ADR-17.b, D-17.b | M3.g | PIANIFICATO — non eseguito |
+| T-M3C-VAR-07 | F-REG-03; ADR-17.b §b.5 (`R C Rᵀ`) | ADR-17.b | M3.g | PIANIFICATO — non eseguito |
+| T-M3C-VAR-08 | F-STK-01, F-CAL-06.b; ADR-17.b §b.6 | ADR-17.b, D-17.b | M3.h | PIANIFICATO — non eseguito |
+| T-M3C-VAR-09 | F-POST-06.a.1, G-NOISE-NL; ADR-17.b §b.7 | ADR-17.b | M3.k | PIANIFICATO — non eseguito |
+| T-M3C-VAR-10 | F-REG-03; ADR-17.b §b.5 (geometria non propagata) | ADR-17.b, D-17.b | M3.g | PIANIFICATO — non eseguito |
+| T-M3C-VAR-11 | NC-21; ADR-17.b §b.8 (ammissione degli ingressi `marginal`) | ADR-17.b, D-17.b | M3.g, M3.h, M3.k | PIANIFICATO — non eseguito |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. Stati finali assegnati il 30 ottobre 2026 dall'esecuzione finale del giro 8 di `M2-gate.md` (`tools/check_m2_trace.py`, uscita 0); vanno riconfermati dalla riesecuzione sul commit del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.
