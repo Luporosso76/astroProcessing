@@ -1,0 +1,26 @@
+# Sorgente del blocco generato di M2-R5.md (tools/evidence.py)
+file docs/contracts/ADR-07-cpu-simd.md
+file src/core/include/astro/cpu_dispatch.hpp
+file src/core/include/astro/calibration.hpp
+file src/core/include/astro/master.hpp
+file src/core/cpu_dispatch.cpp
+file src/core/cpu_kernels.hpp
+file src/core/kernels_scalar.cpp
+file src/core/kernels_avx2.cpp
+file src/core/calibration.cpp
+file src/core/calibration_internal.hpp
+file src/core/calibration_job.cpp
+file src/core/master.cpp
+file src/core/CMakeLists.txt
+file tests/unit/test_simd.cpp
+file tests/unit/simd_support.hpp
+file tests/unit/calib_support.hpp
+file tests/unit/master_support.hpp
+file tests/unit/test_master.cpp
+file tests/unit/test_calibration_real.cpp
+file tests/unit/CMakeLists.txt
+file tools/check_simd_binary.sh
+file tests/trace/M2.tsv
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+trace M2 tests/trace/M2.tsv build/release tmp/release-junit.xml

@@ -11,6 +11,7 @@
 #include "astro/operations.hpp"
 #include "astro/scheduler.hpp"
 #include "calibration_internal.hpp"
+#include "cpu_kernels.hpp"
 
 namespace astro {
 
@@ -95,6 +96,7 @@ void validate_params(const master_recipe& r) {
   check_finite(r.temperature_abs_tol_c, "temperature_abs_tol_c");
   if (*r.temperature_abs_tol_c < 0) bad_param("temperature_abs_tol_c", "deve essere >= 0");
   if (!r.temp_policy) bad_param("temperature_policy", "assente");
+  if (!r.simd) bad_param("simd", "assente");
 }
 
 json fields_json(const declared_image_fields& f) {
@@ -167,6 +169,7 @@ struct master_plan {
   std::uint8_t cfa_x = 0, cfa_y = 0;
   bool per_channel = false;
   std::array<const char*, 4> labels = {"all", "", "", ""};
+  cpu_path path{};  // risolto nel preflight dalla richiesta `simd` (ADR-07)
   image out;
   std::vector<double> lbe, ratio;
   std::vector<std::uint8_t> nonpositive;
@@ -182,8 +185,11 @@ struct master_plan {
 };
 
 master_plan make_plan(const master_recipe& r) {
+  // Prima della validazione: i confronti sui parametri sono gia' operazioni in virgola mobile (ADR-07, D23).
+  require_fp_environment();
   validate_master_recipe(r);
   master_plan p;
+  p.path = resolve_cpu_path(*r.simd, read_cpu_capabilities());
   p.recipe = r;
   p.order = canonical_order(r);
   p.n = r.frames.size();
@@ -537,97 +543,32 @@ void finish_preflight(master_plan& p) {
 
 // ---------------------------------------------------------------- combinazione per pixel (C-02.a §6, §6.3, §7)
 
-// `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f. Ordine delle somme: canonico, accumulatore
-// inizializzato col primo termine. Righe disgiunte: thread-safe.
-template <class T>
-void combine_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
-                  const std::uint16_t* const* bits) {
-  const std::size_t n = p.n;
-  const double dn = static_cast<double>(n), dn1 = static_cast<double>(n - 1);
-  T* out = p.out.data<T>();
-  T* outv = p.out.variance_data<T>();
-  std::uint16_t* mask = p.out.invalid.bits.data();
-  constexpr T nan = std::numeric_limits<T>::quiet_NaN();
-  for (std::uint32_t r = 0; r < rows; ++r) {
-    for (std::uint32_t x = 0; x < p.w; ++x) {
-      const std::size_t j = static_cast<std::size_t>(r) * p.w + x;
-      const std::size_t i = static_cast<std::size_t>(y0 + r) * p.w + x;
-      std::uint16_t b = 0;
-      bool saturated = false;
-      for (std::size_t f = 0; f < n; ++f) {
-        b = static_cast<std::uint16_t>(b | bits[f][j]);
-        if (p.has_sat && vals[f][j] >= p.sat) saturated = true;
-      }
-      if (saturated) b = static_cast<std::uint16_t>(b | invalid_reason::saturated);
-      if (b == 0) {
-        double s = vals[0][j];
-        for (std::size_t f = 1; f < n; ++f) s += vals[f][j];
-        const double mean = s / dn;
-        bool ok = std::isfinite(s) && div_ok(s, mean);
-        double ss = 0;
-        for (std::size_t f = 0; ok && f < n; ++f) {
-          const double d = vals[f][j] - mean;
-          const double sq = d * d;
-          ok = std::isfinite(d) && mul_ok(d, d, sq);
-          if (!ok) break;
-          if (f == 0) {
-            ss = sq;
-          } else {
-            const double t = ss + sq;
-            ok = add_ok(ss, sq, t);
-            ss = t;
-          }
-        }
-        double var = 0;
-        if (ok) {
-          const double s2 = ss / dn1;
-          var = s2 / dn;
-          ok = div_ok(ss, s2) && div_ok(s2, var);
-        }
-        T ms{}, vs{};
-        if (ok && convert_finite<T>(mean, ms) && convert_finite<T>(var, vs)) {
-          out[i] = ms;
-          outv[i] = vs;
-          mask[i] = 0;
-          if (p.flat) {
-            const double a = mean - p.offset;
-            const double ac = a > 0 ? a : 0.0;
-            // Stessa regola di rappresentabilita' dei pixel (§6.3): prodotti e quozienti di operandi non nulli devono
-            // restare normali; altrimenti la statistica non e' rappresentabile e il job si ferma.
-            const double e2 = p.eps * p.eps;
-            const double e2a = e2 * ac;
-            const double t = e2a * ac;
-            const double lbe = t / dn1;
-            if (!mul_ok(p.eps, p.eps, e2) || !mul_ok(e2, ac, e2a) || !mul_ok(e2a, ac, t) || !div_ok(t, lbe)) {
-              stop(error_category::numeric, "master.report_nonfinite", "level_bias_estimate non rappresentabile",
-                   {{"x", std::to_string(x)}, {"y", std::to_string(y0 + r)}});
-            }
-            p.lbe[i] = lbe;
-            p.nonpositive[i] = a <= 0 ? 1 : 0;
-            if (var > 0) {
-              const double q = lbe / var;
-              if (!div_ok(lbe, q)) {
-                stop(error_category::numeric, "master.report_nonfinite", "rapporto level_bias_estimate / piano non finito",
-                     {{"x", std::to_string(x)}, {"y", std::to_string(y0 + r)}});
-              }
-              p.ratio[i] = q;
-            }
-          }
-          continue;
-        }
-        b = invalid_reason::result_nonfinite;
-      }
-      out[i] = nan;
-      outv[i] = nan;
-      mask[i] = b;
-    }
-  }
-}
-
+// `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f. Kernel del percorso risolto nel preflight
+// (ADR-07); ogni banda e' l'avvio di un task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
 void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
                   const std::uint16_t* const* bits) {
-  if (p.out.type == sample_type::f32) combine_band<float>(p, y0, rows, vals, bits);
-  else combine_band<double>(p, y0, rows, vals, bits);
+  kernels::master_band b;
+  b.n = p.n;
+  b.w = p.w;
+  b.y0 = y0;
+  b.rows = rows;
+  b.vals = vals;
+  b.bits = bits;
+  b.has_sat = p.has_sat;
+  b.sat = p.sat;
+  b.f32_out = p.out.type == sample_type::f32;
+  b.out = p.out.samples.data();
+  b.outv = p.out.variance->samples.data();
+  b.mask = p.out.invalid.bits.data();
+  b.flat = p.flat;
+  b.offset = p.offset;
+  b.eps = p.eps;
+  b.lbe = p.lbe.data();
+  b.ratio = p.ratio.data();
+  b.nonpositive = p.nonpositive.data();
+  begin_kernel_task();
+  if (p.path == cpu_path::avx2) kernels::master_band_avx2(b);
+  else kernels::master_band_scalar(b);
 }
 
 std::string rows_digest(const image& out, std::uint32_t y0, std::uint32_t y1) {
@@ -701,6 +642,7 @@ json recipe_report(const master_recipe& r) {
   o.set("temperature_abs_tol_c", json::number(*r.temperature_abs_tol_c));
   o.set("temperature_policy", json::string(policy_name(*r.temp_policy)));
   o.set("output_type", json::string(type_name(r.output_type)));
+  o.set("simd", json::string(simd_request_name(*r.simd)));
   return o;
 }
 
@@ -889,6 +831,7 @@ void validate_master_recipe(const master_recipe& r) {
 }
 
 node_spec make_master_node(const master_recipe& r) {
+  require_fp_environment();  // prima dei confronti sui parametri (ADR-07, D23)
   validate_master_recipe(r);
   const std::vector<std::size_t> order = canonical_order(r);
   json params = recipe_report(r);
@@ -905,7 +848,8 @@ node_spec make_master_node(const master_recipe& r) {
   }
   params.set("frames", std::move(frames));
   return node_spec(master_operator_id, master_algorithm_version, master_serialization_version, std::move(params),
-                   std::move(inputs), sample_type::f64, master_backend, std::nullopt);
+                   std::move(inputs), sample_type::f64, backend_name(resolve_cpu_path(*r.simd, read_cpu_capabilities())),
+                   std::nullopt);
 }
 
 master_descriptor master_descriptor_from_node(const node_spec& node) {
@@ -1187,6 +1131,8 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
+    const cpu_capabilities caps = read_cpu_capabilities();
+    details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
   return run_job_files(store, slot_name, work, budget, &cancel);

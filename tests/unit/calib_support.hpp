@@ -13,6 +13,7 @@
 #include "astro/json.hpp"
 #include "exact_rational.hpp"
 #include "expect_stop.hpp"
+#include "simd_support.hpp"
 #include "syn_fits.hpp"
 
 namespace cal {
@@ -93,6 +94,7 @@ inline calibration_recipe recipe_of(const set_def& s, double read_noise = 2.0) {
   r.exposure_rel_tol = 1e-9;
   r.temperature_abs_tol_c = 0.5;
   r.temp_policy = temperature_policy::compare;
+  r.simd = simd_test::requested();
   return r;
 }
 
@@ -218,7 +220,7 @@ inline double as_double(const json& j) {
 }
 
 inline fs::path fresh_dir(const std::string& name) {
-  const fs::path dir = fs::path(ASTRO_TEST_TMP) / "m2e" / name;
+  const fs::path dir = fs::path(ASTRO_TEST_TMP) / simd_test::tmp_subdir() / "m2e" / name;
   fs::remove_all(dir);
   fs::create_directories(dir);
   return dir;

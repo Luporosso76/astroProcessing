@@ -57,6 +57,9 @@ add_library(astrocore STATIC
   sqlite_recovery.cpp
   project_export.cpp
   project_verify.cpp
+  cpu_dispatch.cpp
+  kernels_scalar.cpp
+  kernels_avx2.cpp
   calibration.cpp
   calibration_report.cpp
   calibration_job.cpp
@@ -68,6 +71,8 @@ add_library(astrocore STATIC
   workflow.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
+# ADR-07: il percorso cpu_scalar si compila senza vettorizzazione; cpu_avx2 usa target("avx2") solo nelle sue funzioni.
+set_source_files_properties(kernels_scalar.cpp PROPERTIES COMPILE_OPTIONS "-fno-tree-vectorize;-fno-tree-slp-vectorize")
 add_dependencies(astrocore astro_source_revision)
 target_include_directories(astrocore PUBLIC include)
 target_compile_features(astrocore PUBLIC cxx_std_20)

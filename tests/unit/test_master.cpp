@@ -1027,6 +1027,7 @@ calibration_recipe product_recipe(const pipeline& p) {
   r.exposure_rel_tol = 1e-9;
   r.temperature_abs_tol_c = 0.5;
   r.temp_policy = temperature_policy::compare;
+  r.simd = simd_test::requested();
   return r;
 }
 
@@ -1182,6 +1183,7 @@ TEST(MasterPipeline, T_M2E_20_product_master_planes_propagate_as_the_rational_or
   r.exposure_rel_tol = 1e-9;
   r.temperature_abs_tol_c = 0.5;
   r.temp_policy = temperature_policy::compare;
+  r.simd = simd_test::requested();
   const calibration_result out = calibrate(r, calibration_images{cal::decode(p.light, 20, 12), d.output, f.output, df.output});
 
   const std::size_t n = 240;

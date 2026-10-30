@@ -142,6 +142,7 @@ inline master_recipe recipe_of(const group& g, double flat_tol = 0.25) {
   r.exposure_rel_tol = 1e-9;
   r.temperature_abs_tol_c = 0.5;
   r.temp_policy = temperature_policy::compare;
+  r.simd = simd_test::requested();
   r.output_type = sample_type::f64;
   return r;
 }
@@ -206,7 +207,7 @@ inline double sample(const image& im, std::size_t i) { return cal::sample_at(im,
 inline double plane(const image& im, std::size_t i) { return cal::variance_at(im, i); }
 
 inline fs::path fresh_dir(const std::string& name) {
-  const fs::path dir = fs::path(ASTRO_TEST_TMP) / "r2" / name;
+  const fs::path dir = fs::path(ASTRO_TEST_TMP) / simd_test::tmp_subdir() / "r2" / name;
   fs::remove_all(dir);
   fs::create_directories(dir);
   return dir;

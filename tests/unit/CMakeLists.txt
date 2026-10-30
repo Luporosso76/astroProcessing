@@ -20,7 +20,7 @@ gtest_discover_tests(test_deps PROPERTIES LABELS fast)
 foreach(t test_error test_image test_fits test_json test_hash test_dag test_job test_store test_store_history
         test_store_contract test_store_crash test_export test_store_review
         test_budget test_resources test_pool test_spill test_scheduler test_calibration test_calibration_job test_job_alloc
-        test_inventory test_phase test_import test_recovery test_master test_blocks test_calibration_r32)
+        test_inventory test_phase test_import test_recovery test_master test_blocks test_calibration_r32 test_simd)
   add_executable(${t} ${t}.cpp)
   target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main)
   target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
@@ -133,6 +133,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_phase.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_import.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_simd.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_stats.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_import_real.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_recovery.dir
@@ -168,6 +169,28 @@ set_tests_properties(
   T-M2R0-02.noexec T-M2R0-02.noexec_negative
   T-M2R0-04.headless T-M2R0-04.headless_negative
   PROPERTIES LABELS fast TIMEOUT 120)
+
+# T-M2R5-01 (ADR-07, aggiunte di R5): le suite di calibrazione (intera e a blocchi), del job e del master sul secondo percorso.
+foreach(t test_calibration test_calibration_job test_master test_calibration_r32)
+  add_test(NAME T-M2R5-01.avx2.${t} COMMAND ${t})
+  set_tests_properties(T-M2R5-01.avx2.${t} PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2)
+endforeach()
+
+# T-M2R5-05 e T-M2R5-07 (parte binaria): istruzioni vietate nei kernel, crtfastmath e fast-math nella build.
+set(ASTRO_KERNEL_OBJECTS ${CMAKE_BINARY_DIR}/src/core/CMakeFiles/astrocore.dir)
+add_test(NAME T-M2R5-05.kernel_instructions
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_simd_binary.sh objects
+    ${ASTRO_KERNEL_OBJECTS}/kernels_scalar.cpp.o ${ASTRO_KERNEL_OBJECTS}/kernels_avx2.cpp.o)
+add_test(NAME T-M2R5-05.kernel_instructions_negative
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_simd_binary.sh --self-test objects ${CMAKE_CXX_COMPILER})
+add_test(NAME T-M2R5-07.no_crtfastmath
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_simd_binary.sh fastmath
+    ${CMAKE_BINARY_DIR}/build.ninja ${CMAKE_BINARY_DIR}/CMakeFiles/rules.ninja --
+    $<TARGET_FILE:test_simd> $<TARGET_FILE:test_calibration> $<TARGET_FILE:test_master>)
+add_test(NAME T-M2R5-07.no_crtfastmath_negative
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_simd_binary.sh --self-test fastmath ${CMAKE_CXX_COMPILER})
+set_tests_properties(T-M2R5-05.kernel_instructions T-M2R5-05.kernel_instructions_negative
+  T-M2R5-07.no_crtfastmath T-M2R5-07.no_crtfastmath_negative PROPERTIES LABELS fast TIMEOUT 120)
 
 # Self-test degli strumenti di processo (tools/trace.py, tools/lint.sh) su dati sintetici in tmp/.
 add_test(NAME TOOLS.trace_selftest COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tools/trace.py selftest)

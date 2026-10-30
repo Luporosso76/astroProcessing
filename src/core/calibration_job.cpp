@@ -97,6 +97,7 @@ json input_params(const calibration_input_spec& s) {
 }  // namespace
 
 node_spec make_calibration_node(const calibration_recipe& recipe) {
+  require_fp_environment();  // prima dei confronti sui parametri (ADR-07, D23)
   validate_calibration_recipe(recipe);
   json params = json::object();
   params.set("normalization", json::string(name_of(*recipe.normalization)));
@@ -105,6 +106,7 @@ node_spec make_calibration_node(const calibration_recipe& recipe) {
   params.set("exposure_rel_tol", json::number(*recipe.exposure_rel_tol));
   params.set("temperature_abs_tol_c", json::number(*recipe.temperature_abs_tol_c));
   params.set("temperature_policy", json::string(name_of(*recipe.temp_policy)));
+  params.set("simd", json::string(simd_request_name(*recipe.simd)));
   json inputs = json::object();
   inputs.set("light", input_params(recipe.light));
   inputs.set("dark", input_params(recipe.dark));
@@ -121,7 +123,8 @@ node_spec make_calibration_node(const calibration_recipe& recipe) {
   node_inputs.push_back(input_of("flat", recipe.flat));
   node_inputs.push_back(input_of("dark_flat", recipe.dark_flat));
   return node_spec(calibration_operator_id, calibration_algorithm_version, calibration_serialization_version,
-                   std::move(params), std::move(node_inputs), sample_type::f64, calibration_backend, std::nullopt);
+                   std::move(params), std::move(node_inputs), sample_type::f64,
+                   backend_name(resolve_cpu_path(*recipe.simd, read_cpu_capabilities())), std::nullopt);
 }
 
 namespace {
@@ -138,6 +141,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
                                 const calibration_job_options& options, const cancel_token& cancel,
                                 const std::optional<budget_snapshot>& budget) {
   const auto work = [&](const job_record& job) -> job_files_result {
+    require_fp_environment();
     validate_calibration_recipe(recipe);
     const node_spec node = make_calibration_node(recipe);
     if (node.key() != job.node_key) {
@@ -220,8 +224,12 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       chosen_plan = plan_resources(in, *options.resources);
       const resource_plan& chosen = *chosen_plan;
       if (chosen.spill) {
-        return calib_detail::run_block_calibration(
+        job_files_result blocks = calib_detail::run_block_calibration(
             store, pool, calib_detail::block_job_request{recipe, node, chosen, *options.resources, plans, options}, cancel);
+        const cpu_capabilities caps = read_cpu_capabilities();
+        if (!blocks.details) blocks.details = json::object();
+        blocks.details->set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
+        return blocks;
       }
       plan.shared_bytes = chosen.shared_bytes;
       plan.per_task_bytes = chosen.per_task_bytes;
@@ -326,6 +334,8 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       details.set("scheduler", calib_detail::scheduler_details(report));
     }
     if (options.pressure) details.set("admission", calib_detail::admission_details(report));
+    const cpu_capabilities caps = read_cpu_capabilities();
+    details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
   std::optional<budget_snapshot> recorded = budget;

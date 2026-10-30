@@ -328,6 +328,7 @@ struct prepared_calibration::impl {
   double norm[4] = {0, 0, 0, 0};
   double norm_sq[4] = {0, 0, 0, 0};
   double q_min = 0, q_rel_sigma_max = 0;
+  cpu_path path{};  // risolto nel preflight dalla richiesta `simd` (ADR-07)
   image out;
   std::vector<channel_normalization> channels;
   std::vector<std::string> warnings;

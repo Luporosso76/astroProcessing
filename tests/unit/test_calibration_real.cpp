@@ -199,6 +199,7 @@ band_master product_master(sqlite_dag_store& store, const std::string& slot, mas
   r.exposure_rel_tol = 1e-3;
   r.temperature_abs_tol_c = 1.0;
   r.temp_policy = temperature_policy::not_applicable_declared;
+  r.simd = simd_test::requested();
   r.output_type = sample_type::f64;
   const node_spec node = make_master_node(r);
   store.put_node(node);
@@ -325,6 +326,7 @@ void run_band(const band& b, const std::map<std::string, double>& env, master_so
   r.exposure_rel_tol = 1e-3;
   r.temperature_abs_tol_c = 1.0;
   r.temp_policy = temperature_policy::not_applicable_declared;
+  r.simd = simd_test::requested();
 
   const node_spec node = make_calibration_node(r);
   store->put_node(node);

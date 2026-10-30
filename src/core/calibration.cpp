@@ -9,6 +9,7 @@
 #include "astro/error.hpp"
 #include "astro/operations.hpp"
 #include "calibration_internal.hpp"
+#include "cpu_kernels.hpp"
 
 namespace astro {
 
@@ -60,6 +61,7 @@ void validate_params(const calibration_recipe& r) {
   check_nonnegative(r.exposure_rel_tol, "exposure_rel_tol");
   check_nonnegative(r.temperature_abs_tol_c, "temperature_abs_tol_c");
   if (!r.temp_policy) bad_param("temperature_policy", "assente");
+  if (!r.simd) bad_param("simd", "assente");
 }
 
 void validate_masters(const calibration_recipe& r) {
@@ -615,8 +617,12 @@ namespace {
 // e l'uscita li fa chi legge a blocchi (calibration_blocks.cpp) con le stesse funzioni.
 std::unique_ptr<prepared_calibration::impl> prepare_impl(const calibration_recipe& recipe, calibration_images images,
                                                          bool pixels) {
+  // Prima della validazione: i confronti sui parametri sono gia' operazioni in virgola mobile (ADR-07, D23). Vale per
+  // le due residenze.
+  require_fp_environment();
   validate_calibration_recipe(recipe);
   auto p = std::make_unique<prepared_calibration::impl>();
+  p->path = resolve_cpu_path(*recipe.simd, read_cpu_capabilities());
   p->recipe = recipe;
   p->images = std::move(images);
   p->q_min = *recipe.q_min;
@@ -790,102 +796,14 @@ std::unique_ptr<prepared_calibration::impl> calib_detail::prepare_headers(const 
 
 // ---------------------------------------------------------------- calcolo per righe
 
-namespace {
-
-template <class T>
-void rows_kernel(const prepared_calibration::impl& p, const calib_detail::kernel_io& io, std::uint32_t y0,
-                 std::uint32_t y1, double* qrow, double* varq, std::uint16_t* qbits) {
-  const std::uint32_t w = p.w;
-  T* out = static_cast<T*>(io.out);
-  T* outv = static_cast<T*>(io.out_variance);
-  std::uint16_t* out_mask = io.out_mask;
-  const input_view &L = *io.light, &D = *io.dark, &F = *io.flat, &DF = *io.dark_flat;
-  constexpr T nan = std::numeric_limits<T>::quiet_NaN();
-  for (std::uint32_t y = y0; y < y1; ++y) {
-    for (std::uint32_t x = 0; x < w; ++x) {
-      const std::size_t i = static_cast<std::size_t>(y - io.row0) * w + x;
-      qbits[x] = 0;
-      qrow[x] = std::numeric_limits<double>::quiet_NaN();
-      varq[x] = std::numeric_limits<double>::quiet_NaN();
-      const bool f_saturated = F.has_saturation && F.value(i) >= F.saturation;
-      if ((F.mask[i] | DF.mask[i]) != 0 || f_saturated) continue;
-      const double f = F.value(i), df = DF.value(i);
-      const double n = p.norm[p.channel_of(x, y)];
-      const double fc = f - df;
-      const double q = fc / n;
-      qrow[x] = q;
-      if (!calib_detail::div_ok(fc, q) && std::isfinite(q)) {
-        qbits[x] = invalid_reason::result_nonfinite;  // Q zero o subnormale da Fc non nullo
-      } else if (!std::isfinite(q)) {
-        qbits[x] = invalid_reason::q_nonfinite;
-      } else if (q <= 0) {
-        qbits[x] = invalid_reason::q_nonpositive;
-      } else {
-        const double vf = F.variance(i, f), vdf = DF.variance(i, df);
-        const double vfc = vf + vdf;
-        const double vq = vfc / p.norm_sq[p.channel_of(x, y)];
-        varq[x] = vq;
-        if (std::isnan(vf) || std::isnan(vdf) || !calib_detail::add_ok(vf, vdf, vfc) || !calib_detail::div_ok(vfc, vq)) {
-          qbits[x] = invalid_reason::result_nonfinite;  // passo del modello di varianza non rappresentabile
-          continue;
-        }
-        if (q < p.q_min) qbits[x] |= invalid_reason::q_below_min;
-        if (std::sqrt(vq) / q > p.q_rel_sigma_max) qbits[x] |= invalid_reason::q_unreliable;
-      }
-    }
-    for (std::uint32_t x = 0; x < w; ++x) {
-      const std::size_t i = static_cast<std::size_t>(y - io.row0) * w + x;
-      const std::uint16_t master_bits = static_cast<std::uint16_t>(D.mask[i] | F.mask[i] | DF.mask[i]);
-      std::uint16_t bits = static_cast<std::uint16_t>(L.mask[i] | master_bits | qbits[x]);
-      if (master_bits != 0) bits |= invalid_reason::master_invalid;
-      if (L.has_saturation && L.value(i) >= L.saturation) bits |= invalid_reason::saturated;
-      if (F.has_saturation && F.value(i) >= F.saturation) bits |= invalid_reason::saturated;
-      if (bits == 0) {
-        const double l = L.value(i), d = D.value(i);
-        const double lc = l - d;
-        const double q = qrow[x];
-        const double c = lc / q;
-        const double vl = L.variance(i, l), vd = D.variance(i, d);
-        const double vlc = vl + vd;
-        const double q2 = q * q;
-        const double q4 = q2 * q2;
-        const double lc2 = lc * lc;
-        const double term_q = lc2 * varq[x];
-        const double t1 = vlc / q2;
-        const double t2 = term_q / q4;
-        const double var_c = t1 + t2;
-        // Ogni prodotto, quoziente e somma deve essere finito e, con operandi non nulli, normale (ne' zero ne'
-        // subnormale per underflow, ne' infinito): altrimenti il pixel e' result_nonfinite.
-        using namespace calib_detail;
-        const bool intermediates_ok = !std::isnan(vl) && !std::isnan(vd) && add_ok(vl, vd, vlc) && is_finite_ok(vlc) &&
-                                      div_ok(lc, c) && mul_ok(q, q, q2) && mul_ok(q2, q2, q4) && q2 > 0 && q4 > 0 &&
-                                      mul_ok(lc, lc, lc2) && mul_ok(lc2, varq[x], term_q) && div_ok(vlc, t1) &&
-                                      div_ok(term_q, t2) && add_ok(t1, t2, var_c);
-        T cs{}, vs{};
-        if (intermediates_ok && convert_finite<T>(c, cs) && convert_finite<T>(var_c, vs)) {
-          out[i] = cs;
-          outv[i] = vs;
-          continue;
-        }
-        bits = invalid_reason::result_nonfinite;
-      }
-      out[i] = nan;
-      outv[i] = nan;
-      out_mask[i] = bits;
-    }
-  }
-}
-
-}  // namespace
-
+// Kernel del percorso risolto nel preflight, per le due residenze: il percorso non cambia durante l'esecuzione. Ogni
+// chiamata e' l'avvio di un task: controllo dell'ambiente FP prima del kernel (ADR-07, D23).
 void calib_detail::calibrate_band(const prepared_calibration::impl& p, const kernel_io& io, std::uint32_t row_begin,
                                   std::uint32_t row_end, void* scratch) {
   ASTRO_ASSERT(io.row0 <= row_begin && row_begin <= row_end && row_end <= p.h);
-  auto* qrow = static_cast<double*>(scratch);
-  double* varq = qrow + p.w;
-  auto* qbits = reinterpret_cast<std::uint16_t*>(varq + p.w);
-  if (p.out.type == sample_type::f32) rows_kernel<float>(p, io, row_begin, row_end, qrow, varq, qbits);
-  else rows_kernel<double>(p, io, row_begin, row_end, qrow, varq, qbits);
+  begin_kernel_task();
+  if (p.path == cpu_path::avx2) kernels::calibrate_rows_avx2(p, io, row_begin, row_end, scratch);
+  else kernels::calibrate_rows_scalar(p, io, row_begin, row_end, scratch);
 }
 
 void prepared_calibration::calibrate_rows(std::uint32_t row_begin, std::uint32_t row_end, void* scratch) {

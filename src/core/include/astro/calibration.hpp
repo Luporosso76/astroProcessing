@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "astro/cpu_dispatch.hpp"
 #include "astro/fits.hpp"
 #include "astro/hash.hpp"
 #include "astro/image.hpp"
@@ -37,7 +38,6 @@ enum class variance_estimator { empirical };
 constexpr const char* calibration_operator_id = "calib.dark_matched_flat_dark_flat";
 constexpr std::uint32_t calibration_algorithm_version = 1;
 constexpr std::uint32_t calibration_serialization_version = 1;
-constexpr const char* calibration_backend = "cpu_scalar";
 
 // Stato dichiarato di un master. I campi non pertinenti al ruolo restano nullopt.
 struct master_descriptor {
@@ -87,6 +87,7 @@ struct calibration_recipe {
   std::optional<double> exposure_rel_tol;
   std::optional<double> temperature_abs_tol_c;
   std::optional<temperature_policy> temp_policy;
+  std::optional<simd_request> simd;  // ADR-07: nessun default
 };
 
 struct calibration_images {

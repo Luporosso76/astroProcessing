@@ -18,7 +18,6 @@ enum class flat_normalization { none, median_ratio };
 constexpr const char* master_operator_id = "master.combine";
 constexpr std::uint32_t master_algorithm_version = 1;
 constexpr std::uint32_t master_serialization_version = 1;
-constexpr const char* master_backend = "cpu_scalar";
 
 struct master_frame_spec {
   std::string path;       // solo per il job
@@ -42,6 +41,7 @@ struct master_recipe {
   std::optional<double> exposure_rel_tol;
   std::optional<double> temperature_abs_tol_c;
   std::optional<temperature_policy> temp_policy;
+  std::optional<simd_request> simd;  // ADR-07: nessun default
   sample_type output_type = sample_type::f32;
 };
 
