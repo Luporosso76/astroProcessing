@@ -1,8 +1,21 @@
 # Gate M2: verifica complessiva della milestone
 
-Stato: **RIAPERTO**, 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è revocato: manca F-IO-10 (import prestacked e calibrato tipizzato), che il registro dell'appendice D impone a M2.c (`M2.c requires_all F-IO-10`, piano attivo riga 4415; foglia a riga 1821). Lo ha rilevato la review del piano M3 (`.omc/artifacts/ask/codex-m3plan-review1-20261029-1424.md`); i sette giri del gate non l'avevano visto. Storico del gate: Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
+Stato: **PASS per arbitraggio del coordinatore**, 30 ottobre 2026 (giro 10, sotto). Storico: **RIAPERTO** il 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è revocato: manca F-IO-10 (import prestacked e calibrato tipizzato), che il registro dell'appendice D impone a M2.c (`M2.c requires_all F-IO-10`, piano attivo riga 4415; foglia a riga 1821). Lo ha rilevato la review del piano M3 (`.omc/artifacts/ask/codex-m3plan-review1-20261029-1424.md`); i sette giri del gate non l'avevano visto. Storico del gate: Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
 
 Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Riesecuzione identica sul commit del gate `cb35d89` con uscita 0 (sezione «Riesecuzione sul commit del gate»); il gate passa con la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7. Il tetto di 3 giri di review vale per il gate rifatto: giro 8 = review 1, giro 9 = review 2, il prossimo è la review 3 e ultima; dopo, arbitraggio del coordinatore.
+
+## Giro 10: chiusura per arbitraggio del coordinatore
+
+- Tetto delle review (proprietario, 30 ottobre 2026; `AGENTS.md`, ciclo di un'unità, punto 4): 2 giri per unità e per gate. Il gate rifatto li ha usati: giro 8 (review 1, FAIL) e giro 9 (review 2, FAIL con un solo rilievo BLOCCANTE). Non c'è una terza review: chiude il coordinatore.
+- Rilievo del giro 9: lo stop `cpu.fp_mode` prima dell'avvio del job non lasciava provenance (NFR-FBK-01.a). Corretto da R5.d (`a9bf82d`, `docs/evidence/M2-R5d.md`): uno stop prima del lavoro chiude il job `failed` (`cancelled` per quella categoria) e, su store durevole, scrive `stop_before_work_record` con sole stringhe e interi; review dell'unità PASS al giro 2, 12 mutazioni su 12 rilevate.
+- Esecuzione finale del coordinatore, 30 ottobre 2026, 6 job, `ulimit -c 0`, build pulite in directory nuove:
+  1. `tools/check.sh` (log `tmp/gate10-check.log`): uscita 0, `lint: ok`.
+  2. `ctest --preset dev-full -j6 --output-junit tmp/dev-junit.xml` (log `tmp/gate10-dev.log`): 516/516, 1690,9 s.
+  3. `cmake --preset release`, `cmake --build --preset release -j6`, `ctest --preset release -j6 --output-junit tmp/release-junit.xml` (log `tmp/gate10-rel.log`): 515/515, 114,8 s.
+  4. `python3 -S tools/check_m2_trace.py --run build/dev:tmp/dev-junit.xml --run build/release:tmp/release-junit.xml` (`tmp/gate10-trace.txt`): **uscita 0**, `check_m2_trace: 63 ID nello stadio M2, 0 con problemi, 0 problemi di esecuzione`.
+- Revisioni delle build: dev `a9bf82d`, release `9d3996c` (entrambe `dirty=false`). Fra i due commit cambiano solo `AGENTS.md`, `plans/M3.md` e `tools/review.sh`, nessuno compilato né usato da ctest: prodotto e test sono gli stessi. Commit del gate: `9d3996c`.
+- Clausola 4: le review del gate (giri 8 e 9) e le review delle unità che ne hanno chiuso i rilievi (R5.c, R6.c, R5.d, tutte PASS) coprono il delta; la chiusura senza terza review è l'arbitraggio previsto dal tetto.
+- Esito: **Gate M2 PASS** per arbitraggio del coordinatore. Limiti accettati: sezione «Limiti residui accettati per M2» e limiti dei record delle unità (`M2-R5d.md`: provenance in memoria per `run_job`, stop di workflow prima di ogni job senza job, stop `cpu.fp_mode` dentro il lavoro con provenance completa).
 
 ## Giro 9 (review 2 di 3 del gate rifatto): correzioni della review del giro 8 e riesecuzione
 
@@ -43,13 +56,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `ae4950eb8715bec20553b0c2c8ae38701cfa5fac4e60f3f154267a5c856714c5` |
-| `tests/trace/M2.tsv` | `94527d5b4ed6c5e0675999398974bc97c433be16b5f25741c32e092deefa335b` |
+| `docs/test-matrix.md` | `3606bd7cf50005153f73ec040c41ae064e9b310a31d3344d6af11bd7d501e597` |
+| `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tools/check_m2_trace.py` | `2ff5df7acdcc07ef45edd4c80fdb6ed7c7d5decd9e5f4629cc1751842c216a9b` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
 
-- Test dev (`tmp/dev-junit.xml`): totali 505, fast 498, slow 7, falliti 0
-- Test release (`tmp/release-junit.xml`): totali 504, fast 497, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 516, fast 509, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 515, fast 508, slow 7, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/dev`, junit `tmp/dev-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->

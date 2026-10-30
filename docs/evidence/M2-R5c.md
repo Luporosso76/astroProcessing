@@ -13,18 +13,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-07-cpu-simd.md` | `802ed028c1f9f8a2f8ed8373c11c9c82c2e5dd2b060a0207de8d0064f3bbd3a2` |
-| `src/core/calibration_job.cpp` | `c87b78460c7cccd05f5364cabd1794c048f3190528835d768c7c5ad3464979e4` |
-| `src/core/include/astro/job.hpp` | `d98604cd15500cc5fa18f44758741a3eee6912a96ccdcf81c49e5cec7a5fe46a` |
+| `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
+| `src/core/calibration_job.cpp` | `5295e8bff4a6c960ea0c0bde998b6f3d0f10f1769fce3de5530822986ae82446` |
+| `src/core/include/astro/job.hpp` | `5f13c42826de94271f60317602ebef2b1eb0edeafa7b4231c68cec90b160350d` |
 | `src/core/include/astro/scheduler.hpp` | `90bcf01a873ac81b8776abc73fe539903350e9793557b6442a436eefca87e658` |
-| `src/core/job.cpp` | `25f14c717b9c341bf65f065c4b77e33d9ed81908029d064bd9f152cd78bf8a8f` |
-| `src/core/master.cpp` | `3697bf2ae016289ee76728cef972b334eb78d4a52f10a781ddf89567cd128fa7` |
+| `src/core/job.cpp` | `072c5191e20ddc22d008a45817faabf00a77721e9386b929f723e93adc01320b` |
+| `src/core/master.cpp` | `4bd0c1c467fbbf0e8e9b20c4c89f8edeea103c7d57ca6de40297e04bb8fa30f4` |
 | `src/core/scheduler.cpp` | `62c376a5785dd4361a74f15ee7dd249a046d4e11a051403cc760aa49a68e2729` |
-| `tests/trace/M2.tsv` | `94527d5b4ed6c5e0675999398974bc97c433be16b5f25741c32e092deefa335b` |
-| `tests/unit/test_simd.cpp` | `8d41128f8f0c219301415e29bd86a211fb332620a9711336f2057f8b8777ab2e` |
+| `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
+| `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
 
-- Test release (`tmp/release-junit.xml`): totali 504, fast 497, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 505, fast 498, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 515, fast 508, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 516, fast 509, slow 7, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

@@ -44,6 +44,6 @@ Regole per scrivere e chiudere i piani di lavoro. Lo stato vive in `docs/progres
 ## Piani attivi
 
 - `plans/M2.md`: fondamenta e prima slice scientifica. È il piano corrente.
-- `plans/M2-residui.md`: residui di M2 dal registro e gate rifatto; R0–R5 chiuse, R6 (tracciabilità ed esecuzione finale del gate) in corso.
-- `plans/M3.md`: PLANNED, parte dopo il PASS del gate M2.
+- `plans/M2-residui.md`: residui di M2 dal registro e gate rifatto; chiuso, Gate M2 PASS per arbitraggio (30 ottobre 2026).
+- `plans/M3.md`: piano corrente; fase M3.entry e base comune prima del codice delle slice.
 - `plans/M0-M1.md` e `plans/M1-*.md`: chiusi con `docs/decisions/ADR-M1-stack.md`; storici.

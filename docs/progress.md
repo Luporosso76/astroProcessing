@@ -4,12 +4,12 @@ Ultimo aggiornamento: 30 ottobre 2026. Unica fonte dello stato corrente; risulta
 
 ## Ora
 
-- **M0 PASS. M1 DONE. M2 IN PROGRESS, Gate M2 RIAPERTO e rifatto** dal registro dell'appendice D (`plans/M2-residui.md`): R0–R5 chiuse (`docs/evidence/M2-R0.md` … `M2-R5.md`); R6 in corso. Esecuzione finale provata prima del commit (giro 8 di `docs/evidence/M2-gate.md`): build pulita, dev 501/501 (slow compresi, preset `dev-full`) e release 500/500, `tools/check_m2_trace.py` uscita 0 sui 63 ID, matrice con stati finali. Il gate passa dopo la riesecuzione sul commit del gate e la review Codex del record (clausola 4).
+- **M0 PASS. M1 DONE. M2 DONE: Gate M2 PASS per arbitraggio il 30 ottobre 2026** (`docs/evidence/M2-gate.md`, giro 10; commit del gate `9d3996c`). Storico: Gate M2 riaperto e rifatto dal registro dell'appendice D (`plans/M2-residui.md`): R0–R5 chiuse (`docs/evidence/M2-R0.md` … `M2-R5.md`); R6 in corso. Esecuzione finale provata prima del commit (giro 8 di `docs/evidence/M2-gate.md`): build pulita, dev 501/501 (slow compresi, preset `dev-full`) e release 500/500, `tools/check_m2_trace.py` uscita 0 sui 63 ID, matrice con stati finali. Il gate passa dopo la riesecuzione sul commit del gate e la review Codex del record (clausola 4).
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
 - D-19/D-20 approvate P0. D-21: preferenza per pack inclusi, subordinata alle verifiche di licenza.
-- Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: `60a6cc8` (R6, `tools/check_m2_trace.py`).
+- Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: vedi `git log` su `work/m0-m1`.
 - Review indipendenti: Codex `gpt-6-astra` in sola lettura finché ha token, poi revisori Claude; Gemini 4 Argon non disponibile; Gemini Flash via `agy` solo per testi e lingue (`AGENTS.md`).
 
 ## Evidenze principali
@@ -28,7 +28,7 @@ I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) rest
 
 ## Prossima unità
 
-Gate M2: commit delle modifiche del giro 8, riesecuzione identica sul commit (`plans/M2.md`, «Prossimo comando»), review indipendente. Dopo il PASS: M3 (`plans/M3.md`, stato PLANNED), fase `M3.entry` (contratti C-01.b…C-19 e stadi ADR prima del codice), poi M3.a import RAW/FITS RGB. Prima di M4 (GUI) ci si ferma col proprietario.
+M3 (`plans/M3.md`): contratti d'ingresso scritti (ADR-08.b, ADR-03.b, ADR-16.b e D-16, C-01.b, D-08, ADR-17.b e D-17, C-02.b, ADR-09.b e D-09); prima del codice di M3.a la base comune con la suite di conformità (`plans/M3.md`, «Base comune prima del codice delle slice»). Prima di M4 (GUI) ci si ferma col proprietario.
 
 Ritmo misurato di M2 (solo informazione): avviata il 28 ottobre 2026; M2.g, M2.f, M2.a e M2.b chiuse il 28 ottobre; M2.c, M2.d e M2.e il 29 ottobre (date dei commit e dei record).
 

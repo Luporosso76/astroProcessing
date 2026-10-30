@@ -52,7 +52,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/ADR-16-stati-master.md` | `e443567e3fbb04693c761fd3dd7243a96a20806a49aa76cb42d63c26a43479fc` |
 | `docs/contracts/C-01-calibrazione-light.md` | `5381f37ca6f41da7401c2f68c83bc82ed5d60ad2a32b8242283614b8c9ec8013` |
 | `docs/contracts/README.md` | `496c611387d092c9c6e88a02df05b01a0edf2a1c79a85d4f83040443c0df0c53` |
-| `docs/test-matrix.md` | `ae4950eb8715bec20553b0c2c8ae38701cfa5fac4e60f3f154267a5c856714c5` |
-| `plans/M3.md` | `d27d7b6e446f30a38488795b5b5f034cc6ecb3eb78f613217cd168a9df07aae4` |
+| `docs/test-matrix.md` | `3606bd7cf50005153f73ec040c41ae064e9b310a31d3344d6af11bd7d501e597` |
+| `plans/M3.md` | `6539466708cc87d7a821794dcc1fc311bc3d796ce479ee7e2df6922e4548b18d` |
 
 <!-- evidence:end -->

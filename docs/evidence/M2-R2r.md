@@ -17,16 +17,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/C-02-master.md` | `7f9c0d34d41da5c97a6a587fa46e9675d7f47fe87ac042671c7bf73bcdd15c4e` |
 | `src/core/include/astro/master.hpp` | `f6214e982869003b763d78c8098bccbaed28c527ef6197fad68907f83f42815f` |
 | `src/core/include/astro/resources.hpp` | `74b04a71563aa738636ae48a224c634b063058fe0d6269a80034329e4ecfc030` |
-| `src/core/master.cpp` | `3697bf2ae016289ee76728cef972b334eb78d4a52f10a781ddf89567cd128fa7` |
+| `src/core/master.cpp` | `4bd0c1c467fbbf0e8e9b20c4c89f8edeea103c7d57ca6de40297e04bb8fa30f4` |
 | `src/core/resources.cpp` | `b4cec8995f8457d770c2ce47ff6afc1c282c804b5709c291973473c26b3006de` |
-| `tests/trace/M2.tsv` | `94527d5b4ed6c5e0675999398974bc97c433be16b5f25741c32e092deefa335b` |
+| `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tests/unit/test_calibration_real.cpp` | `4d6dbaf66b1b6f70d88516acb1a425e7c23917eccc06c4c39d8a1e71d25434c5` |
 | `tests/unit/test_master.cpp` | `ead7cd1bcbf9c7063a86b6bff2749d88d5a2444c9a507869af797484d04a1650` |
 | `tests/unit/test_resources.cpp` | `6fc874ef4942a393e2cac3e8331174f9b2eb2aa6334b8844dc02be7b03108cab` |
-| `tests/unit/test_simd.cpp` | `8d41128f8f0c219301415e29bd86a211fb332620a9711336f2057f8b8777ab2e` |
+| `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
 
-- Test release (`tmp/release-junit.xml`): totali 504, fast 497, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 505, fast 498, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 515, fast 508, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 516, fast 509, slow 7, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 
