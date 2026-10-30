@@ -11,8 +11,8 @@ Versioni e licenze lette dal sistema (28 ottobre 2026; hash e moduli aggiunti il
 | OpenSSL (libcrypto) | 3.5.5 | libssl-dev | Apache-2.0 | Sì con GPL-3; no con GPL-2-only (il prodotto è GPL-3.0-or-later) | core (SHA-256) |
 | FFTW3 (double, float) | 3.3.10 | libfftw3-dev | GPL-2+ | Sì: GPL-2+ include GPL-3; impone GPL al prodotto distribuito | solo test (`test_deps`); candidata per il core |
 | Eigen | 3.4.0 | libeigen3-dev | MPL-2 (parti BSD-3-clause, LGPL-2.1+ con alternativa MPL-2) | Sì: MPL-2 compatibile con GPL-3 | non ancora collegata; candidata per il core |
-| LibRaw | 0.21.5 | libraw-dev | LGPL-2.1 o CDDL-1.0 (a scelta); documentazione CC-BY-SA-3.0 | Sì: LGPL-2.1 collegabile da codice GPL-3 | non ancora collegata; ingresso RAW del core |
-| libtiff | 4.7.0 | libtiff-dev | Hylafax (permissiva, stile BSD) | Sì: permissiva | non ancora collegata; I/O TIFF |
+| LibRaw | 0.21.5 | libraw-dev | LGPL-2.1-or-later o CDDL-1.0 (a scelta; si sceglie LGPL); `RawSpeed/rawspeed_xmldata.cpp` CC-BY-SA-3.0, ritenuto assente dal binario (ipotesi, sezione «NFR-LIC-01.d») | Sì: LGPL-2.1-or-later collegabile da codice GPL-3 | non ancora collegata; decoder RAW del core (ADR-08.b, audit NFR-LIC-01.d sotto) |
+| libtiff | 4.7.0 | libtiff-dev | Hylafax (permissiva, stile BSD) | Sì: permissiva | non ancora collegata; writer TIFF e fixture DNG (ADR-08.b, audit NFR-LIC-01.d sotto) |
 | Little CMS 2 | 2.17 | liblcms2-dev | MIT (parti IJG, GPL-2+/GPL-3 per contributi accessori) | Sì: MIT | non ancora collegata; gestione colore |
 | Qt | 6.10.2 | qt6-base-dev | LGPL-3 o GPL-2 (moduli); GPL-3 con eccezione Qt; BSD-3-clause, Expat per parti | Sì: Qt sotto GPL-3/LGPL-3 | solo GUI; non collegata al core |
 | GoogleTest | 1.17.0, copia in `third_party/googletest` | googletest (copia) | BSD-3-clause | Sì: permissiva | solo test |
@@ -81,3 +81,49 @@ Note:
 - Nessuna incompatibilità con GPL-3.0-or-later trovata. L'unico vincolo da rispettare: OpenSSL (Apache-2.0) non è compatibile con GPL-2-only, quindi la licenza non deve mai scendere a GPL-2-only.
 - GoogleTest si compila dalla copia interna `third_party/googletest` (provenienza e hash in `PROVENANCE.md` e `SHA256SUMS`); il build non legge le installazioni di GoogleTest del sistema.
 - Il SBOM degli artefatti distribuiti si costruisce quando esisterà un artefatto da distribuire; qui c'è l'inventario di adozione.
+
+## NFR-LIC-01.d: audit di adozione M3 (LibRaw, libtiff)
+
+Regola di verifica all'ingresso M3: `docs/contracts/ADR-08-decoder-pack.md` §4. Audit del 30 ottobre 2026 sulla macchina di sviluppo, prima che un binario del progetto colleghi queste librerie: pacchetto da `dpkg -S` sul file reale, versione da `dpkg-query -W`, licenza dal file `/usr/share/doc/<pacchetto>/copyright` del pacchetto installato, SHA-256 calcolati. Dipendenze transitive da `ldd` e `readelf -d` (`NEEDED`) di `libraw_r.so.23.0.0` e `libtiff.so.6.1.0`. Non è un parere legale.
+
+File `copyright` letti:
+
+| Pacchetto | Versione | SHA-256 di `copyright` | Licenze lette (righe `License:`) |
+|---|---|---|---|
+| libraw23t64 | 0.21.5b-1ubuntu1.1 | `82bde4b0195268dfa586f5cae16b06f16179c654976919cd6a86a3fdd7c7351b` | `Files: *` LGPL-2.1 (testo «version 2.1 … or (at your option) any later version») o CDDL-1.0; `RawSpeed/rawspeed_xmldata.cpp` CC-BY-SA-3.0; `debian/*` GPL-2+ |
+| libtiff6 | 4.7.0-3ubuntu5 | `d73e31b03a0d7a515851601c19fee5792c7db03a312efacae146ddf9c91f86f1` | Hylafax (`Files: *` e `debian/*`) |
+| libjpeg-turbo8 | 2.1.5-4ubuntu4 | `3821184e23385bf2cdc01f56bd999b34036fc3aa03d5135d41680374eb81bf8a` | BSD-BY-LC-NE (licenza IJG: obbligo di citare l'uso del codice IJG nella documentazione), BSD-3-clause, Zlib, Expat, NTP |
+| liblcms2-2 | 2.17-1ubuntu0.2 | `420fd2c72204652c08a48548a0d1002edab3d9b180d3c416578c61f74092f460` | MIT (`Files: *`); GPL-3 per `plugins/fast_float/*` e `plugins/threaded/*`; IJG, GPL-2+ per file accessori |
+| libgomp1 | 16-20260322-1ubuntu1 | `d7815dd2364180835891947d96d808878204dea45b8597602a7952332195fbea` | GPL-3 con GCC Runtime Library Exception 3.1 (formato non DEP-5; letto nel testo) |
+| libwebp7, libsharpyuv0 | 1.5.0-0.1build1 | `725344c9200f6e6dad88d1ea88add2d673cdf1d8fbc3961bcd2693ab0c26d30d` | BSD-3-Clause; Apache-2.0 per parti |
+| liblzma5 | 5.8.3-1ubuntu0.1 | `a9c3f6e1bf373b54e29704e31afd99f5405a32cbc7897608b0f15e9d544882d4` | 0BSD (`Files: *`); GPL-2+, LGPL-2.1+, dominio pubblico e permissive per file accessori |
+| liblerc4 | 4.0.0+ds-5ubuntu2 | `6e694f6e6063e7b1ffb5f723ce4e696aa015944cf1b4d15e8f3ea7e90417a71d` | Apache-2.0 |
+| libjbig0 | 2.1-6.1ubuntu3 | `89ab20c324a191652e94598f2144a65442faed4f14f77bbd10516130ee20f05a` | GPL-2+ |
+| libdeflate0 | 1.23-2ubuntu1 | `b08d3438a0eadaee3103fba087a3e0f639506388ed71e7e2dfbb3e3484e9742c` | Expat |
+| libzstd1 | 1.5.7+dfsg-3 | `2efe51c80ddc473bc2c91faec49dae645bf7f5a04824528fec816320432da2ae` | BSD-3-clause o GPL-2 |
+| zlib1g | 1:1.3.dfsg+really1.3.1-1ubuntu3.2 | `9e5b96d63773a5d177ba264254390f792be07e41748ebd94730981c6cac31cc6` | Zlib |
+
+Librerie che un binario collegato a LibRaw e libtiff caricherà, stesse colonne della tabella «Librerie caricate dai binari». Le righe di `libzstd.so.1`, `libz.so.1`, `libstdc++.so.6`, `libm.so.6`, `libc.so.6`, `libgcc_s.so.1` e `ld-linux-x86-64.so.2` ci sono già. Quando il primo binario collega LibRaw o libtiff (M3.a), l'autore copia queste righe nella tabella «Librerie caricate dai binari» e T-M2R0-01 le verifica; finché mancano, T-M2R0-01 fallisce.
+
+| Soname | File reale | Pacchetto | Versione | SHA-256 | Licenza (copyright Debian) | Compatibile GPL-3.0-or-later | Origine |
+|---|---|---|---|---|---|---|---|
+| `libraw_r.so.23` | `/usr/lib/x86_64-linux-gnu/libraw_r.so.23.0.0` | libraw23t64 | 0.21.5b-1ubuntu1.1 | `3484c3eecb3614c845cadd4c4de59ff124c1646317e34438e98394e2edab3010` | LGPL-2.1-or-later o CDDL-1.0 (si sceglie LGPL) | Sì: collegamento dinamico | diretta (ADR-08.b) |
+| `libtiff.so.6` | `/usr/lib/x86_64-linux-gnu/libtiff.so.6.1.0` | libtiff6 | 4.7.0-3ubuntu5 | `d65b506791e2469e886c716a7993b5e65ce40015aef1d15a678804a9fc3c4844` | Hylafax | Sì: permissiva | diretta (ADR-08.b) |
+| `libgomp.so.1` | `/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0` | libgomp1 | 16-20260322-1ubuntu1 | `645478cbe100d1465b9d45f7047bca3965358f4d399937e544f55ac7a924d5a3` | GPL-3 con GCC Runtime Library Exception 3.1 | Sì | transitiva da libraw_r.so.23; diretta se il core chiama `omp_set_num_threads` (ADR-08.b §2.7) |
+| `libjpeg.so.8` | `/usr/lib/x86_64-linux-gnu/libjpeg.so.8.2.2` | libjpeg-turbo8 | 2.1.5-4ubuntu4 | `90a1eebead4d7c1abc46cf9c66c5392c60fc2c16f038af20fc7efbd0d8dd427f` | BSD-BY-LC-NE (IJG), BSD-3-clause, Zlib | Sì: permissiva, con l'obbligo di citazione IJG nella documentazione | transitiva da libraw_r.so.23 e libtiff.so.6 |
+| `liblcms2.so.2` | `/usr/lib/x86_64-linux-gnu/liblcms2.so.2.0.17` | liblcms2-2 | 2.17-1ubuntu0.2 | `046e89ccd894994728028a8f00c2424b79cff4e3d9832530f964edddf1078d1b` | MIT | Sì | transitiva da libraw_r.so.23 |
+| `libwebp.so.7` | `/usr/lib/x86_64-linux-gnu/libwebp.so.7.1.10` | libwebp7 | 1.5.0-0.1build1 | `0b477702bb43d90a1205813a9c211faa8dfef025a258b9d60663b37311b87c08` | BSD-3-Clause | Sì | transitiva da libtiff.so.6 |
+| `libsharpyuv.so.0` | `/usr/lib/x86_64-linux-gnu/libsharpyuv.so.0.1.1` | libsharpyuv0 | 1.5.0-0.1build1 | `fced0bf76ec62fcce9b2cea1a91a9c61fbf6828e9e66b194cc6d779798907ff2` | BSD-3-Clause | Sì | transitiva da libwebp.so.7 |
+| `liblzma.so.5` | `/usr/lib/x86_64-linux-gnu/liblzma.so.5.8.3` | liblzma5 | 5.8.3-1ubuntu0.1 | `515749273a91ca5e3b273b4025dc2c1f8827f90005baea0ab85ffb594e74f72f` | 0BSD | Sì | transitiva da libtiff.so.6 |
+| `libLerc.so.4` | `/usr/lib/x86_64-linux-gnu/libLerc.so.4` | liblerc4 | 4.0.0+ds-5ubuntu2 | `b7c1fe626e31e8c3ecb80d428ffb3a8824fd241ec55c6edc8b12437412206060` | Apache-2.0 | Sì con GPL-3; no con GPL-2-only | transitiva da libtiff.so.6 |
+| `libjbig.so.0` | `/usr/lib/x86_64-linux-gnu/libjbig.so.0` | libjbig0 | 2.1-6.1ubuntu3 | `19ae16694b0f2c442b367fd9dfecf8da68c9b8ded0bc9029c1d53a9ba91a4151` | GPL-2+ | Sì: GPL-2+ include GPL-3 | transitiva da libtiff.so.6 |
+| `libdeflate.so.0` | `/usr/lib/x86_64-linux-gnu/libdeflate.so.0` | libdeflate0 | 1.23-2ubuntu1 | `0e33bbae9bd7f62fd4172ac04d9088736defa499491aacae723732ce4e905f94` | Expat | Sì | transitiva da libtiff.so.6 |
+
+Moduli che il core userà (ADR-08.b §1): LibRaw `open_buffer`, `unpack`, `set_progress_handler`, `set_dataerror_handler`, `version`, lettura di `imgdata`; libtiff `TIFFClientOpen` e funzioni di scrittura su procedure di I/O in memoria. Nessuna apertura per nome (ADR-08.b §5).
+
+Note dell'audit:
+- Nessuna incompatibilità con GPL-3.0-or-later. Il vincolo di OpenSSL vale anche per Apache-2.0 di liblerc4: la licenza del prodotto non scende mai a GPL-2-only.
+- `RawSpeed/rawspeed_xmldata.cpp` (CC-BY-SA-3.0, non compatibile con GPL-3.0) è ritenuto assente dal binario, come ipotesi: `libraw_capabilities()` = `0x80` (la libreria dichiara di essere costruita senza RawSpeed), `nm -D --defined-only libraw_r.so.23.0.0` non ha `_rawspeed_data_xml`, `strings` non trova `<Camera`. Il log di build del pacchetto non è stato letto: se l'ipotesi fosse falsa, l'audit di LibRaw si rifà prima della distribuzione (M5).
+- `libraw_r.pc` richiede `lcms2`, il cui `.pc` aggiunge `-llcms2_fast_float -llcms2_threaded`: archivi statici di `liblcms2-dev` sotto GPL-3. Il linker estrae un oggetto da un archivio solo se un simbolo è richiesto; il core non chiama le funzioni dei plugin. In ogni caso GPL-3 è compatibile con il prodotto GPL-3.0-or-later.
+- libjpeg-turbo (licenza IJG) richiede di citare l'uso del codice IJG nella documentazione del prodotto distribuito: da riportare nell'SBOM e nella documentazione di M5.
+- Hash validi per questa macchina e questi pacchetti; un aggiornamento li cambia e T-M2R0-01 lo segnala dopo il collegamento.

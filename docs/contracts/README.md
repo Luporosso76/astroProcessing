@@ -11,3 +11,7 @@ Parti degli ADR usate da M2.a–e. Errori: modello comune in ADR-05. ID di test 
 - [ADR-17-varianza.md](ADR-17-varianza.md): sorgenti di varianza e propagazione al primo ordine (M2.e).
 - [C-02-master.md](C-02-master.md): generazione dei master, slice minima: metodi, rejection, normalizzazione del flat, varianza per metodo, tolleranze di R2 (C-02.a).
 - [ADR-07-cpu-simd.md](ADR-07-cpu-simd.md): percorsi `cpu_scalar` e `cpu_avx2`, dispatch nel preflight, ambiente in virgola mobile, tolleranze di R5 (ADR-07.a).
+
+Contratti di M3.entry (ID di test `T-M3<slice>-<tema>-NN`):
+
+- [ADR-08-decoder-pack.md](ADR-08-decoder-pack.md): decoder RAW con LibRaw da memoria (§9.6), catalog pack (schema, manifest, G-PACK, pack mancante, corrotto o fuori copertura), cataloghi scelti, regola NFR-LIC-01.d (ADR-08.b).

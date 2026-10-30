@@ -89,6 +89,27 @@ Definiti in `docs/contracts/`; stato per unità, non per singolo test. Un ID si 
 | T-M2R5-06 | NFR-SIMD-01, ADR-07.a | R5 | ESEGUITO (dev e release): `Simd.T_M2R5_06_*`, ingressi f32 subnormali validi, quozienti e medie subnormali `result_nonfinite`, somma con segno nulla valida, conversioni attorno a `2^-150`, divisione dopo le riduzioni entro il bound |
 | T-M2R5-07 | NFR-SIMD-01, ADR-07.a | R5 | ESEGUITO (dev e release): `Simd.T_M2R5_07_*` (FZ, DAZ, RC prima del preflight, nei job e nei worker via `fault_injector`; maschere di eccezione spente prima del preflight e all'avvio del task; contesto `mxcsr`; errno iniettato) e ctest `T-M2R5-07.no_crtfastmath` con self-test negativo |
 
+## M3.entry: ID di lavoro di ADR-08.b
+
+Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criteri fissati prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3A-RAW-01 | F-IO-02; ADR-08.b §2.3 (H2) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-02 | F-IO-02, F-IO-04; ADR-08.b §2.2, §2.4 (H1, H3) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-03 | F-IO-02; ADR-08.b §2.3 (stop) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-04 | F-IO-04; ADR-08.b §2.4 (H4) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-05 | NFR-SEC-01, NC-21; ADR-08.b §2.1, §2.5 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-06 | ADR-06; ADR-08.b §2.8 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-07 | ADR-13, NFR-SEC-04; ADR-08.b §2.1, §5 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-08 | ADR-06; ADR-08.b §2.7 (H6, creazioni di thread con `pthread_create` interposto) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-09 | F-IO-02 (più marche); ADR-08.b §2.3, §2.6 | ADR-08.b | M3.a | PIANIFICATO — non eseguito; richiede il record `PUB-*` dei campioni raw.pixls.us CC0 |
+| T-M3A-RAW-10 | NFR-SEC-04; ADR-08.b §2.5 (H5) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-11 | F-IO-04, §9.6; ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-12 | ADR-05 (chiave del nodo, determinismo); ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-PACK-01…09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
+| T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.
