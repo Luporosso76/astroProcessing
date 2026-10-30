@@ -1,0 +1,19 @@
+# Sorgente del blocco generato di M3-base-I2.md (tools/evidence.py)
+file docs/contracts/BASE-confini.md
+file src/core/include/astro/scheduler.hpp
+file src/core/scheduler.cpp
+file src/core/include/astro/inventory.hpp
+file src/core/inventory.cpp
+file src/core/include/astro/thumbnail_cache.hpp
+file src/core/thumbnail_cache.cpp
+file src/core/include/astro/fits_blocks.hpp
+file src/core/fits_blocks.cpp
+file src/core/include/astro/import_job.hpp
+file src/core/import_job.cpp
+file src/core/job_types.cpp
+file src/core/calibration_job.cpp
+file src/core/calibration_blocks.cpp
+file src/core/master.cpp
+file tests/unit/test_conformance.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

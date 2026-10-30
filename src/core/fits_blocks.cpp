@@ -198,7 +198,7 @@ std::uint64_t fits_block_source::band_bytes_per_row() const noexcept {
 }
 std::uint64_t fits_block_source::region_count() const noexcept { return impl_->regions.size(); }
 
-void fits_block_source::verify(std::span<std::byte> work) {
+void fits_block_source::verify(std::span<std::byte> work, const std::function<void()>& check_cancel) {
   impl& p = *impl_;
   if (work.size() < 8) fail(error_category::invalid_input, "fits.block_work", "buffer della passata sotto 8 byte");
   sha256_stream whole;
@@ -213,6 +213,7 @@ void fits_block_source::verify(std::span<std::byte> work) {
     const std::size_t piece = static_cast<std::size_t>(work.size() / align * align);
     while (pos < end) {
       const std::size_t n = static_cast<std::size_t>(std::min<std::uint64_t>(piece, end - pos));
+      if (check_cancel) check_cancel();
       read_exact(p.input, pos, work.data(), n);
       const std::span<const std::uint8_t> bytes = as_u8(work.first(n));
       whole.update(bytes);

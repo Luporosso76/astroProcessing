@@ -1037,9 +1037,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     spec.prepare = [&](job_context& jc) {
       const std::uint64_t budget_bytes = jc.shared.bytes();
       for (std::size_t k = 0; k < p.n; ++k) {
-        if (jc.cancel.requested() || jc.stopping.requested()) {
-          stop(error_category::cancelled, "sched.cancelled", "annullamento durante la lettura dei frame");
-        }
+        jc.check_cancel();
         const master_frame_spec& f = *p.frames[k].spec;
         image im;
         {

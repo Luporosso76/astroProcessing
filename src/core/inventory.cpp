@@ -23,8 +23,43 @@ constexpr std::uint64_t digest_block_bytes = std::uint64_t{1} << 20;
                    {{"minimo", std::to_string(minimum)}, {"budget", std::to_string(budget)}});
 }
 
-read_fn reader_of(const fits_input& input) {
-  return [&input](std::uint64_t offset, void* dst, std::size_t n) { read_exact(input, offset, dst, n); };
+read_fn reader_of(const fits_input& input, const cancel_token* cancel = nullptr) {
+  return [&input, cancel](std::uint64_t offset, void* dst, std::size_t n) {
+    check_read_cancel(cancel);
+    read_exact(input, offset, dst, n);
+  };
+}
+
+// Geometria del primario e byte di make_preview per `request`, da una scansione dei soli header.
+struct preview_layout {
+  std::uint32_t width, height, planes;
+  int bitpix;
+  double bscale, bzero;
+  std::uint64_t data_offset;
+  std::uint64_t elem, blocks_x, blocks_y, band_bytes, sums_bytes, out_bytes, header_bytes;
+  std::uint64_t rest_bytes() const { return band_bytes + sums_bytes + out_bytes; }
+};
+
+preview_layout layout_of(const fits_input& input, const preview_request& request, const read_fn& read) {
+  const scan_result scan = analyse(input.size_bytes(), read);
+  const hdu_scan& p = scan.hdus[0];
+  preview_layout l{p.width(), p.height(), p.planes(), p.bitpix, p.bscale, p.bzero, p.data_offset, 0, 0, 0, 0, 0, 0, 0};
+  l.elem = static_cast<std::uint64_t>(std::abs(l.bitpix) / 8);
+  l.blocks_x = (l.width + request.block_width - 1) / request.block_width;
+  l.blocks_y = (l.height + request.block_height - 1) / request.block_height;
+  l.band_bytes = std::uint64_t{l.width} * std::min<std::uint64_t>(request.block_height, l.height) * l.elem;
+  l.sums_bytes = l.blocks_x * (sizeof(double) + sizeof(std::uint32_t));
+  l.out_bytes = l.blocks_x * l.blocks_y * l.planes * (sizeof(float) + sizeof(std::uint32_t));
+  l.header_bytes = inventory_reserve_bytes(input.size_bytes());
+  return l;
+}
+
+void check_preview_request(const preview_request& request) {
+  const auto in_range = [](std::uint32_t v) { return v >= 1 && v <= fits_limits::max_axis_length; };
+  if (!in_range(request.block_width) || !in_range(request.block_height)) {
+    throw stop_error(error_category::invalid_input, "preview.block", "dimensione del blocco fuori intervallo",
+                     {{"larghezza", std::to_string(request.block_width)}, {"altezza", std::to_string(request.block_height)}});
+  }
 }
 
 template <class T>
@@ -64,6 +99,20 @@ void accumulate(int bitpix, const std::uint8_t* row, std::uint32_t width, std::u
 
 }  // namespace
 
+reservation io_memory::take(std::uint64_t bytes, const char* label) const {
+  return pool_ != nullptr ? reserve_or_stop(*pool_, bytes, label) : job_->carve(bytes, label);
+}
+
+std::uint64_t io_memory::budget_bytes() const noexcept {
+  return pool_ != nullptr ? pool_->budget_bytes() : job_->bytes() - job_->committed_bytes();
+}
+
+void check_read_cancel(const cancel_token* cancel) {
+  if (cancel != nullptr && cancel->requested()) {
+    throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto durante la lettura");
+  }
+}
+
 reservation reserve_or_stop(memory_pool& pool, std::uint64_t bytes, const char* label) {
   if (bytes > pool.budget_bytes()) budget_stop(bytes, pool.budget_bytes());
   std::optional<reservation> r = pool.try_reserve(bytes, label);
@@ -80,10 +129,11 @@ std::uint64_t inventory_reserve_bytes(std::uint64_t file_bytes) {
   return reserve_overhead + cards * card_footprint;
 }
 
-fits_inventory inventory_fits(const fits_input& input, const fits_read_options& options, memory_pool& pool) {
+fits_inventory inventory_fits(const fits_input& input, const fits_read_options& options, io_memory memory,
+                              const cancel_token* cancel) {
   const std::uint64_t reserved = inventory_reserve_bytes(input.size_bytes());
-  const reservation header_memory = reserve_or_stop(pool, reserved, "inventory.header");
-  const scan_result scan = analyse(input.size_bytes(), reader_of(input));
+  const reservation header_memory = memory.take(reserved, "inventory.header");
+  const scan_result scan = analyse(input.size_bytes(), reader_of(input, cancel));
   const hdu_scan& primary = scan.hdus[0];
   const header_info info = interpret_header(primary.cards, primary.planes(), options);
 
@@ -124,42 +174,30 @@ fits_inventory inventory_fits(const fits_input& input, const fits_read_options& 
   return inv;
 }
 
-fits_preview make_preview(const fits_input& input, const preview_request& request, memory_pool& pool,
-                          const cancel_token* cancel) {
-  const auto in_range = [](std::uint32_t v) { return v >= 1 && v <= fits_limits::max_axis_length; };
-  if (!in_range(request.block_width) || !in_range(request.block_height)) {
-    throw stop_error(error_category::invalid_input, "preview.block", "dimensione del blocco fuori intervallo",
-                     {{"larghezza", std::to_string(request.block_width)}, {"altezza", std::to_string(request.block_height)}});
-  }
-  const std::uint64_t header_bytes = inventory_reserve_bytes(input.size_bytes());
-  reservation header_memory = reserve_or_stop(pool, header_bytes, "preview.header");
+preview_size preview_size_of(const fits_input& input, const preview_request& request) {
+  check_preview_request(request);
+  const preview_layout l = layout_of(input, request, reader_of(input));
+  return {l.header_bytes + l.rest_bytes(), l.blocks_x * l.blocks_y * l.planes};
+}
 
-  std::uint32_t width, height, planes;
-  int bitpix;
-  double bscale, bzero;
-  std::uint64_t data_offset;
-  {
-    const scan_result scan = analyse(input.size_bytes(), reader_of(input));
-    const hdu_scan& p = scan.hdus[0];
-    width = p.width();
-    height = p.height();
-    planes = p.planes();
-    bitpix = p.bitpix;
-    bscale = p.bscale;
-    bzero = p.bzero;
-    data_offset = p.data_offset;
-  }
-  const std::uint64_t elem = static_cast<std::uint64_t>(std::abs(bitpix) / 8);
-  const std::uint32_t blocks_x = (width + request.block_width - 1) / request.block_width;
-  const std::uint32_t blocks_y = (height + request.block_height - 1) / request.block_height;
-  const std::uint64_t band_rows = std::min<std::uint64_t>(request.block_height, height);
-  const std::uint64_t band_bytes = std::uint64_t{width} * band_rows * elem;
-  const std::uint64_t sums_bytes = std::uint64_t{blocks_x} * (sizeof(double) + sizeof(std::uint32_t));
-  const std::uint64_t out_bytes = std::uint64_t{blocks_x} * blocks_y * planes * (sizeof(float) + sizeof(std::uint32_t));
-  const std::uint64_t rest_bytes = band_bytes + sums_bytes + out_bytes;
+fits_preview make_preview(const fits_input& input, const preview_request& request, io_memory memory,
+                          const cancel_token* cancel) {
+  check_preview_request(request);
+  const std::uint64_t budget = memory.budget_bytes();
+  const std::uint64_t header_bytes = inventory_reserve_bytes(input.size_bytes());
+  reservation header_memory = memory.take(header_bytes, "preview.header");
+
+  const preview_layout l = layout_of(input, request, reader_of(input, cancel));
+  const std::uint32_t width = l.width, height = l.height, planes = l.planes;
+  const int bitpix = l.bitpix;
+  const double bscale = l.bscale, bzero = l.bzero;
+  const std::uint64_t data_offset = l.data_offset, elem = l.elem;
+  const auto blocks_x = static_cast<std::uint32_t>(l.blocks_x), blocks_y = static_cast<std::uint32_t>(l.blocks_y);
+  const std::uint64_t band_bytes = l.band_bytes, sums_bytes = l.sums_bytes, out_bytes = l.out_bytes;
+  const std::uint64_t rest_bytes = l.rest_bytes();
   const std::uint64_t need = header_bytes + rest_bytes;
-  if (need > pool.budget_bytes()) budget_stop(need, pool.budget_bytes());
-  reservation rest = reserve_or_stop(pool, rest_bytes, "preview.work");
+  if (need > budget) budget_stop(need, budget);
+  reservation rest = memory.take(rest_bytes, "preview.work");
   pool_buffer band(rest, static_cast<std::size_t>(band_bytes));
   pool_buffer sums_buffer(rest, static_cast<std::size_t>(sums_bytes));
   const reservation out_memory = rest.carve(out_bytes, "preview.out");
@@ -182,9 +220,7 @@ fits_preview make_preview(const fits_input& input, const preview_request& reques
   const auto* raw = reinterpret_cast<const std::uint8_t*>(band.data());
   for (std::uint32_t plane = 0; plane < planes; ++plane) {
     for (std::uint32_t by = 0; by < blocks_y; ++by) {
-      if (cancel != nullptr && cancel->requested()) {
-        throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento durante l'anteprima");
-      }
+      check_read_cancel(cancel);
       const std::uint64_t y0 = std::uint64_t{by} * request.block_height;
       const std::uint64_t rows = std::min<std::uint64_t>(request.block_height, height - y0);
       const std::uint64_t offset = data_offset + ((std::uint64_t{plane} * height + y0) * width) * elem;
@@ -216,12 +252,17 @@ fits_preview make_preview(const fits_input& input, const preview_request& reques
   return pv;
 }
 
-content_digest digest_fits_input(const fits_input& input, memory_pool& pool) {
-  const std::uint64_t block = std::min<std::uint64_t>(digest_block_bytes, std::max<std::uint64_t>(input.size_bytes(), 1));
-  reservation memory = reserve_or_stop(pool, block, "digest.block");
-  pool_buffer buffer(memory, static_cast<std::size_t>(block));
+std::uint64_t digest_reserve_bytes(std::uint64_t file_bytes) {
+  return std::min<std::uint64_t>(digest_block_bytes, std::max<std::uint64_t>(file_bytes, 1));
+}
+
+content_digest digest_fits_input(const fits_input& input, io_memory memory, const cancel_token* cancel) {
+  const std::uint64_t block = digest_reserve_bytes(input.size_bytes());
+  reservation block_memory = memory.take(block, "digest.block");
+  pool_buffer buffer(block_memory, static_cast<std::size_t>(block));
   sha256_stream hasher;
   for (std::uint64_t done = 0; done < input.size_bytes();) {
+    check_read_cancel(cancel);
     const std::size_t n = static_cast<std::size_t>(std::min<std::uint64_t>(block, input.size_bytes() - done));
     read_exact(input, done, buffer.data(), n);
     hasher.update({reinterpret_cast<const std::uint8_t*>(buffer.data()), n});

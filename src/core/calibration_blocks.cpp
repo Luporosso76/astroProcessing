@@ -270,7 +270,7 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     for (std::size_t k = 0; k < 4; ++k) {
       sources[k].emplace(specs[k]->path, specs[k]->digest, specs[k]->read_options, t, layout.variance[k]);
       fits_block_source& src = *sources[k];
-      src.verify(std::span<std::byte>(pass.data(), pass.size()));
+      src.verify(std::span<std::byte>(pass.data(), pass.size()), [&jc] { jc.check_cancel(); });
       const fits_plan& planned = req.plans[k];
       const image& hdr = src.header();
       if (specs[k]->digest.size_bytes != planned.file_bytes) {
@@ -297,7 +297,7 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     for (std::size_t k = 0; k < 4; ++k) {
       if (!views[k]->plane) continue;
       for (std::uint64_t tile = 0; tile < tiles; ++tile) {
-        if (jc.cancel.requested()) fail(error_category::cancelled, "sched.cancelled", "annullamento richiesto");
+        jc.check_cancel();
         sources[k]->read_tile(tile, in.raw[k], in.bands[k]);
         const input_view v = band_view(*views[k], in.bands[k]);
         const std::uint64_t first = std::uint64_t{in.bands[k].row_begin} * w;
@@ -311,7 +311,7 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     std::optional<std::pair<std::uint32_t, std::uint32_t>> bad_variance;
     for (int pass_index = 0; pass_index < kth_selector::passes; ++pass_index) {
       for (std::uint64_t tile = 0; tile < tiles; ++tile) {
-        if (jc.cancel.requested()) fail(error_category::cancelled, "sched.cancelled", "annullamento richiesto");
+        jc.check_cancel();
         sources[2]->read_tile(tile, in.raw[2], in.bands[2]);
         sources[3]->read_tile(tile, in.raw[3], in.bands[3]);
         const input_view F = band_view(p.flat, in.bands[2]), DF = band_view(p.dark_flat, in.bands[3]);

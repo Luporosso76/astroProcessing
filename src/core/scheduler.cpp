@@ -35,6 +35,12 @@ std::size_t cpu_count(const affinity_fn& affinity) {
   return static_cast<std::size_t>(count);
 }
 
+void job_context::check_cancel() const {
+  if (cancel.requested() || stopping.requested()) {
+    throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto o job in arresto");
+  }
+}
+
 void task_context::check_cancel() const {
   if (job.cancel.requested() || job.stopping.requested()) {
     throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto o job in arresto",

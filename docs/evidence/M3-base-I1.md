@@ -89,18 +89,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `7ce6bd1660ffac3a95ddec20be603a59c0fec6e751c26cacea25e64bc5c114fb` |
-| `src/core/calibration_blocks.cpp` | `9e31e40eb78edb9086c62d4a914dc927538dea590c2229e5f6671f05dfebc0ad` |
-| `src/core/calibration_job.cpp` | `38e80c8138a4ca1b24a9e9201b1089ff710e89b7fce4f372f6f7fe8df4c307ad` |
+| `docs/contracts/BASE-confini.md` | `b1868d69604a055bd483d38727a1bba795d8c5484573767c518f99e30750b4ff` |
+| `src/core/calibration_blocks.cpp` | `5075bf2d5d0ff2b6da68ac69c864c57e05975d918f886e1f101cdc09ec5808de` |
+| `src/core/calibration_job.cpp` | `87247d486a0983d9edf00bac4d551fe9c93b11284e5c6f25fbe8939f4e7e4561` |
 | `src/core/cpu_dispatch.cpp` | `2dd162cef227fc5310162865b4579baaa34489238bba06131d72b85e5e4b7644` |
-| `src/core/import_job.cpp` | `f9e855ad710c89124e6c93511162be65543ee1241de35e04ac74d2ad02f4bc14` |
+| `src/core/import_job.cpp` | `35276f2fffcab2d731eb08b0844eea2f8c7116f26e965da651a96ef2d8bcd46b` |
 | `src/core/include/astro/cpu_dispatch.hpp` | `f0a399e10653c68c71219842076d8e872d9cf30c1f6db05e0ae1ebaebb43acee` |
 | `src/core/include/astro/job.hpp` | `e594f0e97270251ee9a73983a0c55d3b3e219615cf6c71872b1fbe0b90f49cc0` |
 | `src/core/job.cpp` | `f9681bccbd5d14b4bdec111fb72f1213b5f802cf249a0e78448f8855acc77805` |
-| `src/core/master.cpp` | `e8a4233a39cd681bdee040b0cb9921deb1bd14b1e9782c3ea2c19b9996ca6b90` |
+| `src/core/master.cpp` | `dfe61c03eac0e109a3886982349fae45182c1a91d28a6d6942ba3b86be72cfa2` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tools/lint-allowlist.txt` | `8c0deba2fa1011e5938f8b50a9633acedb5652e513e35080b3bb9bae2ff444b4` |
 
-- Test release (`tmp/release-junit.xml`): totali 604, fast 597, slow 7, falliti 21
-- Test dev (`tmp/dev-junit.xml`): totali 598, fast 598, slow 0, falliti 21
+- Test release (`tmp/release-junit.xml`): totali 604, fast 597, slow 7, falliti 7
+- Test dev (`tmp/dev-junit.xml`): totali 598, fast 598, slow 0, falliti 7
 <!-- evidence:end -->

@@ -265,6 +265,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       const std::uint64_t budget_bytes = jc.shared.bytes();
       std::array<image, 4> images;
       for (std::size_t i = 0; i < specs.size(); ++i) {
+        jc.check_cancel();
         const std::vector<std::uint8_t> bytes = read_verified_fits(specs[i]->path, specs[i]->digest, budget_bytes);
         images[i] = decode_fits(bytes, budget_bytes, specs[i]->read_options);
         const fits_plan& planned = plans[i];
@@ -285,6 +286,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       observed = prepared->observed_inputs();
       if (options.hook) options.hook("preflight.done");
       for (std::size_t i = 0; i < specs.size(); ++i) {
+        jc.check_cancel();
         try {
           (void)read_verified_fits(specs[i]->path, specs[i]->digest, budget_bytes);
         } catch (stop_error& e) {

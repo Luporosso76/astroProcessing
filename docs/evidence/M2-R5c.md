@@ -14,17 +14,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
-| `src/core/calibration_job.cpp` | `5295e8bff4a6c960ea0c0bde998b6f3d0f10f1769fce3de5530822986ae82446` |
-| `src/core/include/astro/job.hpp` | `5f13c42826de94271f60317602ebef2b1eb0edeafa7b4231c68cec90b160350d` |
-| `src/core/include/astro/scheduler.hpp` | `90bcf01a873ac81b8776abc73fe539903350e9793557b6442a436eefca87e658` |
-| `src/core/job.cpp` | `072c5191e20ddc22d008a45817faabf00a77721e9386b929f723e93adc01320b` |
-| `src/core/master.cpp` | `4bd0c1c467fbbf0e8e9b20c4c89f8edeea103c7d57ca6de40297e04bb8fa30f4` |
-| `src/core/scheduler.cpp` | `62c376a5785dd4361a74f15ee7dd249a046d4e11a051403cc760aa49a68e2729` |
+| `src/core/calibration_job.cpp` | `87247d486a0983d9edf00bac4d551fe9c93b11284e5c6f25fbe8939f4e7e4561` |
+| `src/core/include/astro/job.hpp` | `e594f0e97270251ee9a73983a0c55d3b3e219615cf6c71872b1fbe0b90f49cc0` |
+| `src/core/include/astro/scheduler.hpp` | `617d499fe6c5177b3d588e5f00f77a705fbc67a1ebf2b08c8fcfd0f14dd064ad` |
+| `src/core/job.cpp` | `f9681bccbd5d14b4bdec111fb72f1213b5f802cf249a0e78448f8855acc77805` |
+| `src/core/master.cpp` | `dfe61c03eac0e109a3886982349fae45182c1a91d28a6d6942ba3b86be72cfa2` |
+| `src/core/scheduler.cpp` | `ec971faf2d922e885153ad4ba71723ec115c5aac3e24f199d2cc62bc44376996` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
 
-- Test release (`tmp/release-junit.xml`): totali 515, fast 508, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 516, fast 509, slow 7, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 604, fast 597, slow 7, falliti 7
+- Test dev (`tmp/dev-junit.xml`): totali 598, fast 598, slow 0, falliti 7
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

@@ -45,22 +45,29 @@ node_spec make_cache_rebuild_node(const content_digest& source, const preview_re
 json import_report_json(const fits_inventory& inventory, const content_digest& digest);
 std::string import_report_text(const json& report);
 
+// I tre job di I/O passano da job_scheduler::run con un job_plan di un task: il picco (blocco del digest piu' memoria
+// del task) e' prenotato dal pool, in coda FIFO, prima del primo task; il digest si verifica nel `prepare`.
+// `resources`, se presente, va nella provenance (budget.resources) e da' allo scheduler cpu_set e coda dei job.
+
 // Job di import su uno store durevole: verifica il digest in streaming, inventaria i soli header, pubblica
 // report JSON e testuale. Fase assente: metadata_missing import.phase_missing.
 job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
                            memory_pool& pool, const cancel_token& cancel,
-                           const std::optional<budget_snapshot>& budget = std::nullopt);
+                           const std::optional<budget_snapshot>& budget = std::nullopt,
+                           const resource_config* resources = nullptr);
 
 // Job `thumbnail`: riusa o calcola la voce e pubblica un riferimento; l'esito e' in provenance.details.cache.
 job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
                               const content_digest& digest, const preview_request& request, thumbnail_cache& cache,
                               memory_pool& pool, const cancel_token& cancel,
-                              const std::optional<budget_snapshot>& budget = std::nullopt, const job_hook& hook = {});
+                              const std::optional<budget_snapshot>& budget = std::nullopt, const job_hook& hook = {},
+                              const resource_config* resources = nullptr);
 
 // Job esplicito `cache.rebuild`. `cause`: cache.corrupt o user_request.
 job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
                                   const content_digest& digest, const preview_request& request, const std::string& cause,
                                   thumbnail_cache& cache, memory_pool& pool, const cancel_token& cancel,
-                                  const std::optional<budget_snapshot>& budget = std::nullopt, const job_hook& hook = {});
+                                  const std::optional<budget_snapshot>& budget = std::nullopt, const job_hook& hook = {},
+                                  const resource_config* resources = nullptr);
 
 }  // namespace astro

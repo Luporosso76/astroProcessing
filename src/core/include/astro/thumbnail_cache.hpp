@@ -52,13 +52,18 @@ class thumbnail_cache {
   // Voce valida: cache_hit (nessun calcolo). Assente: calcola, scrive, computed. Presente ma corrotta: integrity
   // cache.corrupt, nessuna modifica. `source` e' il digest gia' verificato del file.
   thumbnail_result get(const fits_input& input, const content_digest& source, const preview_request& request,
-                       memory_pool& pool, const cancel_token* cancel = nullptr);
+                       io_memory memory, const cancel_token* cancel = nullptr);
 
   // Sostituisce la voce presente (anche corrotta) con quella ricalcolata: rebuilt. Nessuna voce: invalid_input
   // cache.rebuild_nothing. `replaced` riceve nome e digest trovato della voce sostituita.
   thumbnail_result rebuild(const fits_input& input, const content_digest& source, const preview_request& request,
-                           memory_pool& pool, const cancel_token* cancel, std::string& replaced_name,
+                           io_memory memory, const cancel_token* cancel, std::string& replaced_name,
                            std::string& replaced_found_digest);
+
+  // Picco di memoria di get e rebuild con voci valide per `request`: il massimo fra il calcolo dell'anteprima e la
+  // voce con l'anteprima (lettura o serializzazione). Legge i soli header di `input`. Una voce presente di dimensione
+  // diversa da quella valida puo' superarlo: dentro un job dello scheduler, budget pool.reservation_exceeded.
+  static std::uint64_t peak_bytes(const fits_input& input, const preview_request& request);
 
   // Elimina i soli `.tmp-*` regolari con st_nlink = 1; symlink o hardlink: security, nulla viene toccato.
   std::vector<std::string> cleanup_temporaries();

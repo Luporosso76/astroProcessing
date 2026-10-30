@@ -168,19 +168,19 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `362a15fb8374c06d7bdf9b55a7a84639cf909bf7b1b4345bf6952469d4a23a55` |
+| `docs/contracts/BASE-confini.md` | `b1868d69604a055bd483d38727a1bba795d8c5484573767c518f99e30750b4ff` |
 | `src/core/CMakeLists.txt` | `44dc4103f2e0154dc4fefd4e3e7946a9ef3e6844efbe01eee417e5f51ea84538` |
 | `src/core/fits.cpp` | `b461862ff1b7652641dab41e8fb9fd9f81096aabf73859bdefb957b801336938` |
-| `src/core/fits_blocks.cpp` | `c7ac5df170431644c3659a22b1bb438ae3014af5a505d5f1b8718f2dab2d7f20` |
-| `src/core/include/astro/job.hpp` | `93e9cd4911eb4108327b802dba4bd88e7278f43453d041bba3423989d8eebb4a` |
+| `src/core/fits_blocks.cpp` | `d3cff6db5ec9329cb236d251691121de59a5692d631c368a67009da934135b56` |
+| `src/core/include/astro/job.hpp` | `e594f0e97270251ee9a73983a0c55d3b3e219615cf6c71872b1fbe0b90f49cc0` |
 | `src/core/include/astro/job_probe.hpp` | `9101e6d1307787e4c693c387bf3f25bf341ee97be940246fba94d1240d43f9a9` |
 | `src/core/include/astro/job_types.hpp` | `e9e6195e9c6de64dc348aaa7a002e9a24fece7ad6038df79c2a9cc4031c96942` |
-| `src/core/inventory.cpp` | `101ee1ff4bac664c10d7c11ec2966b2863f5ca06977ae5883bfa8592ade0009b` |
-| `src/core/job.cpp` | `4abf2c777e346eab0f58b12eabfdcea531ee51a924d1949e70e705f1d2c9e3ef` |
+| `src/core/inventory.cpp` | `66d70cc080ade81ebf24f79afce57e6a6b3762ca539d7690c6b2fe8240b176d4` |
+| `src/core/job.cpp` | `f9681bccbd5d14b4bdec111fb72f1213b5f802cf249a0e78448f8855acc77805` |
 | `src/core/job_probe.cpp` | `a3f08b593a97b04672f0ae4b089e7cebf7594531979cffd6252aa668e70451bc` |
-| `src/core/job_types.cpp` | `545f3d1a61c6b1d2ea5d2f74b8d51cd51a880c8781c50e49618dc6b95f06113f` |
+| `src/core/job_types.cpp` | `ce265ddae60362b26f1ea314081e4834b90a14791fa2ecbfe749b3cf92567bba` |
 | `src/core/node.cpp` | `b697838dd840f877c2b41a63ab83679d03a2ec6700e784438d052532b8bf7e3c` |
-| `src/core/scheduler.cpp` | `9db6f362f97077601c38dcd6886c7e8319d0d1015f305625e52c6564d932202f` |
+| `src/core/scheduler.cpp` | `ec971faf2d922e885153ad4ba71723ec115c5aac3e24f199d2cc62bc44376996` |
 | `tests/fixtures/conformance_inputs.hpp` | `d680048d26f707487062942ff19145a417364f677fdfc12901a7f4a93a88d94d` |
 | `tests/unit/CMakeLists.txt` | `ccc810f54e54442b59efea5d8d8b3bdfca6c95f793ce0bd5d891a88d96819a9d` |
 | `tests/unit/conformance_network.cpp` | `72392f9b1d8d37b68d762da2c73f83b26c4428bdeee02d16c572612fff98d9fc` |

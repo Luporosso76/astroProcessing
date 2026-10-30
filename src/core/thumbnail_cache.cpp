@@ -127,7 +127,7 @@ struct thumbnail_cache::impl {
   }
 
   // Prenota `factor` volte la dimensione della voce (buffer letto, piu' l'anteprima analizzata quando factor = 2).
-  opened_entry read_entry(const std::string& name, memory_pool& pool, std::uint64_t factor) const {
+  opened_entry read_entry(const std::string& name, io_memory memory, std::uint64_t factor) const {
     (void)check(name);
     opened_entry e;
     unique_fd fd(::openat(dir.get(), name.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
@@ -147,7 +147,7 @@ struct thumbnail_cache::impl {
       throw stop_error(error_category::budget, "cache.quota_exceeded", "la voce supera la quota della cache",
                        {{"voce", name}, {"quota", std::to_string(options.quota_bytes)}, {"dimensione", std::to_string(size)}});
     }
-    e.memory = reserve_or_stop(pool, factor * size, "cache.entry");
+    e.memory = memory.take(factor * size, "cache.entry");
     inject(&options.fault, "cache.entry.read");
     e.bytes = read_all(fd.get(), size, "cache.read", name);
     e.size = e.bytes.size();
@@ -229,23 +229,23 @@ std::string thumbnail_cache::key_of(const content_digest& source, const preview_
 }
 
 thumbnail_result thumbnail_cache::get(const fits_input& input, const content_digest& source,
-                                      const preview_request& request, memory_pool& pool, const cancel_token* cancel) {
+                                      const preview_request& request, io_memory memory, const cancel_token* cancel) {
   const std::string key = key_of(source, request);
   const std::vector<std::string> existing = impl_->entries_with_prefix(key);
   if (existing.size() > 1) corrupt(existing.front(), "voci multiple per la stessa chiave", {{"voci", std::to_string(existing.size())}});
   if (existing.size() == 1) {
     const std::string& name = existing.front();
     if (!is_entry_name(name)) corrupt(name, "nome");
-    const opened_entry e = impl_->read_entry(name, pool, 2);
+    const opened_entry e = impl_->read_entry(name, memory, 2);
     const std::string found = digest_of(e.bytes).sha256;
     const std::string expected = name.substr(65, 64);
     if (found != expected) corrupt(name, "digest", {{"atteso", expected}, {"trovato", found}});
     return thumbnail_result{thumbnail_entry{key, name, content_digest{found, e.size}, cache_outcome::cache_hit}, parse(name, e.bytes)};
   }
   ++computations_;
-  fits_preview pv = make_preview(input, request, pool, cancel);
+  fits_preview pv = make_preview(input, request, memory, cancel);
   // L'anteprima restituita e il buffer serializzato vivono insieme: 2 volte la dimensione della voce.
-  const reservation serialize_memory = reserve_or_stop(pool, 2 * (entry_header_bytes + pv.samples.size() * 8), "cache.compute");
+  const reservation serialize_memory = memory.take(2 * (entry_header_bytes + pv.samples.size() * 8), "cache.compute");
   const std::vector<std::uint8_t> bytes = serialize(pv);
   impl_->require_quota(bytes.size(), {});
   const atomic_result written = impl_->write(key, bytes, false);
@@ -253,7 +253,7 @@ thumbnail_result thumbnail_cache::get(const fits_input& input, const content_dig
 }
 
 thumbnail_result thumbnail_cache::rebuild(const fits_input& input, const content_digest& source,
-                                          const preview_request& request, memory_pool& pool, const cancel_token* cancel,
+                                          const preview_request& request, io_memory memory, const cancel_token* cancel,
                                           std::string& replaced_name, std::string& replaced_found_digest) {
   const std::string key = key_of(source, request);
   const std::vector<std::string> existing = impl_->entries_with_prefix(key);
@@ -263,13 +263,13 @@ thumbnail_result thumbnail_cache::rebuild(const fits_input& input, const content
   replaced_name.clear();
   replaced_found_digest.clear();
   for (const std::string& name : existing) {
-    const opened_entry e = impl_->read_entry(name, pool, 1);
+    const opened_entry e = impl_->read_entry(name, memory, 1);
     replaced_name += (replaced_name.empty() ? "" : ",") + name;
     replaced_found_digest += (replaced_found_digest.empty() ? "" : ",") + digest_of(e.bytes).sha256;
   }
   ++computations_;
-  fits_preview pv = make_preview(input, request, pool, cancel);
-  const reservation serialize_memory = reserve_or_stop(pool, 2 * (entry_header_bytes + pv.samples.size() * 8), "cache.compute");
+  fits_preview pv = make_preview(input, request, memory, cancel);
+  const reservation serialize_memory = memory.take(2 * (entry_header_bytes + pv.samples.size() * 8), "cache.compute");
   const std::vector<std::uint8_t> bytes = serialize(pv);
   impl_->require_quota(bytes.size(), std::set<std::string>(existing.begin(), existing.end()));
   const atomic_result written = impl_->write(key, bytes, true);
@@ -282,6 +282,11 @@ thumbnail_result thumbnail_cache::rebuild(const fits_input& input, const content
   }
   fsync_fd(impl_->dir.get(), "cache.fsync", "cache/thumbnails");
   return thumbnail_result{thumbnail_entry{key, written.name, written.digest, cache_outcome::rebuilt}, std::move(pv)};
+}
+
+std::uint64_t thumbnail_cache::peak_bytes(const fits_input& input, const preview_request& request) {
+  const preview_size s = preview_size_of(input, request);
+  return std::max<std::uint64_t>(s.reserve_bytes, 2 * (entry_header_bytes + s.samples * 8));
 }
 
 std::vector<std::string> thumbnail_cache::cleanup_temporaries() {

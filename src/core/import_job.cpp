@@ -4,6 +4,8 @@
 #include <sstream>
 
 #include "astro/operations.hpp"
+#include "astro/resources.hpp"
+#include "astro/scheduler.hpp"
 #include "fits_internal.hpp"
 
 namespace astro {
@@ -154,11 +156,14 @@ std::span<const std::uint8_t> bytes_of(const std::string& s) {
   return {reinterpret_cast<const std::uint8_t*>(s.data()), s.size()};
 }
 
-// Nodo della richiesta, costruito e confrontato con lo slot da run_job_files prima di `work`.
-job_request import_node_request(std::function<node_spec()> node) {
+// Nodo della richiesta, costruito e confrontato con lo slot da run_job_files prima di `work`; `built` riceve il nodo
+// usato da `work`.
+job_request import_node_request(std::optional<node_spec>& built, std::function<node_spec()> node,
+                                const resource_config* resources) {
   job_request r;
-  r.node = std::move(node);
+  r.node = [&built, node = std::move(node)] { return built.emplace(node()); };
   r.mismatch_code = "import.node_mismatch";
+  r.resources = resources;
   return r;
 }
 
@@ -169,16 +174,47 @@ void require_rebuild_cause(const std::string& cause) {
   }
 }
 
-fits_input open_verified(const std::string& path, const content_digest& expected, memory_pool& pool,
-                         const job_hook& hook) {
-  fits_input input = open_fits_input(path);
-  const content_digest found = digest_fits_input(input, pool);
+// `prepare` dei job di I/O: digest dell'intero file nella memoria condivisa del job, prima del task.
+void verify_digest(const fits_input& input, const content_digest& expected, job_context& jc, const job_hook& hook) {
+  jc.check_cancel();
+  const content_digest found = digest_fits_input(input, jc.shared, &jc.cancel);
   if (!(found == expected)) {
     fail(error_category::integrity, "input.digest_mismatch", "digest o dimensione diversi da quelli attesi",
          {{"atteso", expected.sha256}, {"calcolato", found.sha256}});
   }
   if (hook) hook("digest.done");
-  return input;
+}
+
+// Job di I/O sullo scheduler (OB-08): un task, un worker, picco shared_bytes + per_task_bytes prenotato dal pool in
+// coda FIFO prima di `prepare`. `prepare` verifica il digest in shared_bytes; il task lavora in per_task_bytes.
+// worker_count e tile_rows della configurazione non si applicano: un solo task non si divide fra worker, e
+// tile_rows e' l'altezza della fascia letta dal task (1 se il task non legge campioni). Restituisce il piano eseguito.
+std::shared_ptr<const resource_plan> run_single_task(const node_spec& node, std::uint64_t shared_bytes,
+                                                     std::uint64_t per_task_bytes, std::uint32_t tile_rows,
+                                                     memory_pool& pool, const resource_config* resources,
+                                                     const cancel_token& cancel,
+                                                     std::function<void(job_context&)> prepare,
+                                                     const std::function<void(task_context&)>& task) {
+  job_plan plan;
+  plan.shared_bytes = shared_bytes;
+  plan.per_task_bytes = per_task_bytes;
+  plan.tile_rows = tile_rows;
+  job_spec spec(node, 1, [&task](task_context& tc) {
+    task(tc);
+    return std::string();
+  });
+  spec.prepare = std::move(prepare);
+  job_scheduler scheduler(pool, system_affinity, resources ? scheduler_tuning_of(*resources) : scheduler_tuning{});
+  (void)scheduler.run(plan, spec, cancel);
+  auto executed = std::make_shared<resource_plan>();
+  executed->tile_rows = tile_rows;
+  executed->task_count = 1;
+  executed->shared_bytes = shared_bytes;
+  executed->per_task_bytes = per_task_bytes;
+  executed->peak_bytes = shared_bytes + per_task_bytes;  // rappresentabile: lo scheduler lo ha prenotato
+  executed->working_set_bytes = executed->peak_bytes;
+  executed->minimum_feasible_bytes = executed->peak_bytes;
+  return executed;
 }
 
 json observed_source(const content_digest& digest, const fits_inventory& inv) {
@@ -342,11 +378,19 @@ std::string import_report_text(const json& report) {
 }
 
 job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
-                           memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget) {
+                           memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
+                           const resource_config* resources) {
+  std::optional<node_spec> node;
   const auto work = [&](const job_record&) -> job_files_result {
-    if (cancel.requested()) fail(error_category::cancelled, "sched.cancelled", "annullamento prima dell'import");
-    fits_input input = open_verified(request.path, request.digest, pool, request.hook);
-    const fits_inventory inv = inventory_fits(input, request.read_options, pool);  // verifica anche che il file non sia cambiato
+    const fits_input input = open_fits_input(request.path);
+    std::optional<fits_inventory> scanned;
+    std::shared_ptr<const resource_plan> plan = run_single_task(
+        *node, digest_reserve_bytes(input.size_bytes()), inventory_reserve_bytes(input.size_bytes()), 1, pool, resources,
+        cancel, [&](job_context& jc) { verify_digest(input, request.digest, jc, request.hook); },
+        [&](task_context& tc) {  // l'inventario verifica anche che il file non sia cambiato
+          scanned.emplace(inventory_fits(input, request.read_options, tc.memory, &tc.job.cancel));
+        });
+    const fits_inventory& inv = *scanned;
     const json report = import_report_json(inv, request.digest);
     const std::string report_json = canonical_json(report);
     const std::string report_text = import_report_text(report);
@@ -359,19 +403,26 @@ job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
     result.details = std::move(details);
+    result.plan = std::move(plan);
     return result;
   };
   return run_job_files(store, slot_name, work, budget, &cancel,
-                       import_node_request([&] { return make_import_node(request); }));
+                       import_node_request(node, [&] { return make_import_node(request); }, resources));
 }
 
 job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
                               const content_digest& digest, const preview_request& request, thumbnail_cache& cache,
                               memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
-                              const job_hook& hook) {
+                              const job_hook& hook, const resource_config* resources) {
+  std::optional<node_spec> node;
   const auto work = [&](const job_record&) -> job_files_result {
-    fits_input input = open_verified(path, digest, pool, hook);
-    const thumbnail_result r = cache.get(input, digest, request, pool, &cancel);
+    const fits_input input = open_fits_input(path);
+    std::optional<thumbnail_result> got;
+    std::shared_ptr<const resource_plan> plan = run_single_task(
+        *node, digest_reserve_bytes(input.size_bytes()), thumbnail_cache::peak_bytes(input, request),
+        request.block_height, pool, resources, cancel, [&](job_context& jc) { verify_digest(input, digest, jc, hook); },
+        [&](task_context& tc) { got.emplace(cache.get(input, digest, request, tc.memory, &tc.job.cancel)); });
+    const thumbnail_result& r = *got;
     fits_detail::check_unchanged(input);
     const std::string ref = thumbnail_ref_json(r, digest);
     job_files_result result;
@@ -379,23 +430,33 @@ job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_n
     json details = json::object();
     details.set("cache", cache_details("thumbnail", r.entry));
     result.details = std::move(details);
+    result.plan = std::move(plan);
     return result;
   };
   return run_job_files(store, slot_name, work, budget, &cancel,
-                       import_node_request([&] { return make_thumbnail_node(digest, request); }));
+                       import_node_request(node, [&] { return make_thumbnail_node(digest, request); }, resources));
 }
 
 job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
                                   const content_digest& digest, const preview_request& request, const std::string& cause,
                                   thumbnail_cache& cache, memory_pool& pool, const cancel_token& cancel,
-                                  const std::optional<budget_snapshot>& budget, const job_hook& hook) {
+                                  const std::optional<budget_snapshot>& budget, const job_hook& hook,
+                                  const resource_config* resources) {
   // Una causa non valida e' un arresto prima del lavoro sullo slot (job.hpp).
   prepare_job_start(store, slot_name, [&] { require_rebuild_cause(cause); });
+  std::optional<node_spec> node;
   const auto work = [&](const job_record&) -> job_files_result {
-    fits_input input = open_verified(path, digest, pool, hook);
+    const fits_input input = open_fits_input(path);
     std::string replaced_name;
     std::string replaced_found;
-    const thumbnail_result r = cache.rebuild(input, digest, request, pool, &cancel, replaced_name, replaced_found);
+    std::optional<thumbnail_result> rebuilt;
+    std::shared_ptr<const resource_plan> plan = run_single_task(
+        *node, digest_reserve_bytes(input.size_bytes()), thumbnail_cache::peak_bytes(input, request),
+        request.block_height, pool, resources, cancel, [&](job_context& jc) { verify_digest(input, digest, jc, hook); },
+        [&](task_context& tc) {
+          rebuilt.emplace(cache.rebuild(input, digest, request, tc.memory, &tc.job.cancel, replaced_name, replaced_found));
+        });
+    const thumbnail_result& r = *rebuilt;
     fits_detail::check_unchanged(input);
     const std::string ref = thumbnail_ref_json(r, digest);
     job_files_result result;
@@ -409,10 +470,12 @@ job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& sl
     json details = json::object();
     details.set("cache", std::move(c));
     result.details = std::move(details);
+    result.plan = std::move(plan);
     return result;
   };
   return run_job_files(store, slot_name, work, budget, &cancel,
-                       import_node_request([&] { return make_cache_rebuild_node(digest, request, cause); }));
+                       import_node_request(node, [&] { return make_cache_rebuild_node(digest, request, cause); },
+                                           resources));
 }
 
 }  // namespace astro

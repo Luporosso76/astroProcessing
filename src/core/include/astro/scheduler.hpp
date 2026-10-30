@@ -67,6 +67,10 @@ struct job_context {
   spill_area* spill;    // nullptr senza spill dichiarato
   const cancel_token& cancel;
   const cancel_token& stopping;  // impostato al primo errore di un worker: i task attivi devono fermarsi
+
+  // cancelled sched.cancelled se l'annullamento e' richiesto o il job e' in arresto: da chiamare in `prepare` a ogni
+  // blocco letto dagli input, prima della lettura.
+  void check_cancel() const;
 };
 
 struct task_context {

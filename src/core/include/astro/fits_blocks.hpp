@@ -38,7 +38,8 @@ class fits_block_source {
   // Passata P0 sull'intero file in ordine, con `work` come buffer (almeno 8 byte): digest e dimensione
   // (integrity input.digest_mismatch), header analizzati (integrity input.modified), CHECKSUM/DATASUM (integrity
   // fits.checksum), validazione dei campioni come decode_fits; registra il digest di ogni blocco di ogni data unit letto.
-  void verify(std::span<std::byte> work);
+  // `check_cancel`, se presente, e' chiamato prima di ogni lettura e ferma la passata lanciando.
+  void verify(std::span<std::byte> work, const std::function<void()>& check_cancel = {});
 
   // Immagine di soli header, come decode_fits senza campioni (samples, maschera e varianza vuoti).
   const image& header() const noexcept;

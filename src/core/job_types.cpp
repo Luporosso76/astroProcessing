@@ -30,12 +30,20 @@ void require_single(const char* op, const std::string& variant) {
   if (variant != "unica") unknown_variant(op, variant);
 }
 
+// Risorse dei job di I/O: la variante unica non dichiara scratch.
+resource_config io_resources(const job_type_env& env) {
+  resource_config r = env.resources;
+  r.scratch.reset();
+  return r;
+}
+
 minimal_job make_import(const job_type_inputs& inputs, const std::string& variant, const std::filesystem::path&) {
   require_single(import_operator_id, variant);
   const job_type_input in = input_of(inputs, "file");
   const import_request request{in.path, in.digest, {}, nullptr};
   return {make_import_node(request), [request](const job_type_env& env) {
-            return run_import_job(env.store, env.slot_name, request, env.pool, env.cancel, env.budget);
+            const resource_config resources = io_resources(env);
+            return run_import_job(env.store, env.slot_name, request, env.pool, env.cancel, env.budget, &resources);
           }};
 }
 
@@ -44,8 +52,9 @@ minimal_job make_thumbnail(const job_type_inputs& inputs, const std::string& var
   const job_type_input in = input_of(inputs, "file");
   return {make_thumbnail_node(in.digest, minimal_preview), [in](const job_type_env& env) {
             thumbnail_cache cache(env.store.root(), cache_options{minimal_cache_quota, {}});
+            const resource_config resources = io_resources(env);
             return run_thumbnail_job(env.store, env.slot_name, in.path, in.digest, minimal_preview, cache, env.pool,
-                                     env.cancel, env.budget);
+                                     env.cancel, env.budget, {}, &resources);
           }};
 }
 
@@ -61,8 +70,10 @@ minimal_job make_cache_rebuild(const job_type_inputs& inputs, const std::string&
   }
   return {make_cache_rebuild_node(in.digest, minimal_preview, cache_rebuild_cause_user), [in](const job_type_env& env) {
             thumbnail_cache cache(env.store.root(), cache_options{minimal_cache_quota, {}});
+            const resource_config resources = io_resources(env);
             return run_cache_rebuild_job(env.store, env.slot_name, in.path, in.digest, minimal_preview,
-                                         cache_rebuild_cause_user, cache, env.pool, env.cancel, env.budget);
+                                         cache_rebuild_cause_user, cache, env.pool, env.cancel, env.budget, {},
+                                         &resources);
           }};
 }
 
