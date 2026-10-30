@@ -290,6 +290,76 @@ Iniezione nelle chiamate di scrittura del prodotto: `spill_area::set_fault_injec
 | T-M2R3-06 | Processo ucciso dopo un checkpoint, resume identico: artefatti uguali all'esecuzione continua, task ripresi > 0; resume con worker diversi: `resume_mismatch`; staging alterato su un task completato: `sched.checkpoint_digest`; checkpoint e staging rimossi dopo la pubblicazione e conservati dopo stop e annullamento; checkpoint senza scratch: `calib.checkpoint_scratch`. |
 | T-M2R3-07 | Con sorgente PSI sintetica: il job in coda non è ammesso sopra soglia (soglia inclusa) e lo è quando la pressione cala; pressione salita durante l'attesa della memoria ricampionata all'ammissione effettiva; annullamento che interrompe un intervallo di 30 s; il job in corso conserva piano e `recipe_digest`; letture nel report e nella provenance; monitor con i job in attesa; annullamento durante l'attesa; sorgente non interpretabile; prenotazione impossibile durante l'esecuzione: stop con checkpoint e resume che completa; `pressure_poll_ms` persistito con origine e validato. |
 
+## Estensione R2.r: piano del job del master
+
+Perimetro dichiarato prima del codice. Copre F-RES-03 per il job del master di C-02.a e la parte «piano del job» di F-CAL-01.a: worker, tile e coda dei task del master li sceglie il pianificatore dalla `resource_config` e dal budget del pool. Non copre: checkpoint, spill e resume del job del master; pressione PSI durante l'esecuzione del master; un master il cui minimo supera il budget si ferma (D8: la pila non è mai residente, quindi non c'è una residenza più piccola da scegliere).
+
+### Ingresso
+
+`planner_input.frame_count` = numero `n` di frame del gruppo. Con `frame_count` > 0 `plan_resources` e `compute_plan_bounds` usano il modello del master qui sotto; con 0 il modello della calibrazione (estensioni R3.1 e R3.2), invariato. Nel modello del master `input_peak_bytes` è il picco di lettura del frame più grande (`P`, un frame letto per intero alla volta), non la somma. `checkpoint` dichiarato o un campo della residenza a blocchi diverso dal valore iniziale (`block_*` non nulli, `normalization_channels` ≠ 1) con `frame_count` > 0: `invalid_input`, `resources.planner_input` (il master non li usa, e un campo ignorato sarebbe una scelta nascosta). `out_sample_bytes` oltre 16: `invalid_input`, `resources.planner_input` (i tipi di uscita hanno 4 o 8 byte; il limite tiene i prodotti dentro 128 bit).
+
+### Modello
+
+Simboli: `n`, `W`, `H`, `S = W·H`, `E` = byte per campione di uscita, `P`, `HB` = limite dell'header di uscita, `M` = `report_margin_bytes` della configurazione, `D` = 2^20 (blocco della riverifica del digest, `master_digest_chunk_bytes`), `K` = 32 (statistiche per pixel del report, `master_stats_bytes_per_pixel`), `C` = CPU utilizzabili (dimensione di `cpu_set`, altrimenti `cpu_count`), `B` = budget del pool.
+
+```
+out      = S·(2E + 2)                                  uscita (campioni, varianza, maschera)
+shared   = P + 8·S + out + K·S + (out + HB) + D + M    frame letto, accumulatori f64, uscita, statistiche, codifica
+task(t)  = 16·n + t·W·(10·n + 8)                       master_task_bytes(n, t, W): puntatori, righe f64 e bit
+                                                       degli n frame, appoggio della lettura
+t0       = tile esplicito, oppure min(64, max(1, ceil(H / (4·C))))      (lo stesso di R3.1)
+t_min    = tile esplicito, oppure 1
+minimum_feasible_bytes = shared + task(t_min)          (un worker)
+k        = worker esplicito, oppure 1
+tile     = tile esplicito, oppure min(t0, floor((floor((B − shared) / k) − 16·n) / (W·(10·n + 8))))
+T        = ceil(H / tile)
+workers  = worker esplicito, oppure min(C, T, floor((B − shared) / task(tile)))
+peak     = shared + workers·task(tile)
+working_set = shared + min(C, ceil(H / t0))·task(t0)
+```
+
+Il tile automatico è il più grande `t ≤ t0` per cui `k` task entrano nel budget: il budget riduce prima il tile, poi i worker. Con `tile < t0` i worker automatici valgono 1, perché `2·task(t) ≤ B − shared < task(t + 1)` è impossibile per `t ≥ 1`. Il piano riporta `frame_residency = blocks` (i task leggono i frame a blocchi di righe con `pread`; la pila non è mai residente), `master_residency = whole`, nessuno spill, `staging_bytes` = 0, `whole_minimum_bytes` = `minimum_feasible_bytes` (il modello ha una sola residenza), `budget_below_working_set = (B < working_set)`, `task_queue_capacity` dalla configurazione, `user_fixed` come in R3.1. Il piano entra nella provenance del job (`details.resource_plan`) e non cambia durante l'esecuzione.
+
+### Stop
+
+Tutti prima di ogni prenotazione, con `budget`, `sched.job_exceeds_budget` e nel contesto `picco`, `budget_bytes`, `minimum_feasible_bytes`, `shared_bytes`, `per_task_bytes` (del tile del caso), `working_set_bytes`, `residenza` = `master`:
+
+- `B < minimum_feasible_bytes` (anche in automatico), con `picco` = `minimum_feasible_bytes`;
+- worker esplicito `k` e tile automatico senza alcun `t ≥ 1` che entri, con `picco` = `shared + k·task(1)`;
+- worker esplicito con `peak > B`.
+
+Ogni grandezza del modello si calcola con prodotti e somme controllati; `task` è `master_task_bytes`. `shared`, `minimum_feasible_bytes`, `working_set` o il `picco` oltre 2^64 − 1 danno lo stesso stop con `non rappresentabile` al posto del valore nel contesto: è un piano oltre ogni budget. Vale anche per `compute_plan_bounds`, che col modello del master non ha altri stop per budget. Limite dichiarato: un `working_set` non rappresentabile (possibile solo con `C·task(t0)` oltre 2^64, cioè con un tile o un numero di frame fuori da ogni memoria reale) ferma anche un piano che entrerebbe con meno worker.
+
+Tabella di riferimento (calcolata a mano; ingressi del pianificatore dati come numeri): `n` = 10, W = 1000, H = 1000, S = 10^6, E = 4, P = 4 000 000, HB = 100 000, M = D = 1 048 576, K = 32. `out` = 10 000 000; `shared` = 4 000 000 + 8 000 000 + 10 000 000 + 32 000 000 + 10 100 000 + 1 048 576 + 1 048 576 = 66 197 152; `task(t)` = 160 + 108 000·t, `task(1)` = 108 160; `minimum_feasible_bytes` automatico = 66 305 312. Con C = 4: `t0` = 63, `task(63)` = 6 804 160, `working_set` = 66 197 152 + 4·6 804 160 = 93 413 792.
+
+| Caso | B | C | esplicito | Atteso |
+|---|---|---|---|---|
+| p | 104 857 600 | 4 | — | tile 63, T 16, workers 4, picco 93 413 792, sotto working set: no |
+| q | 93 413 791 | 4 | — | tile 63, workers 3, picco 86 609 632, sotto working set: sì |
+| r | 70 000 000 | 4 | — | tile 35 (floor(3 802 688 / 108 000)), T 29, workers 1, picco 69 977 312 |
+| s | 66 305 312 | 4 | — | tile 1, T 1000, workers 1, picco 66 305 312 |
+| t | 66 305 311 | 4 | — | stop, `minimum_feasible_bytes` 66 305 312 |
+| u | 104 857 600 | 4 | workers 2 | tile 63, workers 2, picco 79 805 472 |
+| v | 70 000 000 | 4 | workers 2 | tile 17 (floor(1 901 264 / 108 000)), T 59, picco 69 869 472 |
+| w | 66 305 312 | 4 | workers 2 | stop, picco 66 413 472, `minimum_feasible_bytes` 66 305 312 |
+| x | 104 857 600 | 2 | tile 10 | tile 10, T 100, workers 2, picco 68 357 472, `minimum_feasible_bytes` 67 277 312 |
+| y | 104 857 600 | 4 | tile 400 | stop, `minimum_feasible_bytes` 109 397 312 |
+| z | 2^64 − 1 | 4 | tile 2^32 − 1, `n` 13 106, W 65 536 | stop, `per_task_bytes` e `minimum_feasible_bytes` `non rappresentabile` |
+
+### Job del master
+
+`master_job_options.resources` (una `resource_config`, nessuna opzione esplicita di worker, tile o coda fuori da essa) entra nel pianificatore con `frame_count` = `n`, `C` dalla configurazione e `B` = budget del pool; lo scheduler riceve `scheduler_tuning_of(resources)` (capacità della coda dei job e `cpu_set` dei worker). Con lo snapshot del budget la configurazione con le origini entra nella provenance (`budget.resources`), come per la calibrazione; senza snapshot non viene registrato nulla (limite dichiarato in `master.hpp`).
+
+### Test R2.r
+
+| ID | Clausola |
+|---|---|
+| T-M2R2R-01 | Pianificatore sui casi p-z, con `compute_plan_bounds` coerente col piano; `checkpoint` o residenza a blocchi con `frame_count` > 0 e `out_sample_bytes` > 16: `resources.planner_input`; `frame_count` = 0 lascia invariati i casi a-o. |
+| T-M2R2R-02 | Job reale con worker e tile automatici: il `job_plan` passato allo scheduler è quello di `plan_resources` sugli ingressi del job; col budget pari al minimo tile 1 e un worker; `cpu_set` di una CPU dà un worker e ogni task del master, letto nel thread del worker, ha l'affinità di quella sola CPU; master bit-identico al calcolo in memoria in ogni caso. |
+| T-M2R2R-03 | Coda: `task_queue_capacity` configurata diversa dal default arriva nel `job_plan` e nella provenance; il margine configurato cresce `shared_bytes` della differenza. |
+| T-M2R2R-04 | Stop per budget nel job: budget = minimo − 1 (automatico), worker esplicito oltre il budget, tile esplicito il cui piano supera il budget: `sched.job_exceeds_budget` con `minimum_feasible_bytes` della formula, nessuna prenotazione (picco del pool 0), nessun master. Piano non rappresentabile: caso z. |
+| T-M2R2R-05 | Provenance: con lo snapshot, `budget.resources` uguale a `resource_config_json` della configurazione (origini comprese) e `details.resource_plan` uguale al piano; senza snapshot nessun `budget`. |
+
 ## Fuori da M2
 
 Budget del viewer; eviction della cache; batch di ricerca dell'Advisor (ADR-06.b); prevenzione deadlock fra job diversi oltre la coda FIFO; GPU e VRAM.

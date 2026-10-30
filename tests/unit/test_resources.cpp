@@ -923,4 +923,153 @@ TEST(Resources, T_M2R3_07_monitor_exposes_the_jobs_waiting_for_pressure) {
   EXPECT_EQ(pressure->find("threshold")->as_number(), 10.0);
 }
 
+// ---------------------------------------------------------------- T-M2R2R-01: modello del master (estensione R2.r)
+
+// Tabella del contratto: n = 10, W = H = 1000, E = 4, P = 4 000 000, HB = 100 000, M = D = 1 048 576, K = 32.
+// shared = 66 197 152, task(t) = 160 + 108 000 t, minimo automatico 66 305 312 (calcolati a mano nel contratto).
+constexpr std::uint64_t master_shared_hand = 66'197'152, master_min_hand = 66'305'312;
+
+planner_input master_input(std::uint64_t budget, std::size_t cpus) {
+  planner_input in = table_input(budget, cpus);
+  in.frame_count = 10;
+  return in;
+}
+
+struct master_expect {
+  std::uint32_t tile;
+  std::uint64_t tasks;
+  unsigned workers;
+  std::uint64_t peak;
+  bool below_working_set;
+};
+
+void expect_master_plan(const resource_plan& p, const master_expect& x) {
+  EXPECT_EQ(p.tile_rows, x.tile);
+  EXPECT_EQ(p.task_count, x.tasks);
+  EXPECT_EQ(p.worker_count, x.workers);
+  EXPECT_EQ(p.peak_bytes, x.peak);
+  EXPECT_EQ(p.shared_bytes, master_shared_hand);
+  EXPECT_EQ(p.per_task_bytes, 160 + 108'000 * std::uint64_t{x.tile});
+  EXPECT_EQ(p.budget_below_working_set, x.below_working_set);
+  EXPECT_EQ(p.frame_residency, "blocks");
+  EXPECT_EQ(p.master_residency, "whole");
+  EXPECT_FALSE(p.spill);
+  EXPECT_EQ(p.staging_bytes, 0u);
+  EXPECT_EQ(p.whole_minimum_bytes, p.minimum_feasible_bytes);
+}
+
+void expect_master_stop(const planner_input& in, const resource_config& c, const std::string& peak,
+                        const std::string& minimum) {
+  try {
+    (void)plan_resources(in, c);
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::budget);
+    EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+    EXPECT_EQ(context_value(e, "picco"), peak);
+    EXPECT_EQ(context_value(e, "minimum_feasible_bytes"), minimum);
+    EXPECT_EQ(context_value(e, "budget_bytes"), std::to_string(in.budget_bytes));
+    EXPECT_EQ(context_value(e, "residenza"), "master");
+  }
+}
+
+TEST(Resources, T_M2R2R_01_master_planner_matches_the_hand_computed_table) {
+  const resource_config cfg;
+  {  // p
+    const resource_plan p = plan_resources(master_input(104'857'600, 4), cfg);
+    expect_master_plan(p, {63, 16, 4, 93'413'792, false});
+    EXPECT_EQ(p.working_set_bytes, 93'413'792u);
+    EXPECT_EQ(p.minimum_feasible_bytes, master_min_hand);
+    EXPECT_TRUE(p.user_fixed.empty());
+    EXPECT_EQ(p.task_queue_capacity, 4u);
+  }
+  expect_master_plan(plan_resources(master_input(93'413'791, 4), cfg), {63, 16, 3, 86'609'632, true});  // q
+  expect_master_plan(plan_resources(master_input(70'000'000, 4), cfg), {35, 29, 1, 69'977'312, true});  // r
+  expect_master_plan(plan_resources(master_input(master_min_hand, 4), cfg), {1, 1000, 1, master_min_hand, true});  // s
+  expect_master_stop(master_input(master_min_hand - 1, 4), cfg, "66305312", "66305312");  // t
+  resource_config two = cfg;
+  two.worker_count = 2;
+  {  // u
+    const resource_plan p = plan_resources(master_input(104'857'600, 4), two);
+    expect_master_plan(p, {63, 16, 2, 79'805'472, false});
+    EXPECT_EQ(p.user_fixed, std::vector<std::string>{"worker_count"});
+  }
+  expect_master_plan(plan_resources(master_input(70'000'000, 4), two), {17, 59, 2, 69'869'472, true});  // v
+  expect_master_stop(master_input(master_min_hand, 4), two, "66413472", "66305312");  // w
+  resource_config tile10 = cfg;
+  tile10.tile_rows = 10;
+  {  // x
+    const resource_plan p = plan_resources(master_input(104'857'600, 2), tile10);
+    expect_master_plan(p, {10, 100, 2, 68'357'472, false});
+    EXPECT_EQ(p.minimum_feasible_bytes, 67'277'312u);
+    EXPECT_EQ(p.user_fixed, std::vector<std::string>{"tile_rows"});
+  }
+  resource_config tile400 = cfg;
+  tile400.tile_rows = 400;
+  expect_master_stop(master_input(104'857'600, 4), tile400, "109397312", "109397312");  // y
+}
+
+TEST(Resources, T_M2R2R_01_unrepresentable_master_plan_is_a_budget_stop_with_the_value_declared) {
+  resource_config c;
+  c.tile_rows = 0xFFFFFFFFu;
+  planner_input in = master_input(~std::uint64_t{0}, 4);  // z
+  in.frame_count = 13'106;
+  in.width = 65'536;
+  try {
+    (void)plan_resources(in, c);
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::budget);
+    EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+    EXPECT_EQ(context_value(e, "per_task_bytes"), "non rappresentabile");
+    EXPECT_EQ(context_value(e, "minimum_feasible_bytes"), "non rappresentabile");
+    EXPECT_EQ(context_value(e, "picco"), "non rappresentabile");
+    EXPECT_EQ(context_value(e, "residenza"), "master");
+  }
+  EXPECT_STOP(compute_plan_bounds(in, c), error_category::budget, "sched.job_exceeds_budget");
+  // Tile automatico con un numero di frame che rende non rappresentabile anche task(1).
+  planner_input many = master_input(~std::uint64_t{0}, 4);
+  many.frame_count = std::uint64_t{1} << 62;
+  EXPECT_STOP(plan_resources(many, resource_config{}), error_category::budget, "sched.job_exceeds_budget");
+}
+
+TEST(Resources, T_M2R2R_01_master_bounds_match_the_plan_and_unused_inputs_are_rejected) {
+  const resource_config cfg;
+  const plan_bounds b = compute_plan_bounds(master_input(104'857'600, 4), cfg);
+  EXPECT_EQ(b.tile_rows, 63u);
+  EXPECT_EQ(b.task_count, 16u);
+  EXPECT_EQ(b.shared_bytes, master_shared_hand);
+  EXPECT_EQ(b.per_task_bytes, 6'804'160u);
+  EXPECT_EQ(b.minimum_feasible_bytes, master_min_hand);
+  EXPECT_EQ(b.working_set_bytes, 93'413'792u);
+  // Margine configurato: shared cresce della differenza.
+  resource_config margin = cfg;
+  margin.report_margin_bytes = {3 * 1'048'576, "configurato"};
+  EXPECT_EQ(compute_plan_bounds(master_input(104'857'600, 4), margin).shared_bytes, master_shared_hand + 2 * 1'048'576);
+  planner_input in = master_input(104'857'600, 4);
+  in.checkpoint = true;
+  EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
+  in = master_input(104'857'600, 4);
+  in.block_raw_bytes_per_row = 1;
+  EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
+  in = master_input(104'857'600, 4);
+  in.block_band_bytes_per_row = 1;
+  EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
+  in = master_input(104'857'600, 4);
+  in.block_regions = 1;
+  EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
+  in = master_input(104'857'600, 4);
+  in.normalization_channels = 4;
+  EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
+  in = master_input(104'857'600, 4);
+  in.out_sample_bytes = 17;
+  EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
+  // CPU sintetiche oltre 2^62: t0 = ceil(ceil(H / C) / 4) = 1, senza il prodotto 4 C.
+  in = master_input(104'857'600, std::size_t{1} << 62);
+  EXPECT_EQ(compute_plan_bounds(in, cfg).tile_rows, 1u);
+  EXPECT_EQ(compute_plan_bounds(table_input(104'857'600, std::size_t{1} << 62), cfg).tile_rows, 1u);
+  // Con frame_count = 0 il modello della calibrazione resta quello della tabella di R3.1.
+  EXPECT_EQ(plan_resources(table_input(104'857'600, 4), cfg).shared_bytes, shared_hand);
+}
+
 }  // namespace

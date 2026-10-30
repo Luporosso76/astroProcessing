@@ -8,11 +8,14 @@
 //  - T-M2R2-07: 0 ulp fra blocchi e memoria (stessa sequenza di operazioni IEEE per pixel).
 #include <gtest/gtest.h>
 
+#include <sched.h>
 #include <sys/stat.h>
 
 #include <algorithm>
 #include <limits>
+#include <cerrno>
 #include <map>
+#include <mutex>
 #include <set>
 
 #include "master_support.hpp"
@@ -543,7 +546,7 @@ TEST(MasterJob, T_M2R2_07_stack_over_budget_by_row_blocks_is_bit_identical_to_me
     EXPECT_EQ(out.stop->category(), error_category::budget);
     EXPECT_EQ(out.stop->code(), "sched.job_exceeds_budget");
     for (const auto& [k, v] : out.stop->context()) {
-      if (k == "minimo") minimum = std::stoull(v);
+      if (k == "minimum_feasible_bytes") minimum = std::stoull(v);
     }
   }
   ASSERT_GT(minimum, 0u);
@@ -559,8 +562,8 @@ TEST(MasterJob, T_M2R2_07_stack_over_budget_by_row_blocks_is_bit_identical_to_me
     SCOPED_TRACE(std::to_string(v.workers) + " worker, " + std::to_string(v.rows) + " righe");
     master_project p = make_master_project(c.dir / ("store-" + std::to_string(v.workers) + "-" + std::to_string(v.rows)), c.r);
     master_job_options o;
-    o.worker_count = v.workers;
-    o.tile_rows = v.rows;
+    o.resources.worker_count = v.workers;
+    o.resources.tile_rows = v.rows;
     const std::uint64_t budget = v.budget != 0 ? v.budget : stack_bytes(c) - 1;
     memory_pool pool(budget);
     const job_outcome out = run_master_quiet(*p.store, "master", c.r, pool, o);
@@ -900,13 +903,239 @@ TEST(MasterJob, T_M2R2_07_unrepresentable_plan_memory_is_detected_before_any_res
   master_project p = make_master_project(c.dir / "store", c.r);
   memory_pool pool(64 * MiB);
   master_job_options o;
-  o.tile_rows = 0xFFFFFFFFu;
-  o.worker_count = 1;
+  o.resources.tile_rows = 0xFFFFFFFFu;
+  o.resources.worker_count = 1;
   const job_outcome out = run_master_quiet(*p.store, "master", c.r, pool, o);
   ASSERT_TRUE(out.stop);
   EXPECT_EQ(out.stop->category(), error_category::budget);
   EXPECT_EQ(out.stop->code(), "sched.job_exceeds_budget");
   EXPECT_EQ(by_role(*p.store, p.node.key()).count("primary"), 0u);
+}
+
+// ---------------------------------------------------------------- job con la configurazione delle risorse (R2.r)
+
+// Ingressi del pianificatore ricavati dal test: geometria e frame del gruppo, picco del frame piu' grande, limite
+// dell'header di uscita di tre HDU (ADR-06, estensione R2.r).
+planner_input master_job_input(const job_case& c, std::uint64_t budget, std::size_t cpus) {
+  planner_input in;
+  in.budget_bytes = budget;
+  in.cpus = cpus;
+  in.width = c.g.w;
+  in.height = c.g.h;
+  in.out_sample_bytes = sample_size(c.r.output_type);
+  for (const mframe& f : c.g.frames) {
+    in.input_peak_bytes = std::max(in.input_peak_bytes, plan_fits(file_of(f, c.g.w, c.g.h)).peak_bytes);
+  }
+  in.header_bound_bytes = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
+  in.frame_count = c.g.frames.size();
+  return in;
+}
+
+void expect_job_plan(const job_plan& seen, const resource_plan& expected) {
+  EXPECT_EQ(seen.shared_bytes, expected.shared_bytes);
+  EXPECT_EQ(seen.per_task_bytes, expected.per_task_bytes);
+  EXPECT_EQ(seen.worker_count, expected.worker_count);
+  EXPECT_EQ(seen.tile_rows, expected.tile_rows);
+  EXPECT_EQ(seen.queue_capacity, expected.task_queue_capacity);
+}
+
+json provenance_of(const sqlite_dag_store& store, const std::string& key) {
+  const auto roles = by_role(store, key);
+  const std::vector<std::uint8_t> bytes = read_artifact(store, roles.at("provenance"));
+  return parse_json(std::string(bytes.begin(), bytes.end()));
+}
+
+unsigned first_affinity_cpu() {
+  cpu_set_t set;
+  CPU_ZERO(&set);
+  if (system_affinity(&set) != 0) ADD_FAILURE() << "sched_getaffinity fallita";
+  for (unsigned cpu = 0; cpu < CPU_SETSIZE; ++cpu) {
+    if (CPU_ISSET(cpu, &set)) return cpu;
+  }
+  ADD_FAILURE() << "affinita' vuota";
+  return 0;
+}
+
+TEST(MasterJob, T_M2R2R_02_automatic_workers_and_tile_come_from_the_planner_and_the_master_is_unchanged) {
+  const job_case c = make_job_case("r2r02", mixed_group(384, 320));
+  const master_result memory = combine_master(c.r, images_of(c.g));
+  const std::size_t cpus = cpu_count();
+  const resource_config automatic;
+  const resource_plan wide = plan_resources(master_job_input(c, 256 * MiB, cpus), automatic);
+  const resource_plan tight = plan_resources(master_job_input(c, wide.minimum_feasible_bytes, cpus), automatic);
+  // I casi sono distinti: tile ampio contro tile 1, piu' worker contro uno.
+  ASSERT_GT(wide.tile_rows, 1u);
+  ASSERT_GE(cpus, 2u) << "il caso dei worker automatici richiede almeno due CPU";
+  ASSERT_GT(wide.worker_count, 1u);
+  ASSERT_EQ(tight.tile_rows, 1u);
+  ASSERT_EQ(tight.worker_count, 1u);
+  ASSERT_LT(tight.minimum_feasible_bytes, stack_bytes(c)) << "la pila deve superare il minimo";
+  resource_config one_cpu;
+  const unsigned chosen_cpu = first_affinity_cpu();
+  one_cpu.cpu_set = std::vector<unsigned>{chosen_cpu};
+  const resource_plan single = plan_resources(master_job_input(c, 256 * MiB, 1), one_cpu);
+  ASSERT_EQ(single.worker_count, 1u);
+  ASSERT_GT(single.tile_rows, 1u);
+
+  struct run {
+    const char* name;
+    std::uint64_t budget;
+    resource_config config;
+    resource_plan expected;
+  };
+  std::set<std::string> digests;
+  for (const run& r : {run{"wide", 256 * MiB, automatic, wide}, run{"tight", wide.minimum_feasible_bytes, automatic, tight},
+                       run{"one_cpu", 256 * MiB, one_cpu, single}}) {
+    SCOPED_TRACE(r.name);
+    master_project p = make_master_project(c.dir / r.name, c.r);
+    memory_pool pool(r.budget);
+    std::optional<job_plan> seen;
+    master_job_options o;
+    o.resources = r.config;
+    o.on_job_plan = [&](const job_plan& plan) { seen = plan; };
+    // Affinita' letta dentro ogni task del master, nel thread del worker (seam cpu.task_start).
+    std::mutex affinity_mutex;
+    std::vector<cpu_set_t> task_affinity;
+    cpu_test::set_task_injector([&](std::string_view point) {
+      if (point != "cpu.task_start") return 0;
+      cpu_set_t set;
+      CPU_ZERO(&set);
+      const int rc = ::sched_getaffinity(0, sizeof(set), &set);
+      const std::lock_guard<std::mutex> lock(affinity_mutex);
+      task_affinity.push_back(set);
+      return rc == 0 ? 0 : errno;
+    });
+    const job_outcome out = run_master_quiet(*p.store, "master", c.r, pool, o);
+    cpu_test::set_task_injector(nullptr);
+    ASSERT_EQ(out.exit_code, 0) << (out.stop ? out.stop->what() : "");
+    ASSERT_TRUE(seen.has_value());
+    expect_job_plan(*seen, r.expected);
+    EXPECT_LE(pool.peak_reserved_bytes(), r.budget);
+    ASSERT_EQ(task_affinity.size(), r.expected.task_count);
+    if (r.config.cpu_set) {
+      for (cpu_set_t& set : task_affinity) {
+        EXPECT_EQ(CPU_COUNT(&set), 1);
+        EXPECT_TRUE(CPU_ISSET(chosen_cpu, &set));
+      }
+    }
+    const auto roles = by_role(*p.store, p.node.key());
+    const image decoded = decode_fits(read_artifact(*p.store, roles.at("primary")), cal::big_budget);
+    EXPECT_TRUE(same_bits(decoded, memory.output));
+    digests.insert(roles.at("primary").sha256);
+  }
+  EXPECT_EQ(digests.size(), 1u);
+}
+
+TEST(MasterJob, T_M2R2R_03_configured_task_queue_and_margin_reach_the_scheduler_plan_and_the_provenance) {
+  const job_case c = make_job_case("r2r03", dark_group());
+  resource_config cfg;
+  cfg.task_queue_capacity = {7, "configurato"};
+  cfg.report_margin_bytes = {2 * MiB, "configurato"};
+  ASSERT_NE(cfg.task_queue_capacity.value, resource_config{}.task_queue_capacity.value);
+  master_project p = make_master_project(c.dir / "store", c.r);
+  memory_pool pool(256 * MiB);
+  std::optional<job_plan> seen;
+  master_job_options o;
+  o.resources = cfg;
+  o.on_job_plan = [&](const job_plan& plan) { seen = plan; };
+  const job_outcome out = run_master_quiet(*p.store, "master", c.r, pool, o);
+  ASSERT_EQ(out.exit_code, 0) << (out.stop ? out.stop->what() : "");
+  ASSERT_TRUE(seen.has_value());
+  EXPECT_EQ(seen->queue_capacity, 7u);
+  const planner_input in = master_job_input(c, 256 * MiB, cpu_count());
+  expect_job_plan(*seen, plan_resources(in, cfg));
+  // Il margine configurato e' nel piano: 1 MiB in piu' del default.
+  EXPECT_EQ(seen->shared_bytes, plan_resources(in, resource_config{}).shared_bytes + MiB);
+  const json prov = provenance_of(*p.store, p.node.key());
+  // Confronto sul testo canonico: un campo assente vale null e non interrompe il processo.
+  EXPECT_EQ(canonical_json(cal::at(prov, {"details", "resource_plan", "task_queue_capacity"})), "7");
+}
+
+TEST(MasterJob, T_M2R2R_04_a_plan_over_the_budget_stops_before_any_reservation_and_publishes_no_master) {
+  const job_case c = make_job_case("r2r04", mixed_group(64, 48));
+  const std::size_t cpus = cpu_count();
+  const resource_plan wide = plan_resources(master_job_input(c, 256 * MiB, cpus), resource_config{});
+  const std::uint64_t minimum = wide.minimum_feasible_bytes;
+  ASSERT_GE(cpus, 2u) << "il caso dei worker espliciti richiede almeno due CPU";
+  resource_config two_workers;
+  two_workers.worker_count = 2;
+  resource_config big_tile;
+  big_tile.tile_rows = 0xFFFFFFFFu;
+  struct run {
+    const char* name;
+    std::uint64_t budget;
+    resource_config config;
+    std::string minimum;
+  };
+  for (const run& r : {run{"below_minimum", minimum - 1, resource_config{}, std::to_string(minimum)},
+                       run{"explicit_workers", minimum, two_workers, std::to_string(minimum)},
+                       run{"explicit_tile", 256 * MiB, big_tile,
+                           std::to_string(plan_resources(master_job_input(c, ~std::uint64_t{0}, cpus), big_tile)
+                                              .minimum_feasible_bytes)}}) {
+    SCOPED_TRACE(r.name);
+    master_project p = make_master_project(c.dir / r.name, c.r);
+    memory_pool pool(r.budget);
+    master_job_options o;
+    o.resources = r.config;
+    bool planned = false;
+    o.on_job_plan = [&](const job_plan&) { planned = true; };
+    const job_outcome out = run_master_quiet(*p.store, "master", c.r, pool, o);
+    EXPECT_EQ(out.exit_code, exit_code_stop);
+    ASSERT_TRUE(out.stop);
+    EXPECT_EQ(out.stop->category(), error_category::budget);
+    EXPECT_EQ(out.stop->code(), "sched.job_exceeds_budget");
+    std::map<std::string, std::string> ctx;
+    for (const auto& [k, v] : out.stop->context()) ctx[k] = v;
+    EXPECT_EQ(ctx["minimum_feasible_bytes"], r.minimum);
+    EXPECT_EQ(ctx["residenza"], "master");
+    EXPECT_FALSE(planned);
+    EXPECT_EQ(pool.peak_reserved_bytes(), 0u);
+    EXPECT_EQ(by_role(*p.store, p.node.key()).count("primary"), 0u);
+    EXPECT_EQ(p.store->read_slot("master").state, freshness::missing);
+  }
+}
+
+TEST(MasterJob, T_M2R2R_05_provenance_records_the_configuration_snapshot_and_the_chosen_plan) {
+  const job_case c = make_job_case("r2r05", dark_group());
+  resource_config cfg;
+  cfg.fraction_normal = {{1, 2}, "configurato"};
+  cfg.task_queue_capacity = {5, "configurato"};
+  budget_snapshot snapshot;
+  snapshot.mode = budget_mode::manual;
+  snapshot.manual = parse_manual_budget("256MiB");
+  snapshot.budget_bytes = 256 * MiB;
+  snapshot.mem_total_bytes = 1024 * MiB;
+  snapshot.mem_available_bytes = 512 * MiB;
+  const resource_plan expected = plan_resources(master_job_input(c, 256 * MiB, cpu_count()), cfg);
+  {
+    master_project p = make_master_project(c.dir / "snapshot", c.r);
+    memory_pool pool(256 * MiB);
+    master_job_options o;
+    o.resources = cfg;
+    testing::internal::CaptureStderr();
+    const job_outcome out = run_master_job(*p.store, "master", c.r, pool, o, never_cancelled(), snapshot);
+    testing::internal::GetCapturedStderr();
+    ASSERT_EQ(out.exit_code, 0) << (out.stop ? out.stop->what() : "");
+    const json prov = provenance_of(*p.store, p.node.key());
+    EXPECT_EQ(canonical_json(cal::at(prov, {"budget", "resources"})), canonical_json(resource_config_json(cfg)));
+    // Confronti sul testo canonico: un campo assente vale null e non interrompe il processo.
+    EXPECT_EQ(canonical_json(cal::at(prov, {"budget", "resources", "fraction_normal", "origin"})),
+              canonical_json(json::string("configurato")));
+    EXPECT_EQ(canonical_json(cal::at(prov, {"budget", "resources", "fraction_pressure", "origin"})),
+              canonical_json(json::string(resource_config{}.fraction_pressure.origin)));
+    EXPECT_EQ(canonical_json(cal::at(prov, {"details", "resource_plan"})), canonical_json(resource_plan_json(expected)));
+  }
+  {
+    // Senza snapshot del budget la configurazione non viene registrata (limite dichiarato in master.hpp).
+    master_project p = make_master_project(c.dir / "no_snapshot", c.r);
+    memory_pool pool(256 * MiB);
+    master_job_options o;
+    o.resources = cfg;
+    ASSERT_EQ(run_master_quiet(*p.store, "master", c.r, pool, o).exit_code, 0);
+    const json prov = provenance_of(*p.store, p.node.key());
+    EXPECT_EQ(prov.find("budget"), nullptr);
+    EXPECT_EQ(canonical_json(cal::at(prov, {"details", "resource_plan"})), canonical_json(resource_plan_json(expected)));
+  }
 }
 
 TEST(MasterJob, T_M2R2_05_a_stopped_job_publishes_no_master) {

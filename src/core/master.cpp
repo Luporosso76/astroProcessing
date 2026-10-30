@@ -803,12 +803,8 @@ void render(std::ostringstream& out, const json& value, int depth, const std::st
   }
 }
 
-constexpr std::uint64_t report_margin_bytes = std::uint64_t{1} << 20;
-constexpr std::uint64_t digest_chunk_bytes = std::uint64_t{1} << 20;
 // Header di uscita: al piu' tre HDU con max_header_cards card ciascuno, piu' il riempimento dei blocchi.
 constexpr std::uint64_t output_header_bound = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
-// Statistiche per pixel del report: level_bias_estimate, rapporto, segno e copie per le mediane.
-constexpr std::uint64_t stats_bytes_per_pixel = 32;
 
 }  // namespace
 
@@ -989,42 +985,26 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     std::vector<fits_row_layout> layouts;
     for (const fits_input& in : inputs) layouts.push_back(plan_fits_rows(in));
 
-    // Memoria dichiarata (C-02.a, aggiunte di R2): un frame letto per intero alla volta, uscita, statistiche,
-    // codifica; per task i blocchi di righe di tutti i frame. Mai la pila. Ogni prodotto e somma e' controllato:
-    // un piano non rappresentabile in 64 bit si ferma prima di ogni prenotazione.
+    // Piano del job (ADR-06, estensione R2.r): un frame letto per intero alla volta, uscita, statistiche, codifica;
+    // per task i blocchi di righe di tutti i frame, mai la pila. Il pianificatore ferma un piano oltre il budget o non
+    // rappresentabile prima di ogni prenotazione.
     std::uint64_t frame_peak = 0;
     for (const fits_plan& fp : plans) frame_peak = std::max(frame_peak, fp.peak_bytes);
-    const std::uint64_t w = plans[0].width, h = plans[0].height, px = w * h;
-    const std::uint64_t out_elem = sample_size(recipe.output_type);
-    const std::uint64_t out_bytes = px * (2 * out_elem + sizeof(std::uint16_t));
-    const std::uint64_t shared = frame_peak + px * sizeof(double) + out_bytes + px * stats_bytes_per_pixel +
-                                 (out_bytes + output_header_bound) + digest_chunk_bytes + report_margin_bytes;
-    if (options.tile_rows == 0) {
-      stop(error_category::invalid_input, "sched.tile_rows", "tile_rows deve essere >= 1", {{"tile_rows", "0"}});
-    }
-    const std::uint64_t rows = options.tile_rows;
-    const auto total = [&](std::uint64_t r, std::uint64_t workers) -> std::optional<std::uint64_t> {
-      const std::optional<std::uint64_t> task = master_task_bytes(p.n, r, w);
-      std::uint64_t tasks_bytes = 0, sum = 0;
-      if (!task || __builtin_mul_overflow(*task, workers, &tasks_bytes) || __builtin_add_overflow(shared, tasks_bytes, &sum)) {
-        return std::nullopt;
-      }
-      return sum;
-    };
-    const std::optional<std::uint64_t> minimum = total(1, 1);
-    const std::optional<std::uint64_t> requested = total(rows, options.worker_count);
-    const auto text = [](const std::optional<std::uint64_t>& v) { return v ? std::to_string(*v) : std::string("non rappresentabile"); };
-    if (!minimum || !requested || *requested > pool.budget_bytes()) {
-      stop(error_category::budget, "sched.job_exceeds_budget", "il piano del master supera il budget",
-           {{"minimo", text(minimum)}, {"richiesti", text(requested)}, {"budget", std::to_string(pool.budget_bytes())}});
-    }
+    const std::uint64_t w = plans[0].width, h = plans[0].height;
+    const resource_config& config = options.resources;
+    const std::size_t cpus = config.cpu_set ? config.cpu_set->size() : cpu_count();
+    planner_input in{pool.budget_bytes(), cpus, plans[0].width, plans[0].height, sample_size(recipe.output_type),
+                     frame_peak, output_header_bound};
+    in.frame_count = p.n;
+    const resource_plan chosen = plan_resources(in, config);
     job_plan plan;
-    plan.shared_bytes = shared;
-    plan.per_task_bytes = *master_task_bytes(p.n, rows, w);
-    plan.worker_count = options.worker_count;
-    plan.queue_capacity = options.queue_capacity;
-    plan.tile_rows = options.tile_rows;
-    const std::uint64_t tasks = (h + rows - 1) / rows;
+    plan.shared_bytes = chosen.shared_bytes;
+    plan.per_task_bytes = chosen.per_task_bytes;
+    plan.worker_count = chosen.worker_count;
+    plan.queue_capacity = chosen.task_queue_capacity;
+    plan.tile_rows = chosen.tile_rows;
+    const std::uint64_t rows = chosen.tile_rows;
+    const std::uint64_t tasks = chosen.task_count;
 
     json observed = json::array();
     std::vector<stored_file> files;
@@ -1084,13 +1064,13 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
 
     spec.finalize = [&](job_context& jc) {
       // I blocchi letti appartengono al file verificato: stessa identita' fstat e stesso digest dell'intero file.
-      pool_buffer chunk(jc.shared, static_cast<std::size_t>(digest_chunk_bytes));
+      pool_buffer chunk(jc.shared, static_cast<std::size_t>(master_digest_chunk_bytes));
       for (std::size_t k = 0; k < p.n; ++k) {
         try {
           fits_detail::check_unchanged(inputs[k]);
           sha256_stream hasher;
           for (std::uint64_t done = 0; done < inputs[k].size_bytes();) {
-            const std::size_t n = static_cast<std::size_t>(std::min<std::uint64_t>(digest_chunk_bytes, inputs[k].size_bytes() - done));
+            const std::size_t n = static_cast<std::size_t>(std::min<std::uint64_t>(master_digest_chunk_bytes, inputs[k].size_bytes() - done));
             fits_detail::read_exact(inputs[k], done, chunk.data(), n);
             hasher.update({reinterpret_cast<const std::uint8_t*>(chunk.data()), n});
             done += n;
@@ -1127,15 +1107,19 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
            artifact_content{span(report_text), "txt", "master_report_text", std::nullopt, master_report_text_role}});
     };
 
-    job_scheduler scheduler(pool);
+    if (options.on_job_plan) options.on_job_plan(plan);
+    job_scheduler scheduler(pool, system_affinity, scheduler_tuning_of(config));
     scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
+    details.set("resource_plan", resource_plan_json(chosen));
     const cpu_capabilities caps = read_cpu_capabilities();
     details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
-  return run_job_files(store, slot_name, work, budget, &cancel);
+  std::optional<budget_snapshot> recorded = budget;
+  if (recorded) recorded->resources = resource_config_json(options.resources);
+  return run_job_files(store, slot_name, work, recorded, &cancel);
 }
 
 }  // namespace astro

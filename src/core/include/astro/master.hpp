@@ -72,12 +72,20 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
 // Resa testuale dello stesso documento JSON del report del master.
 std::string master_report_text(const json& report);
 
+// Blocco della riverifica del digest e statistiche per pixel del report: termini D e K del modello del master
+// (ADR-06, estensione R2.r), condivisi da pianificatore e job.
+constexpr std::uint64_t master_digest_chunk_bytes = std::uint64_t{1} << 20;
+constexpr std::uint64_t master_stats_bytes_per_pixel = 32;
+
 struct master_job_options {
-  unsigned worker_count = 1;
-  std::uint32_t tile_rows = 64;
-  std::size_t queue_capacity = 4;
+  // Worker, tile e coda dei task li sceglie plan_resources con frame_count = numero di frame, dal budget del pool; i
+  // worker_count e tile_rows espliciti restano intatti. Configurazione e origini entrano nella provenance solo se il
+  // chiamante passa lo snapshot del budget: senza snapshot non viene registrato nulla.
+  resource_config resources;
   // Solo test: chiamato con "frames.read" dopo la lettura completa dei frame e prima dei blocchi di righe.
   std::function<void(std::string_view)> hook;
+  // Solo test: il job_plan effettivamente passato allo scheduler.
+  std::function<void(const job_plan&)> on_job_plan;
 };
 
 constexpr const char* master_image_role = "primary";

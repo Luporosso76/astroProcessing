@@ -205,8 +205,8 @@ band_master product_master(sqlite_dag_store& store, const std::string& slot, mas
   store.put_node(node);
   store.create_slot(slot, node.key());
   master_job_options o;
-  o.worker_count = 4;
-  o.tile_rows = 128;
+  o.resources.worker_count = 4;
+  o.resources.tile_rows = 128;
   cancel_token cancel;
   const job_outcome out = run_master_job(store, slot, r, pool, o, cancel);
   if (out.exit_code != 0) throw std::runtime_error("master " + slot + ": " + (out.stop ? out.stop->what() : "uscita non nulla"));

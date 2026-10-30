@@ -88,6 +88,9 @@ struct planner_input {
   std::uint64_t block_regions = 0;
   std::uint32_t normalization_channels = 1;
   bool checkpoint = false;
+  // Master (estensione R2.r): numero di frame del gruppo. > 0 seleziona il modello del master, con input_peak_bytes
+  // picco del frame piu' grande; 0 il modello della calibrazione.
+  std::uint64_t frame_count = 0;
 };
 
 struct resource_plan {
@@ -110,8 +113,10 @@ struct resource_plan {
   std::optional<spill_config> spill;
 };
 
-// Grandezze del modello che non dipendono dal budget (nessuno stop per budget). invalid_input resources.planner_input
-// per ingressi nulli o non rappresentabili, sched.worker_count per un worker esplicito oltre le CPU.
+// Grandezze del modello che non dipendono dal budget. invalid_input resources.planner_input per ingressi nulli o non
+// rappresentabili, sched.worker_count per un worker esplicito oltre le CPU. Modello del master: tile_rows e
+// per_task_bytes sono quelli del tile massimo t0, e una grandezza non rappresentabile in 64 bit e' lo stop budget
+// sched.job_exceeds_budget (piano oltre ogni budget), unico stop per budget di questa funzione.
 struct plan_bounds {
   std::uint32_t tile_rows = 1;
   std::uint64_t task_count = 0;
@@ -125,7 +130,8 @@ plan_bounds compute_plan_bounds(const planner_input& input, const resource_confi
 // Stop budget sched.job_exceeds_budget (con minimum_feasible_bytes) se il minimo o il piano esplicito non entrano.
 // Residenza `blocks` se e' dichiarato un checkpoint o se il budget e' sotto il minimo della residenza intera (R3.2):
 // richiede `scratch` (altrimenti, con checkpoint, invalid_input calib.checkpoint_scratch) e staging entro la quota
-// (budget spill.quota_exceeded).
+// (budget spill.quota_exceeded). Modello del master (frame_count > 0, estensione R2.r): tile automatico ridotto dal
+// budget prima dei worker, residenza frame `blocks` e master `whole`, nessuno spill; stessi stop con residenza `master`.
 resource_plan plan_resources(const planner_input& input, const resource_config& config);
 json resource_plan_json(const resource_plan& plan);
 

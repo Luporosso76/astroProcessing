@@ -12,6 +12,7 @@
 #include <regex>
 #include <sstream>
 
+#include "astro/master.hpp"
 #include "astro/sqlite_dag_store.hpp"
 #include "sqlite_internal.hpp"
 
@@ -331,9 +332,7 @@ std::uint64_t narrow(u128 v) {
 
 std::uint64_t ceil_div(std::uint64_t a, std::uint64_t b) { return a / b + (a % b != 0); }
 
-}  // namespace
-
-plan_bounds compute_plan_bounds(const planner_input& in, const resource_config& config) {
+void check_planner_input(const planner_input& in, const resource_config& config) {
   validate_resource_config(config);
   if (in.width == 0 || in.height == 0 || in.cpus == 0 || in.out_sample_bytes == 0) {
     invalid("resources.planner_input", "larghezza, altezza, CPU e byte per campione devono essere > 0");
@@ -341,6 +340,134 @@ plan_bounds compute_plan_bounds(const planner_input& in, const resource_config& 
   if (config.worker_count && *config.worker_count > in.cpus) {
     invalid("sched.worker_count", "worker_count oltre le CPU utilizzabili",
             {{"worker_count", std::to_string(*config.worker_count)}, {"cpu_count", std::to_string(in.cpus)}});
+  }
+}
+
+// ---- modello del master (ADR-06, estensione R2.r)
+
+// Una grandezza assente non e' rappresentabile in 64 bit.
+struct master_model {
+  std::optional<std::uint64_t> shared, task_t0, task_min, minimum, working_set;
+  std::uint32_t t0 = 1;
+  std::uint64_t tasks_t0 = 0;
+};
+
+std::optional<std::uint64_t> fit64(u128 v) {
+  if (v > ~std::uint64_t{0}) return std::nullopt;
+  return static_cast<std::uint64_t>(v);
+}
+
+// shared + k * task, controllato.
+std::optional<std::uint64_t> shared_plus(const std::optional<std::uint64_t>& shared, std::uint64_t k,
+                                         const std::optional<std::uint64_t>& task) {
+  if (!shared || !task) return std::nullopt;
+  return fit64(static_cast<u128>(*shared) + static_cast<u128>(k) * *task);
+}
+
+std::string bytes_text(const std::optional<std::uint64_t>& v) {
+  return v ? std::to_string(*v) : std::string("non rappresentabile");
+}
+
+[[noreturn]] void master_exceeds(const planner_input& in, const master_model& m, const std::optional<std::uint64_t>& peak,
+                                 const std::optional<std::uint64_t>& per_task) {
+  throw stop_error(error_category::budget, "sched.job_exceeds_budget", "il piano del master supera il budget",
+                   {{"picco", bytes_text(peak)},
+                    {"budget_bytes", std::to_string(in.budget_bytes)},
+                    {"minimum_feasible_bytes", bytes_text(m.minimum)},
+                    {"shared_bytes", bytes_text(m.shared)},
+                    {"per_task_bytes", bytes_text(per_task)},
+                    {"working_set_bytes", bytes_text(m.working_set)},
+                    {"residenza", "master"}});
+}
+
+// Grandezze del modello indipendenti dal budget; una non rappresentabile ferma il piano (oltre ogni budget).
+master_model make_master_model(const planner_input& in, const resource_config& config) {
+  if (in.checkpoint || in.block_raw_bytes_per_row != 0 || in.block_band_bytes_per_row != 0 || in.block_regions != 0 ||
+      in.normalization_channels != 1) {
+    invalid("resources.planner_input", "il modello del master non usa checkpoint ne' residenza a blocchi");
+  }
+  if (in.out_sample_bytes > 16) invalid("resources.planner_input", "byte per campione di uscita oltre 16");
+  master_model m;
+  const u128 samples = static_cast<u128>(in.width) * in.height;
+  const u128 out = samples * (2 * static_cast<u128>(in.out_sample_bytes) + sizeof(std::uint16_t));
+  m.shared = fit64(static_cast<u128>(in.input_peak_bytes) + samples * sizeof(double) + out +
+                   samples * master_stats_bytes_per_pixel + (out + in.header_bound_bytes) + master_digest_chunk_bytes +
+                   config.report_margin_bytes.value);
+  m.t0 = config.tile_rows ? *config.tile_rows
+                          : static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                                64, std::max<std::uint64_t>(1, ceil_div(ceil_div(in.height, in.cpus), 4))));
+  m.tasks_t0 = ceil_div(in.height, m.t0);
+  m.task_t0 = master_task_bytes(in.frame_count, m.t0, in.width);
+  m.task_min = master_task_bytes(in.frame_count, config.tile_rows ? *config.tile_rows : 1, in.width);
+  m.minimum = shared_plus(m.shared, 1, m.task_min);
+  m.working_set = shared_plus(m.shared, std::min<std::uint64_t>(in.cpus, m.tasks_t0), m.task_t0);
+  if (!m.minimum || !m.working_set) master_exceeds(in, m, m.minimum, m.task_min);
+  return m;
+}
+
+resource_plan plan_master(const planner_input& in, const resource_config& config, const master_model& m) {
+  const std::uint64_t budget = in.budget_bytes;
+  if (budget < *m.minimum) master_exceeds(in, m, m.minimum, m.task_min);
+  const std::uint64_t avail = budget - *m.shared;
+  const std::uint64_t k = config.worker_count ? *config.worker_count : 1;
+  std::uint32_t tile = 0;
+  if (config.tile_rows) {
+    tile = *config.tile_rows;
+  } else {
+    // Il tile piu' grande <= t0 per cui k task entrano: 16 n + t W (10 n + 8) <= floor(avail / k).
+    const u128 per_worker = avail / k, fixed = 16 * static_cast<u128>(in.frame_count);
+    const u128 per_row = static_cast<u128>(in.width) * (10 * static_cast<u128>(in.frame_count) + 8);
+    const u128 fit = per_worker >= fixed ? (per_worker - fixed) / per_row : 0;
+    tile = static_cast<std::uint32_t>(std::min<u128>(m.t0, fit));
+    if (tile == 0) {
+      const std::optional<std::uint64_t> one = master_task_bytes(in.frame_count, 1, in.width);
+      master_exceeds(in, m, shared_plus(m.shared, k, one), one);
+    }
+  }
+  // tile <= t0: task(tile) <= task(t0), gia' rappresentabile nel modello; il controllo resta come guardia.
+  const std::optional<std::uint64_t> task = master_task_bytes(in.frame_count, tile, in.width);
+  if (!task) master_exceeds(in, m, std::nullopt, task);
+  resource_plan p;
+  p.tile_rows = tile;
+  p.task_count = ceil_div(in.height, tile);
+  p.shared_bytes = *m.shared;
+  p.per_task_bytes = *task;
+  p.minimum_feasible_bytes = *m.minimum;
+  p.whole_minimum_bytes = *m.minimum;
+  p.working_set_bytes = *m.working_set;
+  p.task_queue_capacity = config.task_queue_capacity.value;
+  if (config.worker_count) {
+    p.worker_count = *config.worker_count;
+    const std::optional<std::uint64_t> peak = shared_plus(m.shared, k, task);
+    if (!peak || *peak > budget) master_exceeds(in, m, peak, task);
+    p.peak_bytes = *peak;
+    p.user_fixed.push_back("worker_count");
+  } else {
+    p.worker_count = static_cast<unsigned>(std::min<std::uint64_t>({in.cpus, p.task_count, avail / *task}));
+    p.peak_bytes = *m.shared + std::uint64_t{p.worker_count} * *task;
+  }
+  if (config.tile_rows) p.user_fixed.push_back("tile_rows");
+  p.budget_below_working_set = budget < *m.working_set;
+  p.frame_residency = "blocks";
+  p.master_residency = "whole";
+  p.staging_bytes = 0;
+  return p;
+}
+
+}  // namespace
+
+plan_bounds compute_plan_bounds(const planner_input& in, const resource_config& config) {
+  check_planner_input(in, config);
+  if (in.frame_count > 0) {
+    const master_model m = make_master_model(in, config);
+    plan_bounds b;
+    b.tile_rows = m.t0;
+    b.task_count = m.tasks_t0;
+    b.shared_bytes = *m.shared;
+    b.per_task_bytes = *m.task_t0;
+    b.minimum_feasible_bytes = *m.minimum;
+    b.working_set_bytes = *m.working_set;
+    return b;
   }
   plan_bounds b;
   const u128 samples = static_cast<u128>(in.width) * in.height;
@@ -352,7 +479,7 @@ plan_bounds compute_plan_bounds(const planner_input& in, const resource_config& 
   b.minimum_feasible_bytes = narrow(static_cast<u128>(b.shared_bytes) + b.per_task_bytes);
   b.tile_rows = config.tile_rows ? *config.tile_rows
                                  : static_cast<std::uint32_t>(std::min<std::uint64_t>(
-                                       64, std::max<std::uint64_t>(1, ceil_div(in.height, 4 * in.cpus))));
+                                       64, std::max<std::uint64_t>(1, ceil_div(ceil_div(in.height, in.cpus), 4))));
   b.task_count = ceil_div(in.height, b.tile_rows);
   const std::uint64_t parallel = std::min<std::uint64_t>(in.cpus, b.task_count);
   b.working_set_bytes = narrow(static_cast<u128>(b.shared_bytes) + static_cast<u128>(parallel) * b.per_task_bytes);
@@ -390,6 +517,10 @@ plan_bounds block_bounds(const planner_input& in, const resource_config& config,
 }  // namespace
 
 resource_plan plan_resources(const planner_input& in, const resource_config& config) {
+  if (in.frame_count > 0) {
+    check_planner_input(in, config);
+    return plan_master(in, config, make_master_model(in, config));
+  }
   const plan_bounds whole = compute_plan_bounds(in, config);
   const bool blocks = in.checkpoint || in.budget_bytes < whole.minimum_feasible_bytes;
   if (blocks && in.checkpoint && !config.scratch) {

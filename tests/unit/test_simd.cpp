@@ -948,8 +948,8 @@ TEST(Simd, T_M2R5_07_fault_injected_in_a_worker_stops_every_task_before_the_kern
         at_preflight[1] = calls(cpu_path::avx2);
       };
       master_job_options mo;
-      mo.worker_count = 2;
-      mo.tile_rows = 2;
+      mo.resources.worker_count = 2;
+      mo.resources.tile_rows = 2;
       bool master_frames_read = false;
       mo.hook = [&](std::string_view point) { master_frames_read = master_frames_read || point == "frames.read"; };
       cpu_test::set_task_injector([bad](std::string_view point) {
