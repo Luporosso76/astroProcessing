@@ -58,6 +58,8 @@ add_library(astrocore STATIC
   project_export.cpp
   project_verify.cpp
   cpu_dispatch.cpp
+  job_probe.cpp
+  job_types.cpp
   kernels_scalar.cpp
   kernels_avx2.cpp
   calibration.cpp

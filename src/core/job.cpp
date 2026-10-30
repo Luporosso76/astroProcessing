@@ -277,7 +277,7 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
   std::vector<std::string> warnings;
   std::optional<provenance_record> provenance;
   try {
-    job_files_result result = work(job);
+    job_files_result result = job_probe::run_work(job, work);
     warnings = std::move(result.warnings);
     if (cancel != nullptr && cancel->requested()) {
       throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto prima della pubblicazione");

@@ -248,6 +248,33 @@ Definito in `docs/contracts/ADR-09-algoritmi.md` §b.7. Le soglie dei singoli op
 |---|---|---|---|---|
 | T-M3-ADR09-01 | D-09.b; ADR-09.b §b.3, §b.4 (classe, derivazione e precedenza di ogni soglia sulla prima misura) | ADR-09.b, D-09.b | Gate M3 | PIANIFICATO — non eseguito |
 
+## M3 base: suite di conformità di BASE-confini
+
+Definita in `docs/contracts/BASE-confini.md` §3; eseguita una volta sul preset `dev` (`docs/evidence/M3-base-suite.md`, log `tmp/base-suite-red.log`). Ogni caso gira per ogni voce del registro dei tipi di job (`registered_job_types`). «Rosso atteso» è un test registrato in ctest che fallisce finché l'unità di codice non paga il debito del §4: non è una regressione.
+
+| ID | Obbligo | Test | Stato |
+|---|---|---|---|
+| T-M3BASE-01 | OB-01 | `Types/Conformance.T_M3BASE_01_*` | verde |
+| T-M3BASE-02 | OB-02 | `Types/Conformance.T_M3BASE_02_*` | verde |
+| T-M3BASE-03 | OB-03 | `ConformanceWorkflow.T_M3BASE_03_*` | rosso atteso, debito OB-03 |
+| T-M3BASE-04 | OB-04 | `Types/Conformance.T_M3BASE_04_*` | rosso atteso, debito OB-04 (`cache.rebuild`); verde gli altri tipi |
+| T-M3BASE-05 | OB-05 | `Types/ConformanceScheduler.T_M3BASE_05_*` | rosso atteso, debito OB-05 (calibrazione intera e a blocchi, master) |
+| T-M3BASE-06 | OB-06 | `Types/Conformance.T_M3BASE_06_*` | verde |
+| T-M3BASE-07 | OB-07 | `Types/Conformance.T_M3BASE_07_*` | rosso atteso, debito OB-07 (import, miniatura, ricostruzione anche OB-08; calibrazione intera e a blocchi); verde master |
+| T-M3BASE-08 | OB-08 | `Types/Conformance.T_M3BASE_08_*` | rosso atteso, debito OB-08 (import, miniatura, ricostruzione); verde calibrazione e master |
+| T-M3BASE-09 | OB-09 | `Types/Conformance.T_M3BASE_09_*` | rosso atteso, debito OB-09 (import, miniatura, ricostruzione); verde calibrazione e master |
+| T-M3BASE-10 | OB-10 | `Types/Conformance.T_M3BASE_10_*` | rosso atteso, debito OB-10 (tutti i tipi) |
+| T-M3BASE-11 | OB-11 | `Types/Conformance.T_M3BASE_11_*` | rosso atteso, debito OB-11 (tutti i tipi; import, miniatura, ricostruzione anche OB-08) |
+| T-M3BASE-12 | OB-12 | `Types/Conformance.T_M3BASE_12_*` e verifica (e) di ogni caso | verde |
+| T-M3BASE-13 | OB-13 | `Types/Conformance.T_M3BASE_13_*` | verde |
+| T-M3BASE-14 | OB-14 | `Types/Conformance.T_M3BASE_14_*` | verde |
+| T-M3BASE-15 | OB-15 | `Types/ConformanceCheckpoint.T_M3BASE_15_*` | verde |
+| T-M3BASE-16 | OB-16 | `ConformanceWorkflow.T_M3BASE_16_*` | verde |
+| T-M3BASE-17 | OB-17 | `Types/Conformance.T_M3BASE_17_*`, `ConformanceSource.T_M3BASE_17_*` | verde |
+| T-M3BASE-18 | OB-18 | `T-M3BASE-18.network` | verde |
+| T-M3BASE-19 | OB-19 | `Types/ConformanceCheckpoint.T_M3BASE_19_*` | verde (debito OB-19 non osservabile al confine, vedi il record) |
+| Registro | §3.1 punto 3 | `T-M3BASE.job_types_registry`, `T-M3BASE.job_types_registry_negative` | verde |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. Stati finali assegnati il 30 ottobre 2026 dall'esecuzione finale del giro 8 di `M2-gate.md` (`tools/check_m2_trace.py`, uscita 0); vanno riconfermati dalla riesecuzione sul commit del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.

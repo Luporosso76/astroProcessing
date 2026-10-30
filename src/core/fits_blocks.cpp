@@ -10,6 +10,7 @@
 #include <cstring>
 #include <optional>
 
+#include "astro/job_probe.hpp"
 #include "fits_internal.hpp"
 
 namespace astro {
@@ -258,6 +259,9 @@ void fits_block_source::verify(std::span<std::byte> work) {
                  tile_hash.update(b);
                  if (sums) data_sum.add(b);
                  if (sample_error) return;
+                 if ((&hdu == &primary && integer_primary) || (region->bytes_per_sample == 2 && &hdu != &primary)) {
+                   if (job_probe::active()) job_probe::notify("input.samples", "ino:" + std::to_string(fits_detail::identity_of(p.input).second));
+                 }
                  const std::uint64_t first = (off - hdu.data_offset) / region->bytes_per_sample;
                  const std::uint64_t count = b.size() / region->bytes_per_sample;
                  for (std::uint64_t i = 0; i < count && !sample_error; ++i) {
@@ -326,6 +330,7 @@ void fits_block_source::verify(std::span<std::byte> work) {
 
 void fits_block_source::read_tile(std::uint64_t tile, std::span<std::byte> raw, row_band& out) const {
   const impl& p = *impl_;
+  if (job_probe::active()) job_probe::notify("input.samples", "ino:" + std::to_string(fits_detail::identity_of(p.input).second));
   ASTRO_ASSERT(p.verified && tile < p.tiles);
   const auto [y0, y1] = p.rows_of(tile);
   out.row_begin = y0;

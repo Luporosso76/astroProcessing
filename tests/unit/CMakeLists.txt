@@ -38,6 +38,31 @@ foreach(t test_store test_store_history test_store_contract test_store_crash tes
   target_link_libraries(${t} PRIVATE SQLite::SQLite3)
 endforeach()
 
+# Suite di conformita' della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
+# registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finche' l'unita' di codice non li paga.
+add_executable(test_conformance test_conformance.cpp)
+target_link_libraries(test_conformance PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_conformance PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_conformance PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_conformance NO_PRETTY_VALUES PROPERTIES LABELS fast)
+
+# T-M3BASE-18: un job per ogni tipo registrato sotto strace, zero chiamate di rete.
+add_executable(conformance_network conformance_network.cpp)
+target_link_libraries(conformance_network PRIVATE astrocore)
+target_include_directories(conformance_network PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures)
+add_test(NAME T-M3BASE-18.network
+  COMMAND ${PROJECT_SOURCE_DIR}/tools/check_m2f02_network.sh $<TARGET_FILE:conformance_network>
+    ${PROJECT_SOURCE_DIR}/tmp/m3base-network-${CMAKE_BUILD_TYPE})
+set_tests_properties(T-M3BASE-18.network PROPERTIES LABELS fast TIMEOUT 300)
+
+# Completezza del registro dei tipi di job (§3.1, punto 3) e controllo negativo dello strumento.
+add_test(NAME T-M3BASE.job_types_registry COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tools/check_job_types.py ${PROJECT_SOURCE_DIR})
+add_test(NAME T-M3BASE.job_types_registry_negative
+  COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tools/check_job_types.py --self-test ${PROJECT_SOURCE_DIR}/tmp)
+set_tests_properties(T-M3BASE.job_types_registry T-M3BASE.job_types_registry_negative PROPERTIES LABELS fast TIMEOUT 60)
+
 # T-M2E-21 e T-M2E-26: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_calibration_stats test_calibration_stats.cpp)
 target_link_libraries(test_calibration_stats PRIVATE astrocore GTest::gtest_main)
@@ -140,7 +165,9 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_stats.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_real.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/m2e_workflow.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_m1d_protocol.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_m1d_protocol.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conformance_network.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.

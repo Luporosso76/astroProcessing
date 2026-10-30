@@ -91,6 +91,15 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
                           const std::optional<budget_snapshot>& budget = std::nullopt,
                           const cancel_token* cancel = nullptr);
 
+// Solo test (suite di conformita', docs/contracts/BASE-confini.md §3.2): involucro del `work` che run_job_files invoca.
+// Si imposta prima del job e non cambia durante l'esecuzione. Vuoto: run_job_files invoca `work` direttamente.
+namespace job_probe {
+using work_fn = std::function<job_files_result(const job_record&)>;
+using work_wrapper = std::function<job_files_result(const job_record&, const work_fn&)>;
+void set_work_wrapper(work_wrapper w);
+job_files_result run_work(const job_record& job, const work_fn& work);
+}  // namespace job_probe
+
 // Preparazione di un job durevole sullo slot prima di run_job_files (controllo dell'ambiente FP, serializzazione delle
 // risorse nel budget): un'eccezione di `prepare` e' un arresto prima del lavoro, registrato e propagato come sopra.
 void prepare_job_start(sqlite_dag_store& store, const std::string& slot_name, const std::function<void()>& prepare);

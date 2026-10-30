@@ -5,6 +5,7 @@
 #include <cstring>
 #include <limits>
 
+#include "astro/job_probe.hpp"
 #include "fits_internal.hpp"
 
 namespace astro {
@@ -188,6 +189,7 @@ fits_preview make_preview(const fits_input& input, const preview_request& reques
       const std::uint64_t rows = std::min<std::uint64_t>(request.block_height, height - y0);
       const std::uint64_t offset = data_offset + ((std::uint64_t{plane} * height + y0) * width) * elem;
       read_exact(input, offset, band.data(), static_cast<std::size_t>(rows * width * elem));
+      if (job_probe::active()) job_probe::notify("input.samples", "ino:" + std::to_string(fits_detail::identity_of(input).second));
       std::fill(sums, sums + blocks_x, 0.0);
       std::fill(counts, counts + blocks_x, 0u);
       for (std::uint64_t r = 0; r < rows; ++r) {

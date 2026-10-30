@@ -14,6 +14,7 @@
 
 #include "astro/cpu_dispatch.hpp"
 #include "astro/hash.hpp"
+#include "astro/job_probe.hpp"
 #include "sqlite_internal.hpp"
 
 namespace astro {
@@ -237,7 +238,10 @@ void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job
       std::string digest;
       {
         const active_scope active(st);
+        const std::string task = std::to_string(index);
+        job_probe::notify("sched.task", task);
         digest = spec.run_task(tc);
+        job_probe::notify("sched.task_done", task);
       }
       if (plan.checkpoint_every > 0 && !is_sha256_hex(digest)) {
         invalid("sched.task_digest", "il digest del risultato parziale non e' SHA-256 esadecimale",
@@ -348,6 +352,13 @@ void produce(run_state& st, const std::vector<std::uint64_t>& pending, std::size
 
 job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const cancel_token& cancel) {
   ASTRO_ASSERT(static_cast<bool>(spec.run_task));
+  job_probe::notify("sched.plan", "shared_bytes=" + std::to_string(plan.shared_bytes) +
+                                      ";per_task_bytes=" + std::to_string(plan.per_task_bytes) +
+                                      ";worker_count=" + std::to_string(plan.worker_count) +
+                                      ";queue_capacity=" + std::to_string(plan.queue_capacity) +
+                                      ";tile_rows=" + std::to_string(plan.tile_rows) +
+                                      ";spill=" + (plan.spill ? "1" : "0") +
+                                      ";checkpoint_every=" + std::to_string(plan.checkpoint_every));
   const std::size_t cpus = cpu_count(affinity_);
   validate_plan(plan, spec, cpus);
   if (tuning_.max_queued_jobs < 1) invalid("sched.queue_capacity", "max_queued_jobs deve essere almeno 1");
@@ -421,6 +432,7 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
 
   const bool pin = !tuning_.cpu_set.empty();
   job_context jc{plan, shared, spill ? &*spill : nullptr, cancel, st.stopping};
+  job_probe::notify("sched.prepare");
   if (spec.prepare) spec.prepare(jc);
   if (resume) verify_resume_digests(*resume, spec);
   {
@@ -443,6 +455,7 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
     throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto prima della pubblicazione");
   }
   ASTRO_ASSERT(st.report.tasks_run == pending.size());
+  job_probe::notify("sched.finalize");
   if (spec.finalize) spec.finalize(jc);
   if (cancel.requested()) {
     throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto durante finalize");

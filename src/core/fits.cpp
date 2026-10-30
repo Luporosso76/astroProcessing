@@ -15,6 +15,8 @@
 
 #include <fitsio.h>
 
+#include "astro/hash.hpp"
+#include "astro/job_probe.hpp"
 #include "fits_internal.hpp"
 
 namespace astro {
@@ -459,6 +461,7 @@ namespace {
 
 void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::uint64_t expected_size,
                  const fault_injector& fault, const fits_input::pread_observer& observer) {
+  job_probe::notify("input.read");
   if (observer) {
     const int injected = observer(offset, n);
     if (injected != 0) {
@@ -541,6 +544,7 @@ std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input) {
 }  // namespace fits_detail
 
 fits_input open_fits_input(const std::string& path) {
+  job_probe::notify("input.open", path);
   int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
   if (fd < 0) {
     const int e = errno;
@@ -617,6 +621,7 @@ std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t
 // ---------------------------------------------------------------- decode
 
 image decode_fits(std::span<const std::uint8_t> bytes, std::uint64_t budget_bytes, const fits_read_options& options) {
+  if (job_probe::active()) job_probe::notify("input.samples", "sha256:" + sha256_hex(bytes));
   const scan_result scan = analyse(bytes.size(), memory_reader(bytes));
   if (scan.plan.peak_bytes > budget_bytes) {
     fail(error_category::budget, "sched.job_exceeds_budget", "picco di memoria oltre il budget",
@@ -767,6 +772,7 @@ std::uint64_t fits_row_scratch_bytes(const fits_row_layout& layout, std::uint32_
 
 void read_fits_rows(const fits_input& input, const fits_row_layout& layout, std::uint32_t y0, std::uint32_t rows,
                     std::byte* scratch, double* values, std::uint16_t* bits) {
+  if (job_probe::active()) job_probe::notify("input.samples", "ino:" + std::to_string(fits_detail::identity_of(input).second));
   ASTRO_ASSERT(y0 <= layout.height && rows <= layout.height - y0);
   const std::size_t count = static_cast<std::size_t>(layout.width) * rows;
   const std::size_t elem = static_cast<std::size_t>(std::abs(layout.bitpix) / 8);

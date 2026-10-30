@@ -8,6 +8,7 @@
 #include <type_traits>
 
 #include "astro/error.hpp"
+#include "astro/job_probe.hpp"
 
 namespace astro {
 
@@ -114,6 +115,7 @@ node_spec::node_spec(std::string operator_id, std::uint32_t algorithm_version,
       precision_(precision),
       backend_(std::move(backend)),
       seed_(seed) {
+  job_probe::notify("node.build", operator_id_);
   if (operator_id_.empty()) bad_spec("operator_id vuoto");
   if (backend_.empty()) bad_spec("backend vuoto");
   if (algorithm_version_ == 0 || serialization_version_ == 0) bad_spec("versione 0 non ammessa");

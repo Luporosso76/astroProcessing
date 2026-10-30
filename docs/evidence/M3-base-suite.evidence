@@ -1,0 +1,19 @@
+# Sorgente del blocco generato di M3-base-suite.md (tools/evidence.py)
+file docs/contracts/BASE-confini.md
+file src/core/include/astro/job_types.hpp
+file src/core/job_types.cpp
+file src/core/include/astro/job_probe.hpp
+file src/core/job_probe.cpp
+file src/core/include/astro/job.hpp
+file src/core/job.cpp
+file src/core/node.cpp
+file src/core/fits.cpp
+file src/core/scheduler.cpp
+file src/core/CMakeLists.txt
+file tests/fixtures/conformance_inputs.hpp
+file tests/unit/test_conformance.cpp
+file tests/unit/conformance_network.cpp
+file tests/unit/CMakeLists.txt
+file tools/check_job_types.py
+file src/core/fits_blocks.cpp
+file src/core/inventory.cpp
