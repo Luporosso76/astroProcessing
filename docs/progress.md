@@ -40,5 +40,5 @@ Ritmo misurato di M2 (solo informazione): avviata il 28 ottobre 2026; M2.g, M2.f
 - M2.c: durabilità contro perdita di corrente non provata (fuori dal modello di minaccia); processo malevolo con lo stesso UID fuori dal modello; `readdir` in `read_directory` coperto da `Export.T_M2A_readdir_failure_while_verifying_stops_as_io_and_names_errno`.
 - Vincolo: prima di qualsiasi lavoro sulla GUI ci si ferma col proprietario (`AGENTS.md`).
 - Dato CFA reale per M3.d: PUB-CFA-01, sub Seestar di Zenodo 17843622 (CC BY 4.0), acquisito nei residui M2.
-- Cataloghi: Gaia DR3 per astrometria e colore (decisione del proprietario, 30 ottobre 2026; CC BY-NC 3.0 IGO, distribuzione non commerciale, release commerciale solo con autorizzazione scritta ESA). Estratto non ancora acquisito: si adotta in M3.p.
+- Cataloghi: Gaia DR3 per astrometria e colore (scelta del coordinatore secondo la regola «Componenti», 30 ottobre 2026; CC BY-NC 3.0 IGO, distribuzione non commerciale, release commerciale solo con autorizzazione scritta ESA). Estratto non ancora acquisito: si adotta in M3.p.
 - M10 non autorizzato.

@@ -55,7 +55,7 @@
 
 | Catalogo | Licenza e URL | Bande e contenuto | Sottoinsieme ridistribuibile | Esito |
 |---|---|---|---|---|
-| Gaia DR3 (incluso GSPC) | "Gaia data are distributed under the CC BY-NC 3.0 IGO license": https://www.cosmos.esa.int/web/gaia-users/license; l'uso commerciale richiede autorizzazione a data.licences@esa.int: https://www.cosmos.esa.int/web/esdc/terms-and-conditions | G, BP, RP; GSPC con sintetiche B, V e g, r, i | Solo non commerciale | Adottato (proprietario, 30 ottobre 2026): il pack è un componente dati separato dal codice GPL, con la propria licenza CC BY-NC 3.0 IGO e l'attribuzione; distribuzione non commerciale, release commerciale solo con autorizzazione scritta ESA |
+| Gaia DR3 (incluso GSPC) | "Gaia data are distributed under the CC BY-NC 3.0 IGO license": https://www.cosmos.esa.int/web/gaia-users/license; l'uso commerciale richiede autorizzazione a data.licences@esa.int: https://www.cosmos.esa.int/web/esdc/terms-and-conditions | G, BP, RP; GSPC con sintetiche B, V e g, r, i | Solo non commerciale | Adottato (coordinatore, regola «Componenti», 30 ottobre 2026): il pack è un componente dati separato dal codice GPL, con la propria licenza CC BY-NC 3.0 IGO e l'attribuzione; distribuzione non commerciale, release commerciale solo con autorizzazione scritta ESA |
 | Hipparcos, Tycho-2 | Nessuna licenza sulla pagina ESA (https://www.cosmos.esa.int/web/hipparcos/tycho-2); valgono i termini dell'archivio ESA: CC BY-NC 3.0 IGO | Tycho-2: 2,5 M stelle, BT e VT | Solo non commerciale | Non adottabili |
 | APASS DR10 | AAVSO Data Usage Guidelines del 16 luglio 2026 (https://aavso.org/wp-content/uploads/2026/07/Data-Usage-Guidelines-2026-07.pdf): solo riconoscimento e citazione | B, V, g', r', i' | Nessuna concessione | Non adottabile |
 | ATLAS-REFCAT2 | "These HLSP data products are licensed for use under CC BY 4.0": https://archive.stsci.edu/hlsp/atlas-refcat2 | Circa 1 G stelle fino a m≈19, g, r, i, z (più J, H, K), tutto il cielo; circa 47 GB `.tbz` | Dichiarato dall'autore, ma eredita astrometria Gaia DR2 e stelle brillanti da Tycho-2, APASS DR9 e Yale BSC | Il migliore tecnicamente, non adottabile oggi |
@@ -84,7 +84,7 @@ Stima progettuale del pack, non misurata, con circa 28–32 byte per stella più
 2. PUB-DEEP-01: drz/drc HST ACS di un campo nebulare, ritagliato con un cutout. Lo stack Seestar è più vicino al dominio d'uso, ma richiede di scorrere un tgz da 35 GB.
 3. CFA M3.d: sub Seestar di Zenodo 17843622, CC BY 4.0; unico candidato.
 4. RAW M3.a: raw.pixls.us con il filtro `License == CC0` file per file e il SHA-256 pubblicato.
-5. Pack di catalogo: Gaia DR3 per astrometria e colore (decisione del proprietario, tabella sotto); SDSS e 2MASS restano come riferimenti indipendenti di confronto.
+5. Pack di catalogo: Gaia DR3 per astrometria e colore (regola «Componenti», tabella sotto); SDSS e 2MASS restano come riferimenti indipendenti di confronto.
 6. M3.q: frame SDSS g, r, i con il catalogo SDSS. M3.r: corpus su campi e frame disgiunti dalle fixture di sviluppo.
 
 ## Decisioni del coordinatore
@@ -95,7 +95,7 @@ Stima progettuale del pack, non misurata, con circa 28–32 byte per stella più
 | RAW M3.a | raw.pixls.us, solo file CC0; esclusi i file CC BY-NC-SA 4.0 |
 | CFA M3.d | Zenodo 17843622, sub Seestar (PUB-CFA-01). Acquisizione nei residui M2 (R1, T-M2R1-09); in M3.d solo l'uso per il debayer |
 | PUB-DEEP-01 | Cutout HST ACS drz/drc di un campo nebulare, da scegliere in M3.i |
-| Cataloghi di colore e astrometria (M3.p, M3.q) | Decisione del proprietario (30 ottobre 2026): il prodotto usa le fonti migliori con licenza certa, non quelle incerte. Gaia DR3 (astrometria e fotometria, comprese le sintetiche GSPC dagli spettri XP) sotto CC BY-NC 3.0 IGO, con l'attribuzione richiesta da ESA; il pack di catalogo è un componente dati separato dal codice GPL e porta la propria licenza. La distribuzione M0–M9 è non commerciale; una release commerciale (M10, già bloccata) richiede prima l'autorizzazione scritta di ESA (data.licences@esa.int). Scartato ATLAS-REFCAT2: licenza CC BY dichiarata ma componenti ereditati incerti. Il coordinatore acquisisce l'estratto (nessun download al proprietario), con record `docs/datasets/PUB-*.md` |
+| Cataloghi di colore e astrometria (M3.p, M3.q) | Scelta del coordinatore secondo la regola «Componenti» di AGENTS.md (30 ottobre 2026): il prodotto usa le fonti migliori con licenza certa, non quelle incerte. Gaia DR3 (astrometria e fotometria, comprese le sintetiche GSPC dagli spettri XP) sotto CC BY-NC 3.0 IGO, con l'attribuzione richiesta da ESA; il pack di catalogo è un componente dati separato dal codice GPL e porta la propria licenza. La distribuzione M0–M9 è non commerciale; una release commerciale (M10, già bloccata) richiede prima l'autorizzazione scritta di ESA (data.licences@esa.int). Scartato ATLAS-REFCAT2: licenza CC BY dichiarata ma componenti ereditati incerti. Il coordinatore acquisisce l'estratto (nessun download al proprietario), con record `docs/datasets/PUB-*.md` |
 | Solver M3.p | Gaia DR3 per l'astrometria (vedi riga dei cataloghi); 2MASS PSC solo come confronto |
 | Colore nel footprint SDSS | Catalogo SDSS (pubblico dominio) |
 | Corpus M3.r | Campi disgiunti dalle fixture di sviluppo |
