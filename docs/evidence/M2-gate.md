@@ -2,13 +2,13 @@
 
 Stato: **RIAPERTO**, 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è revocato: manca F-IO-10 (import prestacked e calibrato tipizzato), che il registro dell'appendice D impone a M2.c (`M2.c requires_all F-IO-10`, piano attivo riga 4415; foglia a riga 1821). Lo ha rilevato la review del piano M3 (`.omc/artifacts/ask/codex-m3plan-review1-20261029-1424.md`); i sette giri del gate non l'avevano visto. Storico del gate: Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
 
-Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Il gate passa solo dopo la riesecuzione identica sul commit `<COMMIT-GATE>` e la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7.
+Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Riesecuzione identica sul commit del gate `cb35d89` con uscita 0 (sezione «Riesecuzione sul commit del gate»); il gate passa con la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7.
 
 ## Giro 8: esecuzione finale del gate rifatto (R6)
 
 - Unità: M2, R6 (`plans/M2-residui.md`, sezione 6, clausole 1-3).
 - Scopo: un'unica esecuzione completa dev e release, slow compresi, e stato finale della tracciabilità dei 63 ID a stadio `M2.*` e `M2.entry`.
-- Commit: `<COMMIT-GATE>` (da registrare dopo il commit e la riesecuzione). Base del working tree: `60a6cc8`; modifiche del giro solo a documenti, `tests/trace/M2.tsv` e `CMakePresets.json` (preset `dev-full`), nessun codice di prodotto né test.
+- Commit del gate: `cb35d8988601d81a61f36820830d4e4782a4e265` (`cb35d89`). Prova preliminare sul working tree sopra `60a6cc8`; modifiche del giro solo a documenti, `tests/trace/M2.tsv` e `CMakePresets.json` (preset `dev-full`), nessun codice di prodotto né test.
 - Versioni: piano attivo SHA-256 `95abbb1a…4094`; GCC 15.2.0, CMake e CTest 4.2.3, Ninja 1.13.2, ccache 4.12.3, Python 3.14.4; CFITSIO 4.6.3, SQLite 3.46.1, OpenSSL 3.5.5, FFTW 3.3.10.
 - Ambiente: Linux 7.0.0-38-generic x86_64, AMD Ryzen 7 6800H, 16 CPU, 30 GiB RAM; 4 job per build e test (sotto il tetto del 70%); `ulimit -c 0`; temporanei in `tmp/` e `build/<preset>/test_tmp/sys`; `data` collegamento simbolico non versionato ai dati pubblici del progetto.
 
@@ -28,7 +28,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `afe57cdb79486768ac3bcde70c4de8e8d34abcd1f3a171d62c1781fb076dca3b` |
+| `docs/test-matrix.md` | `ba3087d3207d2b203257cfa4023c158778f9e81f0ea5b592d8eb0fab1de1b155` |
 | `tests/trace/M2.tsv` | `263f2bf1ad3ed72cd6d2cc243caef8e40ee3d7d5198a4bf1ab712fb84701ad07` |
 | `tools/check_m2_trace.py` | `e4d581a595eaec6b322f2f5294aa48fed59603c424c44bae14c0cd6bbb207682` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
@@ -68,10 +68,21 @@ Il test presente solo in dev è `BuildInfo.SanitizersAreActiveInDevBuild`. I set
 
 Nessuna parte della clausola resta senza test.
 
+### Riesecuzione sul commit del gate
+
+Coordinatore, 30 ottobre 2026, sul commit `cb35d89` (`git status` pulito, salvo `data`), 6 job per build e test (nessun altro carico, sotto il tetto del 70%), `ulimit -c 0`:
+
+1. `rm -rf build/dev build/release`; `tools/check.sh` (log `tmp/gate-cb-check.log`): uscita 0, `lint: ok`, dev fast 494/494.
+2. `ctest --preset dev-full -j6 --output-junit tmp/dev-junit.xml` (log `tmp/gate-cb-dev.log`): 501/501, 1685,4 s.
+3. `cmake --preset release`, `cmake --build --preset release -j6`, `ctest --preset release -j6 --output-junit tmp/release-junit.xml` (log `tmp/gate-cb-rel.log`): 500/500, 131,2 s.
+4. `python3 -S tools/check_m2_trace.py --run build/dev:tmp/dev-junit.xml --run build/release:tmp/release-junit.xml` (`tmp/gate-cb-trace.txt`): **uscita 0**, `check_m2_trace: 63 ID nello stadio M2, 0 con problemi, 0 problemi di esecuzione`.
+
+Il blocco generato sopra riporta i conteggi e gli hash di questa esecuzione.
+
 ### Esito e limiti
 
-- Esito: PARZIALE fino alla riesecuzione sul commit `<COMMIT-GATE>` e alla review (clausola 4); sul working tree le clausole 1-3 sono soddisfatte.
-- L'esecuzione è sul working tree, non su un commit: i binari portano la revisione sporca in `source_revision.cpp`.
+- Esito: clausole 1-3 soddisfatte sul commit `cb35d89`; clausola 4 (review indipendente del record) nella sezione «Review del giro 8».
+- La prova preliminare era sul working tree (revisione sporca in `source_revision.cpp`); la riesecuzione sul commit `cb35d89` ha working tree pulito, salvo il collegamento simbolico `data` non versionato.
 - Release e dev non sono simultanee: release prima di `tools/check.sh`, dev dopo, ciascuna sui binari della propria build.
 - Limiti degli ID, nella colonna di stato della matrice: F-IO-01 (RGB e multi-plane solo sintetici), F-IO-05 (HDU compressi rifiutati), F-RES-07.a (ENOSPC sulla cache delle miniature non provato), NFR-SEC-03 (inode degli originali non confrontati nella cache), NFR-PERF-01 e F-RES-01 (soglie misurate su un solo PC), F-PRJ-06 (T-PRJ-01 completo in M3.s).
 - Autore e data: agente general-purpose su Claude Opus 5.5, 30 ottobre 2026. Review indipendente: da fare.
