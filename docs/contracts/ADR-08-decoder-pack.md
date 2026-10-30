@@ -208,6 +208,17 @@ Limiti dichiarati della scelta, da trattare nei contratti C-18 e C-16: 2MASS è 
 
 G-PACK in M3.a si costruisce e si prova solo con pack sintetici generati dal test (seed fisso, componente `synthetic`, licenza `CC0-1.0`). Gli estratti 2MASS e SDSS si costruiscono e si adottano in M3.p e M3.q, dopo il loro audit.
 
+### 3.6 Scelte fissate dai test di U10 (coordinatore, 30 ottobre 2026)
+
+I test di U10 (`tests/unit/test_pack.cpp`, review Codex PASS al giro 2) fissano punti che §3.1–§3.4 lasciavano aperti. Il coordinatore li adotta come parte del contratto:
+
+- Chiavi JSON dei sotto-oggetti del manifest: `size_bytes`, `sha256`, `index`, `meaning`, `order`, `cells`, `name`/`system`, `builder{name, version, inputs_sha256}`.
+- `license_evidence` è un percorso relativo alla radice delle evidenze, sotto `docs/datasets/`, senza `..`; la licenza del record si legge dalla riga «Licenza SPDX: \`<id>\`». Licenza del record diversa da quella del manifest: `pack.license_evidence`.
+- `CC-BY-4.0` senza attribuzione: `pack.license_not_allowed`; `license_file` assente o fuori da `licenses/`: `pack.license_file`.
+- Percorso assoluto o con `..` in `files[]`: `pack.manifest_invalid`.
+- Dimensione diversa: `pack.size_mismatch`, controllata prima dell'hash; file elencato sostituito da una directory: `pack.file_missing`; percorso della ricetta che è un file, o `manifest.json` che è una directory: `pack.missing`.
+- Aperti, da chiudere in U11 con un caso di test: codice per una directory relativa nella ricetta (§3.2 la vieta, §3.4 non assegna un codice); significato di `flag_bits: []`.
+
 ## 4. Regola di licenza all'ingresso M3 (NFR-LIC-01.d)
 
 Prima dell'adozione di una libreria nuova (prima build di un binario che la collega) o di un pack:
