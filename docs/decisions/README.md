@@ -14,7 +14,7 @@ Le decisioni D-19, D-20 e D-21 non aggiungono ADR. Si riflettono in ADR-09 (deco
 |---|---|---|---|
 | ADR-01 | Linguaggio e componenti del core | M1 | **Deciso**: C++20, un solo linguaggio ([ADR-M1-stack](ADR-M1-stack.md)); APPROVATO (in review), [M2-entry](M2-entry.md) |
 | ADR-02 | GUI e comunicazione con il core | M1, conferma M4.a | **Provvisorio**: Qt 6 Widgets, confronto con QML al gate M4.a ([ADR-M1-stack](ADR-M1-stack.md)); core headless APPROVATO (in review), [M2-entry](M2-entry.md) |
-| ADR-03 | Modello pixel, precisione e maschere | M2 ingresso; estensioni M3 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); proposto per le estensioni: immagine tipizzata, f32 candidato, maschera distinta da invalidità e alpha |
+| ADR-03 | Modello pixel, precisione e maschere | M2 ingresso; estensioni M3 | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); `.b` (tipi estesi): contratto [ADR-03-pixel-maschere](../contracts/ADR-03-pixel-maschere.md) §«Estensione ADR-03.b», review in `docs/evidence/M3-entry-ADR03b.md`; tile, piramide, alpha e capability fuori da `.b` |
 | ADR-04 | Persistenza del progetto | M2 ingresso, verifica M2.c | **Deciso**: SQLite autorità, JSON per manifest; migrazione e recovery al gate M2.c; `.a` APPROVATO (in review), [M2-entry](M2-entry.md) |
 | ADR-05 | DAG, cache e invalidazione | M2 ingresso | `.a` APPROVATO (in review), [M2-entry](M2-entry.md); proposto per le estensioni: DAG immutabile, hash di contenuto, token di generazione |
 | ADR-06 | RAM, scheduler e spill | M2 ingresso, verifica M2.d | **Vincoli fissati**: prenotazioni, spill dichiarato nel preflight, stop senza riduzione; protocollo completo al gate M2.d; `.a` APPROVATO (in review), [M2-entry](M2-entry.md) |

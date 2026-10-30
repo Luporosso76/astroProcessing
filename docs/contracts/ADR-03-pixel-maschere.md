@@ -229,3 +229,198 @@ Errori aggiuntivi:
 ## Fuori da M2
 
 Tile e piramide; alpha; coverage e capability; maschere di editing usate dagli operatori; XISF e RAW (ADR-08.b, M3.a); unità `electron` prodotte da conversione di gain.
+
+## Estensione ADR-03.b: tipi estesi (M3)
+
+Stadio: ADR-03.b, tipi estesi (registro riga 3389; aggregato ADR-03 riga 3387, testo riga 2564). Archi: ADR-03.b `requires_all` ADR-03.a (riga 4081); F-IO-02 e C-11 `decided_by` ADR-03.b (righe 3686, 4126). Piano: §7.14 (asset di maschera), §8.4 (CFA e debayer), §8.6.2 (coverage, maschere, alpha), §9.6 (stato lasciato dal decoder), §9.8 (propagazione), §10.4 C-03 campi 1, 6 e 7, §10.12 C-11 campi 2, 3, 6, 7 e 10. Dipendenze fra contratti: [ADR-08.b](ADR-08-decoder-pack.md) §2.3, §2.4 e §2.6 (origine `decoder`), [ADR-17.a](ADR-17-varianza.md) (modello diagonale). Unità che lo implementano: M3.a (origine `decoder`, stato del decoder), M3.d (RGB da debayer), M3.g (coverage), M3.j (maschere fotografiche). Il tipo per gli input prestacked è già in «Aggiunte di R1» (`process_phase::prestacked`) e non cambia.
+
+Ogni clausola è una **regola** (vincolo del prodotto, verificato dal test indicato), un **fatto** (con la fonte) o un'**ipotesi** (dichiarata, con il test o l'unità che la prova). Le parti di ADR-03.a sopra restano valide; i punti che cambiano sono elencati in §b.8.
+
+Fuori da ADR-03.b: tile e piramide; alpha (§b.7); capability di misura (§9.8); modelli di covarianza fra campioni e fra canali (ADR-17.b); scelta del metodo di debayer e sua validazione (C-03, M3.d); generazione, edit e persistenza delle maschere (C-11, ADR-04.b, M3.j); uso del nero nella calibrazione e ledger dell'offset (C-01.b, ADR-16.b).
+
+### b.1 Origine `decoder` dei metadati
+
+`metadata_origin` ∈ {`header`, `declared`, `decoder`}. `decoder`: valore letto dal decoder RAW di ADR-08.b; `metadata_source.keyword` contiene il nome del campo di LibRaw da cui viene (per esempio `other.shutter`, `color.maximum`). Regole, verificate da T-M3A-TYP-01:
+
+- L'origine `decoder` vale per ogni campo che porta un'origine: i campi di `frame_metadata`, `image.phase`, `image.lin_origin`, `decoder_state` (§b.2).
+- Un valore `declared` diverso da un valore `decoder` già presente: `incompatible`, `metadata.declared_conflict`, come per `header`; uguale: nessun effetto.
+- L'origine resta provenienza: l'uguaglianza e `equivalent_content` non la confrontano. Lo scrittore FITS scrive il valore nella sua keyword; la rilettura lo restituisce con origine `header`, mentre l'origine `decoder` resta nella provenance (ADR-05) e nel record del decoder (ADR-08.b §2.9).
+- Il lettore FITS non produce mai l'origine `decoder`.
+
+Campo nuovo in `frame_metadata`, richiesto da ADR-08.b §2.6 («ora di acquisizione»): `capture_time_libraw` (`metadata_value<std::int64_t>`), il valore di `other.timestamp` di LibRaw (fatto: tipo `time_t`, `/usr/include/libraw/libraw_types.h` riga 854). LibRaw non dichiara il fuso orario: il campo non è un istante UTC e non si scrive in `DATE-OBS`. Keyword `ASTRTSTP` (intera), interpretata. `camera` da decoder = `idata.make`, uno spazio, `idata.model`.
+
+### b.2 Stato lasciato dal decoder
+
+`image.decoder_state` (`std::optional<decoder_state>`), presente solo nelle immagini prodotte dal decoder RAW. Porta, con origine `decoder`, i dati di §9.6 che servono a chi consuma l'immagine (C-01.b, G-OFFSET); il record completo resta quello di ADR-08.b §2.9.
+
+| Campo | Tipo | Contenuto |
+|---|---|---|
+| `raw_width`, `raw_height` | `uint32_t` | Dimensioni del buffer grezzo di LibRaw |
+| `window` | `x0`, `y0`, `width`, `height` (`uint32_t`) | Area visibile importata nel buffer grezzo (ADR-08.b §2.3) |
+| `black` | `uint32_t` | `color.black` |
+| `cfa_color_index` | `std::array<uint8_t, 4>` | Indice di colore di LibRaw `FC(r, c)` dei quattro siti della cella 2×2 all'origine dell'area visibile, in ordine `(0, 0)`, `(0, 1)`, `(1, 0)`, `(1, 1)` (riga, colonna; ADR-08.b §2.3) |
+| `black_per_color` | `std::array<uint32_t, 4>` | `color.cblack[0..3]`, per indice di colore di LibRaw |
+| `black_pattern_rows`, `black_pattern_cols` | `uint32_t` | `color.cblack[4]`, `color.cblack[5]` |
+| `black_pattern` | `std::vector<uint32_t>` | `color.cblack[6…]`, `rows · cols` valori |
+| `white` | `uint32_t` | `color.maximum` |
+| `data_maximum` | `std::optional<uint32_t>` | `color.data_maximum`, se non nullo |
+| `linear_max` | `std::optional<std::array<int64_t, 4>>` | `color.linear_max[0..3]` (`long` in LibRaw), se almeno uno è non nullo |
+| `linearization` | `identity`, `decoder_curve` | ADR-08.b §2.4 |
+| `curve_sha256` | `std::optional<std::array<uint8_t, 32>>` | Presente se e solo se `linearization = decoder_curve` |
+| `source` | `metadata_source` | Origine `decoder` |
+
+Fatti: tipi dei campi in `/usr/include/libraw/libraw_types.h` righe 751-754 e 770. `cfa_color_index` serve perché il pattern di `cfa_layout` non distingue i verdi con indice 1 da quelli con indice 3, e `black_per_color` è per indice. Il nero del singolo campione si ricava da questi campi con la formula dell'ipotesi H3 di ADR-08.b §2.4; il tipo conserva la rappresentazione di LibRaw e non la valuta. `saturation_adu` di `frame_metadata` vale `white` con origine `decoder` (ADR-08.b §2.6).
+
+Invarianti (`validate_image`, violazione `invalid_input`, `image.decoder_state`; T-M3A-TYP-02):
+
+- `layout = cfa`, `phase` presente e uguale a `raw`, `source.origin = decoder`;
+- `window.width = geometry.width`, `window.height = geometry.height`, `x0 + width ≤ raw_width`, `y0 + height ≤ raw_height`, calcolati senza overflow;
+- `black_pattern.size() = black_pattern_rows · black_pattern_cols ≤ 4098` (fatto: `LIBRAW_CBLACK_SIZE = 4104`, `/usr/include/libraw/libraw_const.h` riga 72, meno i sei elementi iniziali); una sola delle due dimensioni nulla è una violazione;
+- `curve_sha256` presente se e solo se `linearization = decoder_curve`;
+- `cfa_color_index` coerente con `cfa`: indice 0 sul sito rosso, 2 sul sito blu, 1 o 3 sui due siti verdi (le combinazioni ammesse da ADR-08.b §2.3).
+
+Un'operazione che produce un'immagine con `phase` diversa da `raw` non copia `decoder_state`: lo consuma e lo registra nella provenance (C-01.b). Persistenza: lo scrittore FITS non rappresenta `decoder_state`; un'immagine che lo porta non si scrive: `unsupported`, `fits.decoder_state`, nessun buffer (T-M3A-TYP-02). L'immagine si ricostruisce decodificando di nuovo l'originale immutabile (ADR-04, ADR-05). Limite dichiarato: un master costruito da RAW ha bisogno dello stato del decoder dei suoi frame, e dove lo porta (descrittore derivato dal nodo, ADR-16.b) non si decide qui.
+
+### b.3 RGB da debayer
+
+Il debayer produce un'immagine con `layout = rgb`, `planes = 3`, `cfa` assente, stessa geometria e stessa unità dell'ingresso CFA. Ordine dei piani: 0 = R, 1 = G, 2 = B, regola del prodotto per ogni immagine `rgb`; un file RGB esterno con un ordine diverso non è riconoscibile dall'header (limite dichiarato). I due verdi della CFA (G1, G2, canali distinti in ADR-03.a) finiscono nel piano G; quale sito CFA ha generato un campione resta ricavabile da `demosaic.source_cfa`.
+
+`image.demosaic` (`std::optional<demosaic_info>`):
+
+| Campo | Tipo | Contenuto |
+|---|---|---|
+| `source_cfa` | `cfa_layout` | Pattern e offset della CFA di ingresso |
+| `method`, `method_version` | `std::string` non vuota, `uint32_t` | Algoritmo e versione (scelta in C-03) |
+| `measured_preserved` | `bool` | Il metodo lascia invariato, bit per bit, il campione CFA nel piano del suo canale |
+| `variance_propagation` | `linear_weights`, `fixed_weight_approximation` | Come è stata ottenuta la varianza dei campioni stimati (sotto) |
+
+Classe di un campione, funzione `sample_kind(x, y, plane)` ricavata dai campi, senza un piano aggiuntivo: `measured` se `measured_preserved` è vero e `plane` è il piano del canale che `source_cfa` assegna al pixel `(x, y)` con la regola di ADR-03.a (`pattern` traslato di `(x + x_offset, y + y_offset)`); altrimenti `interpolated`. Con `measured_preserved` falso ogni campione è `interpolated`. T-M3A-TYP-04.
+
+Invarianti (`validate_image`, `invalid_input`, `image.demosaic`; T-M3A-TYP-04): `demosaic` presente implica `layout = rgb`, `planes = 3`, `cfa` assente, `method` non vuoto, offset di `source_cfa` in {0, 1}.
+
+Validità di `demosaic` dopo altre operazioni: un'operazione per pixel e per piano (stesso pixel e stesso piano in ingresso e in uscita, per esempio scala o sottrazione per canale) lo copia; un'operazione il cui campione di uscita dipende da più posizioni, da più piani o da una geometria diversa (resampling, convoluzione, combinazione di canali) produce `demosaic` assente, e l'incertezza dei suoi campioni vive solo nel piano di varianza. La regola si verifica nei test dell'operatore, nella sua unità (C-06 in M3.g, C-09 in M3.k).
+
+FITS (T-M3A-TYP-05): keyword interpretate, scritte quando `demosaic` è presente e lette solo come insieme completo: `ASTRDPAT` (stringa, pattern con i valori di `BAYERPAT`), `ASTRDXOF`, `ASTRDYOF` (interi 0 o 1), `ASTRDMTH` (stringa), `ASTRDVER` (intero ≥ 0), `ASTRDKEP` (logico, `measured_preserved`), `ASTRDVAR` (stringa, `variance_propagation`). Insieme incompleto: `invalid_input`, `fits.demosaic_incomplete`; presenti con `layout` diverso da `rgb`: `invalid_input`, `fits.demosaic_layout`; valore non riconosciuto: `unsupported`, `fits.demosaic_value`. `BAYERPAT` su un'immagine con `planes > 1` resta `fits.cfa_planes` di ADR-03.a: la CFA d'origine di un RGB non usa mai `BAYERPAT`.
+
+#### Varianza dei campioni
+
+Il piano di varianza di ADR-03.a e ADR-17.a è già per pixel e per piano (`variance_plane`, stessa geometria e `sample_type`), quindi un RGB porta una varianza per canale. Le regole seguenti dicono che cosa contiene; il valore numerico lo calcola il metodo di C-03.
+
+- Campione `measured`: varianza uguale a quella del campione CFA calibrato da cui è copiato.
+- Campione `interpolated` di un metodo lineare a pesi fissi (`variance_propagation = linear_weights`): se `ŷ = Σ_i w_i x_i` con pesi `w_i` che dipendono solo dalla posizione e dal pattern, `Var(ŷ) = Σ_i Σ_j w_i w_j Cov(x_i, x_j)`. È l'identità della varianza di una combinazione lineare; riferimento pubblico, non riletto in questa unità: legge di propagazione dell'incertezza della GUM, JCGM 100:2008, §5.1.2 eq. (10) senza correlazioni e §5.2.2 eq. (13) con correlazioni. Con l'ingresso nel modello `diagonal_independent` di ADR-17.a si riduce a `Σ_i w_i² Var(x_i)`, esatta rispetto a quel modello, anche con pesi negativi (filtri lineari come quelli di Malvar, He e Cutler, ICASSP 2004, riferimento di C-03 non letto in questa unità). Calcolo in f64, un solo arrotondamento al tipo di uscita, come ADR-17.a.
+- Campione `interpolated` di un metodo con pesi che dipendono dai dati (edge-aware): la propagazione al primo ordine (GUM §5.1.2) richiede le derivate dei pesi rispetto ai dati. La formula a pesi fissi le omette ed è un'approssimazione, dichiarata con `variance_propagation = fixed_weight_approximation`. Il suo errore non è misurato: C-03 lo misura, con soglia fissata prima, prima di ammettere in P0 un metodo di questa classe. Ipotesi.
+- Un campione invalido della CFA non entra mai nei pesi con il suo valore: o il metodo lo esclude con una regola dichiarata in C-03, o il campione di uscita eredita l'unione dei bit (regola T-M2E-14 di ADR-03.a) ed è invalido.
+
+`ŷ` è in generale correlato con i campioni misurati da cui deriva e con i campioni stimati vicini (correlazione spaziale); i piani dello stesso pixel possono essere correlati fra loro quando i loro pesi condividono campioni di ingresso (correlazione fra canali), e non lo sono, sotto `diagonal_independent`, quando li costruiscono insiemi disgiunti di campioni. Il piano diagonale non rappresenta queste covarianze: contiene solo le varianze **marginali** (§b.4). La rappresentazione delle covarianze spetta ad ADR-17.b.
+
+### b.4 Portata del piano di varianza
+
+`image.variance_scope` (`std::optional<variance_scope>`):
+
+- `independent`: il piano è la covarianza completa sotto il modello `diagonal_independent` di ADR-17.a;
+- `marginal`: il piano contiene solo la diagonale di una covarianza che ha termini fuori diagonale non rappresentati (debayer, resampling).
+
+Regole (T-M3A-TYP-06):
+
+- Un'immagine prodotta da un operatore con `variance` presente ha `variance_scope` presente. La calibrazione di ADR-17.a produce `independent`; il debayer produce `marginal` (con tre piani e un solo canale misurato per pixel, ogni RGB da debayer ha campioni `interpolated`). `operator_output_invariants_hold` verifica la presenza e, con `demosaic` presente, il valore `marginal`; il valore `independent` della calibrazione lo verifica T-M3A-TYP-06 sull'uscita della calibrazione.
+- Un operatore che assume l'indipendenza fra campioni non accetta un ingresso `marginal` e si ferma con `unsupported`, `var.marginal_input` prima di ogni calcolo: la calibrazione di ADR-17.a, il debayer (entrambe le formule di §b.3 assumono l'ingresso `diagonal_independent`) e ogni somma o media su più pixel che dichiari un'incertezza. Quale modello di ADR-17.b sblocchi questi casi lo decide ADR-17.b.
+- Un'immagine letta da file senza la keyword ha `variance_scope` assente; per la calibrazione vale, invariata, la dichiarazione `variance_source` della ricetta (ADR-17.a).
+- FITS: keyword `ASTRVSCP` (stringa `independent` o `marginal`, senza distinzione di maiuscole), scritta quando `variance_scope` è presente. Valore diverso: `unsupported`, `fits.variance_scope`. Keyword senza HDU `VARIANCE`: `invalid_input`, `fits.variance_scope_without_plane`.
+
+### b.5 Coverage
+
+Grandezza (§8.6.2): frazione geometrica dell'area di un pixel di uscita coperta da campioni validi in ingresso. Non è la somma dei pesi, non è una maschera di invalidità, non è una maschera fotografica, non è alpha. Il numero di frame che contribuiscono a un pixel dello stack è un'altra grandezza: la definisce C-07 e non usa questo tipo.
+
+`coverage_plane`: un campione per pixel e per piano, stessa geometria e stesso `sample_type` dell'immagine, buffer allineato a 64 byte; `image.coverage` è `std::optional<coverage_plane>`. Invarianti (`validate_image`, `invalid_input`, `image.coverage`; T-M3A-TYP-07):
+
+- ogni valore è finito e in `[0, 1]`, anche sui pixel invalidi: la coverage è geometrica e resta definita dove il campione è `NaN` (eccezione esplicita alla regola «campione e varianza NaN» di ADR-03.a);
+- in un'immagine prodotta da un operatore, coverage 0 su un piano implica il bit `support_incomplete` (§b.6) su quel pixel e quel piano;
+- con coverage in `(0, 1)` la validità segue la politica dei bordi dichiarata dall'operatore (rinormalizzare, invalidare, accettare la perdita di flusso; §8.6.2, C-06).
+
+FITS: HDU `EXTNAME = 'COVERAGE'`, stesso BITPIX float dei campioni, scala identità (altrimenti `invalid_input`, `fits.extension_encoding`), geometria del primario (`fits.extension_geometry`). Un valore non finito o fuori da `[0, 1]` letto dal file: `invalid_input`, `fits.coverage_range`. Lo scrittore scrive l'HDU se `coverage` è presente; rilettura identica (T-M3A-TYP-07).
+
+### b.6 Bit di invalidità aggiunto
+
+| Bit | Nome | Origine |
+|---|---|---|
+| 9 | `support_incomplete` | Il campione di uscita non ha il supporto che l'operatore richiede: bordo dell'immagine fuori dal kernel, vicini validi insufficienti secondo la regola dichiarata dall'operatore (debayer, resampling), coverage 0 |
+
+I bit riservati diventano 10–15 (`reserved_mask = 0xFC00`). Un file con il bit 9 acceso, rifiutato da ADR-03.a come riservato, si legge; un bit fra 10 e 15 resta `invalid_input`, `fits.invalid_reserved_bits` (T-M3A-TYP-08).
+
+### b.7 Maschere fotografiche
+
+La maschera fotografica di C-11 è `edit_mask` di ADR-03.a: un valore f32 in `[0, 1]` per pixel, un solo piano, che si applica a tutti i piani dell'immagine. Le maschere per canale non sono in P0 (F-POST-08.a).
+
+Regole di tipo (T-M3A-TYP-09):
+
+- `invalid_mask`, `edit_mask`, `coverage_plane` e `variance_plane` sono tipi distinti, senza conversioni implicite né esplicite fra loro; verifica in compilazione con `std::is_convertible` e `std::is_constructible`, in entrambe le direzioni.
+- `edit_mask` non ha alcuna API che legga o scriva `invalid`, `coverage` o `variance` di un'immagine: il valore della maschera non entra nei bit di invalidità né nella coverage. Un pixel invalido resta invalido qualunque sia il valore della maschera; uno 0 della maschera non rende invalido un pixel (C-11 campo 7). La precedenza sui dati la verifica G-MASK in M3.j. L'assenza dell'API non ha un test: è un controllo della review sul diff di ogni unità che tocca `edit_mask` (nessun metodo e nessuna funzione libera che riceva un `edit_mask` e un riferimento non costante a `image`, `invalid_mask`, `coverage_plane` o `variance_plane`), dichiarato come tale.
+- Una maschera usata con un'immagine ne ha `width` e `height`; altrimenti `invalid_input`, `mask.edit_geometry`. Il controllo è `check_edit_mask(const image&, const edit_mask&)`, chiamato dagli operatori di C-11 prima del calcolo.
+- Valori `NaN`, ±Inf o fuori da `[0, 1]` restano `mask.edit_range` (ADR-03.a). Il feather e le altre operazioni non producono valori fuori intervallo (C-11 campo 6): un valore fuori intervallo prodotto da un operatore è uno stop, non un clip silenzioso.
+
+`mask_info`, i dati della maschera richiesti da C-11 campo 10 e da §7.14 (T-M3A-TYP-10):
+
+| Campo | Tipo | Regola |
+|---|---|---|
+| `kind` | `painted`, `imported`, `derived`, `combined` | §7.14: le prime due sono asset autorevoli, le altre derivate |
+| `revision` | `uint64_t` ≥ 1 | Revisione della maschera |
+| `rasterizer` | `std::optional<std::string>` (identificatore e versione) | Presente se e solo se `kind` è `painted` o `combined` |
+| `sources` | elenco di (`node_id`, `revision`) | Vuoto per `painted` e `imported`; un elemento per `derived`; almeno due per `combined` |
+
+Violazione: `invalid_input`, `mask.info`. Generatori, eventi, rasterizzatore, cicli di dipendenza e persistenza sono di C-11, ADR-04.b e M3.j; il formato su disco della maschera non è deciso qui.
+
+Alpha non è un campo di `image` in ADR-03.b. Se un formato di export lo richiede, la regola sta nel suo contratto (C-10.b), che non ricava alpha da `invalid_mask`, `edit_mask` o `coverage` senza una regola dichiarata.
+
+### b.8 Modifiche ad ADR-03.a
+
+- `metadata_origin` ha il valore `decoder` (§b.1); `frame_metadata` ha `capture_time_libraw`.
+- `image` ha `decoder_state`, `demosaic`, `variance_scope`, `coverage`; `equivalent_content` li confronta tutti, salvo l'origine di `decoder_state.source` (T-M3A-TYP-12).
+- Bit 9 definito; riservati 10–15.
+- Keyword interpretate in più: `ASTRTSTP`, `ASTRDPAT`, `ASTRDXOF`, `ASTRDYOF`, `ASTRDMTH`, `ASTRDVER`, `ASTRDKEP`, `ASTRDVAR`, `ASTRVSCP`. Tipo della card verificato senza coercizione; duplicati e `CONTINUE` come le altre (ADR-03.a).
+- HDU `COVERAGE` ammesso, oltre a `INVALID` e `VARIANCE`.
+- Limiti: `max_file_bytes` copre campioni, `INVALID`, `VARIANCE` e `COVERAGE` f64, cioè 26 byte per campione: `2^28 · 26 + 16 MiB = 6 672 MiB`. Gli altri limiti non cambiano. Il preflight aggiunge la coverage al picco se l'HDU esiste. T-M2A-05 si riesegue sul nuovo confine (T-M3A-TYP-11).
+- `operator_output_invariants_hold` aggiunge: `variance_scope` presente se c'è `variance`, uguale a `marginal` se c'è anche `demosaic`; coverage finita in `[0, 1]`; coverage 0 implica `support_incomplete`; `demosaic` solo con `layout = rgb`.
+
+### b.9 Errori aggiunti
+
+| Condizione | Categoria | Codice |
+|---|---|---|
+| Invarianti di `decoder_state` violati | `invalid_input` | `image.decoder_state` |
+| Scrittura FITS di un'immagine con `decoder_state` | `unsupported` | `fits.decoder_state` |
+| Invarianti di `demosaic` violati | `invalid_input` | `image.demosaic` |
+| Keyword `ASTRD*` incomplete; su layout non `rgb`; con valore non riconosciuto | `invalid_input`; `invalid_input`; `unsupported` | `fits.demosaic_incomplete`; `fits.demosaic_layout`; `fits.demosaic_value` |
+| `ASTRVSCP` non riconosciuta; senza HDU `VARIANCE` | `unsupported`; `invalid_input` | `fits.variance_scope`; `fits.variance_scope_without_plane` |
+| Ingresso `marginal` a un operatore che assume indipendenza | `unsupported` | `var.marginal_input` |
+| Invarianti di `coverage` violati; coverage letta fuori intervallo | `invalid_input` | `image.coverage`; `fits.coverage_range` |
+| Maschera fotografica di geometria diversa dall'immagine | `invalid_input` | `mask.edit_geometry` |
+| `mask_info` incoerente | `invalid_input` | `mask.info` |
+
+### b.10 Test pianificati
+
+Tolleranze e criteri fissati qui, prima di ogni misura. Oracle scritti a mano nel test, indipendenti dall'implementazione.
+
+| ID | Verifica | Criterio |
+|---|---|---|
+| T-M3A-TYP-01 | Origine `decoder` su ogni campo di `frame_metadata`, su `phase` e su `lin_origin`; `declared` uguale: nessun effetto; diverso: `metadata.declared_conflict`; uguaglianza ed `equivalent_content` indipendenti dall'origine; scrittura e rilettura FITS: valori uguali, origine `header`; il lettore non produce mai `decoder` | Esatta |
+| T-M3A-TYP-02 | Ogni invariante di `decoder_state` violato uno alla volta, compreso l'overflow di `x0 + width`, il motivo del nero con 4098 valori (passa) e 4099 (stop), `cfa_color_index` incoerente con il pattern; per ognuno dei quattro pattern, gli stati validi con lo stesso pattern e diversa assegnazione degli indici verdi (1/3, 3/1, 1/1) accettati e diversi fra loro; scrittura FITS con `decoder_state` presente | `image.decoder_state` per ogni violazione; `fits.decoder_state` e nessun buffer |
+| T-M3A-TYP-03 | `capture_time_libraw`: `ASTRTSTP` scritta e riletta; `ASTRTSTP` stringa o reale | Esatta; `fits.keyword_value` |
+| T-M3A-TYP-04 | `sample_kind` per i quattro pattern × quattro coppie di offset su una griglia 4×4 × 3 piani, contro una tabella scritta a mano; `measured_preserved` falso: tutto `interpolated`; ogni invariante di `demosaic` violato uno alla volta | Esatta: 0 differenze; `image.demosaic` |
+| T-M3A-TYP-05 | Keyword `ASTRD*`: scrittura e rilettura identiche; ciascuna tolta una alla volta; presenti su `mono`, `cfa`, `multi_plane`; valori non riconosciuti; `BAYERPAT` su un RGB | `fits.demosaic_incomplete`, `fits.demosaic_layout`, `fits.demosaic_value`, `fits.cfa_planes` |
+| T-M3A-TYP-06 | `ASTRVSCP` scritta e riletta con i due valori; valore ignoto; keyword senza `VARIANCE`; immagine prodotta con varianza e senza `variance_scope`: invariante falso; RGB con `demosaic` e `variance_scope = independent`: invariante falso; uscita della calibrazione: `variance_scope = independent`; calibrazione con un ingresso `marginal` | Esatta; stop con i codici di §b.4; zero calcoli nella calibrazione (contatore del `fault_injector`) |
+| T-M3A-TYP-07 | Coverage: valori 0, 1, `−0`, `nextafter(1, 2)`, `nextafter(0, −1)`, `NaN`, ±Inf; coverage finita su pixel invalidi accettata; coverage 0 senza `support_incomplete` in un'immagine prodotta; HDU `COVERAGE` scritto e riletto; HDU con valore fuori intervallo, BITPIX diverso o geometria diversa | Confini e `−0` accettati, gli altri valori `image.coverage`; invariante falso; rilettura bit-esatta; `fits.coverage_range`, `fits.extension_encoding`, `fits.extension_geometry` |
+| T-M3A-TYP-08 | Maschera `INVALID` con il bit 9 letta; con un bit fra 10 e 15 | Lettura riuscita; `fits.invalid_reserved_bits` |
+| T-M3A-TYP-09 | `static_assert` di non convertibilità e non costruibilità fra `invalid_mask`, `edit_mask`, `coverage_plane`, `variance_plane`, in entrambe le direzioni; `check_edit_mask` con larghezza o altezza diverse | Compilazione; `mask.edit_geometry` |
+| T-M3A-TYP-10 | `mask_info`: per ogni `kind`, `rasterizer` presente e assente, `sources` con 0, 1 e 2 elementi, `revision = 0` | Ammesse solo le combinazioni della tabella di §b.7; le altre `mask.info` |
+| T-M3A-TYP-11 | T-M2A-05 rieseguito con il nuovo `max_file_bytes` e con l'HDU `COVERAGE` nel picco del preflight | Confine passa, confine+1 si ferma senza allocazione |
+| T-M3A-TYP-12 | `equivalent_content` su coppie di immagini valide che differiscono in un solo elemento: presenza di `decoder_state`, `demosaic`, `variance_scope`, `coverage`, e per ciascuno un campo o un valore diverso; coppie che differiscono solo nell'origine di `decoder_state.source` | Diverse: `false` per ogni coppia; solo origine: `true` |
+
+Test del piano che questi alimentano: T-IO-01 (import RAW, M3.s), i test di debayer di C-03 (M3.d), G-MASK (M3.j). I test della varianza dei campioni interpolati (oracle razionale per `linear_weights`, Monte Carlo per `fixed_weight_approximation`) sono di C-03 e si fissano nel suo campo 9.
+
+### b.11 Limiti dichiarati
+
+- Ordine dei piani R, G, B: regola del prodotto, non verificabile su un RGB esterno.
+- `capture_time_libraw` non è un istante UTC: il fuso orario non è noto.
+- `decoder_state` non si scrive in FITS; dove lo porta un master costruito da RAW non è deciso (ADR-16.b).
+- Il piano di varianza di un RGB da debayer contiene solo varianze marginali; covarianze fra campioni e fra canali assenti fino ad ADR-17.b. Un operatore che assume l'indipendenza si ferma su questi ingressi.
+- `fixed_weight_approximation` è un'approssimazione di errore non misurato: C-03 lo misura prima di usarla in P0.
+- Alpha e capability di misura non sono tipi di questa estensione.

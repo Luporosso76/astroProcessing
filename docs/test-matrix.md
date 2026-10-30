@@ -110,6 +110,25 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-PACK-01…09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
 | T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 
+## M3.entry: ID di lavoro di ADR-03.b
+
+Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10, con criteri fissati prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3A-TYP-01 | F-IO-02; ADR-03.b §b.1 (origine `decoder`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-02 | F-IO-02, §9.6; ADR-03.b §b.2 (`decoder_state`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-03 | F-IO-02; ADR-03.b §b.1 (`capture_time_libraw`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-04 | F-CAL-08, C-03; ADR-03.b §b.3 (`demosaic`, `sample_kind`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
+| T-M3A-TYP-05 | F-CAL-08; ADR-03.b §b.3 (keyword `ASTRD*`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
+| T-M3A-TYP-06 | ADR-17; ADR-03.b §b.4 (`variance_scope`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
+| T-M3A-TYP-07 | F-REG-03, §8.6.2; ADR-03.b §b.5 (coverage) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
+| T-M3A-TYP-08 | ADR-03.b §b.6 (bit `support_incomplete`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
+| T-M3A-TYP-09 | C-11, F-POST-08.a.1; ADR-03.b §b.7 (tipi distinti) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
+| T-M3A-TYP-10 | C-11, §7.14; ADR-03.b §b.7 (`mask_info`) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
+| T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
+| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.
