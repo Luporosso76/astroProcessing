@@ -2,9 +2,9 @@
 
 Stato: **RIAPERTO**, 29 ottobre 2026. Il PASS del giro 7 (commit `fe94d0b`) è revocato: manca F-IO-10 (import prestacked e calibrato tipizzato), che il registro dell'appendice D impone a M2.c (`M2.c requires_all F-IO-10`, piano attivo riga 4415; foglia a riga 1821). Lo ha rilevato la review del piano M3 (`.omc/artifacts/ask/codex-m3plan-review1-20261029-1424.md`); i sette giri del gate non l'avevano visto. Storico del gate: Autore: agente executor su Claude Sonnet 5.5. Review indipendente: Codex `gpt-6-astra` (reasoning high, sola lettura), giri 1-6 FAIL con correzioni, giro 7 PASS (`.omc/artifacts/ask/codex-m2-gate-review7-20261029-1420.md`). Clausola: `plans/M2.md`, sezione "Gate M2". Contratti toccati: `docs/contracts/ADR-05-dag-provenance.md` (provenance), `ADR-06-budget-scheduler.md` (soglie F-RES-01), `ADR-04-persistenza.md` (T-M2C-11).
 
-Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Riesecuzione identica sul commit del gate `cb35d89` con uscita 0 (sezione «Riesecuzione sul commit del gate»); il gate passa con la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7.
+Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: esecuzione finale provata sul working tree sopra `60a6cc8`, prima del commit, con `tools/check_m2_trace.py` a uscita 0. Riesecuzione identica sul commit del gate `cb35d89` con uscita 0 (sezione «Riesecuzione sul commit del gate»); il gate passa con la review indipendente del record (clausola 4). Le sezioni da «Clausola del gate e record» in poi sono lo storico dei giri 1-7. Il tetto di 3 giri di review vale per il gate rifatto: giro 8 = review 1, giro 9 = review 2, il prossimo è la review 3 e ultima; dopo, arbitraggio del coordinatore.
 
-## Giro 9: correzioni della review del giro 8 e riesecuzione
+## Giro 9 (review 2 di 3 del gate rifatto): correzioni della review del giro 8 e riesecuzione
 
 - Review del giro 8 (Codex `gpt-6-astra`, sola lettura, `.omc/artifacts/ask/codex-m2gate-round8-20261030-0347.md`): FAIL, 1 BLOCCANTE, 1 MED, 2 LOW.
   - BLOCCANTE: con DM spenta e parametri subnormali il job riceveva SIGFPE nel confine `run_job_files`, prima del controllo dell'ambiente FP; NFR-FBK-01.a, ADR-07.a e G-STOP non potevano chiudersi con quel limite. Corretto da R5.c (`463ccf9`, `docs/evidence/M2-R5c.md`): controllo all'ingresso di `run_job`, `run_job_files`, `run_calibration_job`, `run_master_job` e in ogni task dello scheduler prima della lettura dei dati; review PASS al giro 2.
@@ -19,7 +19,7 @@ Giro 8 (gate rifatto, `plans/M2-residui.md` R6 e sezione 6), 30 ottobre 2026: es
 - Il blocco generato del giro 8 riporta conteggi e hash di questa esecuzione.
 - Esito: clausole 1-3 soddisfatte sul commit `463ccf9`; clausola 4 nella review del giro 9.
 
-## Giro 8: esecuzione finale del gate rifatto (R6)
+## Giro 8 (review 1 di 3 del gate rifatto): esecuzione finale del gate rifatto (R6)
 
 - Unità: M2, R6 (`plans/M2-residui.md`, sezione 6, clausole 1-3).
 - Scopo: un'unica esecuzione completa dev e release, slow compresi, e stato finale della tracciabilità dei 63 ID a stadio `M2.*` e `M2.entry`.
