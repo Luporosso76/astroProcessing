@@ -502,3 +502,222 @@ Chiuse da ADR-09.b:
 
 - normalizzazione dei flat (`median_ratio`) e metodi robusti sui flat, con la varianza delle scale stimate: assegnati a F-CAL-01.b, unità `C-02.b-flat`, prima del codice di M3.b che li usa (ADR-09.b §b.6);
 - formulazione P0 e classi delle soglie (archi `decided_by`): ADR-09.b §b.2 e §b.5, classi in §b.9.
+
+## Estensione C-02.b-flat: normalizzazione e metodi robusti dei flat (M3)
+
+Stadio: C-02.b (registro riga 3431), unità `C-02.b-flat` di M3.entry, assegnata da [ADR-09.b](ADR-09-algoritmi.md#estensione-adr-09b-algoritmi-p0-di-m3) §b.6. Requisito: F-CAL-01.b (riga 3180). Testo F-CAL-01 (riga 1840): «combinazione, statistiche e rejection configurabili» per bias, dark, flat e dark-flat. §10.3, campo 1 (riga 1375): «con rejection e normalizzazione dichiarate». Dipendenze: C-02.a §6.2, C-02.b §b.1-§b.15, [ADR-16.b](ADR-16-stati-master.md#estensione-adr-16b-matrice-completa-della-calibrazione-m3) §b.2 e §b.5, [ADR-17.b](ADR-17-varianza.md#estensione-adr-17b-modelli-di-covarianza-p0-m3) §b.1 e §b.10 (regola I), [C-01.b](C-01-calibrazione-light.md), [D-09.b](../decisions/D-09-soglie.md). Unità che la implementa: M3.b.
+
+Ogni clausola è una **regola**, un **fatto** o un'**ipotesi**, come in C-02.b. Le parti `.a` e `.b` restano valide salvo i punti elencati in §f.13. Le derivazioni sono verificate in aritmetica razionale e con Monte Carlo a seed fisso da `tmp/c02bflat_algebra.py`, citato dal record dell'unità.
+
+### f.1 Problema matematico
+
+Modello per canale `c` (C-02.a §6.2, canale per canale come in C-02.b §b.6): `x_f(p) = b(p) + c_(f,c) · g(p) + ν_f(p)`. Il termine additivo `b` (bias e termico all'esposizione del flat) e la forma d'illuminazione `g` sono comuni ai frame; `ν_f` sono rumori indipendenti a media nulla. `β(p) = b(p) − offset_adu` è la parte di `b` diversa dall'offset dichiarato: struttura del bias più termico del flat.
+
+**Stimando**, come in ADR-09.b §b.6: per canale, `b(p) + λ_c · g(p)` con `λ_c > 0` non specificato. Con un dark-flat abbinato (`E[DF] = b`, catena `flat.dark_flat`) è `E[Fc] = λ_c g`. Il master a livelli uguali ha la stessa forma, con `λ_c` uguale al livello comune.
+
+**Normalizzazione `median_ratio`** (regola). Per canale, con `m_(f,c)` il livello di C-02.b §b.6:
+
+```
+m_H,c   = n / Σ_f (1 / m_(f,c))                  media armonica dei livelli
+r_(f,c) = m_H,c / m_(f,c)
+y_f(p)  = offset_adu + r_(f,c) · (x_f(p) − offset_adu)
+```
+
+Il metodo di C-02.b §b.1 si applica agli `y_f` al posto degli `x_f`, con le stesse definizioni. Fatto: in aritmetica esatta `Σ_f r_(f,c) = m_H,c · Σ_f 1/m_(f,c) = n`.
+
+**Fatto 1 (`mean`, fattore globale senza ipotesi sui livelli né su `β`).** Con `Σ_f r_f = n`, la media è `M = (1/n) Σ_f y_f = (1/n) Σ_f r_f x_f`. Condizionata alle scale, quindi, `E[M | r] = b + λ_c g`, con `λ_c = (1/n) Σ_f r_(f,c) c_(f,c)`. Il termine `b` passa con coefficiente 1 per ogni valore dei livelli. Serve solo il modello (`b` e `g` comuni) con le scale trattate come fissate (`scale_fixed`, sotto).
+
+**Fatto 2 (metodi robusti e media pesata, sotto `level_proportional`).** Con `m_(f,c) = κ_c c_(f,c)` (ipotesi `level_proportional` di C-02.a §6.2, per canale) si ha `r_(f,c) c_(f,c) = c_H,c`, la media armonica dei livelli. Quindi `y_f = u + (r_f − 1) β + r_f ν_f`, con `u = b + c_H,c g`: i frame differiscono solo per `(r_f − 1) β` e per la scala del rumore. Ogni metodo di §b.1 è equivariante per traslazione: `T(u·1 + v) = u + T(v)`. Mediana e winsorized sono anche monotone in ogni campione e dispari, `T(−v) = −T(v)` (Bickel e Lehmann, §f.5). `sigma_clip` con `clip_kappa_low = clip_kappa_high` è dispari ma non monotona. Controesempio: con i campioni `[−1, 1] × 5` più `2` la media dei tenuti è `2/11`; portando `2` a `100` il campione è rifiutato e la media scende a 0. Ne segue, con `ρ_c = max_f |r_(f,c) − 1|`:
+
+- **mediana, winsorized.** Con `ν_f` indipendenti e simmetrici attorno a 0, anche con varianze diverse, `T(r ν)` ha distribuzione simmetrica e `E[T(r ν)] = 0`. Per monotonia ed equivarianza, `T(v) + min_f s_f ≤ T(v + s) ≤ T(v) + max_f s_f`. Quindi `E[M | r] − (b + c_H,c g)` sta fra `min_f (r_f − 1) β` e `max_f (r_f − 1) β`, e in modulo è al più `ρ_c |β(p)|`.
+- **`weighted_mean`.** `E[M | r] = b + c_H,c g + (Σ_f a_f r_f − 1) β`, con `Σ_f a_f r_f` fra `min r` e `max r`: stesso limite, senza ipotesi di simmetria.
+- **`sigma_clip`.** Condizionata all'insieme tenuto `K` (selezione congelata, C-02.b §b.6), `M = u + media_K((r_f − 1) β) + media_K(r_f ν_f)`. Il primo termine sta nello stesso intervallo. Il valore atteso del secondo è 0 con `β ≡ 0` (procedura dispari, rumore simmetrico). Con `β ≠ 0` non è derivato e resta nell'approssimazione della selezione congelata.
+
+Con `β ≡ 0` ogni metodo dà `E[M | r] = b + c_H,c g`. Ipotesi `additive_bounded`: `|β(p)| ≤ A`, con `A = flat_additive_bound_adu` dichiarato. È l'ipotesi sul termico (e sulla struttura del bias) che ADR-09.b §b.6 chiede di dichiarare quando il fattore globale non è dimostrato senza ipotesi. Lo scarto dal fattore globale è al più `ρ_c A ≤ flat_norm_rel_budget · m_H,c` (controllo di §f.2), più l'errore d'arrotondamento degli `r̂_(f,c)` f64, che la regola I comprende (§f.6). Relativo al termine d'illuminazione del pixel, `c_H,c g(p) = m_H,c g(p) / κ_c`, è al più `flat_norm_rel_budget · κ_c / g(p)`: un pixel con `g(p) = κ_c / 2` ha al più il doppio del budget.
+
+**Fatto 3 (perché i metodi robusti richiedono la normalizzazione).** Senza normalizzazione i frame hanno medie diverse `c_f g`, e il coefficiente di `g` nel valore atteso dipende dal rapporto segnale/rumore del pixel. Esempio: mediana con `n = 3`, `c = (1, 2, 10)` e rumore gaussiano `σ`. Per `g/σ → ∞` il coefficiente tende a `c_med = 2`. Per `g/σ → 0` tende a `(1 + 2 + 10)/3 = 13/3`: per scambiabilità la derivata di `E[mediana(μ + σZ)]` rispetto a ogni `μ_f`, a `μ` costante, vale `1/n`. Monte Carlo in `tmp/c02bflat_algebra.py`: 2.0 e 4.40 ± 0.07. Il coefficiente cambia da pixel a pixel, quindi non è un fattore globale. Per questo il flat con `flat_normalization = none` resta limitato a `single` e `mean` (C-02.b §b.2, invariato).
+
+**Fatto 4 (flat CFA).** Il fattore è uno per canale, `λ_c`. Con la normalizzazione `cfa_channel_median` della calibrazione (ADR-16 §6) il `Q` calcolato da `λ_c g` non dipende dai `λ_c > 0`, anche diversi fra canali, perché la mediana di ogni canale è equivariante per scala. Con `global_median` i rapporti fra canali di `Q` sono `λ_c / λ_c'`. Coincidono con quelli di un master a livelli uguali sotto `level_proportional` e `same_illumination_color` (`c_(f,c) = k_c a_f`, colore uguale in tutti i frame): allora `r_(f,c) = a_H / a_f` per ogni canale e `λ_c = k_c a_H`. Se il colore cambia fra i frame (flat al crepuscolo), i rapporti sono quelli delle medie armoniche dei livelli di canale. Per un flat mono c'è un solo fattore.
+
+**Scale stimate (`scale_fixed`).** Le scale sono calcolate dagli stessi frame; gli enunciati sopra sono condizionati a `r`. Fatto: cambiare il valore di un solo pixel sposta la `k`-esima statistica d'ordine del canale al più fino a `z_(k−1)` o `z_(k+1)`. La dipendenza di `m_(f,c)` dal rumore del singolo pixel è quindi limitata dalla spaziatura delle statistiche d'ordine attorno alla mediana, non dal suo rumore. L'effetto su `E[M]` non è derivato: ipotesi dichiarata.
+
+### f.2 Dominio, unità e prerequisiti
+
+Restano C-02.a §2, le «Aggiunte di R2» e C-02.b §b.2, con le modifiche che seguono. `flat_normalization` ∈ {`none`, `median_ratio`}, solo per il ruolo `flat`. Metodi sul flat:
+
+| Metodo | `none` | `median_ratio` |
+|---|---|---|
+| `single` | ammesso | `unsupported`, `master.variance_domain` |
+| `mean` | ammesso | ammesso |
+| `weighted_mean`, `median`, `winsorized` | `unsupported`, `master.variance_domain` (C-02.b §b.2) | ammesso nel dominio di C-02.b §b.1 |
+| `mean` + `sigma_clip` | `unsupported`, `master.variance_domain` | ammesso nel dominio di C-02.b §b.1, con `clip_kappa_low = clip_kappa_high` |
+
+`sigma_clip` sul flat richiede soglie uguali perché con soglie diverse la procedura non è dispari. Il suo valore atteso si sposta allora di una quantità proporzionale al rumore del pixel, che in un flat dipende da `g(p)`: non è un fattore globale.
+
+Parametri con `median_ratio` (regole; assenti, non finiti o fuori dominio: `invalid_input`, `master.param.<nome>`):
+
+- `flat_additive_bound_adu` ≥ 0: obbligatorio per ogni metodo.
+- `flat_norm_rel_budget` in (0, 1): obbligatorio per `weighted_mean`, `median`, `winsorized` e `sigma_clip`, vietato per `mean`, che non ne ha bisogno (fatto 1).
+- `flat_level_rel_tol`: vietato. Il suo ruolo in `.a` era limitare il termine dei livelli `B`, che con la normalizzazione è sostituito da quello di §f.6.
+- `flat_min_signal_adu`: obbligatorio come in `.a`; garantisce `m_(f,c) > 0`.
+
+Con `none`, `flat_additive_bound_adu` e `flat_norm_rel_budget` sono vietati e `flat_level_rel_tol` resta obbligatorio.
+
+Controlli del preflight, per canale, dopo il passaggio dei livelli e prima della combinazione:
+
+1. livelli come in C-02.b §b.6 (`master.flat_low_signal` invariato);
+2. costanti `1/m_(f,c)`, la loro somma, `m_H,c` e `r_(f,c)` finite e normali, altrimenti `numeric`, `master.flat_scale_nonfinite`;
+3. per `median`, `winsorized` e `sigma_clip`: `max_f m_(f,c) ≤ 4 · min_f m_(f,c)`, confrontati in aritmetica esatta sui valori f64, altrimenti `unsupported`, `master.variance_domain`. È il dominio in cui T-M3B-FLAT-05 caratterizza il piano di quei metodi (§f.6);
+4. per i metodi diversi da `mean`: `A · ρ_c ≤ flat_norm_rel_budget · m_H,c`, con `ρ_c` calcolato in modo esatto dagli `r̂_(f,c)` f64 e il confronto in aritmetica esatta (prodotti senza arrotondamento), altrimenti `unsupported`, `master.flat_norm_budget`, con canale, `A`, `ρ_c`, `m_H,c` e budget nel contesto.
+
+**Analisi** (C-02.b §b.2): invariata. Un gruppo con stato `flat_level` non ha proposta, perché la proposta non inventa `flat_additive_bound_adu` (C-02.b §b.4). Il report indica `median_ratio` come scelta esperta disponibile, con il parametro che richiede. Nessun frame si esclude per livello.
+
+### f.3 Ipotesi e limiti
+
+- Comuni: `same_illumination_shape`, `additive_common` (`b` uguale in tutti i frame: stessa esposizione e temperatura, garantite dal gruppo solo entro tolleranza), rumori indipendenti a media nulla, `scale_fixed`.
+- `mean` + `median_ratio`: per il valore atteso nessun'altra ipotesi (fatto 1). Il piano ha il termine dei livelli limitato sotto `level_proportional` e `additive_bounded` (§f.6).
+- Altri metodi: `level_proportional`, `additive_bounded`; per mediana, winsorized e `sigma_clip` anche `symmetric_noise` (rumore simmetrico, vero per il gaussiano); per `sigma_clip` la selezione congelata.
+- CFA con `global_median` in calibrazione: `same_illumination_color` (fatto 4).
+- Piano di mediana, winsorized e `sigma_clip`: approssimazione (§f.6).
+- Le ipotesi non sono verificate dal prodotto: il report le dichiara (§f.7).
+
+### f.4 Alternative e scelta
+
+| Alternativa | Esito | Motivo |
+|---|---|---|
+| Nessuna normalizzazione, `mean` (C-02.b) | Resta, con `none` | Valore atteso già nella forma `b + c̄ g`, ma piano con il termine dei livelli `B` (C-02.a §6.2), che richiede livelli entro `flat_level_rel_tol` |
+| Riferimento aritmetico, `r_f = m̄ / m_f` | Scartata | `Σ r_f ≥ n` (medie aritmetica e armonica), quindi con `mean` `β` passa con coefficiente `r̄ ≥ 1` e `E[Fc]` ha un termine additivo `(r̄ − 1) β` che non è un fattore globale. Controesempio in `tmp/c02bflat_algebra.py`: `n = 2`, `c = (1, 3)`, `β = (1, 0, 0)` su tre pixel |
+| Scala sull'intero valore, `y_f = r_f x_f` | Scartata | Con `mean` coincide con la scelta (`Σ r_f = n`). Per i metodi robusti i frame differiscono per `(r_f − 1) b`, con `b ≈ offset_adu` (migliaia di ADU) invece di `β` |
+| Sottrazione del dark-flat per frame, poi normalizzazione | Scartata per P0 | Esatta senza ipotesi su `β`, ma il master conterrebbe il dark-flat (`Cov(F, DF) ≠ 0`, contro C-02.a §6.2 e ADR-17) e non sarebbe `raw` (ADR-16.b §b.2): un altro stato del master, non un passo del metodo |
+| Scala per frame comune ai canali | Scartata | Con colore variabile il fattore resta per canale (fatto 4); ADR-09.b §b.6 chiede la normalizzazione per canale |
+| Livello da media o moda | Scartata | La media non resiste alle stelle dei flat di cielo; la moda non ha una definizione deterministica su dati continui. La mediana è il livello già calcolato (C-02.b §b.6) |
+
+Scelta: riferimento armonico, normalizzazione attorno a `offset_adu`, per canale. La proposta a priori resta quella di C-02.b §b.4: `median_ratio` è solo una scelta esperta.
+
+### f.5 Riferimenti indipendenti e stato
+
+Nessuno dei testi è stato riletto in questa unità; il contratto non usa loro valori numerici. Le derivazioni sono in §f.1 e §f.6, verificate da `tmp/c02bflat_algebra.py`, e le verificano i test di §f.12.
+
+- Flat field e combinazione dei flat: S. B. Howell, *Handbook of CCD Astronomy*, 2ª ed., Cambridge University Press 2006; J. R. Janesick, *Scientific Charge-Coupled Devices*, SPIE Press 2001; R. L. Gilliland, «Details of noise sources and reduction processes», in *Astronomical CCD Observing and Reduction Techniques*, ASP Conf. Ser. 23, 1992; EMVA Standard 1288, release 4.0, 2021 (non uniformità da frame mediati).
+- Misure di posizione equivarianti, monotone e antisimmetriche: P. J. Bickel, E. L. Lehmann, «Descriptive statistics for nonparametric models II. Location», *Annals of Statistics* 3(5), 1975. Robustezza: Huber e Ronchetti, 2009 (C-02.b §b.5).
+- Statistiche d'ordine, anche di variabili non identicamente distribuite: H. A. David, H. N. Nagaraja, *Order Statistics*, 3ª ed., Wiley 2003.
+- Stime per rapporto da dati campionari: W. G. Cochran, *Sampling Techniques*, 3ª ed., Wiley 1977, cap. 6.
+- Varianza totale, `Var(M) = E[Var(M | r)] + Var(E[M | r])`: G. Casella, R. L. Berger, *Statistical Inference*, 2ª ed., Duxbury 2002, teorema 4.4.7.
+- Varianza di valori in un intervallo: T. Popoviciu, «Sur les équations algébriques ayant toutes leurs racines réelles», *Mathematica* (Cluj) 9, 1935.
+- Aritmetica degli intervalli e regola I: come ADR-17.b §b.10.
+
+Nessuna derivazione da software esistente (DEC-02, NC-15).
+
+### f.6 Numerica, stabilità e varianza
+
+**Ordine delle operazioni**, fissato per la regola I e per il determinismo:
+
+- Costanti del nodo, per canale, nel preflight: `i_f = 1 / m_f`; `S = Σ_f i_f` nell'ordine canonico; `m_H = n / S`; `r_f = m_H / m_f`. `ρ_c` si calcola esatto dagli `r̂_f`.
+- Per pixel: `d_f = x_f − offset_adu`, `t_f = r_f · d_f`, `y_f = offset_adu + t_f`, poi la sequenza di C-02.b §b.6 sugli `y_f`.
+- Rappresentabilità: regola di C-02.a §6.3. `r_f · d_f` con operandi non nulli che dà zero o un subnormale rende il pixel `result_nonfinite`. `offset_adu + t_f` è una somma con segno, valida come in `.a`. Ogni risultato non finito dà `result_nonfinite`.
+- Arrotondamento: in f64 `Σ r̂_f ≠ n`, quindi `β` passa con coefficiente `(1/n) Σ r̂_f`, che dista da 1 per l'errore d'arrotondamento. La normalizzazione attorno a `offset_adu` lo applica a `β` e non a `b`. L'oracle riesegue la sequenza con la regola I (ADR-17.b §b.10), che lo comprende.
+
+**Piano `VARIANCE`.** Gli stimatori sono quelli di C-02.b §b.6, calcolati sugli `y_f`; `variance_estimator` non cambia nome. Regola: con `median_ratio` il piano stima `Var(M | r)`, la varianza condizionata alle scale. Con `μ_f = E[y_f | r] = offset_adu + r_f β + r_f c_f g` e `σ_f²` la varianza di `ν_f`:
+
+- `mean`. Fatto (identità di C-02.a §6.1 e §6.2, con medie e varianze diverse): `E[V | r] = Var(M | r) + B_N(p)`, con `Var(M | r) = Σ_f r_f² σ_f² / n²` (varianze diverse ammesse) e `B_N = Var_f(μ_f) / n ≥ 0`. Sotto `level_proportional`, `B_N = β² Var_f(r) / n ≤ A² Var_f(r) / n`.
+- `weighted_mean`. Fatto (derivazione di C-02.b §b.6 con medie diverse): `E[V | r] = Var(M | r) + Σ_f c_f (μ_f − Σ_g a_g μ_g)²`, con termine aggiunto non negativo perché `c_f > 0`. Sotto `level_proportional` è al più `A² Σ_f c_f (r_f − Σ_g a_g r_g)²`.
+- `median`, `winsorized`. `V = κ s²_y`. `E[s²_y | r] = (1/n) Σ_f r_f² σ_f² + Var_f(μ_f)`, e il primo termine per `κ` è `Var(M | r)` solo se `r_f σ_f` è uguale per tutti i frame (`iid_gaussian` dopo la normalizzazione). Con livelli diversi i campioni normalizzati sono eteroschedastici e il piano è un'approssimazione con errore non derivato, caratterizzato da T-M3B-FLAT-05 nel dominio `max m ≤ 4 min m`. Stima, non prova (`tmp/c02bflat_algebra.py`, mediana, `n = 9`, rumore fotonico, rapporto fra i livelli estremi): `E[V]/Var(M | r)` ≈ 1.03 a 2, 1.14 a 4, 1.36 a 8. Termine dei livelli, sotto `level_proportional`: `κ β² Var_f(r) ≤ κ A² Var_f(r)`.
+- `sigma_clip`. Selezione congelata sugli `y_f` (C-02.b §b.6). Termine dei livelli sotto `level_proportional`: `β²` per la varianza campionaria degli `r_f` tenuti divisa per `m`. Fatto (Popoviciu): la varianza campionaria di `m` valori in un intervallo di ampiezza `w` è al più `w² m / (4(m − 1))`. Il termine è quindi al più `A² (max r − min r)² / (4(clip_min_kept − 1))`.
+
+Il report chiama `norm_level_bias_bound` il limite del termine dei livelli: è una costante per canale, una formula per metodo.
+
+**Termine delle scale.** Fatto (varianza totale): `Var(M) = E[Var(M | r)] + Var(E[M | r])`. Il piano omette il secondo termine. Per `mean`, `E[M | r] = b + λ_c(r) g` (fatto 1), quindi `Var(E[M | r]) = g² Var(λ_c)`: proporzionale a `g`, cioè una fluttuazione del fattore globale. Fatto, in calibrazione: condizionato a `r`, `Fc = λ_c g + e`, con `e` il rumore di `M` e del dark-flat. Per l'equivarianza della mediana, `Q = Fc / N(Fc) = (g + e/λ_c) / N(g + e/λ_c)`. `λ_c` entra in `Q` solo attraverso `e/λ_c`: una variazione relativa `δ` di `λ_c` cambia il termine di rumore della frazione `δ`, un effetto di secondo ordine. Per gli altri metodi `E[M | r]` contiene anche i termini `(r_f − 1) β` limitati in §f.1. Le scale sono pesi stimati dai dati: il master porta `variance.fixed_weight_approximation`, come le righe a pesi congelati di ADR-17.b §b.1.
+
+### f.7 Maschere, metadati e bordi
+
+- Invalidità e saturazione si valutano sugli `x_f`, prima della normalizzazione, come C-02.a §7. I livelli usano i pixel validi di C-02.b §b.6. Rifiuti di `sigma_clip` e `support_incomplete` come C-02.b §b.7, sugli `y_f`.
+- **Descrittore**: campo `frame_normalization` ∈ {`none`, `median_ratio`} per i master flat del prodotto, uguale a `flat_normalization` della ricetta. È distinto da `flat_normalization_declared` di ADR-16.b §b.2, che riguarda i flat `calibrated` esterni. `variance_estimator` come C-02.b §b.7.
+- **Capability**: con `median_ratio` `measure` contiene `variance.fixed_weight_approximation` per ogni metodo (con `sigma_clip` c'era già).
+- **Report** del master flat con `median_ratio`, in aggiunta a C-02.b §b.7:
+  - per frame e canale, `m_(f,c)` e `r_(f,c)`; per canale `m_H,c`, `ρ_c`, il rapporto `max m / min m`, `A`, il budget e il valore del controllo `A · ρ_c / m_H,c`;
+  - `norm_level_bias_bound` per canale (§f.6) e, sui pixel validi, mediana e massimo del suo rapporto col piano. Un piano nullo rende il rapporto `null` con motivo `variance_zero`, come in C-02.a §6.2;
+  - `level_bias_estimate`, il suo rapporto e `level_bias_ratio_null`: `null` con motivo `normalized`. `pixels_nonpositive_signal` come in `.a`;
+  - ipotesi non verificate: `scale_fixed`, `same_illumination_shape`, `additive_common` e, secondo il metodo, `level_proportional`, `additive_bounded`, `symmetric_noise`, `same_illumination_color` (CFA), `gaussian_reference_heteroscedastic` (mediana, winsorized, `sigma_clip`);
+  - avviso `flat_norm_scales_estimated`.
+- Una statistica del report non rappresentabile segue C-02.a, «Aggiunte di R2» (`numeric`, `master.report_nonfinite`).
+
+### f.8 Determinismo
+
+C-02.b §b.8, con gli `y_f` al posto degli `x_f`. Le costanti di §f.6 si calcolano una volta nel preflight, nell'ordine canonico, dai livelli calcolati sull'intera immagine prima dei blocchi: sono bit-identiche con qualunque `tile_rows`, numero di worker e residenza. L'ordinamento per pixel usa l'ordine totale (valore di `y_f`, indice canonico). Nessun seed.
+
+### f.9 Fixture, metriche, soglia e gate
+
+Classi di ADR-09.b §b.3. `α = 10⁻³` per test, Bonferroni sulle `m` statistiche del test; `K`, `P`, seed e parametri nel protocollo preregistrato di M3.b, committato prima della misura (C-02.b §b.9). Riferimento: la verità della simulazione.
+
+Fixture `FIX-SYN-CAL-08`, estesa con flat a livelli diversi per canale e `b`, `β`, `g`, `c_(f,c)` noti, con rumore gaussiano di varianza nota, anche eteroschedastico (`σ_f² = c_f g / G + R²`). Ogni canale ha una **regione di livello**: più della metà dei pixel del canale, con `g = 1`, `β = 0` e nessun rumore. Fatto (verificato in `tmp/c02bflat_algebra.py`): se più della metà dei valori è uguale a `v`, la mediana vale `v` qualunque siano gli altri. Quindi `m_(f,c) = c_(f,c)` esatto in ogni realizzazione, `level_proportional` vale esattamente e `r` è noto all'oracle e indipendente dal rumore. I criteri S non dipendono da `scale_fixed`, che resta un'ipotesi sui dati reali. La **regione di misura** ha `g`, `β` e rumore variabili, con `|β| ≤ A`. Dato reale: PUB-LFC-01, flat `N = 3`, mono.
+
+Classi: E per T-M3B-FLAT-01, 02 e per l'oracle numerico di 07; S come controlli di coerenza per 03 e 04; C per 05; B per 06, 07 e 08; R con oracle del test per 09. 03 e 04 non hanno potenza dichiarata, perché le proprietà che verificano sono fatti derivati in §f.1 e §f.6. Il valore e l'aritmetica di ogni operazione li verificano 01 e 02, che sono la prova del fattore globale: 02(a) per `mean` senza ipotesi su `β`, 02(b) per ogni metodo con `β ≡ 0`. Il margine deterministico dei criteri S è `max_k τ_k`, il bound della regola I del valore confrontato, come in C-02.b §b.9. Quantili: χ² come C-02.a §9; normale per bisezione su `std::erfc` con errore relativo ≤ 10⁻¹⁰ sulla coda; binomiale esatta dalla somma dei termini in `long double`, con errore relativo ≤ 10⁻¹⁰ sulla coda. Stop e astensioni: classe B, nessun calcolo della combinazione (T-M3B-FLAT-06).
+
+Costo: le costanti sono `n` valori per canale. Gli `y_f` di un pixel occupano il buffer di ordinamento di C-02.b §b.11. Il modello di memoria di ADR-06 (estensione R2.r) li conta con l'aggiornamento previsto da C-02.b §b.13 punto 5. Il tempo non ha soglia.
+
+Gate: parte del gate M3.b (F-CAL-01.b). F-CAL-01.b non si chiude senza i test di §f.12 (ADR-09.b §b.6).
+
+### f.10 Failure mode, warning e provenance
+
+Restano gli stop di C-02.a, C-02.b e §f.2. Nuovi codici:
+
+| Condizione | Categoria | Codice |
+|---|---|---|
+| `median_ratio` con `single`; metodo robusto o pesato sul flat con `none`; `sigma_clip` sul flat con soglie diverse; `max m > 4 min m` per mediana, winsorized e `sigma_clip` | `unsupported` | `master.variance_domain` |
+| Parametri di §f.2 assenti, non finiti, fuori dominio o presenti dove vietati | `invalid_input` | `master.param.<nome>` |
+| Costanti delle scale non finite o non normali | `numeric` | `master.flat_scale_nonfinite` |
+| `A · ρ_c > flat_norm_rel_budget · m_H,c` | `unsupported` | `master.flat_norm_budget` |
+
+Avvisi: `flat_norm_scales_estimated` e quelli di C-02.b. La provenance del nodo contiene `m_(f,c)`, `r_(f,c)`, `m_H,c` e `ρ_c`. Nessun percorso alternativo: un controllo fallito non passa a `none` né a un altro metodo (NFR-FBK-01, NC-21).
+
+### f.11 Ottimizzazione
+
+La normalizzazione è fusa nel ciclo per pixel: gli `y_f` stanno nel buffer del task e nessun frame normalizzato si memorizza. Le costanti si calcolano nel preflight. Nessuna ottimizzazione cambia l'ordine delle operazioni di §f.6.
+
+### f.12 Test pianificati
+
+Criteri fissati qui, prima di ogni misura.
+
+| ID | Verifica | Criterio |
+|---|---|---|
+| T-M3B-FLAT-01 | Valori di `m_H,c`, `r_(f,c)`, `ρ_c`, `y_f`, master e piano per ogni metodo con `median_ratio`, mono e CFA. Casi diadici con ogni operazione esatta (livelli `(1, 3)`: `m_H = 3/2`, `r = (3/2, 1/2)`; livelli `(1, 1, 3, 3)`: `m_H = 3/2`); casi non diadici | 0 dove l'oracle verifica esatta ogni operazione; altrimenti regola I più mezzo ulp f32 se l'uscita è f32 (per `gaussian_reference` col `κ` riportato come ingresso, come C-02.b §b.6) |
+| T-M3B-FLAT-02 | Fattore globale senza rumore (`ν = 0`). (a) `mean`, `β` qualunque, anche non proporzionale a `g`, livelli con rapporto fino a 16, mono e CFA con livelli diversi per canale. (b) Ogni metodo, `β ≡ 0`, rapporto fino a 4 | (a) `|M̂ − (b + λ_c g)| ≤ τ`, con `λ_c = (1/n) Σ r̂_f c_f` e `τ` il bound della regola I: scarto dal fattore globale entro l'arrotondamento. (b) `|M̂ − (offset_adu + c_H,c g)| ≤ τ` |
+| T-M3B-FLAT-03 | `mean` + `median_ratio`, regione di livello, `β = 0` e `|β| ≤ A`, rumore eteroschedastico. (a) Piano: `X = V`, `E = Σ r² σ²/n² + Var_f(μ)/n`, `Var(X) = [2 tr((HΣ_y)²) + 4 μᵀ H Σ_y H μ] / ((n − 1)² n²)` con `H = I − 11ᵀ/n` e `Σ_y = diag(r² σ²)`. (b) Valori: `(K − 1) var_K(M) / Var(M | r) ~ χ²_(K−1)`, esatta perché `r` è fissato dalla fixture. (c) Centro: `mean_K(M) − (b + λ_c g)` normale di varianza `Var(M | r)/K` | (a) Chebyshev più `max_k τ_k`. (b) Intervallo bilaterale esatto al livello `α/m`. (c) `|mean_K(M) − (b + λ_c g)| ≤ z_(1 − α/(2m)) sqrt(Var(M | r)/K) + max_k τ_k` |
+| T-M3B-FLAT-04 | Mediana (`n` ∈ {3, 9}), winsorized (`n = 9`, `g = 1`), `sigma_clip` (`n` ∈ {11, 31}, soglie uguali), regione di livello, rumore gaussiano eteroschedastico, rapporto fino a 4. (a) `β ≡ 0`: `U` = realizzazioni con `M̂ > b + c_H g + τ_k`, `D` = realizzazioni con `M̂ < b + c_H g − τ_k`. (b) Mediana e winsorized con `|β| ≤ A`: `U` sopra `b + c_H g + max_f (r_f − 1) β + τ_k`, `D` sotto `b + c_H g + min_f (r_f − 1) β − τ_k` | Ogni evento ha probabilità ≤ 1/2 (§f.1): `U` e `D` ≤ il quantile superiore di `Bin(K·P, 1/2)` al livello `α/(2m)`, esatto |
+| T-M3B-FLAT-05 | Caratterizzazione del piano di mediana, winsorized (`g` ∈ {1, ⌊(n−1)/2⌋}) e `sigma_clip`: `n` ∈ {3, 9, 31}, rapporto fra i livelli estremi ∈ {1, 1.5, 2, 3, 4}, rumore fotonico e di lettura dominanti; rapporto `E[V] / Var(M | r)` su `K · P` realizzazioni | Nessuna soglia: stima con l'errore Monte Carlo nel record, come limite di §f.14. Binario: `variance.fixed_weight_approximation` in `measure`, ipotesi `gaussian_reference_heteroscedastic` e avviso presenti |
+| T-M3B-FLAT-06 | Domini e stop: ogni casella della tabella di §f.2; parametri assenti, presenti dove vietati, fuori dominio; `sigma_clip` con soglie diverse; rapporto uguale a 4 (ammesso) e con `max m` uguale al successore f64 di `4 min m` (stop); budget al confine con valori rappresentabili (`A · ρ_c = budget · m_H,c` ammesso, budget uguale al predecessore f64 escluso); `flat_min_signal_adu` e livello subnormali (`1/m` non finito) | Codici di §f.2 e §f.10; nessun calcolo della combinazione e nessun nodo negli stop (contatore del `fault_injector`) |
+| T-M3B-FLAT-07 | Descrittore, `measure` e report per ogni metodo con `median_ratio` e con `none`; analisi di un gruppo `flat_level` | `frame_normalization`, `variance_estimator`, codice di capability, ipotesi e avvisi esatti; `m`, `r`, `m_H`, `ρ`, valore del controllo, `norm_level_bias_bound` e rapporti contro l'oracle (regola I); `level_bias_estimate` `null` con motivo `normalized`; nell'analisi nessuna proposta e alternativa `median_ratio` indicata |
+| T-M3B-FLAT-08 | Determinismo: ogni metodo con `median_ratio`, `tile_rows` ∈ {1, 7, 64}, worker ∈ {1, 4}, a blocchi e in memoria; riapertura e ricostruzione del nodo; candidati permutati | 0 differenze bit a bit in master, piano, maschera e report; stessa chiave del nodo |
+| T-M3B-FLAT-09 | PUB-LFC-01: flat `N = 3` con `mean` + `median_ratio`, `A` dichiarato nel record del dato, `sample_type = f64` | Master, costanti e piano entro la regola I contro l'oracle del test, come T-M3B-C02-16 |
+
+Riesecuzioni: T-M3B-C02-09 (proposta invariata), T-M3B-C02-14 (flat con `none`, mono identico a `.a`), T-M2R2-01…09.
+
+### f.13 Modifiche a C-02.a, C-02.b e ad altri contratti
+
+1. **C-02.a §1**, tabella dei parametri: `flat_normalization = median_ratio` è ammesso secondo §f.2 invece di fermarsi con `master.variance_domain`. La ricetta `.a` resta `none`.
+2. **C-02.a, «Aggiunte di R2»**, parametri dei ruoli: `flat_level_rel_tol` è obbligatorio solo con `none` ed è vietato con `median_ratio`; `flat_additive_bound_adu` e `flat_norm_rel_budget` seguono §f.2.
+3. **C-02.a §6.2 e C-02.b §b.7**, statistiche del flat: con `median_ratio` `level_bias_estimate` è `null` con motivo `normalized` e il report porta `norm_level_bias_bound` (§f.7).
+4. **C-02.b, elenco «Fuori da C-02.b»**, voce «Normalizzazione dei flat»: sostituita da questa estensione. Resta fuori soltanto la normalizzazione con dark-flat sottratto per frame (§f.4).
+5. **C-02.b §b.2**, colonna `flat` della tabella dei domini: `weighted_mean`, `median`, `winsorized` e `mean` + `sigma_clip` sono ammessi con `median_ratio`, secondo §f.2; con `none` resta lo stop.
+6. **C-02.b §b.6**: con `median_ratio` gli stimatori si applicano agli `y_f` e il piano stima `Var(M | r)` (§f.6). Per il flat, la frase sulla tolleranza dei livelli vale solo con `none`.
+7. **C-02.b §b.7 e §b.13 punto 3**: il descrittore dei master flat del prodotto ha il campo `frame_normalization`, che `master_descriptor_from_node` scrive dal nodo. Con `median_ratio` `measure` contiene `variance.fixed_weight_approximation`.
+8. **C-02.b §b.10**: i codici di §f.10.
+9. **C-02.b §b.14**, voce «Flat: solo `single` e `mean`»: sostituita da §f.14.
+10. **C-02.b §b.15**: la questione dei flat è chiusa da questa estensione.
+11. **ADR-06, estensione R2.r** (C-02.b §b.13 punto 5): il modello di memoria conta anche le costanti delle scale.
+
+ADR-16.b, ADR-17.b e C-01.b non cambiano. Il master flat resta `raw` e non contiene il dark-flat (`Cov(F, DF) = 0`). La calibrazione lo usa come prima (`Fc = F − DF`, `Q = Fc / N(Fc)`), e il codice di capability si propaga con `merge_measure` (ADR-03.b §b.13).
+
+### f.14 Limiti dichiarati
+
+- Il fattore globale è dimostrato per `mean` condizionato alle scale. Per gli altri metodi vale entro `ρ_c A`, sotto `level_proportional` e `additive_bounded`, che il prodotto non verifica; per `sigma_clip` con `β ≠ 0`, solo nell'approssimazione della selezione congelata.
+- `scale_fixed`: la dipendenza delle scale dal rumore del pixel non è derivata, solo limitata dalla spaziatura delle statistiche d'ordine. Il piano omette `Var(E[M | r])`; per `mean` è una fluttuazione del fattore globale, che in `Q` entra al secondo ordine.
+- Il piano di mediana, winsorized e `sigma_clip` su flat normalizzati è un'approssimazione con errore non derivato, caratterizzato da T-M3B-FLAT-05 solo con rapporto fra i livelli fino a 4. Oltre, quei metodi sono fuori dominio.
+- CFA con `global_median` in calibrazione: un solo fattore globale solo sotto `same_illumination_color`.
+- `A` e il budget sono dichiarazioni dell'utente; il controllo di §f.2 limita lo scarto atteso, non lo misura.
+- I flat a livelli diversi senza normalizzazione restano limitati a `single` e `mean` entro `flat_level_rel_tol`.
+- Nessun test è eseguito: le righe di §f.12 sono piani.
+
+### f.15 Questioni
+
+Chiusa da questa estensione: normalizzazione dei flat e metodi robusti sui flat, con la varianza delle scale stimate (ADR-09.b §b.6; C-02.b §b.15). Nessuna questione aperta.

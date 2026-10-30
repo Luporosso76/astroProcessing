@@ -224,6 +224,22 @@ Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli stat
 | T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 
+## M3.entry: ID di lavoro di C-02.b-flat
+
+Definiti in `docs/contracts/C-02-master.md` §f.12, con classi, livelli statistici e criteri fissati prima di ogni misura. T-M3B-FLAT-05 è una caratterizzazione senza soglia, a sostegno di un limite dichiarato. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3B-FLAT-01 | F-CAL-01.b; C-02.b-flat §f.1, §f.6, regola I di ADR-17.b §b.10 (valori con `median_ratio`) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-02 | F-CAL-01.b; C-02.b-flat §f.1 (fattore globale senza rumore, ADR-09.b §b.6) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-03 | F-CAL-01.b; C-02.b-flat §f.6 (piano e valori di `mean` + `median_ratio`, controllo di coerenza) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-04 | F-CAL-01.b; C-02.b-flat §f.1 (valore atteso dei metodi robusti normalizzati, controllo di coerenza) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-05 | F-CAL-01.b; C-02.b-flat §f.6, ADR-17.b §b.1 (piano robusto eteroschedastico, caratterizzazione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-06 | F-CAL-01.b, NC-21; C-02.b-flat §f.2, §f.10 (domini e stop) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-07 | F-CAL-01.b; C-02.b-flat §f.7 (descrittore, capability, report) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-08 | F-CAL-01.b; C-02.b-flat §f.8 (determinismo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-09 | F-CAL-01.b, NFR-TEST-02; C-02.b-flat §f.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+
 ## M3.entry: ID di lavoro di ADR-09.b e D-09.b
 
 Definito in `docs/contracts/ADR-09-algoritmi.md` §b.7. Le soglie dei singoli operatori stanno nel campo 9 dei loro contratti, con le classi di §b.3. Nessuno è eseguito: la riga è un piano, non una prova.

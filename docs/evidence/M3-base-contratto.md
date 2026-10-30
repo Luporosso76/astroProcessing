@@ -78,6 +78,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `2e9428531ed13bc3b2b8e7ce9ddd0b3ffe5c8ec61d9c9272e0c07896b1c21388` |
-| `docs/contracts/README.md` | `c7561c4cf14641f06eb6950b4ae8cd39d24ee8a09b4bcf362002e23f84a2a4f2` |
+| `docs/contracts/README.md` | `603cd99cb80049be168c75247bab3a392c6b597095ecf6a79675a7a1cb01173c` |
 
 <!-- evidence:end -->

@@ -58,11 +58,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-09-algoritmi.md` | `6c14b9ddb98276fbbed5fe168f90a4360f02f26ce82ebd75ab4d686309e68121` |
 | `docs/contracts/C-01-calibrazione-light.md` | `063e14eacdbf25c92b31cf78c4bb6e19934d39fada23a06ba0c24d7fe8212162` |
-| `docs/contracts/C-02-master.md` | `f69280df31fc2aa05a1e5cb4108e870c4eafaa3bd0038ddc02aeff43c0f3798d` |
-| `docs/contracts/README.md` | `e6e3d69e1cb45d91fa30ffb57df91d776291866b3b41ba6bc060acc4c8da004b` |
+| `docs/contracts/C-02-master.md` | `c34b078781862e905ddd53734909d34113f893367a92ad8bf9f37a514336876d` |
+| `docs/contracts/README.md` | `603cd99cb80049be168c75247bab3a392c6b597095ecf6a79675a7a1cb01173c` |
 | `docs/decisions/D-09-soglie.md` | `b906fe06799f1f250f954734d54410aa443391d2efd07d8ccad6006a39d29d76` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
-| `docs/test-matrix.md` | `874634156790b236282d204d61aba926a9217275b0003241a1c8317dee75ac20` |
-| `plans/M3.md` | `a7ec9173fdb713afe26941008cc5c88033bca8d28c694cf90c391ce3cb54a95d` |
+| `docs/test-matrix.md` | `e92513e7ef3a10d8cd0ccc04c18209f155879815dfb2ef03ddc3427897bcbf9e` |
+| `plans/M3.md` | `e091bb75a8655635046cffda62dcd3b54005c69dfdbe65f9d99f7f03090f6757` |
 
 <!-- evidence:end -->
