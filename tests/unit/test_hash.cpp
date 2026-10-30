@@ -144,6 +144,27 @@ TEST(Hash, T_M2B_09_missing_file_is_io_input_missing) {
               error_category::io, "input.missing");
 }
 
+// OB-11: la riverifica legge i byte della dimensione aperta; un file cresciuto durante la lettura ha lo stesso digest
+// su quel prefisso e deve fermarsi comunque, senza input aperto dal chiamante.
+TEST(Hash, reverify_input_stops_a_file_appended_during_the_reading) {
+  const fs::path p = tmp_file("riverifica.bin");
+  const std::vector<std::uint8_t> data = pattern(4096);
+  write_file(p, data);
+  std::vector<std::byte> work(512);
+  bool appended = false;
+  const auto append_once = [&] {
+    if (appended) return;
+    appended = true;
+    std::ofstream out(p, std::ios::binary | std::ios::app);
+    out.put('x');
+  };
+  EXPECT_STOP(reverify_input(p.string(), nullptr, digest_of(data), work, append_once), error_category::integrity,
+              "input.size_changed");
+  EXPECT_TRUE(appended);
+  write_file(p, data);
+  EXPECT_NO_THROW(reverify_input(p.string(), nullptr, digest_of(data), work, {}));
+}
+
 TEST(Hash, stream_matches_one_shot_for_any_chunking) {
   std::vector<std::uint8_t> data(3 * 1024 * 1024 + 17);
   for (std::size_t i = 0; i < data.size(); ++i) data[i] = static_cast<std::uint8_t>(i * 31 + (i >> 8));

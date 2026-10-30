@@ -25,6 +25,17 @@ std::optional<cpu_capabilities> injected_capabilities;
 fault_injector task_injector;
 std::atomic<std::uint64_t> scalar_calls{0};
 std::atomic<std::uint64_t> avx2_calls{0};
+// Vero nei thread dei worker dello scheduler, dopo il primo begin_worker_task: il seam cpu.task_start vi scatta una
+// sola volta per task, nel worker.
+thread_local bool scheduler_worker = false;
+
+void inject_task_start() {
+  if (!task_injector) return;
+  const int err = task_injector("cpu.task_start");
+  if (err != 0) {
+    throw stop_error(error_category::io, "cpu.task_start", "errore all'avvio del task", {{"errno", std::to_string(err)}});
+  }
+}
 
 }  // namespace
 
@@ -86,14 +97,14 @@ void require_fp_environment() {
                     {"maschere", std::to_string((csr & mxcsr_masks) >> 7)}});
 }
 
+void begin_worker_task() {
+  scheduler_worker = true;
+  inject_task_start();
+  require_fp_environment();
+}
+
 void begin_kernel_task() {
-  if (task_injector) {
-    const int err = task_injector("cpu.task_start");
-    if (err != 0) {
-      throw stop_error(error_category::io, "cpu.task_start", "errore all'avvio del task del kernel",
-                       {{"errno", std::to_string(err)}});
-    }
-  }
+  if (!scheduler_worker) inject_task_start();
   require_fp_environment();
 }
 

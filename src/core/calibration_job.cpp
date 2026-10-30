@@ -182,10 +182,12 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     }
 
     std::array<fits_plan, 4> plans;
-    std::uint64_t input_peaks = 0;
+    std::array<std::optional<fits_input>, 4> opened;  // residenza intera: letti nel prepare con gli header del piano
+    std::uint64_t input_peaks = 0, largest_input = 0;
     std::uint64_t block_raw = 0, block_band = 0, block_regions = 0;
     for (std::size_t i = 0; i < specs.size(); ++i) {
-      fits_input input = open_fits_input(specs[i]->path);
+      const fits_input& input = opened[i].emplace(open_fits_input(specs[i]->path));
+      largest_input = std::max(largest_input, input.size_bytes());
       // Fase e linearita' dai soli header e dalla ricetta, prima di ogni lettura di campioni (ADR-03, R1).
       const header_peek peek = peek_header(input, specs[i]->read_options);
       require_calibration_phase(names[i], peek.phase);
@@ -266,18 +268,13 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       std::array<image, 4> images;
       for (std::size_t i = 0; i < specs.size(); ++i) {
         jc.check_cancel();
-        const std::vector<std::uint8_t> bytes = read_verified_fits(specs[i]->path, specs[i]->digest, budget_bytes);
-        images[i] = decode_fits(bytes, budget_bytes, specs[i]->read_options);
-        const fits_plan& planned = plans[i];
-        if (bytes.size() != planned.file_bytes) {
-          fail(error_category::integrity, "input.size_changed", "il file riletto ha dimensione diversa da quella pianificata",
-               {{"input", names[i]}, {"pianificata", std::to_string(planned.file_bytes)}, {"riletta", std::to_string(bytes.size())}});
-        }
-        const image_geometry& g = images[i].geometry;
-        if (g.width != planned.width || g.height != planned.height || g.planes != planned.planes) {
-          fail(error_category::integrity, "input.geometry_changed", "la geometria riletta differisce da quella del piano",
-               {{"input", names[i]}, {"pianificata", std::to_string(planned.width) + "x" + std::to_string(planned.height)},
-                {"riletta", std::to_string(g.width) + "x" + std::to_string(g.height)}});
+        try {
+          images[i] = decode_fits(
+              read_verified_input(*opened[i], specs[i]->path, specs[i]->digest, budget_bytes, plans[i]), budget_bytes,
+              specs[i]->read_options);
+        } catch (stop_error& e) {
+          e.add_context("input", names[i]);
+          throw;
         }
       }
       prepared.emplace(prepare_calibration(
@@ -285,19 +282,23 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
                                      std::move(images[3])}));
       observed = prepared->observed_inputs();
       if (options.hook) options.hook("preflight.done");
-      for (std::size_t i = 0; i < specs.size(); ++i) {
-        jc.check_cancel();
-        try {
-          (void)read_verified_fits(specs[i]->path, specs[i]->digest, budget_bytes);
-        } catch (stop_error& e) {
-          e.add_context("fase", "riverifica dopo il preflight");
-          e.add_context("input", names[i]);
-          throw;
-        }
-      }
     };
 
-    spec.finalize = [&](job_context&) {
+    spec.finalize = [&](job_context& jc) {
+      {
+        pool_buffer chunk(jc.shared, static_cast<std::size_t>(std::clamp<std::uint64_t>(largest_input, 1, sha256_chunk_bytes)));
+        for (std::size_t i = 0; i < specs.size(); ++i) {
+          try {
+            jc.check_cancel();
+            reverify_input(specs[i]->path, &*opened[i], specs[i]->digest, {chunk.data(), chunk.size()},
+                           [&jc] { jc.check_cancel(); });
+          } catch (stop_error& e) {
+            e.add_context("fase", "riverifica prima della pubblicazione");
+            e.add_context("input", names[i]);
+            throw;
+          }
+        }
+      }
       warnings = prepared->warnings();
       calibration_result result = finish_calibration(std::move(*prepared));
       prepared.reset();

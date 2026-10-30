@@ -158,9 +158,9 @@ minimal_job make_master(const job_type_inputs& inputs, const std::string& varian
 
 const std::vector<job_type_entry>& registered_job_types() {
   static const std::vector<job_type_entry> entries{
-      {import_operator_id, {"file"}, {{"unica", false, false}}, false, make_import},
-      {thumbnail_operator_id, {"file"}, {{"unica", false, false}}, false, make_thumbnail},
-      {cache_rebuild_operator_id, {"file"}, {{"unica", false, false}}, false, make_cache_rebuild},
+      {import_operator_id, {"file"}, {{"unica", false, false}}, true, make_import},
+      {thumbnail_operator_id, {"file"}, {{"unica", false, false}}, true, make_thumbnail},
+      {cache_rebuild_operator_id, {"file"}, {{"unica", false, false}}, true, make_cache_rebuild},
       {calibration_operator_id,
        {"light", "dark", "flat", "dark_flat"},
        {{"intera", false, false}, {"blocchi", true, true}},

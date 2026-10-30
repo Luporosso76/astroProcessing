@@ -184,6 +184,7 @@ fits_block_source& fits_block_source::operator=(fits_block_source&&) noexcept = 
 fits_block_source::~fits_block_source() = default;
 
 const image& fits_block_source::header() const noexcept { return impl_->header; }
+const fits_plan& fits_block_source::plan() const noexcept { return impl_->scan.plan; }
 std::uint32_t fits_block_source::tile_rows() const noexcept { return impl_->tile_rows; }
 std::uint64_t fits_block_source::tile_count() const noexcept { return impl_->tiles; }
 bool fits_block_source::has_invalid() const noexcept { return impl_->scan.invalid_hdu >= 0; }
@@ -316,13 +317,7 @@ void fits_block_source::verify(std::span<std::byte> work, const std::function<vo
       }
     }
   }
-  const content_digest actual = whole.finish();
-  if (!(actual == p.expected)) {
-    throw stop_error(error_category::integrity, "input.digest_mismatch", "digest o dimensione del file diversi dal record",
-                     {{"percorso", p.path},
-                      {"atteso", p.expected.sha256 + ":" + std::to_string(p.expected.size_bytes)},
-                      {"letto", actual.sha256 + ":" + std::to_string(actual.size_bytes)}});
-  }
+  require_input_digest(whole.finish(), p.expected, p.path);
   if (header_changed) throw *header_changed;
   if (checksum_error) throw *checksum_error;
   if (sample_error) throw *sample_error;
@@ -404,19 +399,8 @@ void fits_block_source::read_tile(std::uint64_t tile, std::span<std::byte> raw, 
 }
 
 void fits_block_source::check_identity() const {
-  const impl& p = *impl_;
-  struct stat named {};
-  if (::stat(p.path.c_str(), &named) != 0) {
-    const int e = errno;
-    fail(error_category::io, e == ENOENT ? "input.missing" : "fits.fstat", "file dell'ingresso non accessibile",
-         {{"percorso", p.path}, {"errno", std::to_string(e)}});
-  }
-  const auto [dev, ino] = identity_of(p.input);
-  if (static_cast<std::uint64_t>(named.st_dev) != dev || static_cast<std::uint64_t>(named.st_ino) != ino) {
-    fail(error_category::integrity, "input.modified", "il percorso indica un file diverso da quello letto",
-         {{"percorso", p.path}});
-  }
-  check_unchanged(p.input);
+  check_path_names(impl_->path, impl_->input);
+  check_unchanged(impl_->input);
 }
 
 std::uint64_t primary_sample_bytes(const fits_input& input) {

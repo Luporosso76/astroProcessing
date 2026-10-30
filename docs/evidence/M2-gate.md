@@ -61,8 +61,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tools/check_m2_trace.py` | `2ff5df7acdcc07ef45edd4c80fdb6ed7c7d5decd9e5f4629cc1751842c216a9b` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
 
-- Test dev (`tmp/dev-junit.xml`): totali 598, fast 598, slow 0, falliti 7
-- Test release (`tmp/release-junit.xml`): totali 604, fast 597, slow 7, falliti 7
+- Test dev (`tmp/dev-junit.xml`): totali 602, fast 602, slow 0, falliti 1
+- Test release (`tmp/release-junit.xml`): totali 608, fast 601, slow 7, falliti 1
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/dev`, junit `tmp/dev-junit.xml`): trace: 63 ID nello stadio M2, 38 non coperti
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->

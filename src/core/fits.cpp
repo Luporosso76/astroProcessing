@@ -541,6 +541,20 @@ std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input) {
   return {static_cast<std::uint64_t>(sb.st_dev), static_cast<std::uint64_t>(sb.st_ino)};
 }
 
+void check_path_names(const std::string& path, const fits_input& input) {
+  struct stat named {};
+  if (::stat(path.c_str(), &named) != 0) {
+    const int e = errno;
+    fail(error_category::io, e == ENOENT ? "input.missing" : "fits.fstat", "file dell'ingresso non accessibile",
+         {{"percorso", path}, {"errno", std::to_string(e)}});
+  }
+  const auto [dev, ino] = identity_of(input);
+  if (static_cast<std::uint64_t>(named.st_dev) != dev || static_cast<std::uint64_t>(named.st_ino) != ino) {
+    fail(error_category::integrity, "input.modified", "il percorso indica un file diverso da quello letto",
+         {{"percorso", path}});
+  }
+}
+
 }  // namespace fits_detail
 
 fits_input open_fits_input(const std::string& path) {

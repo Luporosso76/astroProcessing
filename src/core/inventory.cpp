@@ -260,16 +260,10 @@ content_digest digest_fits_input(const fits_input& input, io_memory memory, cons
   const std::uint64_t block = digest_reserve_bytes(input.size_bytes());
   reservation block_memory = memory.take(block, "digest.block");
   pool_buffer buffer(block_memory, static_cast<std::size_t>(block));
-  sha256_stream hasher;
-  for (std::uint64_t done = 0; done < input.size_bytes();) {
-    check_read_cancel(cancel);
-    const std::size_t n = static_cast<std::size_t>(std::min<std::uint64_t>(block, input.size_bytes() - done));
-    read_exact(input, done, buffer.data(), n);
-    hasher.update({reinterpret_cast<const std::uint8_t*>(buffer.data()), n});
-    done += n;
-  }
+  const content_digest found =
+      digest_input(input, {buffer.data(), buffer.size()}, [cancel] { check_read_cancel(cancel); });
   check_unchanged(input);
-  return hasher.finish();
+  return found;
 }
 
 }  // namespace astro

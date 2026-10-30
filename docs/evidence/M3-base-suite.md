@@ -168,19 +168,19 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `b1868d69604a055bd483d38727a1bba795d8c5484573767c518f99e30750b4ff` |
+| `docs/contracts/BASE-confini.md` | `f337acc5a5a0780bdaf784ffe9a87b62fd36c6ef902e0bf98c578ba8d46d63bb` |
 | `src/core/CMakeLists.txt` | `44dc4103f2e0154dc4fefd4e3e7946a9ef3e6844efbe01eee417e5f51ea84538` |
-| `src/core/fits.cpp` | `b461862ff1b7652641dab41e8fb9fd9f81096aabf73859bdefb957b801336938` |
-| `src/core/fits_blocks.cpp` | `d3cff6db5ec9329cb236d251691121de59a5692d631c368a67009da934135b56` |
+| `src/core/fits.cpp` | `c73cfc5e73993cbfba5d4052078b50fd446c6caccd21b7a1d7cd69d90005afbc` |
+| `src/core/fits_blocks.cpp` | `d8c0d71a430957157b7c8895ded765db1c7d8455dd074d11818a51e87b5a74f1` |
 | `src/core/include/astro/job.hpp` | `e594f0e97270251ee9a73983a0c55d3b3e219615cf6c71872b1fbe0b90f49cc0` |
 | `src/core/include/astro/job_probe.hpp` | `9101e6d1307787e4c693c387bf3f25bf341ee97be940246fba94d1240d43f9a9` |
 | `src/core/include/astro/job_types.hpp` | `e9e6195e9c6de64dc348aaa7a002e9a24fece7ad6038df79c2a9cc4031c96942` |
-| `src/core/inventory.cpp` | `66d70cc080ade81ebf24f79afce57e6a6b3762ca539d7690c6b2fe8240b176d4` |
+| `src/core/inventory.cpp` | `6b2fee4bf475ca554a8647c2418da24741465ac2f63d0cdd7fbae81b30e17ef1` |
 | `src/core/job.cpp` | `f9681bccbd5d14b4bdec111fb72f1213b5f802cf249a0e78448f8855acc77805` |
 | `src/core/job_probe.cpp` | `a3f08b593a97b04672f0ae4b089e7cebf7594531979cffd6252aa668e70451bc` |
-| `src/core/job_types.cpp` | `ce265ddae60362b26f1ea314081e4834b90a14791fa2ecbfe749b3cf92567bba` |
+| `src/core/job_types.cpp` | `b5bd937c1d3088eeed6b5eaf2c24c92244ee4279852941551ad971f5ecc8d933` |
 | `src/core/node.cpp` | `b697838dd840f877c2b41a63ab83679d03a2ec6700e784438d052532b8bf7e3c` |
-| `src/core/scheduler.cpp` | `ec971faf2d922e885153ad4ba71723ec115c5aac3e24f199d2cc62bc44376996` |
+| `src/core/scheduler.cpp` | `9588b0adfc402c790329ee0f837972128a3548ef82b5012055f228c429d38069` |
 | `tests/fixtures/conformance_inputs.hpp` | `d680048d26f707487062942ff19145a417364f677fdfc12901a7f4a93a88d94d` |
 | `tests/unit/CMakeLists.txt` | `ccc810f54e54442b59efea5d8d8b3bdfca6c95f793ce0bd5d891a88d96819a9d` |
 | `tests/unit/conformance_network.cpp` | `72392f9b1d8d37b68d762da2c73f83b26c4428bdeee02d16c572612fff98d9fc` |

@@ -23,6 +23,9 @@ void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::s
 void check_unchanged(const fits_input& input);
 // (st_dev, st_ino) del file aperto.
 std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input);
+// `path` indica il file aperto: assente io input.missing, non accessibile io fits.fstat, un altro file integrity
+// input.modified.
+void check_path_names(const std::string& path, const fits_input& input);
 }
 
 namespace fits_limits {
@@ -43,6 +46,7 @@ struct fits_plan {
   std::uint32_t height = 0;
   std::uint32_t planes = 0;
   sample_type type = sample_type::f32;
+  int bitpix = 0;  // BITPIX del primario: con `type` fissa i byte grezzi per campione
   bool has_invalid = false;
   bool has_variance = false;
   // file + campioni + maschera (2 byte per campione) + varianza se presente.

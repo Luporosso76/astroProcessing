@@ -265,26 +265,15 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     shared = &jc.shared;
     std::uint64_t pass_bytes = layout.inputs_bytes();
     pool_buffer pass(jc.shared, static_cast<std::size_t>(pass_bytes));
-    // P0 di ogni ingresso, nell'ordine della residenza intera; poi dimensione e geometria contro il piano.
+    // P0 di ogni ingresso, nell'ordine della residenza intera.
     std::array<image, 4> headers;
     for (std::size_t k = 0; k < 4; ++k) {
       sources[k].emplace(specs[k]->path, specs[k]->digest, specs[k]->read_options, t, layout.variance[k]);
       fits_block_source& src = *sources[k];
+      // Header del piano uguali a quelli che la passata P0 verifica, prima che P0 legga un campione.
+      require_planned_header(req.plans[k], src.plan(), specs[k]->path);
       src.verify(std::span<std::byte>(pass.data(), pass.size()), [&jc] { jc.check_cancel(); });
-      const fits_plan& planned = req.plans[k];
-      const image& hdr = src.header();
-      if (specs[k]->digest.size_bytes != planned.file_bytes) {
-        fail(error_category::integrity, "input.size_changed", "il file riletto ha dimensione diversa da quella pianificata",
-             {{"input", input_names[k]}, {"pianificata", std::to_string(planned.file_bytes)},
-              {"riletta", std::to_string(specs[k]->digest.size_bytes)}});
-      }
-      if (hdr.geometry.width != planned.width || hdr.geometry.height != planned.height ||
-          hdr.geometry.planes != planned.planes) {
-        fail(error_category::integrity, "input.geometry_changed", "la geometria riletta differisce da quella del piano",
-             {{"input", input_names[k]}, {"pianificata", std::to_string(planned.width) + "x" + std::to_string(planned.height)},
-              {"riletta", std::to_string(hdr.geometry.width) + "x" + std::to_string(hdr.geometry.height)}});
-      }
-      headers[k] = hdr;
+      headers[k] = src.header();
     }
     prepared = prepare_headers(recipe, calibration_images{std::move(headers[0]), std::move(headers[1]),
                                                           std::move(headers[2]), std::move(headers[3])});
@@ -393,7 +382,11 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     }
     warnings = p.warnings;
     json report = calibration_report(p, counts, invalid_pixels);
-    for (const auto& src : sources) src->check_identity();
+    for (std::size_t k = 0; k < 4; ++k) {
+      sources[k]->check_identity();
+      reverify_input(specs[k]->path, nullptr, specs[k]->digest, {buffer.data(), buffer.size()},
+                     [&jc] { jc.check_cancel(); });
+    }
     const fits_stream_writer writer(p.out, invalid_pixels > 0);
     const auto read_staging = [&](std::uint64_t offset, std::span<std::byte> dst) { staging->read(offset, dst); };
     sha256_stream hash;

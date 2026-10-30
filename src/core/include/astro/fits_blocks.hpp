@@ -43,6 +43,8 @@ class fits_block_source {
 
   // Immagine di soli header, come decode_fits senza campioni (samples, maschera e varianza vuoti).
   const image& header() const noexcept;
+  // Piano degli header analizzati all'apertura, gli stessi che verify confronta con i byte letti.
+  const fits_plan& plan() const noexcept;
   std::uint32_t tile_rows() const noexcept;
   std::uint64_t tile_count() const noexcept;
   bool has_invalid() const noexcept;

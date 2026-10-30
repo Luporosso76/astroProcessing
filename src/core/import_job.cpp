@@ -174,27 +174,18 @@ void require_rebuild_cause(const std::string& cause) {
   }
 }
 
-// `prepare` dei job di I/O: digest dell'intero file nella memoria condivisa del job, prima del task.
-void verify_digest(const fits_input& input, const content_digest& expected, job_context& jc, const job_hook& hook) {
-  jc.check_cancel();
-  const content_digest found = digest_fits_input(input, jc.shared, &jc.cancel);
-  if (!(found == expected)) {
-    fail(error_category::integrity, "input.digest_mismatch", "digest o dimensione diversi da quelli attesi",
-         {{"atteso", expected.sha256}, {"calcolato", found.sha256}});
-  }
-  if (hook) hook("digest.done");
-}
-
 // Job di I/O sullo scheduler (OB-08): un task, un worker, picco shared_bytes + per_task_bytes prenotato dal pool in
-// coda FIFO prima di `prepare`. `prepare` verifica il digest in shared_bytes; il task lavora in per_task_bytes.
+// coda FIFO prima di `prepare`. In shared_bytes (un blocco di digest) `prepare` verifica il digest di `input` e
+// `finalize` lo riverifica prima della pubblicazione (OB-11); il task lavora in per_task_bytes.
 // worker_count e tile_rows della configurazione non si applicano: un solo task non si divide fra worker, e
 // tile_rows e' l'altezza della fascia letta dal task (1 se il task non legge campioni). Restituisce il piano eseguito.
-std::shared_ptr<const resource_plan> run_single_task(const node_spec& node, std::uint64_t shared_bytes,
+std::shared_ptr<const resource_plan> run_single_task(const node_spec& node, const fits_input& input, const std::string& path,
+                                                     const content_digest& digest, const job_hook& hook,
                                                      std::uint64_t per_task_bytes, std::uint32_t tile_rows,
                                                      memory_pool& pool, const resource_config* resources,
                                                      const cancel_token& cancel,
-                                                     std::function<void(job_context&)> prepare,
                                                      const std::function<void(task_context&)>& task) {
+  const std::uint64_t shared_bytes = digest_reserve_bytes(input.size_bytes());
   job_plan plan;
   plan.shared_bytes = shared_bytes;
   plan.per_task_bytes = per_task_bytes;
@@ -203,7 +194,15 @@ std::shared_ptr<const resource_plan> run_single_task(const node_spec& node, std:
     task(tc);
     return std::string();
   });
-  spec.prepare = std::move(prepare);
+  spec.prepare = [&](job_context& jc) {
+    jc.check_cancel();
+    require_input_digest(digest_fits_input(input, jc.shared, &jc.cancel), digest, path);
+    if (hook) hook("digest.done");
+  };
+  spec.finalize = [&](job_context& jc) {
+    pool_buffer work(jc.shared, static_cast<std::size_t>(shared_bytes));
+    reverify_input(path, &input, digest, {work.data(), work.size()}, [&jc] { jc.check_cancel(); });
+  };
   job_scheduler scheduler(pool, system_affinity, resources ? scheduler_tuning_of(*resources) : scheduler_tuning{});
   (void)scheduler.run(plan, spec, cancel);
   auto executed = std::make_shared<resource_plan>();
@@ -385,9 +384,8 @@ job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name
     const fits_input input = open_fits_input(request.path);
     std::optional<fits_inventory> scanned;
     std::shared_ptr<const resource_plan> plan = run_single_task(
-        *node, digest_reserve_bytes(input.size_bytes()), inventory_reserve_bytes(input.size_bytes()), 1, pool, resources,
-        cancel, [&](job_context& jc) { verify_digest(input, request.digest, jc, request.hook); },
-        [&](task_context& tc) {  // l'inventario verifica anche che il file non sia cambiato
+        *node, input, request.path, request.digest, request.hook, inventory_reserve_bytes(input.size_bytes()), 1, pool,
+        resources, cancel, [&](task_context& tc) {  // l'inventario verifica anche che il file non sia cambiato
           scanned.emplace(inventory_fits(input, request.read_options, tc.memory, &tc.job.cancel));
         });
     const fits_inventory& inv = *scanned;
@@ -419,11 +417,10 @@ job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_n
     const fits_input input = open_fits_input(path);
     std::optional<thumbnail_result> got;
     std::shared_ptr<const resource_plan> plan = run_single_task(
-        *node, digest_reserve_bytes(input.size_bytes()), thumbnail_cache::peak_bytes(input, request),
-        request.block_height, pool, resources, cancel, [&](job_context& jc) { verify_digest(input, digest, jc, hook); },
+        *node, input, path, digest, hook, thumbnail_cache::peak_bytes(input, request), request.block_height, pool,
+        resources, cancel,
         [&](task_context& tc) { got.emplace(cache.get(input, digest, request, tc.memory, &tc.job.cancel)); });
     const thumbnail_result& r = *got;
-    fits_detail::check_unchanged(input);
     const std::string ref = thumbnail_ref_json(r, digest);
     job_files_result result;
     result.files = store.write_files({artifact_content{bytes_of(ref), "json", "thumbnail_ref", std::nullopt, "primary"}});
@@ -451,13 +448,11 @@ job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& sl
     std::string replaced_found;
     std::optional<thumbnail_result> rebuilt;
     std::shared_ptr<const resource_plan> plan = run_single_task(
-        *node, digest_reserve_bytes(input.size_bytes()), thumbnail_cache::peak_bytes(input, request),
-        request.block_height, pool, resources, cancel, [&](job_context& jc) { verify_digest(input, digest, jc, hook); },
-        [&](task_context& tc) {
+        *node, input, path, digest, hook, thumbnail_cache::peak_bytes(input, request), request.block_height, pool,
+        resources, cancel, [&](task_context& tc) {
           rebuilt.emplace(cache.rebuild(input, digest, request, tc.memory, &tc.job.cancel, replaced_name, replaced_found));
         });
     const thumbnail_result& r = *rebuilt;
-    fits_detail::check_unchanged(input);
     const std::string ref = thumbnail_ref_json(r, digest);
     job_files_result result;
     result.files = store.write_files({artifact_content{bytes_of(ref), "json", "thumbnail_ref", std::nullopt, "primary"}});

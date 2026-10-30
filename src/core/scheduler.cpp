@@ -237,8 +237,8 @@ void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job
         throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto o job in arresto",
                          {{"task", std::to_string(index)}});
       }
-      // Nel thread del worker, prima che il task legga o decodifichi i propri dati (ADR-07).
-      require_fp_environment();
+      // Nel thread del worker, prima che il task legga o decodifichi i propri dati (ADR-07, OB-05).
+      begin_worker_task();
       reservation memory = job_res.carve(plan.per_task_bytes, "task");
       task_context tc{jc, index, memory};
       std::string digest;

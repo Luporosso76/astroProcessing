@@ -18,14 +18,14 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-04-persistenza.md` | `6681f95533f13d72b158069994c9a7e71e8e948b3af409e40cfd76c1d3b29a7a` |
-| `src/core/import_job.cpp` | `35276f2fffcab2d731eb08b0844eea2f8c7116f26e965da651a96ef2d8bcd46b` |
+| `src/core/import_job.cpp` | `f524e0c1b79a5b1525845ab9615abb8dffc8abec6380e3d174c161192a57e123` |
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
 | `src/core/workflow.cpp` | `8ce82489db3416b44396cca59bce06f6d4ab6af7d4bacc33e62fdd77204e1d82` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tests/unit/test_recovery.cpp` | `884b87b25700b53ff9263a0b20b26139e798ed92d8368866e5ca3c08fee0ccaf` |
 
-- Test release (`tmp/release-junit.xml`): totali 604, fast 597, slow 7, falliti 7
-- Test dev (`tmp/dev-junit.xml`): totali 598, fast 598, slow 0, falliti 7
+- Test release (`tmp/release-junit.xml`): totali 608, fast 601, slow 7, falliti 1
+- Test dev (`tmp/dev-junit.xml`): totali 602, fast 602, slow 0, falliti 1
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

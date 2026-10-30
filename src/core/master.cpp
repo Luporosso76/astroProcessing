@@ -1040,18 +1040,12 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         jc.check_cancel();
         const master_frame_spec& f = *p.frames[k].spec;
         image im;
-        {
-          const std::vector<std::uint8_t> bytes = read_input_bytes(inputs[k], budget_bytes);
-          const content_digest got = digest_of(bytes);
-          if (!(got == f.digest)) {
-            stop(error_category::integrity, "input.digest_mismatch", "digest del frame diverso da quello della ricetta",
-                 {{"frame", p.frames[k].name}, {"atteso", f.digest.sha256}, {"trovato", got.sha256}});
-          }
-          im = decode_fits(bytes, budget_bytes, f.read_options);
-        }
-        if (im.geometry.width != layouts[k].width || im.geometry.height != layouts[k].height) {
-          stop(error_category::integrity, "input.geometry_changed", "la geometria decodificata differisce da quella del piano",
-               {{"frame", p.frames[k].name}});
+        try {
+          im = decode_fits(read_verified_input(inputs[k], f.path, f.digest, budget_bytes, plans[k]), budget_bytes,
+                           f.read_options);
+        } catch (stop_error& e) {
+          e.add_context("frame", p.frames[k].name);
+          throw;
         }
         inspect_frame(p, k, im);
         compare_with_reference(p, k);
@@ -1063,23 +1057,13 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     };
 
     spec.finalize = [&](job_context& jc) {
-      // I blocchi letti appartengono al file verificato: stessa identita' fstat e stesso digest dell'intero file.
+      // I blocchi letti dai task appartengono al file verificato: file aperto invariato e digest al percorso.
       pool_buffer chunk(jc.shared, static_cast<std::size_t>(master_digest_chunk_bytes));
       for (std::size_t k = 0; k < p.n; ++k) {
         try {
-          fits_detail::check_unchanged(inputs[k]);
-          sha256_stream hasher;
-          for (std::uint64_t done = 0; done < inputs[k].size_bytes();) {
-            const std::size_t n = static_cast<std::size_t>(std::min<std::uint64_t>(master_digest_chunk_bytes, inputs[k].size_bytes() - done));
-            fits_detail::read_exact(inputs[k], done, chunk.data(), n);
-            hasher.update({reinterpret_cast<const std::uint8_t*>(chunk.data()), n});
-            done += n;
-          }
-          const content_digest got = hasher.finish();
-          if (!(got == p.frames[k].spec->digest)) {
-            stop(error_category::integrity, "input.digest_mismatch", "digest del frame cambiato durante il job",
-                 {{"atteso", p.frames[k].spec->digest.sha256}, {"trovato", got.sha256}});
-          }
+          jc.check_cancel();
+          reverify_input(p.frames[k].spec->path, &inputs[k], p.frames[k].spec->digest, {chunk.data(), chunk.size()},
+                         [&jc] { jc.check_cancel(); });
         } catch (stop_error& e) {
           e.add_context("frame", p.frames[k].name);
           e.add_context("fase", "riverifica prima della pubblicazione");

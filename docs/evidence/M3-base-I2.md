@@ -74,7 +74,7 @@ T-11 per i tipi di I/O era rosso per il solo caso «file cambiato dopo la verifi
 In `src/core/` (unica directory dei sorgenti di prodotto) con `grep`:
 
 - `spec.prepare`: `calibration_job.cpp:264`, `calibration_blocks.cpp:264`, `master.cpp:1037`, `import_job.cpp:206` (i tre tipi di I/O). Tutti chiamano ora `job_context::check_cancel` prima dei blocchi letti; nessun altro `prepare` nel prodotto.
-- Cicli di lettura degli input (`read_exact`, `read_tile`, `read_verified_fits`, `read_input_bytes`, `read_fits_rows`): nei task `calibration_blocks.cpp:236`, `master.cpp:1029` con `task_context::check_cancel`; nei `prepare` quelli sopra; in `inventory.cpp` col token. **Non coperto**: la riverifica degli input nel `finalize` del master (`master.cpp:1072`), che legge ogni frame per intero senza controllo; lo scheduler ferma il job dopo `finalize`. Dichiarato come limite nel contratto (OB-07), non corretto qui: il caso T-M3BASE-07 vieta di eseguire `finalize` dopo il cancel e non lo esercita. Il `finalize` della residenza a blocchi legge lo staging, non gli input.
+- Cicli di lettura degli input (`read_exact`, `read_tile`, `read_verified_fits`, `read_input_bytes`, `read_fits_rows`): nei task `calibration_blocks.cpp:236`, `master.cpp:1029` con `task_context::check_cancel`; nei `prepare` quelli sopra; in `inventory.cpp` col token. **Non coperto da I2**: la riverifica degli input nel `finalize` del master (`master.cpp:1072`), che leggeva ogni frame per intero senza controllo; corretto dall'intervento I3 (`docs/evidence/M3-base-I3.md`), che vi chiama `job_context::check_cancel` prima di ogni frame e di ogni pezzo letto. Il caso T-M3BASE-07 vieta di eseguire `finalize` dopo il cancel e non lo esercita. Il `finalize` della residenza a blocchi legge lo staging, non gli input.
 - Prenotazioni dentro `work` (`reserve_or_stop`, `try_reserve`, `pool.reserve`): restano solo `io_memory::take` sul pool (`inventory.cpp:103`, chiamate di libreria fuori da un job, usate dai test di inventario, anteprima e cache) e la prenotazione del job nello scheduler (`scheduler.cpp:411`). `job_types.cpp:66` crea un pool per la precondizione del registro di `cache.rebuild`, fuori da ogni job.
 
 ## Scelte
@@ -96,23 +96,23 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `b1868d69604a055bd483d38727a1bba795d8c5484573767c518f99e30750b4ff` |
-| `src/core/calibration_blocks.cpp` | `5075bf2d5d0ff2b6da68ac69c864c57e05975d918f886e1f101cdc09ec5808de` |
-| `src/core/calibration_job.cpp` | `87247d486a0983d9edf00bac4d551fe9c93b11284e5c6f25fbe8939f4e7e4561` |
-| `src/core/fits_blocks.cpp` | `d3cff6db5ec9329cb236d251691121de59a5692d631c368a67009da934135b56` |
-| `src/core/import_job.cpp` | `35276f2fffcab2d731eb08b0844eea2f8c7116f26e965da651a96ef2d8bcd46b` |
-| `src/core/include/astro/fits_blocks.hpp` | `2820f9796c90781957537fcac075a9135c6e4baf3ce09817a1bd10429da07b1d` |
+| `docs/contracts/BASE-confini.md` | `f337acc5a5a0780bdaf784ffe9a87b62fd36c6ef902e0bf98c578ba8d46d63bb` |
+| `src/core/calibration_blocks.cpp` | `52ef8cb2d248f4f2905ec2dbbd4ca3dbfe7912a828326bffee8b496db76d58c5` |
+| `src/core/calibration_job.cpp` | `35824e7b097097ad0a256037436f2644b6a1a50bae2ce656cb80fe4e99c15c6b` |
+| `src/core/fits_blocks.cpp` | `d8c0d71a430957157b7c8895ded765db1c7d8455dd074d11818a51e87b5a74f1` |
+| `src/core/import_job.cpp` | `f524e0c1b79a5b1525845ab9615abb8dffc8abec6380e3d174c161192a57e123` |
+| `src/core/include/astro/fits_blocks.hpp` | `49c32447622cdf9f0f2fb5122679e474a36ca492f296cf44e1e7a87d96e4860c` |
 | `src/core/include/astro/import_job.hpp` | `58eaa1d71c185f33248804cf2970db132418b5d28bbd9c170b49bc927541bc17` |
 | `src/core/include/astro/inventory.hpp` | `64dd96ce0c1656d68806c51bb08d2931d87538f4878e62e073802f127beccb12` |
 | `src/core/include/astro/scheduler.hpp` | `617d499fe6c5177b3d588e5f00f77a705fbc67a1ebf2b08c8fcfd0f14dd064ad` |
 | `src/core/include/astro/thumbnail_cache.hpp` | `3495a68da974abc44ea5814d8e7e552d3fc0bfa4d3429834c03676904fc2f289` |
-| `src/core/inventory.cpp` | `66d70cc080ade81ebf24f79afce57e6a6b3762ca539d7690c6b2fe8240b176d4` |
-| `src/core/job_types.cpp` | `ce265ddae60362b26f1ea314081e4834b90a14791fa2ecbfe749b3cf92567bba` |
-| `src/core/master.cpp` | `dfe61c03eac0e109a3886982349fae45182c1a91d28a6d6942ba3b86be72cfa2` |
-| `src/core/scheduler.cpp` | `ec971faf2d922e885153ad4ba71723ec115c5aac3e24f199d2cc62bc44376996` |
+| `src/core/inventory.cpp` | `6b2fee4bf475ca554a8647c2418da24741465ac2f63d0cdd7fbae81b30e17ef1` |
+| `src/core/job_types.cpp` | `b5bd937c1d3088eeed6b5eaf2c24c92244ee4279852941551ad971f5ecc8d933` |
+| `src/core/master.cpp` | `062e3f341aeb95b9f9d8aa9e233a7bfa8cee4f9af0f4d56a56f2ae683940dcb2` |
+| `src/core/scheduler.cpp` | `9588b0adfc402c790329ee0f837972128a3548ef82b5012055f228c429d38069` |
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 
-- Test release (`tmp/release-junit.xml`): totali 604, fast 597, slow 7, falliti 7
-- Test dev (`tmp/dev-junit.xml`): totali 598, fast 598, slow 0, falliti 7
+- Test release (`tmp/release-junit.xml`): totali 608, fast 601, slow 7, falliti 1
+- Test dev (`tmp/dev-junit.xml`): totali 602, fast 602, slow 0, falliti 1
 <!-- evidence:end -->

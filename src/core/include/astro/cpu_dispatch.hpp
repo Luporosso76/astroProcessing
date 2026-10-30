@@ -32,8 +32,13 @@ cpu_path resolve_cpu_path(simd_request request, const cpu_capabilities& caps);
 // (bit 7-12) spenta: numeric cpu.fp_mode, con `mxcsr` nel contesto. Il registro non viene modificato.
 void require_fp_environment();
 
-// Avvio di un task di kernel nel thread del worker: fault_injector del seam al punto cpu.task_start (un valore non
-// nullo e' io cpu.task_start con l'errno), poi require_fp_environment.
+// Avvio di un task dello scheduler nel thread del worker, prima che il task legga i propri dati (OB-05):
+// fault_injector del seam al punto cpu.task_start (un valore non nullo e' io cpu.task_start con l'errno), poi
+// require_fp_environment.
+void begin_worker_task();
+
+// Avvio di un kernel: require_fp_environment, preceduto dal seam cpu.task_start solo fuori dai worker dello scheduler
+// (chiamate di libreria), dove il seam e' gia' scattato in begin_worker_task.
 void begin_kernel_task();
 
 // Somma ricorsiva su pixel (ADR-07 (b)): cpu_scalar nell'ordine degli indici, cpu_avx2 su 4 corsie con riduzione
