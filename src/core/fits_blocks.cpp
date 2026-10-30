@@ -411,6 +411,7 @@ std::uint64_t primary_sample_bytes(const fits_input& input) {
 // ---------------------------------------------------------------- FITS in streaming
 
 fits_stream_writer::fits_stream_writer(const image& header_only, bool with_invalid) : with_invalid_(with_invalid) {
+  reject_decoder_state(header_only);
   // Lo staging contiene campioni in virgola mobile del tipo dell'immagine: solo l'encoding identita' corrispondente.
   const int float_bitpix = header_only.type == sample_type::f32 ? -32 : -64;
   if (header_only.encoding && (header_only.encoding->bitpix != float_bitpix || header_only.encoding->bzero != 0.0 ||

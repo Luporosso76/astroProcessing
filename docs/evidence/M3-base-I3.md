@@ -123,15 +123,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
-| `docs/evidence/M3-base-I2.md` | `d6a86a508260ca1051fa82fc6855ad4e3ceef99f9d157a7b25d38367bc4d4306` |
+| `docs/evidence/M3-base-I2.md` | `eb37d1580a89d798f152ecd70b5a1f5a9fd0e9d019c09cb546d49500c5ff69d5` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
 | `src/core/cpu_dispatch.cpp` | `73c737a9f1ce03e297be90126d47d85c1fe5f451fbdacde579478bb5bff367ae` |
-| `src/core/fits.cpp` | `7aecd983c003877de00f87a3ecb1e6b620f75790f1e8a4dd87c2a0835ac472c0` |
-| `src/core/fits_blocks.cpp` | `d8c0d71a430957157b7c8895ded765db1c7d8455dd074d11818a51e87b5a74f1` |
+| `src/core/fits.cpp` | `043760d83d7a03067169f0d0523be43a26556985f1f8f342fb79c2d975afe46d` |
+| `src/core/fits_blocks.cpp` | `86235fb0f71ae2246a95926d162fa283478d7e33d2cf67fcc41545cf1c6ba40b` |
 | `src/core/fits_scan.cpp` | `0caccd3aac283689838f4fa060c5c1fd28fbc1d04351a60d5e5088b3f1d84b0e` |
 | `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
-| `src/core/import_job.cpp` | `c3b73a0b879a25cccf50ab38f5c4ee4806647c807f73bcb79deea05610b1c5ed` |
+| `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/include/astro/cpu_dispatch.hpp` | `21c32fbd9c9416789ec7d31bf3c561d631b460a9ae9ce4162a1e7aab4fb7adb2` |
 | `src/core/include/astro/fits.hpp` | `37d4c4a21797c3a54c1d1bdc80c2e12b383d00d729571a3e41ef8fe07976abd7` |
 | `src/core/include/astro/fits_blocks.hpp` | `49c32447622cdf9f0f2fb5122679e474a36ca492f296cf44e1e7a87d96e4860c` |
@@ -143,6 +143,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 633, fast 626, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 627, fast 627, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 666, fast 659, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 660, fast 660, slow 0, falliti 0
 <!-- evidence:end -->

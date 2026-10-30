@@ -702,7 +702,14 @@ image decode_fits(std::span<const std::uint8_t> bytes, std::uint64_t budget_byte
 
 // ---------------------------------------------------------------- encode
 
+void fits_detail::reject_decoder_state(const image& img) {
+  if (img.decoder_state) {
+    fail(error_category::unsupported, "fits.decoder_state", "lo scrittore FITS non rappresenta lo stato del decoder");
+  }
+}
+
 std::vector<std::uint8_t> encode_fits(const image& img) {
+  fits_detail::reject_decoder_state(img);
   validate_image(img);
   const source_encoding enc = resolve_encoding(img);
   const std::vector<std::string> cards = compose_cards(img);

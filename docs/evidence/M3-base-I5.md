@@ -90,16 +90,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
-| `docs/evidence/M3-base-I2.md` | `d6a86a508260ca1051fa82fc6855ad4e3ceef99f9d157a7b25d38367bc4d4306` |
-| `docs/evidence/M3-base-I3.md` | `d14d526853d5f8f7b3c7feb43621f458d15dcf5c295a73d92cc443ed7c1f83fc` |
+| `docs/evidence/M3-base-I2.md` | `eb37d1580a89d798f152ecd70b5a1f5a9fd0e9d019c09cb546d49500c5ff69d5` |
+| `docs/evidence/M3-base-I3.md` | `e622522753fda90b68d5eec4913ccf7941c969ea38b837b6a39e9f47cf3df705` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
-| `src/core/import_job.cpp` | `c3b73a0b879a25cccf50ab38f5c4ee4806647c807f73bcb79deea05610b1c5ed` |
+| `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/master.cpp` | `1aba5a2b6688d8d1c4e198b065589283ce62a35e30bf3866933e1c3d4b35aa9b` |
-| `tests/unit/CMakeLists.txt` | `11692a0d0102fa9e69f0e241a2c1ca72a8543622c451f34819721dd20946914e` |
+| `tests/unit/CMakeLists.txt` | `869dc6561d2460b37ecf477fdd37939daabd80b9058c10d79d5397255bb96bdc` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 
-- Test release (`tmp/release-junit.xml`): totali 633, fast 626, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 627, fast 627, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 666, fast 659, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 660, fast 660, slow 0, falliti 0
 <!-- evidence:end -->

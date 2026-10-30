@@ -124,9 +124,9 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3A-TYP-01 | F-IO-02; ADR-03.b §b.1 (origine `decoder`) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
-| T-M3A-TYP-02 | F-IO-02, §9.6; ADR-03.b §b.2 (`decoder_state`) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
-| T-M3A-TYP-03 | F-IO-02; ADR-03.b §b.1 (`capture_time_libraw`) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
+| T-M3A-TYP-01 | F-IO-02; ADR-03.b §b.1 (origine `decoder`) | ADR-03.b | M3.a | verde (U1) |
+| T-M3A-TYP-02 | F-IO-02, §9.6; ADR-03.b §b.2 (`decoder_state`) | ADR-03.b | M3.a | verde (U1) |
+| T-M3A-TYP-03 | F-IO-02; ADR-03.b §b.1 (`capture_time_libraw`) | ADR-03.b | M3.a | verde (U1) |
 | T-M3A-TYP-04 | F-CAL-08, C-03; ADR-03.b §b.3 (`demosaic`, `sample_kind`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-05 | F-CAL-08; ADR-03.b §b.3 (keyword `ASTRD*`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-06 | ADR-17; ADR-03.b §b.4 (`variance_scope`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
@@ -135,7 +135,7 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 | T-M3A-TYP-09 | C-11, F-POST-08.a.1; ADR-03.b §b.7 (tipi distinti) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-10 | C-11, §7.14; ADR-03.b §b.7 (`mask_info`) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
-| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi; coppia «solo provenienza» di §b.15) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
+| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi; coppia «solo provenienza» di §b.15) | ADR-03.b | M3.a | verde (U1) |
 | T-M3A-TYP-13 | §8.6.2, C-10.b; ADR-03.b §b.12 (`alpha_plane`, tipi distinti) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
 | T-M3A-TYP-14 | NFR-EXP-01.b, C-10.b; ADR-03.b §b.12 (`derive_alpha`) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
 | T-M3A-TYP-15 | §9.8; ADR-03.b §b.13 (`measure`, keyword `ASTRMCAP`/`ASTRMLnn`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |

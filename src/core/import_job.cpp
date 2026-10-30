@@ -44,19 +44,17 @@ node_spec io_node(const char* operator_id, json params, const content_digest& so
                    std::move(inputs), sample_type::f64, io_backend, std::nullopt);
 }
 
-const char* origin_text(metadata_origin o) { return o == metadata_origin::header ? "header" : "declared"; }
-
 json phase_json(const metadata_value<process_phase>& phase) {
   json j = json::object();
   j.set("value", json::string(to_string(phase.value)));
-  j.set("origin", json::string(origin_text(phase.source.origin)));
+  j.set("origin", json::string(to_string(phase.source.origin)));
   return j;
 }
 
 json linearity_json(linearity_class lin, const std::optional<metadata_origin>& origin) {
   json j = json::object();
   j.set("value", json::string(to_string(lin)));
-  j.set("origin", origin ? json::string(origin_text(*origin)) : json::null());
+  j.set("origin", origin ? json::string(to_string(*origin)) : json::null());
   return j;
 }
 
@@ -73,7 +71,7 @@ void add_metadata(json& out, const char* name, const std::optional<metadata_valu
   if constexpr (std::is_same_v<T, std::string>) e.set("value", json::string(field->value));
   else if constexpr (std::is_same_v<T, std::int64_t>) e.set("value", json::integer(field->value));
   else e.set("value", json::number(field->value));
-  e.set("origin", json::string(origin_text(field->source.origin)));
+  e.set("origin", json::string(to_string(field->source.origin)));
   e.set("keyword", json::string(field->source.keyword));
   out.set(name, std::move(e));
 }

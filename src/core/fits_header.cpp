@@ -32,7 +32,7 @@ void for_each_field(F&& f) {
 }
 
 constexpr const char* other_keys[] = {"BUNIT",    "LINEAR",   "BAYERPAT", "XBAYROFF", "YBAYROFF",
-                                      "XBINNING", "YBINNING", "ASTRPHAS"};
+                                      "XBINNING", "YBINNING", "ASTRPHAS", "ASTRTSTP"};
 
 [[noreturn]] void bad_value(const std::string& key, const char* expected) {
   fail(error_category::invalid_input, "fits.keyword_value", "tipo o valore di keyword non valido",
@@ -86,6 +86,13 @@ std::int64_t as_integral(const located& l) {
     bad_value(l.card.key, "intero");
   }
   return static_cast<std::int64_t>(*v);
+}
+
+// Card intera senza coercizione: un reale, anche di parte frazionaria nulla, e' un errore di tipo.
+std::int64_t as_strict_integer(const located& l) {
+  auto v = try_integer(l.card);
+  if (!v) bad_value(l.card.key, "intero");
+  return *v;
 }
 
 std::string as_string(const located& l) {
@@ -263,6 +270,10 @@ header_info interpret_header(const std::vector<std::string>& cards, std::uint32_
     using value_type = decltype(mv::value);
     if (auto l = idx.find(key)) info.metadata.*member = make_value(*l, static_cast<value_type*>(nullptr));
   });
+  if (auto l = idx.find("ASTRTSTP")) {
+    info.metadata.capture_time_libraw =
+        metadata_value<std::int64_t>{as_strict_integer(*l), {metadata_origin::header, "ASTRTSTP"}};
+  }
   if (auto l = idx.find("BUNIT")) {
     const std::string u = upper(as_string(*l));
     if (u == "ADU") info.unit = pixel_unit::adu;
@@ -333,6 +344,7 @@ std::vector<std::string> missing_cards(const image& img, const std::vector<std::
   for_each_field([&](auto member, const char* key) {
     if (const auto& v = img.metadata.*member) add(key, v->value);
   });
+  if (const auto& t = img.metadata.capture_time_libraw) add("ASTRTSTP", t->value);
   if (img.unit) add("BUNIT", std::string(unit_text(*img.unit)));
   if (img.lin) add("LINEAR", *img.lin == linearity::linear);
   if (img.phase) add("ASTRPHAS", std::string(phase_text(img.phase->value)));
@@ -361,6 +373,7 @@ void check_header_matches(const image& img, const header_info& info) {
   for_each_field([&](auto member, const char* key) {
     if (!(img.metadata.*member == info.metadata.*member)) bad(key);
   });
+  if (!(img.metadata.capture_time_libraw == info.metadata.capture_time_libraw)) bad("ASTRTSTP");
   if (img.uninterpreted_keywords != info.uninterpreted_keywords) bad("uninterpreted_keywords");
 }
 

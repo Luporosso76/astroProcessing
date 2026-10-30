@@ -94,6 +94,9 @@ std::vector<std::string> missing_cards(const image& img, const std::vector<std::
 // Stop `fits.header_inconsistent` se i campi interpretati dell'immagine non coincidono con l'header.
 void check_header_matches(const image& img, const header_info& info);
 
+// Lo scrittore FITS non rappresenta `decoder_state` (ADR-03.b §b.2): stop `fits.decoder_state` prima di ogni buffer.
+void reject_decoder_state(const image& img);
+
 // Confronta ogni HDU letto da CFITSIO (offset, BITPIX, assi) con la scansione: differenza = fits.structure_mismatch.
 void verify_structure(fitsfile* f, const std::vector<hdu_scan>& hdus);
 

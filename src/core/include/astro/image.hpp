@@ -1,9 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -127,7 +129,10 @@ struct variance_plane {
   friend bool operator==(const variance_plane&, const variance_plane&) = default;
 };
 
-enum class metadata_origin { header, declared };
+// `decoder`: valore del decoder RAW; `metadata_source.keyword` e' il nome del campo di LibRaw (ADR-03.b §b.1).
+enum class metadata_origin { header, declared, decoder };
+
+const char* to_string(metadata_origin origin) noexcept;
 
 struct metadata_source {
   metadata_origin origin = metadata_origin::header;
@@ -158,6 +163,8 @@ struct frame_metadata {
   std::optional<metadata_value<std::int64_t>> roi_y;
   std::optional<metadata_value<std::string>> readout_mode;
   std::optional<metadata_value<std::string>> row_order;
+  // `other.timestamp` di LibRaw: fuso orario non dichiarato, non e' un istante UTC e non va in DATE-OBS (ADR-03.b §b.1).
+  std::optional<metadata_value<std::int64_t>> capture_time_libraw;
   friend bool operator==(const frame_metadata&, const frame_metadata&) = default;
 };
 
@@ -173,6 +180,47 @@ void declare_metadata(std::optional<metadata_value<T>>& field, const T& value,
   }
   field = metadata_value<T>{value, {metadata_origin::declared, {}}};
 }
+
+// Area visibile importata nel buffer grezzo del decoder (ADR-08.b §2.3).
+struct decoder_window {
+  std::uint32_t x0 = 0;
+  std::uint32_t y0 = 0;
+  std::uint32_t width = 0;
+  std::uint32_t height = 0;
+  friend bool operator==(const decoder_window&, const decoder_window&) = default;
+};
+
+enum class decoder_linearization { identity, decoder_curve };
+
+// Stato lasciato dal decoder RAW nella rappresentazione di LibRaw (ADR-03.b §b.2): il nero del singolo campione non si
+// valuta qui. Invarianti in validate_image (`image.decoder_state`).
+struct decoder_state {
+  std::uint32_t raw_width = 0;
+  std::uint32_t raw_height = 0;
+  decoder_window window;
+  std::uint32_t black = 0;
+  // FC(r, c) dei siti (0, 0), (0, 1), (1, 0), (1, 1) della cella all'origine dell'area visibile.
+  std::array<std::uint8_t, 4> cfa_color_index{};
+  std::array<std::uint32_t, 4> black_per_color{};
+  std::uint32_t black_pattern_rows = 0;
+  std::uint32_t black_pattern_cols = 0;
+  std::vector<std::uint32_t> black_pattern;
+  std::uint32_t white = 0;
+  std::optional<std::uint32_t> data_maximum;
+  std::optional<std::array<std::int64_t, 4>> linear_max;
+  decoder_linearization linearization = decoder_linearization::identity;
+  std::optional<std::array<std::uint8_t, 32>> curve_sha256;
+  metadata_source source;
+  // `source` e' provenienza (origine e keyword): l'uguaglianza non la confronta.
+  friend bool operator==(const decoder_state& a, const decoder_state& b) {
+    const auto content = [](const decoder_state& s) {
+      return std::tie(s.raw_width, s.raw_height, s.window, s.black, s.cfa_color_index, s.black_per_color,
+                      s.black_pattern_rows, s.black_pattern_cols, s.black_pattern, s.white, s.data_maximum,
+                      s.linear_max, s.linearization, s.curve_sha256);
+    };
+    return content(a) == content(b);
+  }
+};
 
 // Origine di un valore che non fa parte del contenuto: l'uguaglianza non la confronta.
 struct origin_note {
@@ -195,11 +243,13 @@ struct image {
   sample_type type = sample_type::f32;
   std::optional<pixel_unit> unit;
   std::optional<linearity> lin;
-  // Origine di `lin` (header o dichiarata); vuota se `lin` e' assente.
+  // Origine di `lin` (header, dichiarata o decoder); vuota se `lin` e' assente.
   origin_note lin_origin;
-  // Fase di processo dichiarata (header `ASTRPHAS` o dichiarazione); assente = non dichiarata, mai indovinata.
+  // Fase di processo dichiarata (header `ASTRPHAS`, dichiarazione o decoder); assente = non dichiarata, mai indovinata.
   std::optional<metadata_value<process_phase>> phase;
   std::optional<cfa_layout> cfa;
+  // Solo nelle immagini prodotte dal decoder RAW; lo scrittore FITS non lo rappresenta (ADR-03.b §b.2).
+  std::optional<astro::decoder_state> decoder_state;
   aligned_buffer samples;
   invalid_mask invalid;
   std::optional<variance_plane> variance;
@@ -240,8 +290,9 @@ struct image {
   }
 };
 
-// Contenuto scientifico: geometria, layout, tipo, unita', linearita', fase (valore, senza origine), cfa, campioni, maschera, varianza e
-// valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine dei metadati.
+// Contenuto scientifico: geometria, layout, tipo, unita', linearita', fase (valore, senza origine), cfa, decoder_state (senza
+// `source`), campioni, maschera, varianza e valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine
+// dei metadati.
 bool equivalent_content(const image& a, const image& b);
 
 // Byte di campioni, maschere e varianze allocati da make_image, aligned_buffer e invalid_mask dall'avvio.

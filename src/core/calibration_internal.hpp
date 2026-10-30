@@ -254,7 +254,7 @@ inline json metadata_report(const image& im) {
     if (!field) return;
     json e = json::object();
     e.set("value", to_json(field->value));
-    e.set("origin", json::string(field->source.origin == metadata_origin::header ? "header" : "declared"));
+    e.set("origin", json::string(to_string(field->source.origin)));
     if (!field->source.keyword.empty()) e.set("keyword", json::string(field->source.keyword));
     out.set(name, std::move(e));
   };

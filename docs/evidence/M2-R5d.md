@@ -16,7 +16,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/ADR-05-dag-provenance.md` | `7b4b4d4a0610799ae5e405e7d8e50fb28061f2100e9441b9b33a65ea48b01bcb` |
 | `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
 | `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
-| `src/core/import_job.cpp` | `c3b73a0b879a25cccf50ab38f5c4ee4806647c807f73bcb79deea05610b1c5ed` |
+| `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
 | `src/core/include/astro/provenance.hpp` | `9d95b56f73c0a046c18c737013fa8dfceea31f43a3c959ec89aaa9e54f98417d` |
 | `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
@@ -29,8 +29,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 | `tests/unit/test_store_review.cpp` | `23e1dc408879523e5fe06725dd029ee0968f07ef21d7ee76aac76381987d034e` |
 
-- Test release (`tmp/release-junit.xml`): totali 633, fast 626, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 627, fast 627, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 666, fast 659, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 660, fast 660, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

@@ -26,6 +26,57 @@ std::size_t checked_bytes(std::uint64_t count, std::size_t element) {
   return static_cast<std::size_t>(bytes);
 }
 
+// Limite del motivo del nero: LIBRAW_CBLACK_SIZE = 4104 meno i sei elementi iniziali (ADR-03.b §b.2).
+constexpr std::uint64_t max_black_pattern = 4098;
+
+// Canali della cella 2x2 del pattern, ordine (0, 0) (0, 1) (1, 0) (1, 1): 0 rosso, 1 verde, 2 blu.
+std::array<int, 4> pattern_cell(cfa_pattern p) {
+  switch (p) {
+    case cfa_pattern::rggb: return {0, 1, 1, 2};
+    case cfa_pattern::bggr: return {2, 1, 1, 0};
+    case cfa_pattern::grbg: return {1, 0, 2, 1};
+    case cfa_pattern::gbrg: return {1, 2, 0, 1};
+  }
+  std::abort();
+}
+
+// Canale del sito (riga r, colonna c): pattern traslato di (c + x_offset, r + y_offset) come in ADR-03.a.
+int cfa_site_channel(const cfa_layout& cfa, unsigned r, unsigned c) {
+  return pattern_cell(cfa.pattern)[((r + cfa.y_offset) & 1u) * 2 + ((c + cfa.x_offset) & 1u)];
+}
+
+[[noreturn]] void bad_decoder_state(const char* field) {
+  throw stop_error(error_category::invalid_input, "image.decoder_state", "stato del decoder incoerente",
+                   {{"campo", field}});
+}
+
+// Chiamata dopo il controllo del layout: con layout cfa, `cfa` e' presente.
+void validate_decoder_state(const image& img) {
+  if (!img.decoder_state) return;
+  const decoder_state& s = *img.decoder_state;
+  if (img.layout != plane_layout::cfa) bad_decoder_state("layout");
+  if (!img.phase || img.phase->value != process_phase::raw) bad_decoder_state("phase");
+  if (s.source.origin != metadata_origin::decoder) bad_decoder_state("source");
+  const decoder_window& w = s.window;
+  if (w.width != img.geometry.width || w.height != img.geometry.height) bad_decoder_state("window");
+  if (std::uint64_t{w.x0} + w.width > s.raw_width || std::uint64_t{w.y0} + w.height > s.raw_height) {
+    bad_decoder_state("window");
+  }
+  const std::uint64_t cells = std::uint64_t{s.black_pattern_rows} * s.black_pattern_cols;
+  if ((s.black_pattern_rows == 0) != (s.black_pattern_cols == 0) || cells > max_black_pattern ||
+      s.black_pattern.size() != cells) {
+    bad_decoder_state("black_pattern");
+  }
+  if (s.curve_sha256.has_value() != (s.linearization == decoder_linearization::decoder_curve)) {
+    bad_decoder_state("curve_sha256");
+  }
+  for (unsigned site = 0; site < 4; ++site) {
+    const int channel = cfa_site_channel(*img.cfa, site / 2, site % 2);
+    const std::uint8_t index = s.cfa_color_index[site];
+    if (channel == 1 ? index != 1 && index != 3 : index != channel) bad_decoder_state("cfa_color_index");
+  }
+}
+
 template <class T>
 bool is_nonfinite(const std::byte* data, std::size_t i) {
   T v;
@@ -127,12 +178,21 @@ void edit_mask::set(std::uint32_t x, std::uint32_t y, float value) {
   values_[static_cast<std::size_t>(y) * width_ + x] = value;
 }
 
+const char* to_string(metadata_origin origin) noexcept {
+  switch (origin) {
+    case metadata_origin::header: return "header";
+    case metadata_origin::declared: return "declared";
+    case metadata_origin::decoder: return "decoder";
+  }
+  std::abort();
+}
+
 std::uint64_t allocated_sample_bytes() noexcept { return g_allocated_bytes.load(std::memory_order_relaxed); }
 
 bool equivalent_content(const image& a, const image& b) {
   return a.geometry == b.geometry && a.layout == b.layout && a.type == b.type && a.unit == b.unit &&
-         a.lin == b.lin && a.phase == b.phase && a.cfa == b.cfa && a.samples == b.samples && a.invalid == b.invalid &&
-         a.variance == b.variance && a.metadata == b.metadata;
+         a.lin == b.lin && a.phase == b.phase && a.cfa == b.cfa && a.decoder_state == b.decoder_state &&
+         a.samples == b.samples && a.invalid == b.invalid && a.variance == b.variance && a.metadata == b.metadata;
 }
 
 image make_image(const image_geometry& geometry, sample_type type, plane_layout layout,
@@ -179,6 +239,7 @@ void validate_image(const image& img) {
     case plane_layout::multi_plane: ok = p > 1; break;
   }
   if (!ok) fail(error_category::invalid_input, "image.layout", "plane_layout incoerente con planes e cfa");
+  validate_decoder_state(img);
 }
 
 bool operator_output_invariants_hold(const image& img) {

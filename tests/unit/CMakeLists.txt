@@ -151,6 +151,12 @@ target_compile_definitions(test_m1d_protocol PRIVATE
 add_test(NAME T-M2D-13.m1d_protocol COMMAND test_m1d_protocol)
 set_tests_properties(T-M2D-13.m1d_protocol PROPERTIES LABELS slow TIMEOUT 1800)
 
+# U1 (M3.a): tipi del decoder (ADR-03.b §b.1, §b.2, §b.8, §b.9).
+add_executable(test_decoder_types test_decoder_types.cpp)
+target_link_libraries(test_decoder_types PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_decoder_types PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_decoder_types PROPERTIES LABELS fast)
+
 add_test(NAME T-M2F-01.offline
   COMMAND ${PROJECT_SOURCE_DIR}/tools/check_offline.sh
     $<TARGET_FILE:astrocore>
@@ -191,7 +197,8 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance_gaps.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance_format.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conformance_network.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conformance_network.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_decoder_types.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.

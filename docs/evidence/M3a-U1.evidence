@@ -1,0 +1,14 @@
+# Sorgente del blocco generato di M3a-U1.md (tools/evidence.py)
+file docs/contracts/ADR-03-pixel-maschere.md
+file src/core/include/astro/image.hpp
+file src/core/image.cpp
+file src/core/fits.cpp
+file src/core/fits_blocks.cpp
+file src/core/fits_internal.hpp
+file src/core/fits_header.cpp
+file src/core/import_job.cpp
+file src/core/calibration_internal.hpp
+file tests/unit/test_decoder_types.cpp
+file tests/unit/CMakeLists.txt
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
