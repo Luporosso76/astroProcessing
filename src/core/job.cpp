@@ -2,6 +2,8 @@
 
 #include <cstdio>
 #include <exception>
+#include <new>
+#include <optional>
 #include <span>
 
 #include "astro/cpu_dispatch.hpp"
@@ -15,11 +17,16 @@ int exit_code_for(error_category category) noexcept {
 namespace {
 
 constexpr const char* provenance_role = provenance_output_role;
+// Contesto aggiunto allo stop originale quando la sua registrazione prima del lavoro fallisce.
+constexpr const char* record_failure_key = "registrazione_arresto";
 
-stored_file write_provenance(sqlite_dag_store& store, const provenance_record& provenance) {
-  const std::string text = provenance_canonical(provenance);
+stored_file write_provenance_text(sqlite_dag_store& store, const std::string& text) {
   const std::span<const std::uint8_t> bytes(reinterpret_cast<const std::uint8_t*>(text.data()), text.size());
   return store.write_files({artifact_content{bytes, "json", "provenance", std::nullopt, provenance_role}}).front();
+}
+
+stored_file write_provenance(sqlite_dag_store& store, const provenance_record& provenance) {
+  return write_provenance_text(store, provenance_canonical(provenance));
 }
 
 // Senza allocazioni: il puntatore resta valido finche' `ep` e' vivo.
@@ -33,8 +40,8 @@ const char* what_of(const std::exception_ptr& ep) noexcept {
   }
 }
 
-void persist_provenance(sqlite_dag_store& durable, const job_record& job, const provenance_record& provenance) {
-  const stored_file file = write_provenance(durable, provenance);
+void persist_provenance_text(sqlite_dag_store& durable, const job_record& job, const std::string& text) {
+  const stored_file file = write_provenance_text(durable, text);
   artifact_record a;
   a.node_key = job.node_key;
   a.generation = job.generation;
@@ -44,6 +51,10 @@ void persist_provenance(sqlite_dag_store& durable, const job_record& job, const 
   a.rel_path = file.rel_path();
   a.output_role = provenance_role;
   durable.add_artifact(std::move(a));
+}
+
+void persist_provenance(sqlite_dag_store& durable, const job_record& job, const provenance_record& provenance) {
+  persist_provenance_text(durable, job, provenance_canonical(provenance));
 }
 
 // Chiude il job `running` con `cause`; restituisce lo stato durevole finale, che e' la fonte della provenance.
@@ -139,18 +150,103 @@ job_outcome stopped(dag_store& store, sqlite_dag_store* durable, const job_recor
   std::rethrow_exception(original);
 }
 
+// Causa registrata per un arresto prima del lavoro: lo stop_error stesso, oppure integrity job.unexpected_exception.
+stop_error cause_of(const std::exception_ptr& ep) {
+  try {
+    std::rethrow_exception(ep);
+  } catch (const stop_error& e) {
+    return e;
+  } catch (...) {
+    return stop_error(error_category::integrity, "job.unexpected_exception", what_of(ep));
+  }
+}
+
+// Rilancia `original` dopo una registrazione fallita: uno stop_error con stessa categoria, codice, messaggio e contesto
+// piu' `registrazione_arresto` con l'errore secondario; ogni altra eccezione invariata. Se il contesto non si puo'
+// aggiungere (memoria esaurita) si rilancia lo stop originale invariato: la diagnosi secondaria e' gia' su stderr.
+[[noreturn]] void rethrow_with_record_failure(const std::exception_ptr& original, const char* secondary) {
+  try {
+    std::rethrow_exception(original);
+  } catch (const stop_error& e) {
+    std::optional<stop_error> annotated;
+    try {
+      annotated.emplace(e);
+      annotated->add_context(record_failure_key, secondary);
+    } catch (const std::bad_alloc&) {
+      annotated.reset();
+    }
+    if (annotated) throw std::move(*annotated);
+    throw;
+  }
+}
+
+// Arresto al confine prima del lavoro del job (NFR-FBK-01.a, ADR-05): registra `original` e lo rilancia invariato. Lo
+// stop_error e' la causa; ogni altra eccezione si registra come integrity job.unexpected_exception. Senza `job` il job si
+// avvia qui, solo per registrare l'arresto. Il job si chiude con la causa e, su store durevole, si scrive la provenance
+// dell'arresto senza il nodo (stop_before_work_record: stringhe e interi, nessun numero in virgola mobile analizzato o
+// serializzato). Registrazione fallita: diagnosi su stderr e rethrow_with_record_failure, mai l'errore secondario al
+// posto dell'originale.
+[[noreturn]] void stop_before_work(dag_store& store, sqlite_dag_store* durable, const std::string& slot_name,
+                                   std::optional<job_record> job, const std::exception_ptr& original) {
+  try {
+    const stop_error cause = cause_of(original);
+    if (!job) job = store.start_job(slot_name);
+    const job_record after = settle(store, *job, cause.category(), cause.code());
+    std::fprintf(stderr, "job %llu su %s fermato prima del lavoro: %s\n", static_cast<unsigned long long>(after.id),
+                 slot_name.c_str(), cause.what());
+    if (durable != nullptr) {
+      const stop_before_work_record record{after.node_key, current_library_versions(), after.generation, after.state,
+                                           persisted_cause(after, &cause), durable->resume_context()};
+      persist_provenance_text(*durable, after, stop_before_work_canonical(record));
+    }
+  } catch (...) {
+    const std::exception_ptr secondary = std::current_exception();
+    std::fprintf(stderr, "registrazione dell'arresto prima del lavoro su %s fallita (%s); si propaga l'arresto: %s\n",
+                 slot_name.c_str(), what_of(secondary), what_of(original));
+    rethrow_with_record_failure(original, what_of(secondary));
+  }
+  std::rethrow_exception(original);
+}
+
+// Nodo del job avviato; nodo assente: graph dag.missing_node. Ogni errore della lettura e' un arresto prima del lavoro.
+node_spec node_of(dag_store& store, sqlite_dag_store* durable, const job_record& job) {
+  try {
+    std::optional<node_spec> node = store.get_node(job.node_key);
+    if (!node) {
+      throw stop_error(error_category::graph, "dag.missing_node", "nodo del job assente dallo store",
+                       {{"nodo", job.node_key}});
+    }
+    return std::move(*node);
+  } catch (...) {
+    stop_before_work(store, durable, job.slot_name, job, std::current_exception());
+  }
+}
+
 }  // namespace
+
+void prepare_job_start(sqlite_dag_store& store, const std::string& slot_name, const std::function<void()>& prepare) {
+  try {
+    prepare();
+  } catch (...) {
+    stop_before_work(store, &store, slot_name, std::nullopt, std::current_exception());
+  }
+}
 
 job_outcome run_job(dag_store& store, const std::string& slot_name,
                     const std::function<job_result(const job_record&)>& work,
                     const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
-  if (dynamic_cast<sqlite_dag_store*>(&store) != nullptr) {
-    throw stop_error(error_category::invalid_input, "job.durable_store_requires_run_job_files",
-                     "uno store durevole richiede run_job_files: run_job non persiste la provenance");
+  sqlite_dag_store* const durable = dynamic_cast<sqlite_dag_store*>(&store);
+  try {
+    if (durable != nullptr) {
+      throw stop_error(error_category::invalid_input, "job.durable_store_requires_run_job_files",
+                       "uno store durevole richiede run_job_files: run_job non persiste la provenance");
+    }
+    require_fp_environment();  // prima di leggere il nodo (ADR-07)
+  } catch (...) {
+    stop_before_work(store, durable, slot_name, std::nullopt, std::current_exception());
   }
-  require_fp_environment();  // prima di avviare il job e di leggere il nodo (ADR-07)
   const job_record job = store.start_job(slot_name);
-  const node_spec spec = *store.get_node(job.node_key);
+  const node_spec spec = node_of(store, nullptr, job);
   std::vector<std::string> warnings;
   artifact_record artifact;
   try {
@@ -174,11 +270,10 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
 job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
                           const std::function<job_files_result(const job_record&)>& work,
                           const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
-  // Prima di avviare il job: leggere il nodo analizza i parametri numerici, anche subnormali, e la provenance
-  // dell'arresto li riscriverebbe (ADR-07).
-  require_fp_environment();
+  // Prima di leggere il nodo, che analizza i parametri numerici, anche subnormali (ADR-07).
+  prepare_job_start(store, slot_name, require_fp_environment);
   const job_record job = store.start_job(slot_name);
-  const node_spec spec = *store.get_node(job.node_key);
+  const node_spec spec = node_of(store, &store, job);
   std::vector<std::string> warnings;
   std::optional<provenance_record> provenance;
   try {

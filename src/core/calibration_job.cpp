@@ -140,7 +140,6 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
                                 const calibration_recipe& recipe, memory_pool& pool,
                                 const calibration_job_options& options, const cancel_token& cancel,
                                 const std::optional<budget_snapshot>& budget) {
-  require_fp_environment();  // prima di serializzare le risorse nel budget e di avviare il job (ADR-07)
   const auto work = [&](const job_record& job) -> job_files_result {
     require_fp_environment();
     validate_calibration_recipe(recipe);
@@ -339,8 +338,13 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
-  std::optional<budget_snapshot> recorded = budget;
-  if (recorded && options.resources) recorded->resources = resource_config_json(*options.resources);
+  // L'ambiente FP si controlla prima di serializzare le risorse nel budget (ADR-07).
+  std::optional<budget_snapshot> recorded;
+  prepare_job_start(store, slot_name, [&] {
+    require_fp_environment();
+    recorded = budget;
+    if (recorded && options.resources) recorded->resources = resource_config_json(*options.resources);
+  });
   job_outcome outcome = run_job_files(store, slot_name, work, recorded, &cancel);
   // Checkpoint e staging restano dopo stop e annullamento (stato del resume); dopo la pubblicazione si rimuovono.
   if (outcome.exit_code == 0 && options.checkpoint) {

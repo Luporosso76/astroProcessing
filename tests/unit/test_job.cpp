@@ -9,6 +9,7 @@
 #include "astro/job.hpp"
 #include "astro/provenance.hpp"
 #include "expect_stop.hpp"
+#include "no_crash_report.hpp"
 #include "syn_fits.hpp"
 
 namespace {
@@ -161,6 +162,113 @@ TEST(Job, T_M2B_12_non_stop_exceptions_mark_the_job_failed_and_propagate) {
   EXPECT_EQ(job->stop_code, "job.unexpected_exception");
 }
 
+// Nodo dello slot non leggibile dopo l'avvio del job: assente, oppure lettura che lancia un'eccezione estranea.
+class store_with_unreadable_node : public memory_dag_store {
+ public:
+  explicit store_with_unreadable_node(bool throws) : throws_(throws) {}
+  std::optional<node_spec> get_node(const std::string& node_key) const override {
+    if (throws_) throw std::runtime_error("lettura del nodo non riuscita");
+    (void)node_key;
+    return std::nullopt;
+  }
+
+ private:
+  bool throws_;
+};
+
+// R5.d: un nodo assente dopo l'avvio chiude il job `failed` graph dag.missing_node con la chiave del nodo e lo stop si
+// propaga; un'eccezione estranea nella lettura chiude il job `failed` job.unexpected_exception e si rilancia
+// invariata. Il lavoro non parte in nessuno dei due casi. Ogni caso gira in un processo figlio con SIGSEGV e SIGABRT
+// convertiti in uscite: un nodo assente dereferenziato non abbatte il processo dei test e non produce un core.
+TEST(Job, T_M2B_12_unreadable_node_after_start_marks_the_job_failed_and_propagates) {
+  for (const bool throws : {false, true}) {
+    const auto child = [throws] {
+      struct sigaction action {};
+      action.sa_handler = [](int) { _exit(139); };
+      sigemptyset(&action.sa_mask);
+      if (sigaction(SIGSEGV, &action, nullptr) != 0) _exit(2);
+      exit_instead_of_core_dump();
+      store_with_unreadable_node store(throws);
+      const std::string key = setup_single_slot(store);
+      bool worked = false;
+      const work_fn work = [&](const job_record& job) {
+        worked = true;
+        return result_for(job);
+      };
+      bool propagated = false;
+      try {
+        (void)run_job(store, "s", work);
+      } catch (const stop_error& e) {
+        propagated = !throws && e.category() == error_category::graph && e.code() == "dag.missing_node" &&
+                     e.context() == stop_error::context_list{{"nodo", key}};
+      } catch (const std::runtime_error& e) {
+        propagated = throws && std::string(e.what()) == "lettura del nodo non riuscita";
+      }
+      const auto job = store.get_job(1);
+      const bool recorded = job.has_value() && job->state == job_state::failed &&
+                            job->stop_category == (throws ? error_category::integrity : error_category::graph) &&
+                            job->stop_code == (throws ? "job.unexpected_exception" : "dag.missing_node") &&
+                            job->node_key == key;
+      if (!propagated) std::fprintf(stderr, "eccezione propagata diversa dall'originale\n");
+      if (!recorded) std::fprintf(stderr, "job non registrato come fermato\n");
+      if (worked) std::fprintf(stderr, "lavoro del job eseguito\n");
+      _exit(propagated && recorded && !worked && store.artifacts_for(key).empty() ? 0 : 1);
+    };
+    EXPECT_EXIT(child(), testing::ExitedWithCode(0), "") << throws;
+  }
+}
+
+// Slot inesistente: l'avvio del job fallisce, nessun job esiste e lo stop si propaga invariato.
+class store_counting_starts : public memory_dag_store {
+ public:
+  job_record start_job(const std::string& slot_name) override {
+    ++starts;
+    return memory_dag_store::start_job(slot_name);
+  }
+  int starts = 0;
+};
+
+// Avvio fallito: una sola chiamata a start_job (nessun nuovo tentativo per registrare), errore e contesto invariati.
+TEST(Job, T_M2B_12_failed_job_start_propagates_unchanged_without_a_job) {
+  store_counting_starts store;
+  setup_single_slot(store);
+  try {
+    (void)run_quiet(store, "assente", [](const job_record& job) { return result_for(job); });
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.code(), "dag.unknown_slot");
+    EXPECT_EQ(e.context(), (stop_error::context_list{{"slot", "assente"}}));
+  }
+  EXPECT_EQ(store.starts, 1);
+  EXPECT_FALSE(store.get_job(1).has_value());
+}
+
+// Nodo assente e chiusura del job fallita: lo stop originale si propaga con tutto il suo contesto (`nodo`) piu' il solo
+// campo `registrazione_arresto` con l'errore secondario.
+class store_failing_finish_without_node : public memory_dag_store {
+ public:
+  std::optional<node_spec> get_node(const std::string&) const override { return std::nullopt; }
+  void finish_job(std::uint64_t, job_state, std::optional<error_category>, const std::string&) override {
+    throw stop_error(error_category::io, "test.finish_failed", "chiusura del job non riuscita");
+  }
+};
+
+TEST(Job, T_M2B_12_failed_record_keeps_the_original_context_and_adds_only_the_secondary_failure) {
+  store_failing_finish_without_node store;
+  const std::string key = setup_single_slot(store);
+  try {
+    (void)run_quiet(store, "s", [](const job_record& job) { return result_for(job); });
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::graph);
+    EXPECT_EQ(e.code(), "dag.missing_node");
+    EXPECT_EQ(e.message(), "nodo del job assente dallo store");
+    EXPECT_EQ(e.context(), (stop_error::context_list{
+                               {"nodo", key},
+                               {"registrazione_arresto", "io test.finish_failed: chiusura del job non riuscita"}}));
+  }
+}
+
 TEST(Job, T_M2B_10_runner_provenance_for_a_completed_job) {
   memory_dag_store store;
   const std::string key = setup_single_slot(store);
@@ -286,6 +394,36 @@ TEST(Provenance, T_M2B_10_incoherent_records_are_rejected) {
   EXPECT_STOP(provenance_json(wrong_state), error_category::invalid_input, "dag.bad_provenance");
   provenance_record running{node, fixed_versions(), 1, job_state::running, {}, {}, std::nullopt};
   EXPECT_STOP(provenance_json(running), error_category::invalid_input, "dag.bad_provenance");
+}
+
+// R5.d: record dell'arresto prima del lavoro. Testo canonico esatto per `cancelled` con `resume`; stati non finali o
+// incoerenti con la categoria e revisione assente rifiutati.
+TEST(Provenance, T_M2B_12_stop_before_work_record_text_and_rejections) {
+  json resume = json::object();
+  resume.set("workflow", json::string("wf"));
+  const stop_before_work_record cancelled{"k1", fixed_versions(), 3, job_state::cancelled,
+                                          stop_error(error_category::cancelled, "sched.cancelled", "m", {{"a", "b"}}),
+                                          resume};
+  EXPECT_EQ(stop_before_work_canonical(cancelled),
+            "{\"generation\":3,\"node_key\":\"k1\",\"resume\":{\"workflow\":\"wf\"},\"state\":\"cancelled\","
+            "\"stop\":{\"category\":\"cancelled\",\"code\":\"sched.cancelled\",\"context\":[{\"key\":\"a\",\"value\":\"b\"}],"
+            "\"message\":\"m\"},\"stop_before_work\":true,\"versions\":{\"cfitsio\":\"4.6.3\",\"openssl\":\"OpenSSL 3.5.5\","
+            "\"product\":\"1.2.3\",\"source_dirty\":true,\"source_revision\":\"" + std::string(40, 'c') +
+                "\",\"sqlite\":\"3.46.1\"}}");
+  const stop_error io(error_category::io, "x.y", "m");
+  for (const job_state state : {job_state::running, job_state::completed, job_state::interrupted}) {
+    EXPECT_STOP(stop_before_work_json(stop_before_work_record{"k", fixed_versions(), 1, state, io}),
+                error_category::invalid_input, "dag.bad_provenance");
+  }
+  EXPECT_STOP(stop_before_work_json(stop_before_work_record{"k", fixed_versions(), 1, job_state::cancelled, io}),
+              error_category::invalid_input, "dag.bad_provenance");
+  EXPECT_STOP(stop_before_work_json(stop_before_work_record{"k", fixed_versions(), 1, job_state::failed,
+                                                            stop_error(error_category::cancelled, "c.d", "m")}),
+              error_category::invalid_input, "dag.bad_provenance");
+  library_versions no_revision = fixed_versions();
+  no_revision.source_revision.clear();
+  EXPECT_STOP(stop_before_work_json(stop_before_work_record{"k", no_revision, 1, job_state::failed, io}),
+              error_category::invalid_input, "dag.bad_provenance");
 }
 
 TEST(Provenance, current_library_versions_are_all_reported) {

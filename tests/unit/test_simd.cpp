@@ -125,6 +125,65 @@ stop_error expect_stop_of(const std::function<void()>& f, error_category categor
   return stop_error(error_category::invalid_input, "test.no_stop", "nessuno stop");
 }
 
+// Lo slot ha esattamente `jobs` job, tutti `failed` con `category` e `code` sul nodo `node_key`, e la generazione e'
+// avanzata solo per loro.
+bool stop_jobs_recorded(const dag_store& store, const char* slot, const std::string& node_key, std::size_t jobs,
+                           error_category category = error_category::numeric, const char* code = "cpu.fp_mode") {
+  std::size_t seen = 0;
+  bool ok = true;
+  for (std::uint64_t id = 1; const std::optional<job_record> j = store.get_job(id); ++id) {
+    if (j->slot_name != slot) continue;
+    ++seen;
+    if (j->state != job_state::failed || j->stop_category != category || j->stop_code != code ||
+        j->node_key != node_key) {
+      std::fprintf(stderr, "slot %s: job %llu non registrato come arresto %s del nodo\n", slot,
+                   static_cast<unsigned long long>(id), code);
+      ok = false;
+    }
+  }
+  const std::optional<slot_record> s = store.get_slot(slot);
+  if (seen != jobs || !s || s->current_generation != jobs) {
+    std::fprintf(stderr, "slot %s: %zu job registrati, attesi %zu\n", slot, seen, jobs);
+    ok = false;
+  }
+  return ok;
+}
+
+// Gli artefatti del nodo sono `count` provenance dell'arresto prima del lavoro (R5.d): chiave del nodo, stato `failed`,
+// arresto con `category` e `code` (per cpu.fp_mode con `mxcsr` nel contesto), `stop_before_work`, nessun campo che
+// richieda il nodo letto (node_spec, digest degli input, budget, details). Con `expected`, messaggio e contesto
+// persistiti coincidono per intero con quelli dello stop propagato. Si legge con MXCSR regolare.
+bool only_stop_before_work_provenance(const sqlite_dag_store& store, const node_spec& node, std::size_t count,
+                                      const char* category = "numeric", const char* code = "cpu.fp_mode",
+                                      const stop_error* expected = nullptr) {
+  const std::vector<artifact_record> rows = store.artifacts_for(node.key());
+  bool ok = rows.size() == count;
+  if (!ok) std::fprintf(stderr, "nodo %s: %zu artefatti, attese %zu provenance\n", node.key().c_str(), rows.size(), count);
+  for (const artifact_record& a : rows) {
+    const json doc = parse_json(cal::read_text(store.artifact_path(a.rel_path)));
+    const json& stop = field(doc, "stop", json::kind::object);
+    bool mxcsr = false;
+    stop_error::context_list persisted;
+    for (const json& item : field(stop, "context", json::kind::array).items()) {
+      mxcsr = mxcsr || text(item, "key") == "mxcsr";
+      persisted.emplace_back(text(item, "key"), text(item, "value"));
+    }
+    if (expected != nullptr && (persisted != expected->context() || text(stop, "message") != expected->message())) {
+      std::fprintf(stderr, "contesto o messaggio persistiti diversi dallo stop propagato: %s\n", a.rel_path.c_str());
+      ok = false;
+    }
+    const bool good = a.output_role == "provenance" && text(doc, "node_key") == node.key() &&
+                      text(doc, "state") == "failed" && flag(doc, "stop_before_work") &&
+                      text(stop, "category") == category && text(stop, "code") == code &&
+                      (mxcsr || std::string(code) != "cpu.fp_mode") &&
+                      doc.find("node_spec") == nullptr && doc.find("input_digests") == nullptr &&
+                      doc.find("budget") == nullptr && doc.find("details") == nullptr;
+    if (!good) std::fprintf(stderr, "provenance dell'arresto non conforme: %s\n", a.rel_path.c_str());
+    ok = ok && good;
+  }
+  return ok;
+}
+
 // ---------------------------------------------------------------- generatori
 
 double uniform(std::mt19937_64& g, double lo, double hi) {
@@ -907,9 +966,9 @@ TEST(Simd, T_M2R5_07_denormal_mask_off_with_subnormal_parameters_stops_before_va
   EXPECT_EXIT(child(), testing::ExitedWithCode(0), "");
 }
 
-// Il confine del job controlla MXCSR prima di avviare il job: lo stop si propaga, nessun job parte (generazione dello
-// slot invariata), nessun artefatto, nessun kernel.
-TEST(Simd, T_M2R5_07_job_with_ftz_stops_before_any_kernel_and_publishes_nothing) {
+// Il confine del job controlla MXCSR prima di leggere il nodo: l'arresto si registra (un job `failed` con la sola
+// provenance dell'arresto prima del lavoro, R5.d) e lo stop si propaga; nessun kernel, nulla pubblicato.
+TEST(Simd, T_M2R5_07_job_with_ftz_stops_before_any_kernel_and_records_the_stop) {
   seam_guard seam;
   const cal_disk c = write_cal("ftz_job", simd_test::requested());
   cal_store p = cal_project(c, "store");
@@ -926,10 +985,48 @@ TEST(Simd, T_M2R5_07_job_with_ftz_stops_before_any_kernel_and_publishes_nothing)
   }
   EXPECT_EQ(fp_mode_bits(*cal_stop), mxcsr_ftz);
   EXPECT_EQ(fp_mode_bits(*master_stop), mxcsr_ftz);
-  EXPECT_EQ(p.store->get_slot("cal")->current_generation, 0u);
-  EXPECT_EQ(m.store->get_slot("master")->current_generation, 0u);
-  EXPECT_EQ(artifacts_of(p), 0u);
-  EXPECT_EQ(m.store->artifacts_for(m.node.key()).size(), 0u);
+  EXPECT_EQ(context_of(*cal_stop, "registrazione_arresto"), "");
+  EXPECT_EQ(context_of(*master_stop, "registrazione_arresto"), "");
+  EXPECT_TRUE(stop_jobs_recorded(*p.store, "cal", p.node.key(), 1));
+  EXPECT_TRUE(stop_jobs_recorded(*m.store, "master", m.node.key(), 1));
+  EXPECT_TRUE(only_stop_before_work_provenance(*p.store, p.node, 1, "numeric", "cpu.fp_mode", &*cal_stop));
+  EXPECT_TRUE(only_stop_before_work_provenance(*m.store, m.node, 1, "numeric", "cpu.fp_mode", &*master_stop));
+  EXPECT_EQ(p.store->read_slot("cal").state, freshness::missing);
+  EXPECT_EQ(m.store->read_slot("master").state, freshness::missing);
+  EXPECT_EQ(calls(cpu_path::scalar), 0u);
+  EXPECT_EQ(calls(cpu_path::avx2), 0u);
+}
+
+// R5.d: con il budget, i job di calibrazione e master serializzano le risorse prima del job. Una soglia PSI non finita
+// ferma la serializzazione (invalid_input dag.param_nonfinite): l'arresto si registra prima del lavoro (job `failed`,
+// sola provenance dell'arresto senza nodo) e lo stop si propaga invariato; nessun kernel.
+TEST(Simd, T_M2B_12_resources_not_serializable_in_the_budget_record_the_stop_before_work) {
+  seam_guard seam;
+  const cal_disk c = write_cal("nan_psi", simd_test::requested());
+  cal_store p = cal_project(c, "store");
+  master_disk m = master_project("nan_psi_master", simd_test::requested());
+  resource_config nan_psi;
+  nan_psi.psi_threshold.value = std::numeric_limits<double>::quiet_NaN();
+  calibration_job_options co;
+  co.resources = nan_psi;
+  master_job_options mo;
+  mo.resources = nan_psi;
+  const budget_snapshot budget{};
+  memory_pool pool(256 * MiB);
+  testing::internal::CaptureStderr();
+  const stop_error cal_stop = expect_stop_of(
+      [&] { (void)run_calibration_job(*p.store, "cal", c.recipe, pool, co, no_cancel(), budget); },
+      error_category::invalid_input, "dag.param_nonfinite");
+  const stop_error master_stop = expect_stop_of(
+      [&] { (void)run_master_job(*m.store, "master", m.recipe, pool, mo, no_cancel(), budget); },
+      error_category::invalid_input, "dag.param_nonfinite");
+  testing::internal::GetCapturedStderr();
+  EXPECT_EQ(context_of(cal_stop, "registrazione_arresto"), "");
+  EXPECT_EQ(context_of(master_stop, "registrazione_arresto"), "");
+  EXPECT_TRUE(stop_jobs_recorded(*p.store, "cal", p.node.key(), 1, error_category::invalid_input, "dag.param_nonfinite"));
+  EXPECT_TRUE(stop_jobs_recorded(*m.store, "master", m.node.key(), 1, error_category::invalid_input, "dag.param_nonfinite"));
+  EXPECT_TRUE(only_stop_before_work_provenance(*p.store, p.node, 1, "invalid_input", "dag.param_nonfinite", &cal_stop));
+  EXPECT_TRUE(only_stop_before_work_provenance(*m.store, m.node, 1, "invalid_input", "dag.param_nonfinite", &master_stop));
   EXPECT_EQ(calls(cpu_path::scalar), 0u);
   EXPECT_EQ(calls(cpu_path::avx2), 0u);
 }
@@ -1061,20 +1158,14 @@ bool dm_off_stops(const char* what, const std::function<void()>& f) {
   } catch (const stop_error& e) {
     const unsigned seen = _mm_getcsr();
     _mm_setcsr(base);
+    // La registrazione dell'arresto riuscita non aggiunge contesto: lo stop propagato e' quello del controllo.
     const bool ok = e.category() == error_category::numeric && e.code() == "cpu.fp_mode" && fp_mode_bits(e) == mxcsr_dm &&
-                    fp_violation(seen) == mxcsr_dm;
+                    fp_violation(seen) == mxcsr_dm && context_of(e, "registrazione_arresto").empty();
     if (!ok) std::fprintf(stderr, "%s: stop diverso da cpu.fp_mode con DM spenta: %s\n", what, e.what());
     return ok;
   }
   _mm_setcsr(base);
   std::fprintf(stderr, "%s: nessuno stop\n", what);
-  return false;
-}
-
-bool generation_is_zero(const dag_store& store, const char* slot) {
-  const std::optional<slot_record> s = store.get_slot(slot);
-  if (s && s->current_generation == 0) return true;
-  std::fprintf(stderr, "slot %s: job avviato (generazione diversa da 0)\n", slot);
   return false;
 }
 
@@ -1108,10 +1199,11 @@ bool dm_off_job_stop(const char* what, const job_outcome& out, const sqlite_dag_
 
 }  // namespace
 
-// Con DM spenta il confine run_job_files si ferma prima di avviare il job: nessuna generazione dello slot, nessun nodo
-// letto (l'analisi del parametro subnormale nel JSON del nodo genererebbe SIGFPE), nessun artefatto, nessun kernel.
-// Stesso stop per i job di calibrazione, master, import e per run_branches sullo store durevole.
-TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_files_before_the_job_and_the_node) {
+// Con DM spenta il confine run_job_files si ferma prima di leggere il nodo (l'analisi del parametro subnormale nel JSON
+// del nodo genererebbe SIGFPE) e registra l'arresto senza numeri in virgola mobile (R5.d): un job `failed` numeric
+// cpu.fp_mode per ogni chiamata, con la sola provenance dell'arresto prima del lavoro; nessun altro artefatto, nessun
+// kernel. Stesso stop per i job di calibrazione, master, import e per run_branches sullo store durevole.
+TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_files_before_the_node_and_records_the_stop) {
   seam_guard seam;
   ASSERT_EQ(fp_violation(_mm_getcsr()), 0u);
   cal_disk c = write_cal("dm_job_files", simd_test::requested());
@@ -1162,23 +1254,27 @@ TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_files_before_the_job_and_th
         jobs.push_back(branch_files_job{"branch", [](const job_record&) { return job_files_result{}; }});
         (void)run_branches(*store, std::move(jobs));
       }) && ok;
-      for (const char* slot : {"cal", "branch", "import"}) ok = generation_is_zero(*store, slot) && ok;
-      ok = generation_is_zero(*mstore, "master") && ok;
-      const bool no_artifacts = store->artifacts_for(cal_node.key()).empty() &&
-                                store->artifacts_for(imp_node.key()).empty() &&
-                                mstore->artifacts_for(m_node.key()).empty();
-      if (!no_artifacts) std::fprintf(stderr, "artefatti scritti\n");
+      ok = stop_jobs_recorded(*store, "cal", cal_node.key(), 2) && ok;
+      ok = stop_jobs_recorded(*store, "branch", cal_node.key(), 1) && ok;
+      ok = stop_jobs_recorded(*store, "import", imp_node.key(), 1) && ok;
+      ok = stop_jobs_recorded(*mstore, "master", m_node.key(), 2) && ok;
+      ok = only_stop_before_work_provenance(*store, cal_node, 3) && ok;
+      ok = only_stop_before_work_provenance(*store, imp_node, 1) && ok;
+      ok = only_stop_before_work_provenance(*mstore, m_node, 2) && ok;
+      for (const char* slot : {"cal", "branch", "import"}) ok = store->read_slot(slot).state == freshness::missing && ok;
+      ok = mstore->read_slot("master").state == freshness::missing && ok;
       const bool no_kernel = calls(cpu_path::scalar) == 0 && calls(cpu_path::avx2) == 0;
       if (!no_kernel) std::fprintf(stderr, "kernel eseguiti\n");
-      return ok && no_artifacts && no_kernel;
+      return ok && no_kernel;
     });
   };
   EXPECT_EXIT(child(), testing::ExitedWithCode(0), "");
 }
 
-// Stesso confine in memoria: run_job e run_branches si fermano prima di avviare il job e prima del lavoro, che con un
-// operando subnormale genererebbe SIGFPE.
-TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_before_the_job_and_the_work) {
+// Stesso confine in memoria: run_job e run_branches si fermano prima di leggere il nodo e prima del lavoro, che con un
+// operando subnormale genererebbe SIGFPE, e registrano l'arresto nel job (R5.d). Lo store in memoria non persiste
+// provenance: il record e' il job `failed` con categoria, codice e chiave del nodo.
+TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_before_the_node_and_records_the_stop) {
   seam_guard seam;
   ASSERT_EQ(fp_violation(_mm_getcsr()), 0u);
   const auto child = [&] {
@@ -1209,7 +1305,49 @@ TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_before_the_job_and_the_work
         jobs.push_back(branch_job{"b", work});
         (void)run_branches(store, std::move(jobs));
       }) && ok;
-      ok = generation_is_zero(store, "s") && generation_is_zero(store, "b") && ok;
+      ok = stop_jobs_recorded(store, "s", node.key(), 1) && stop_jobs_recorded(store, "b", node.key(), 1) && ok;
+      const bool no_artifacts = store.artifacts_for(node.key()).empty();
+      if (!no_artifacts) std::fprintf(stderr, "artefatti scritti\n");
+      if (worked) std::fprintf(stderr, "lavoro del job eseguito\n");
+      return ok && no_artifacts && !worked;
+    });
+  };
+  EXPECT_EXIT(child(), testing::ExitedWithCode(0), "");
+}
+
+// Con tutte e sei le eccezioni smascherate (anche PM: ogni operazione inesatta genererebbe SIGFPE) la registrazione
+// dell'arresto prima del lavoro sullo store durevole, provenance compresa, termina senza segnale (R5.d).
+TEST(Simd, T_M2R5_07_every_exception_unmasked_records_the_stop_without_a_signal) {
+  seam_guard seam;
+  ASSERT_EQ(fp_violation(_mm_getcsr()), 0u);
+  const fs::path dir = cal::fresh_dir("simd_all_unmasked");
+  const auto child = [&] {
+    run_in_fp_child([&] {
+      auto store = sqlite_dag_store::create(dir / "store");
+      json params = json::object();
+      params.set("x", json::number(0x1p-1074));
+      const node_spec node("test.subnormal", 1, 1, std::move(params), {}, sample_type::f64, "cpu_scalar", std::nullopt);
+      store->put_node(node);
+      store->create_slot("s", node.key());
+      bool worked = false;
+      const auto work = [&](const job_record&) {
+        worked = true;
+        return job_files_result{};
+      };
+      const unsigned base = _mm_getcsr();
+      std::optional<stop_error> stop;
+      _mm_setcsr(base & ~mxcsr_masks);
+      try {
+        (void)run_job_files(*store, "s", work);
+      } catch (const stop_error& e) {
+        _mm_setcsr(base);
+        stop = e;
+      }
+      _mm_setcsr(base);
+      bool ok = stop && stop->category() == error_category::numeric && stop->code() == "cpu.fp_mode" &&
+                fp_mode_bits(*stop) == mxcsr_masks && context_of(*stop, "registrazione_arresto").empty();
+      if (!ok) std::fprintf(stderr, "stop diverso: %s\n", stop ? stop->what() : "nessuno");
+      ok = stop_jobs_recorded(*store, "s", node.key(), 1) && only_stop_before_work_provenance(*store, node, 1, "numeric", "cpu.fp_mode", stop ? &*stop : nullptr) && ok;
       if (worked) std::fprintf(stderr, "lavoro del job eseguito\n");
       return ok && !worked;
     });

@@ -689,17 +689,22 @@ TEST(Review, P2_completed_and_stopped_jobs_on_a_durable_store_persist_the_return
 }
 
 // Senza la correzione run_job eseguiva il job su store durevole senza persistere la provenance.
-TEST(Review, P3_run_job_on_a_durable_store_stops_before_starting_the_job) {
+// run_job su uno store durevole si ferma prima del lavoro; l'arresto si registra (R5.d) e il lavoro non parte.
+TEST(Review, P3_run_job_on_a_durable_store_stops_before_the_work) {
   auto store = make_project("rvp3");
   store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
   bool worked = false;
+  testing::internal::CaptureStderr();
   EXPECT_STOP(run_job(*store, "s", [&](const job_record&) -> job_result {
                 worked = true;
                 return job_result{};
               }),
               error_category::invalid_input, "job.durable_store_requires_run_job_files");
+  testing::internal::GetCapturedStderr();
   EXPECT_FALSE(worked);
-  EXPECT_FALSE(store->get_job(1).has_value());
+  ASSERT_TRUE(store->get_job(1).has_value());
+  EXPECT_EQ(store->get_job(1)->state, job_state::failed);
+  EXPECT_EQ(store->get_job(1)->stop_code, "job.durable_store_requires_run_job_files");
 }
 
 // Senza la correzione l'errore sulla provenance dell'arresto andava solo su stderr: l'esito non lo dichiarava.

@@ -141,7 +141,7 @@ Artefatti in `.omc/artifacts/ask/codex-m2-gate-review{1,2,3,4}-*.md` (Codex `gpt
 | Rilievo | Correzione e dove | Test |
 |---|---|---|
 | Su `dag.stale_publish` provenance `completed` e poi `failed` per lo stesso job | Generazione superata: nessun record `completed`, un solo record `failed` `dag.stale_publish` (`job.cpp`) | `Review.P1_stale_generation_during_publication_leaves_one_failed_provenance_after_reopen` |
-| `run_job` su store durevole teneva la provenance solo in memoria | `run_job` con `sqlite_dag_store` si ferma prima di avviare il job (`invalid_input`, `job.durable_store_requires_run_job_files`); la provenance durevole la scrive solo `run_job_files` | `Review.P2_completed_and_stopped_jobs_on_a_durable_store_persist_the_returned_provenance`, `Review.P3_run_job_on_a_durable_store_stops_before_starting_the_job` |
+| `run_job` su store durevole teneva la provenance solo in memoria | `run_job` con `sqlite_dag_store` si ferma prima del lavoro (`invalid_input`, `job.durable_store_requires_run_job_files`); la provenance durevole la scrive solo `run_job_files` | `Review.P2_completed_and_stopped_jobs_on_a_durable_store_persist_the_returned_provenance`, `Review.P3_run_job_on_a_durable_store_stops_before_the_work` (dopo R5.d registra lo stop come job `failed`) |
 | LOW: limite di T-M2C-11 ancora in `M2-c.md` | Limite e tabella aggiornati | vedi giro 1 |
 | LOW: riferimenti a comandi e log delle nuove prove | Aggiunti in `M2-a.md` e `M2-c.md`; la mutazione non è documentata nei log, quindi la dichiarazione è "dedotta da lettura del codice" | nessuno |
 

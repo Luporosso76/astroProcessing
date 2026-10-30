@@ -435,4 +435,220 @@ TEST(Store, write_files_rejects_unexpected_digest_and_bad_extension) {
   EXPECT_EQ(ok[0].digest(), digest_of(bytes));
 }
 
+// ---------------------------------------------------------------- arresti al confine prima del lavoro (R5.d)
+
+std::vector<std::string> keys_of_object(const json& doc) {
+  std::vector<std::string> keys = doc.keys();
+  std::sort(keys.begin(), keys.end());
+  return keys;
+}
+
+// Unica provenance del nodo: la provenance dell'arresto prima del lavoro del job `job`.
+json stop_before_work_provenance(const sqlite_dag_store& store, const job_record& job) {
+  const auto rows = store.artifacts_for(job.node_key);
+  EXPECT_EQ(rows.size(), 1u);
+  if (rows.empty()) return json::object();
+  EXPECT_EQ(rows[0].output_role, "provenance");
+  EXPECT_EQ(rows[0].generation, job.generation);
+  return parse_json(read_text(store.artifact_path(rows[0].rel_path)));
+}
+
+// La provenance prima del lavoro ha solo chiave del nodo, versioni, generazione, stato e arresto: nessun campo che
+// richieda il nodo letto (node_spec, digest degli input), nessun budget, details o avviso.
+void expect_stop_before_work(const json& doc, const job_record& job, const stop_error& stop) {
+  ASSERT_EQ(keys_of_object(doc),
+            (std::vector<std::string>{"generation", "node_key", "state", "stop", "stop_before_work", "versions"}));
+  EXPECT_EQ(doc.find("node_key")->as_string(), job.node_key);
+  EXPECT_EQ(doc.find("generation")->as_integer(), static_cast<std::int64_t>(job.generation));
+  EXPECT_EQ(doc.find("state")->as_string(), "failed");
+  EXPECT_TRUE(doc.find("stop_before_work")->as_bool());
+  const json& s = *doc.find("stop");
+  ASSERT_EQ(keys_of_object(s), (std::vector<std::string>{"category", "code", "context", "message"}));
+  EXPECT_EQ(s.find("category")->as_string(), to_string(stop.category()));
+  EXPECT_EQ(s.find("code")->as_string(), stop.code());
+  EXPECT_EQ(s.find("message")->as_string(), stop.message());
+  stop_error::context_list persisted;
+  for (const json& item : s.find("context")->items()) {
+    persisted.emplace_back(item.find("key")->as_string(), item.find("value")->as_string());
+  }
+  EXPECT_EQ(persisted, stop.context());
+}
+
+// Nodo illeggibile dopo l'avvio (params alterati nel database): il job si chiude `failed` con la causa, la provenance
+// dell'arresto si scrive senza il nodo, lo stop si propaga invariato e il lavoro non parte.
+TEST(Store, T_M2B_12_unreadable_node_after_start_records_the_stop_before_work) {
+  fs::path dir;
+  auto store = make_project("tnode_unreadable", &dir);
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+  const std::string key = store->get_slot("s")->target_node_key;
+  {
+    raw_db raw(dir);
+    ASSERT_EQ(raw.exec("DROP TRIGGER nodes_immutable_update"), SQLITE_OK);
+    ASSERT_EQ(raw.exec("UPDATE nodes SET params_canonical='{' WHERE node_key='" + key + "'"), SQLITE_OK);
+  }
+  bool worked = false;
+  std::optional<stop_error> stop;
+  testing::internal::CaptureStderr();
+  try {
+    (void)run_job_files(*store, "s", [&](const job_record&) {
+      worked = true;
+      return job_files_result{};
+    });
+  } catch (const stop_error& e) {
+    stop = e;
+  }
+  testing::internal::GetCapturedStderr();
+  ASSERT_TRUE(stop.has_value());
+  EXPECT_FALSE(worked);
+  EXPECT_TRUE(std::none_of(stop->context().begin(), stop->context().end(),
+                           [](const auto& kv) { return kv.first == "registrazione_arresto"; }));
+  const std::optional<job_record> job = store->get_job(1);
+  ASSERT_TRUE(job.has_value());
+  EXPECT_EQ(job->state, job_state::failed);
+  EXPECT_EQ(job->stop_category, stop->category());
+  EXPECT_EQ(job->stop_code, stop->code());
+  EXPECT_EQ(job->node_key, key);
+  expect_stop_before_work(stop_before_work_provenance(*store, *job), *job, *stop);
+  EXPECT_EQ(store->read_slot("s").state, freshness::missing);
+}
+
+// Uno store durevole passato a run_job: l'arresto invalid_input si registra come gli altri arresti prima del lavoro.
+TEST(Store, T_M2B_12_durable_store_in_run_job_records_the_stop_before_work) {
+  auto store = make_project("tdurable_run_job");
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+  bool worked = false;
+  std::optional<stop_error> stop;
+  testing::internal::CaptureStderr();
+  try {
+    (void)run_job(*store, "s", [&](const job_record&) -> job_result {
+      worked = true;
+      return {};
+    });
+  } catch (const stop_error& e) {
+    stop = e;
+  }
+  testing::internal::GetCapturedStderr();
+  ASSERT_TRUE(stop.has_value());
+  EXPECT_EQ(stop->category(), error_category::invalid_input);
+  EXPECT_EQ(stop->code(), "job.durable_store_requires_run_job_files");
+  EXPECT_TRUE(stop->context().empty());
+  EXPECT_FALSE(worked);
+  const std::optional<job_record> job = store->get_job(1);
+  ASSERT_TRUE(job.has_value());
+  EXPECT_EQ(job->state, job_state::failed);
+  EXPECT_EQ(job->stop_category, error_category::invalid_input);
+  EXPECT_EQ(job->stop_code, "job.durable_store_requires_run_job_files");
+  expect_stop_before_work(stop_before_work_provenance(*store, *job), *job, *stop);
+}
+
+// Registrazione fallita: si propaga lo stop originale (categoria, codice, contesto) con l'errore secondario nel
+// contesto `registrazione_arresto`. Scrittura della provenance fallita: il job resta `failed` senza provenance.
+// Store in sola lettura: nessun job si apre.
+TEST(Store, T_M2B_12_failed_stop_record_propagates_the_original_stop_with_the_secondary_failure) {
+  fs::path dir;
+  {
+    auto store = make_project("trecord_fails", &dir);
+    store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+    store->set_fault_injector([](std::string_view p) { return p == "artifact.fsync_file" ? EIO : 0; });
+    testing::internal::CaptureStderr();
+    try {
+      (void)run_job(*store, "s", [](const job_record&) -> job_result { return {}; });
+      ADD_FAILURE() << "stop atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::invalid_input);
+      EXPECT_EQ(e.code(), "job.durable_store_requires_run_job_files");
+      ASSERT_EQ(e.context().size(), 1u);
+      EXPECT_EQ(e.context()[0].first, "registrazione_arresto");
+      EXPECT_EQ(e.context()[0].second.rfind("io ", 0), 0u) << e.context()[0].second;
+    }
+    testing::internal::GetCapturedStderr();
+    const std::optional<job_record> job = store->get_job(1);
+    ASSERT_TRUE(job.has_value());
+    EXPECT_EQ(job->state, job_state::failed);
+    EXPECT_EQ(job->stop_code, "job.durable_store_requires_run_job_files");
+    EXPECT_TRUE(store->artifacts_for(job->node_key).empty());
+  }
+  auto ro = sqlite_dag_store::open(dir, open_intent::read_only);
+  testing::internal::CaptureStderr();
+  try {
+    (void)run_job(*ro, "s", [](const job_record&) -> job_result { return {}; });
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::invalid_input);
+    EXPECT_EQ(e.code(), "job.durable_store_requires_run_job_files");
+    ASSERT_EQ(e.context().size(), 1u);
+    EXPECT_EQ(e.context()[0].first, "registrazione_arresto");
+    EXPECT_EQ(e.context()[0].second.rfind("schema store.read_only", 0), 0u) << e.context()[0].second;
+  }
+  testing::internal::GetCapturedStderr();
+  EXPECT_FALSE(ro->get_job(2).has_value());
+}
+
+// Avvio del job fallito (slot inesistente, store in sola lettura): nessun job esiste per registrare l'arresto, che si
+// propaga invariato e senza un secondo tentativo di avvio: nessuna registrazione tentata, quindi nessuna diagnosi su
+// stderr.
+TEST(Store, T_M2B_12_failed_job_start_propagates_unchanged_without_a_job) {
+  fs::path dir;
+  {
+    auto store = make_project("tstart_fails", &dir);
+    store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+    testing::internal::CaptureStderr();
+    try {
+      (void)run_job_files(*store, "assente", [](const job_record&) { return job_files_result{}; });
+      ADD_FAILURE() << "stop atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::invalid_input);
+      EXPECT_EQ(e.code(), "dag.unknown_slot");
+      EXPECT_EQ(e.context(), (stop_error::context_list{{"slot", "assente"}}));
+    }
+    EXPECT_EQ(testing::internal::GetCapturedStderr(), "");
+    EXPECT_FALSE(store->get_job(1).has_value());
+  }
+  auto ro = sqlite_dag_store::open(dir, open_intent::read_only);
+  testing::internal::CaptureStderr();
+  try {
+    (void)run_job_files(*ro, "s", [](const job_record&) { return job_files_result{}; });
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.code(), "store.read_only");
+    EXPECT_TRUE(e.context().empty());
+  }
+  EXPECT_EQ(testing::internal::GetCapturedStderr(), "");
+  EXPECT_FALSE(ro->get_job(1).has_value());
+}
+
+// Arresto `cancelled` nella preparazione, durante un resume: il job si chiude `cancelled` e la provenance dell'arresto
+// ha stato `cancelled`, lo stop con il suo contesto e il contesto del resume invariato.
+TEST(Store, T_M2B_12_cancelled_stop_before_work_keeps_the_resume_context) {
+  auto store = make_project("tcancel_before_work");
+  store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});
+  json resume = json::object();
+  resume.set("workflow", json::string("wf"));
+  resume.set("definition_sha256", json::string(std::string(64, 'd')));
+  resume.set("reused", json::array());
+  store->set_resume_context(resume);
+  const stop_error cancel(error_category::cancelled, "sched.cancelled", "annullato", {{"fase", "preparazione"}});
+  testing::internal::CaptureStderr();
+  try {
+    prepare_job_start(*store, "s", [&] { throw cancel; });
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::cancelled);
+    EXPECT_EQ(e.code(), "sched.cancelled");
+    EXPECT_EQ(e.context(), cancel.context());
+  }
+  testing::internal::GetCapturedStderr();
+  store->set_resume_context(std::nullopt);
+  const std::optional<job_record> job = store->get_job(1);
+  ASSERT_TRUE(job.has_value());
+  EXPECT_EQ(job->state, job_state::cancelled);
+  EXPECT_EQ(job->stop_category, error_category::cancelled);
+  const json doc = stop_before_work_provenance(*store, *job);
+  ASSERT_EQ(keys_of_object(doc), (std::vector<std::string>{"generation", "node_key", "resume", "state", "stop",
+                                                            "stop_before_work", "versions"}));
+  EXPECT_EQ(doc.find("state")->as_string(), "cancelled");
+  EXPECT_EQ(canonical_json(*doc.find("resume")), canonical_json(resume));
+  EXPECT_EQ(doc.find("stop")->find("code")->as_string(), "sched.cancelled");
+}
+
 }  // namespace

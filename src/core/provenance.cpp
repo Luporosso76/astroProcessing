@@ -68,6 +68,18 @@ void validate(const provenance_record& r) {
   }
 }
 
+json versions_json(const library_versions& v) {
+  if (v.source_revision.empty()) bad("revisione del sorgente assente");
+  json versions = json::object();
+  versions.set("product", json::string(v.product));
+  versions.set("source_revision", json::string(v.source_revision));
+  versions.set("source_dirty", v.source_dirty ? json::boolean(*v.source_dirty) : json::null());
+  versions.set("cfitsio", json::string(v.cfitsio));
+  versions.set("sqlite", json::string(v.sqlite));
+  versions.set("openssl", json::string(v.openssl));
+  return versions;
+}
+
 }  // namespace
 
 library_versions current_library_versions() {
@@ -79,7 +91,7 @@ library_versions current_library_versions() {
 
 json provenance_json(const provenance_record& r) {
   validate(r);
-  if (r.versions.source_revision.empty()) bad("revisione del sorgente assente");
+  json versions = versions_json(r.versions);
   json inputs = json::array();
   for (const auto& in : r.spec.inputs()) {
     if (in.is_file()) inputs.push(digest_json(in.file_digest()));
@@ -88,13 +100,6 @@ json provenance_json(const provenance_record& r) {
   for (const auto& w : r.warnings) warnings.push(json::string(w));
   json outputs = json::array();
   for (const auto& d : r.output_digests) outputs.push(digest_json(d));
-  json versions = json::object();
-  versions.set("product", json::string(r.versions.product));
-  versions.set("source_revision", json::string(r.versions.source_revision));
-  versions.set("source_dirty", r.versions.source_dirty ? json::boolean(*r.versions.source_dirty) : json::null());
-  versions.set("cfitsio", json::string(r.versions.cfitsio));
-  versions.set("sqlite", json::string(r.versions.sqlite));
-  versions.set("openssl", json::string(r.versions.openssl));
   json doc = json::object();
   doc.set("node_spec", r.spec.to_json());
   doc.set("node_key", json::string(r.spec.key()));
@@ -112,5 +117,25 @@ json provenance_json(const provenance_record& r) {
 }
 
 std::string provenance_canonical(const provenance_record& record) { return canonical_json(provenance_json(record)); }
+
+json stop_before_work_json(const stop_before_work_record& r) {
+  if (r.state != job_state::failed && r.state != job_state::cancelled) bad("job fermato prima del lavoro senza stato finale di arresto");
+  if ((r.state == job_state::cancelled) != (r.stop.category() == error_category::cancelled)) {
+    bad("stato incoerente con la categoria dell'arresto");
+  }
+  json doc = json::object();
+  doc.set("node_key", json::string(r.node_key));
+  doc.set("versions", versions_json(r.versions));
+  doc.set("generation", json::uinteger(r.generation));
+  doc.set("state", json::string(state_name(r.state)));
+  doc.set("stop", stop_json(r.stop));
+  doc.set("stop_before_work", json::boolean(true));
+  if (r.resume) doc.set("resume", *r.resume);
+  return doc;
+}
+
+std::string stop_before_work_canonical(const stop_before_work_record& record) {
+  return canonical_json(stop_before_work_json(record));
+}
 
 }  // namespace astro

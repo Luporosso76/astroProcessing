@@ -383,9 +383,11 @@ job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& sl
                                   const content_digest& digest, const preview_request& request, const std::string& cause,
                                   thumbnail_cache& cache, memory_pool& pool, const cancel_token& cancel,
                                   const std::optional<budget_snapshot>& budget, const job_hook& hook) {
-  const node_spec node = make_cache_rebuild_node(digest, request, cause);
+  // Una causa non valida e' un arresto prima del lavoro sullo slot (job.hpp).
+  std::optional<node_spec> node;
+  prepare_job_start(store, slot_name, [&] { node = make_cache_rebuild_node(digest, request, cause); });
   const auto work = [&](const job_record& job) -> job_files_result {
-    check_node(node, job);
+    check_node(*node, job);
     fits_input input = open_verified(path, digest, pool, hook);
     std::string replaced_name;
     std::string replaced_found;

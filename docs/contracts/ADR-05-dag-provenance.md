@@ -22,7 +22,7 @@ class stop_error : public std::exception {
 
 - `code` è stabile, `<modulo>.<condizione>` in `snake_case`; i test asseriscono categoria e codice.
 - Si lancia al punto di rilevazione. Un `catch` intermedio può solo aggiungere contesto e rilanciare la stessa categoria. Nessun `catch` prosegue.
-- Il confine (CLI, runner dei job) cattura, scrive la provenance dell'arresto, marca il job `failed` o `cancelled`, rilascia le prenotazioni ed esce con codice **2**; per la categoria `cancelled` il codice è **3**, così un annullamento si distingue da un guasto.
+- Il confine (CLI, runner dei job) cattura, scrive la provenance dell'arresto, marca il job `failed` o `cancelled`, rilascia le prenotazioni ed esce con codice **2**; per la categoria `cancelled` il codice è **3**, così un annullamento si distingue da un guasto. Un arresto prima del lavoro del job si registra allo stesso modo e si propaga come eccezione (sezione [Provenance](#provenance)).
 - Una violazione di invariante interno è un bug: `ASTRO_ASSERT` chiama `std::abort`. Non è una categoria.
 - Nessuna categoria attiva un percorso alternativo (NC-21). T-FBK-01 lo verifica tracciando le chiamate.
 
@@ -92,6 +92,8 @@ Il riuso di un passo sicuro non apre un job e non scrive provenance. Le esecuzio
 
 Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita resta 2 (3 per `cancelled`); non si scrive provenance altrove.
 
+**Arresto prima del lavoro (R5.d, NFR-FBK-01.a).** Un arresto al confine prima del lavoro del job (ambiente FP vietato, preparazione del job, store durevole passato a `run_job`, nodo del job assente o illeggibile; elenco in `job.hpp`) si registra senza leggere il nodo. Il job si chiude `failed` (`cancelled` per quella categoria) con categoria e codice. Se non è ancora avviato, lo si avvia solo per registrare l'arresto. Sullo store durevole la provenance dell'arresto (`stop_before_work_record`) si scrive come artefatto `provenance` del nodo. Il record contiene soltanto `node_key`, `versions`, `generation`, `state`, `stop` (categoria, codice, messaggio, contesto), `stop_before_work: true` ed eventualmente `resume`: stringhe e interi. Non porta parametri, `node_spec`, digest degli input, avvisi, budget né `details`: con l'ambiente FP vietato niente analizza o serializza numeri in virgola mobile. Lo stop si propaga poi al chiamante come eccezione, con la stessa categoria, lo stesso codice e lo stesso contesto. Il chiamante ne ricava il codice di uscita con `exit_code_for`. Se la registrazione fallisce, lo stop originale si propaga con l'errore secondario nel contesto `registrazione_arresto`. Non si registra un fallimento dell'avvio del job (`start_job`: slot inesistente o escluso, store in sola lettura, errore SQL): è la scrittura stessa del record che non riesce. L'errore si propaga invariato e nessun job esiste.
+
 ## Test
 
 | ID | Clausola |
@@ -107,7 +109,7 @@ Se lo store non è scrivibile, la diagnosi va su stderr e il codice di uscita re
 | T-M2B-09 | Input mancante: fermo solo il ramo dipendente. |
 | T-M2B-10 | Provenance completa per un job riuscito e per uno fermato. |
 | T-M2B-11 | Versione di schema esclusa dalla chiave. |
-| T-M2B-12 | Ogni categoria al confine: exit 2 (3 per `cancelled`), job marcato, prenotazioni rilasciate. |
+| T-M2B-12 | Ogni categoria al confine: exit 2 (3 per `cancelled`), job marcato, prenotazioni rilasciate. R5.d: arresto prima del lavoro (nodo assente o illeggibile, store durevole in `run_job`, causa non valida di `cache.rebuild`) registrato e propagato invariato; registrazione fallita con `registrazione_arresto`; avvio del job fallito propagato senza job e senza nuovo tentativo. |
 | T-M2B-13 | `fits.decode`: cambiare `fits_read_options` o un valore `declare_metadata` cambia `node_key`; stessi parametri, stessa chiave. Da implementare in M2.b. |
 | T-M2R4-01 | Estensione R4: la provenance di un job eseguito da un resume ha il campo `resume` con i passi riusati; un passo riusato non aggiunge provenance. |
 

@@ -364,6 +364,34 @@ TEST(Thumbnail, T_M2R1_04_T_M2R1_11_a_corrupt_entry_stops_and_only_the_explicit_
   EXPECT_EQ(none.stop->category(), error_category::invalid_input);
   EXPECT_EQ(none.stop->code(), "cache.rebuild_nothing");
   EXPECT_STOP(make_cache_rebuild_node(src.digest, req, "perche_si"), error_category::invalid_input, "cache.rebuild_cause");
+  // La causa non valida nel job e' un arresto prima del lavoro (R5.d): job `failed` registrato con la provenance
+  // dell'arresto senza nodo, stop propagato invariato, nessuna ricostruzione.
+  const std::uint64_t computations_before = cache.computations();
+  const std::uint64_t generation_before = p.store->get_slot("nothing")->current_generation;
+  testing::internal::CaptureStderr();
+  EXPECT_STOP(run_cache_rebuild_job(*p.store, "nothing", src.path.string(), src.digest, other, "perche_si", cache, pool,
+                                    never()),
+              error_category::invalid_input, "cache.rebuild_cause");
+  testing::internal::GetCapturedStderr();
+  EXPECT_EQ(cache.computations(), computations_before);
+  {
+    const std::uint64_t generation = p.store->get_slot("nothing")->current_generation;
+    EXPECT_EQ(generation, generation_before + 1) << "un job registra l'arresto";
+    std::size_t found = 0;
+    for (const artifact_record& a : p.store->artifacts_for(nothing.key())) {
+      if (a.output_role != "provenance" || a.generation != generation_before + 1) continue;
+      ++found;
+      const json doc = parse_json(text_of(p.store->artifact_path(a.rel_path)));
+      const json* marker = doc.find("stop_before_work");
+      ASSERT_NE(marker, nullptr);
+      EXPECT_EQ(marker->type(), json::kind::boolean);
+      EXPECT_EQ(at(doc, "node_key").as_string(), nothing.key());
+      EXPECT_EQ(at(doc, "state").as_string(), "failed");
+      EXPECT_EQ(at(at(doc, "stop"), "code").as_string(), "cache.rebuild_cause");
+      EXPECT_EQ(doc.find("node_spec"), nullptr);
+    }
+    EXPECT_EQ(found, 1u);
+  }
   const node_spec user = make_cache_rebuild_node(src.digest, req, cache_rebuild_cause_user);
   add_slot(p, "user", user);
   const job_outcome valid = quiet([&] {

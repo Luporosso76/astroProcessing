@@ -44,4 +44,22 @@ struct provenance_record {
 json provenance_json(const provenance_record& record);
 std::string provenance_canonical(const provenance_record& record);
 
+// Provenance di un job fermato al confine prima del lavoro (NFR-FBK-01.a): il nodo non e' letto, quindi il record ha solo
+// stringhe e interi (chiave del nodo, versioni, generazione, stato, arresto, resume) e nessun numero in virgola mobile da
+// analizzare o serializzare. Non porta parametri, node_spec, digest degli input, avvisi, budget ne' details; il JSON ha
+// `stop_before_work: true`. `state` failed o cancelled coerente con la categoria dell'arresto (altrimenti invalid_input
+// dag.bad_provenance).
+struct stop_before_work_record {
+  std::string node_key;
+  library_versions versions;
+  std::uint64_t generation = 0;
+  job_state state = job_state::failed;
+  stop_error stop;
+  // Contesto di resume_workflow (stringhe e interi, ADR-05 estensione R4); assente, il campo non compare.
+  std::optional<json> resume = std::nullopt;
+};
+
+json stop_before_work_json(const stop_before_work_record& record);
+std::string stop_before_work_canonical(const stop_before_work_record& record);
+
 }  // namespace astro

@@ -959,7 +959,6 @@ calibration_input_spec product_master_input(const sqlite_dag_store& store, const
 job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name, const master_recipe& recipe,
                            memory_pool& pool, const master_job_options& options, const cancel_token& cancel,
                            const std::optional<budget_snapshot>& budget) {
-  require_fp_environment();  // prima di serializzare le risorse nel budget e di avviare il job (ADR-07)
   const auto work = [&](const job_record& job) -> job_files_result {
     master_plan p = make_plan(recipe);
     const node_spec node = make_master_node(recipe);
@@ -1118,8 +1117,13 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
     return job_files_result{std::move(files), std::move(warnings), std::move(details)};
   };
-  std::optional<budget_snapshot> recorded = budget;
-  if (recorded) recorded->resources = resource_config_json(options.resources);
+  // L'ambiente FP si controlla prima di serializzare le risorse nel budget (ADR-07).
+  std::optional<budget_snapshot> recorded;
+  prepare_job_start(store, slot_name, [&] {
+    require_fp_environment();
+    recorded = budget;
+    if (recorded) recorded->resources = resource_config_json(options.resources);
+  });
   return run_job_files(store, slot_name, work, recorded, &cancel);
 }
 
