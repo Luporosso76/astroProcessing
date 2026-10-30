@@ -310,7 +310,7 @@ T-M3BASE-20 e T-M3BASE-21 girano per formato, non per voce del registro, e non h
 
 ### 3.3 Ingresso di un operatore nuovo
 
-Un operatore nuovo entra solo aggiungendo la propria voce al registro (§3.1, punti 1 e 2) e passando la suite. Nessun test degli obblighi OB-01…OB-19 si scrive per l'operatore; nessun confine si modifica nella slice. Se l'operatore non passa un caso, si corregge l'operatore o, se il difetto è del confine, il confine (`plans/M3.md`, punto 3).
+Un operatore nuovo entra solo aggiungendo la propria voce al registro (§3.1, punti 1 e 2) e passando la suite. Nessun test degli obblighi OB-01…OB-20 si scrive per l'operatore; nessun confine si modifica nella slice. Se l'operatore non passa un caso, si corregge l'operatore o, se il difetto è del confine, il confine (`plans/M3.md`, punto 3).
 
 ## 4. Debiti
 
