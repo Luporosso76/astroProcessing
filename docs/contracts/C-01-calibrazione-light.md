@@ -111,7 +111,7 @@ Nessuna derivazione da software esistente (DEC-02, NC-15). I testi seguenti non 
   | `flat.given_q` | `Var(Q)` dal piano del flat |
   | ogni catena che divide | `Var(C)` con la formula di ADR-17.a e `Cov(Lc, Q) = 0` |
 
-  Fatto: per una combinazione lineare di ingressi indipendenti la somma delle varianze è esatta (GUM eq. 10). La divisione per `Q` è al primo ordine, come in ADR-17.a, già verificata nel regime di T-M2E-21. Non c'è un bound non dyadic della varianza per le catene `.b`: lo fissa ADR-17.b, che ridefinisce il modello. Fino ad allora la verifica numerica della varianza `.b` è esatta sui casi dyadic (T-M3A-C01-08).
+  Fatto: per una combinazione lineare di ingressi indipendenti la somma delle varianze è esatta (GUM eq. 10). La divisione per `Q` è al primo ordine, come in ADR-17.a, già verificata nel regime di T-M2E-21. La tabella vale con i master usati una volta; con `B` in entrambe le catene vale il modello di ADR-17.b §b.2. T-M3A-C01-08 verifica la tabella sui casi dyadic; il bound non dyadic è la regola I di ADR-17.b §b.10, verificata in T-M3C-VAR-01.
 - Nessun epsilon. `Q` non valido si maschera (ADR-16.a §7).
 
 ## 7. Maschere, metadati e bordi
@@ -149,7 +149,7 @@ Metriche del §10.2 e §9.9 del piano, con soglia fissata qui:
 |---|---|---|---|
 | Bias residuo | Sensibilità all'offset fisico: `s = Q · (C(Δ) − C(0)) / Δ` (`Q = 1` senza divisione), con `Δ = 64` aggiunto ai frame che contengono l'offset: light, bias, `D`, `DF`, flat `raw`; non a `D'`, `DF'` e ai flat preparati | `s = 0` esatto per offset `removed`, `s = 1` esatto per `known_not_removed` e `unknown`, sulla variante dyadic | T-M3A-C01-04 |
 | Doppio offset | Uscita al variare del nero dichiarato `b → b + 16` su tutti gli ingressi RAW, campioni invariati | Campioni, varianza e maschera bit-identici; estremi per canale del residuo dichiarato uguali a `min_i (b_i + 16)/Q_i` e `max_i (b_i + 16)/Q_i` dell'oracle, esatti (dyadic) | T-M3A-C01-04, 05 |
-| Rumore | Piano di varianza per catena contro la formula di §6 in aritmetica razionale | 0 sulla variante dyadic | T-M3A-C01-08 |
+| Rumore | Piano di varianza per catena contro la formula di §6 in aritmetica razionale | 0 sulla variante dyadic; variante non dyadic: regola I (ADR-17.b §b.10) | T-M3A-C01-08; T-M3C-VAR-01 |
 | Flat residuo | `m_i = Ĉ_i·K/(N(Fc)·S_i) − 1` sui pixel validi, con `Ĉ_i` il campione di uscita e `K`, `N(Fc)`, `S_i` esatti dell'oracle, calcolata dal test in aritmetica razionale (nessun arrotondamento nella metrica); la fixture ha `S ≥ 1` ovunque, quindi `S = 0` non compare. Ricette con offset e termico rimossi e flat applicato | `|m_i| ≤ B_C,i · K/(N(Fc)·S_i)` pixel per pixel, con `B_C,i` il bound assoluto di ADR-16.b §b.12 per `C` (uscita f32 compresa). Fatto: in aritmetica esatta queste ricette danno `C = S·N(Fc)/K`, quindi `m_i = (Ĉ_i − C_i)·K/(N(Fc)·S_i)`. Per le ricette con un'omissione dichiarata si riporta senza soglia: l'omissione è un esito dichiarato | T-M3A-C01-10 |
 | Perdita di segnale | Insieme dei pixel invalidi dell'uscita e conteggi per bit | Insieme uguale a quello dell'oracle, esatto | T-M3A-C01-09 |
 | Residuo dichiarato | Minimo e massimo per canale di `b_L/Q` | 0 sulla variante dyadic; altrimenti entro `max_i` del bound di §6 sui pixel del canale; canale senza pixel validi: valori assenti con `no_valid_pixels` | T-M3A-C01-05 |
@@ -171,6 +171,8 @@ Test pianificati. Oracle scritti a mano nel test, indipendenti dall'implementazi
 | T-M3A-C01-11 | c | Ogni catena con 1, 2 e 4 worker e `tile_rows` ∈ {1, 7, altezza} | Uscita, varianza, maschera e report bit-identici |
 
 Gate: G-OFFSET in M3.a con T-M3A-C01-01, 02, 03, 06 e la parte di analisi di 07, insieme a T-M3A-CAL-08 e T-M3A-RAW-02 (nero non sottratto dal decoder). T-CAL-08 al gate M3 con T-M3A-C01-04, 05, la parte di esecuzione di 07, e 08…11. Dato reale: PUB-LFC-01 per le combinazioni ottenibili per omissione dichiarata (`plans/M3.md`, slice c). Senza verità indipendente vale solo per coerenza e report.
+
+Classi delle soglie ([ADR-09.b](ADR-09-algoritmi.md#estensione-adr-09b-algoritmi-p0-di-m3) §b.3): B per T-M3A-C01-01, 02, 03, 06, 07, 09, 11; E per 04, 05, 08, 10; C per il flat residuo delle ricette con un'omissione dichiarata. PUB-LFC-01 è di classe R senza verità: sono criteri di gate solo quelli di classe B o E che non richiedono verità, e le metriche di accuratezza sono di classe C.
 
 ## 10. Failure mode, warning e provenance
 
@@ -198,8 +200,7 @@ Ammesse senza cambiare il contratto: blocchi di righe e streaming (ADR-06), perc
 - Il residuo dichiarato non comprende la componente termica.
 - Unità `electron` e light RGB fuori dal dominio.
 - Un ingresso con coverage, anche tutta a 1, è fuori dominio.
-- Senza ADR-17.b la varianza delle catene `.b` non ha un bound non dyadic; le ricette con `B` in due catene restano senza modello (ADR-16.b §b.10).
+- La tabella della varianza di §6 vale con i master usati una volta; le ricette con `B` in due catene hanno il modello di ADR-17.b §b.2.
 - L'offset del modello di rumore (`noise_model.offset_adu`, ADR-17.a) resta una dichiarazione della ricetta. Il prodotto non lo ricava da `b_L`.
 - I riferimenti di §5 non sono riletti in questa unità.
-- ADR-09.b non è scritto.
 - C-14 e C-16 devono dichiarare l'accettazione di `calib.offset.known_not_removed`.

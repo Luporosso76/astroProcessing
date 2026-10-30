@@ -53,9 +53,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
 | `docs/contracts/ADR-16-stati-master.md` | `e443567e3fbb04693c761fd3dd7243a96a20806a49aa76cb42d63c26a43479fc` |
-| `docs/contracts/README.md` | `496c611387d092c9c6e88a02df05b01a0edf2a1c79a85d4f83040443c0df0c53` |
+| `docs/contracts/README.md` | `e6e3d69e1cb45d91fa30ffb57df91d776291866b3b41ba6bc060acc4c8da004b` |
 | `docs/decisions/D-16-calibrazione-incompleta.md` | `17d99880649e716815e5a57741c71362fee41710535c0e2b99662a392649abb7` |
-| `docs/decisions/README.md` | `867ee555140e2581eb9754fdabc9d14d31aebc53661a5379b8b8f0ad4f85b961` |
-| `docs/test-matrix.md` | `3606bd7cf50005153f73ec040c41ae064e9b310a31d3344d6af11bd7d501e597` |
+| `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
+| `docs/test-matrix.md` | `874634156790b236282d204d61aba926a9217275b0003241a1c8317dee75ac20` |
 
 <!-- evidence:end -->

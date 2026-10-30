@@ -252,7 +252,7 @@ Ogni clausola è una **regola** (vincolo del prodotto, verificato dal test indic
 
 Fuori da C-02.b, ognuno con stop o motivo dichiarato:
 
-- **Normalizzazione dei flat** (`median_ratio`) e, sul ruolo `flat`, ogni metodo diverso da `single` e `mean`: stop `unsupported`, `master.variance_domain`. Con livelli diversi i frame del flat non sono identicamente distribuiti, quindi il modello di §b.6 per i metodi robusti non vale. Con scale stimate dai dati, inoltre, la varianza del master contiene il termine delle scale, che qui non è derivato (C-02.a, «Fuori da `.a`»). Questione aperta in §b.15.
+- **Normalizzazione dei flat** (`median_ratio`) e, sul ruolo `flat`, ogni metodo diverso da `single` e `mean`: stop `unsupported`, `master.variance_domain`. Con livelli diversi i frame del flat non sono identicamente distribuiti, quindi il modello di §b.6 per i metodi robusti non vale. Con scale stimate dai dati, inoltre, la varianza del master contiene il termine delle scale, che qui non è derivato (C-02.a, «Fuori da `.a`»). Assegnati a F-CAL-01.b, unità `C-02.b-flat` (ADR-09.b §b.6).
 - **Produzione di `Q`, di flat `corrected_unnormalized` o `calibrated`**: il master flat del prodotto è `raw`; `Q` si calcola nella calibrazione (ADR-16.b §b.5).
 - **Master `bias_subtracted`** (`D'`, `DF'`). Il prodotto non li genera. Un `D'` ottenuto dal bias `B` del prodotto darebbe `(L − B) − (D − B) = L − D`, cioè la catena `light.dark`. Avrebbe inoltre i frame di `B` fra i propri, e ADR-17.b §b.3 toglierebbe la ricetta con `shared_input`. `D'` e `DF'` restano master esterni (ADR-16.b §b.2). La riga `master_create` della tabella delle operazioni resta quella di R1 (ADR-03.b §b.14).
 - **Pesi stimati dai dati**: solo pesi dichiarati (§b.1).
@@ -410,7 +410,15 @@ Errore d'arrotondamento: per `mean` resta il bound di C-02.a §6.3. Per gli altr
 
 ### b.9 Fixture, metriche, soglia e gate
 
-Fixture: `FIX-SYN-CAL-08` (bias, dark, dark-flat e flat con `B`, `d`, `F` e rumore noti, outlier iniettati in posizioni note), con frame RAW sintetici di M3.a (DNG scritti con libtiff) per i gruppi da RAW; dato reale PUB-LFC-01 (bias 6+1, dark e flat con `N = 3`, mono). Oracle scritti nel test, indipendenti dall'implementazione. Soglie fissate qui, prima di ogni misura. Statistica come C-02.a §9: `α = 10⁻³` per test, Bonferroni sulle `m` statistiche del test, quantili χ² esatti (gamma incompleta regolarizzata, bisezione, errore relativo ≤ 10⁻¹⁰), limite di Chebyshev `|media_(K·P)(X) − E| ≤ sqrt(m · Var(X) / (α · K · P))`. Il riferimento è la varianza vera della simulazione. `K`, `P`, seed e parametri sono fissati prima dell'esecuzione e scritti nel record del test.
+Fixture: `FIX-SYN-CAL-08` (bias, dark, dark-flat e flat con `B`, `d`, `F` e rumore noti, outlier iniettati in posizioni note), con frame RAW sintetici di M3.a (DNG scritti con libtiff) per i gruppi da RAW; dato reale PUB-LFC-01 (bias 6+1, dark e flat con `N = 3`, mono). Oracle scritti nel test, indipendenti dall'implementazione. Soglie fissate qui, prima di ogni misura. Statistica come C-02.a §9: `α = 10⁻³` per test, Bonferroni sulle `m` statistiche del test, quantili χ² esatti (gamma incompleta regolarizzata, bisezione, errore relativo ≤ 10⁻¹⁰), limite di Chebyshev `|media_(K·P)(X) − E| ≤ sqrt(m · Var(X) / (α · K · P))`. Il riferimento è la varianza vera della simulazione. `K`, `P`, seed e parametri sono fissati prima dell'esecuzione in un protocollo preregistrato, committato prima della misura e citato dal record del test (ADR-09.b §b.4).
+
+Classi delle soglie ([ADR-09.b](ADR-09-algoritmi.md#estensione-adr-09b-algoritmi-p0-di-m3) §b.3): E per T-M3B-C02-01, 13 e per l'oracle di 11; E con intervalli per 02; S come controlli di coerenza per 03 e 04 (le proprietà che verificano sono fatti derivati in §b.6, e l'aritmetica la verificano esattamente 01 e 05), con la varianza di 04(b) che dipende da `μ_4` stimato (§b.14); P per 05 (accuratezza richiesta 10⁻⁹, errore dell'oracle di quadratura stimato, §b.14); C per 06 e 07; B per 08, 09, 10, 12, 14, 15; R con oracle dagli header per 16.
+
+Margine deterministico dei criteri S di 03 e 04 (ADR-09.b §b.3). Per ogni realizzazione `k` l'oracle calcola con la regola I il bound `τ_k` del valore del prodotto confrontato, piano o master. L'intervallo di accettazione si allarga di:
+
+- `max_k τ_k` per le medie dei piani di 03(a) e 04(a), oltre a `ρ_c · E` di 03(a); fatto: una media dista dalla media dei valori esatti al più del massimo scarto;
+- `sqrt(K/(K − 1)) · max_k τ_k` per la deviazione standard campionaria dei master di 03(b), confrontata come nel criterio (B) di ADR-17.b §b.12; fatto: `|sd_K(x̂) − sd_K(x)| ≤ sd_K(x̂ − x) ≤ sqrt(K/(K − 1)) · max_k |x̂_k − x_k|`;
+- `max_k τ_k (2|M̂_k − μ| + τ_k)` per la media di `(M − μ)²` di 04(b); fatto: `|(M̂ − μ)² − (M − μ)²| = |M̂ − M| · |M̂ + M − 2μ|`.
 
 Gate della slice M3.b: master riproducibili bit-esatti dal progetto in ordine canonico (T-M3B-C02-10), report completo (T-M3B-C02-11), frame incompatibile escluso prima della scelta (T-M3B-C02-08). I test sono in §b.12.
 
@@ -474,9 +482,9 @@ Riesecuzioni: T-M2R2-01…09 sulla ricetta `.a`, e T-M3A-CAL-07 (stato del decod
 - Il piano dei metodi robusti è non distorto solo sotto `iid_gaussian` e `continuous_samples`. Su campioni interi lo scostamento della varianza della mediana dal caso continuo non è corretto, solo misurato (T-M3B-C02-07). Con outlier il piano cresce, senza un bound.
 - La selezione congelata di `sigma_clip` ha un errore non derivato, misurato solo sotto `iid_gaussian` (T-M3B-C02-06).
 - `gaussian_reference` e `noise_model` non hanno un codice di capability: l'ipotesi è nel descrittore e nel report, e una misura che la deve conoscere la legge da lì. Un codice nuovo sarebbe un'estensione di ADR-03.b.
-- `κ` è verificato ai punti di T-M3B-C02-05 e per `n ≤ 1024`; oltre, i metodi robusti sono fuori dominio. L'errore dell'oracle di quadratura è stimato, non dimostrato.
+- `κ` è verificato ai punti di T-M3B-C02-05 e per `n ≤ 1024`; oltre, i metodi robusti sono fuori dominio. L'errore dell'oracle di quadratura è stimato, non dimostrato. Lo stesso vale per `μ_4` in T-M3B-C02-04(b): la copertura `α/m` del suo limite di Chebyshev vale sotto l'ipotesi che la stima sia corretta.
 - La caratterizzazione della selezione congelata (T-M3B-C02-06) è descrittiva, senza copertura probabilistica.
-- Flat: solo `single` e `mean`, senza normalizzazione. I flat a livelli molto diversi (crepuscolo) richiedono un sottoinsieme scelto dall'utente o la normalizzazione, che non è qui (§b.15).
+- Flat: solo `single` e `mean`, senza normalizzazione. I flat a livelli molto diversi (crepuscolo) richiedono un sottoinsieme scelto dall'utente o la normalizzazione, che è dell'unità `C-02.b-flat` (ADR-09.b §b.6).
 - Pesi solo dichiarati; nessuna proposta li usa.
 - Il nero del decoder è una sentinella dell'offset (ADR-16.b §b.14); `offset_adu` dei RAW è un valore dichiarato.
 - Fra backend diversi `sigma_clip` può dare appartenenze diverse vicino alle soglie.
@@ -490,7 +498,7 @@ Chiuse da questo contratto (rimosse da `plans/M3.md`):
 - codice di stop per un ingresso del master in stato non ammesso: §b.13 punto 1;
 - master con `pedestal_adu ≠ 0` nell'analisi `.b`: motivo `pedestal` in ADR-16.b §b.3 (§b.13 punto 2).
 
-Aperte, per il coordinatore:
+Chiuse da ADR-09.b:
 
-- normalizzazione dei flat (`median_ratio`) e metodi robusti sui flat, con la varianza delle scale stimate: non coperti da C-02.b; da assegnare a un'unità (F-CAL-01.b o F-CAL-03.b) prima della chiusura di F-CAL-01.b, oppure da dichiarare come limite del P0;
-- ADR-09.b e D-09.b (archi `decided_by`): formulazione unica delle soglie della famiglia, che usa §b.9 come ingresso.
+- normalizzazione dei flat (`median_ratio`) e metodi robusti sui flat, con la varianza delle scale stimate: assegnati a F-CAL-01.b, unità `C-02.b-flat`, prima del codice di M3.b che li usa (ADR-09.b §b.6);
+- formulazione P0 e classi delle soglie (archi `decided_by`): ADR-09.b §b.2 e §b.5, classi in §b.9.

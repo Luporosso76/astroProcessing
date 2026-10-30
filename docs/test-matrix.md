@@ -224,6 +224,14 @@ Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli stat
 | T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 
+## M3.entry: ID di lavoro di ADR-09.b e D-09.b
+
+Definito in `docs/contracts/ADR-09-algoritmi.md` §b.7. Le soglie dei singoli operatori stanno nel campo 9 dei loro contratti, con le classi di §b.3. Nessuno è eseguito: la riga è un piano, non una prova.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3-ADR09-01 | D-09.b; ADR-09.b §b.3, §b.4 (classe, derivazione e precedenza di ogni soglia sulla prima misura) | ADR-09.b, D-09.b | Gate M3 | PIANIFICATO — non eseguito |
+
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 
 Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `plans/M2-residui.md` (testo di accettazione esatto di ogni ID nella sua appendice A). Stato iniziale del 29 ottobre 2026, dall'audit del registro e dalla verifica del codice. Stati durante il lavoro: `APPROVATO` (decisione con verbale e contratto passati dalla review: abilita i dipendenti); `DA RIESEGUIRE` (test eseguito prima che i prerequisiti fossero abilitati, oppure su un workflow che poi si estende); `PARZIALE`, `PIANIFICATO`; `APERTO` per le consegne. Stato finale, deciso solo al gate da un'unica esecuzione finale completa registrata in `docs/evidence/M2-gate.md`, a cui ogni riga rimanda: `CHIUSO` per ID funzionali, NFR, G e consegne; `VERIFICATO` per gli ID ADR, C e D. In entrambi i casi il test nominato deve passare nell'esecuzione finale e i prerequisiti devono essere nello stesso stato. La colonna «Unità» indica la fase di lavoro e di abilitazione (`plans/M2-residui.md`, sezione 5): le fasi `.b` sono riesecuzioni operative, prima dei dipendenti. Nessuna riga si chiude prima del gate. Stati finali assegnati il 30 ottobre 2026 dall'esecuzione finale del giro 8 di `M2-gate.md` (`tools/check_m2_trace.py`, uscita 0); vanno riconfermati dalla riesecuzione sul commit del gate. «Reg.» è la riga del registro, «Acc.» la riga di accettazione nel piano.
