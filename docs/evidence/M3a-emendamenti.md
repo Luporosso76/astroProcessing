@@ -49,7 +49,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `7d14675becdafd046139373e0498052083b13d89b3a018d6fa0d95d7336f639e` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `8268d69f2d07206c8f86f7c775c6823e82061b173f736cb115929e0f43bc2359` |
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
 | `plans/M3a.md` | `597e94e164b2b9e49f11f3f0f12a01e0ee72e15852ac78428af40840eb8802d0` |
 

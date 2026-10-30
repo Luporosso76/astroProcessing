@@ -50,6 +50,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
-| `docs/test-matrix.md` | `45eeaeebb48005f2960ca676c8dde7d9f8516458aebe12a2526e9dbe19b6a373` |
+| `docs/test-matrix.md` | `e4b5c8d30854c61d040e84dc2f61a5961bbf3092572780d8782ec4bcb1393d39` |
 
 <!-- evidence:end -->

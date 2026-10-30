@@ -56,7 +56,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `45eeaeebb48005f2960ca676c8dde7d9f8516458aebe12a2526e9dbe19b6a373` |
+| `docs/test-matrix.md` | `e4b5c8d30854c61d040e84dc2f61a5961bbf3092572780d8782ec4bcb1393d39` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tools/check_m2_trace.py` | `2ff5df7acdcc07ef45edd4c80fdb6ed7c7d5decd9e5f4629cc1751842c216a9b` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |

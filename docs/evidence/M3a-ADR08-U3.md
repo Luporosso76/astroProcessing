@@ -85,6 +85,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `9f59a2a36993f211ab67b7343fdf1af9c1c6af38f6b5348d1da5c177c7d64aa9` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `8268d69f2d07206c8f86f7c775c6823e82061b173f736cb115929e0f43bc2359` |
 
 <!-- evidence:end -->

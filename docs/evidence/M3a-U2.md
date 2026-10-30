@@ -105,7 +105,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `CMakeLists.txt` | `f7fe6082d3f46ee63e7c84598a97bcbd44473b56d87742f8a0f1e839dfe1177f` |
-| `docs/contracts/ADR-08-decoder-pack.md` | `7d14675becdafd046139373e0498052083b13d89b3a018d6fa0d95d7336f639e` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `8268d69f2d07206c8f86f7c775c6823e82061b173f736cb115929e0f43bc2359` |
 | `docs/licenses.md` | `a166e854e75428fa8678b20afe2f44886c57ffdbb85ec76bcf9af61f11c56cd2` |
 | `src/core/CMakeLists.txt` | `44de095ca8c5788eeda9cd73dbd1ad92ac29a64306f59994daf63060369e507e` |
 | `src/core/include/astro/raw_decode.hpp` | `b815a0b7eec8bb76052c3bc6308d91f7c9a82db4e611f7d1b8624c4acbf8ff6e` |
