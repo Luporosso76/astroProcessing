@@ -1,0 +1,14 @@
+# Sorgente del blocco generato di M3-base-I1.md (tools/evidence.py)
+file docs/contracts/BASE-confini.md
+file src/core/include/astro/job.hpp
+file src/core/job.cpp
+file src/core/include/astro/cpu_dispatch.hpp
+file src/core/cpu_dispatch.cpp
+file src/core/calibration_job.cpp
+file src/core/calibration_blocks.cpp
+file src/core/master.cpp
+file src/core/import_job.cpp
+file tools/lint-allowlist.txt
+file tests/unit/test_conformance.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

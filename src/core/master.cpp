@@ -959,13 +959,15 @@ calibration_input_spec product_master_input(const sqlite_dag_store& store, const
 job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name, const master_recipe& recipe,
                            memory_pool& pool, const master_job_options& options, const cancel_token& cancel,
                            const std::optional<budget_snapshot>& budget) {
-  const auto work = [&](const job_record& job) -> job_files_result {
+  // Nodo della ricetta: lo costruisce e lo confronta con lo slot run_job_files, prima di `work`.
+  std::optional<node_spec> requested;
+  job_request request;
+  request.node = [&] { return requested.emplace(make_master_node(recipe)); };
+  request.mismatch_code = "master.node_mismatch";
+  request.resources = &options.resources;
+  const auto work = [&](const job_record&) -> job_files_result {
     master_plan p = make_plan(recipe);
-    const node_spec node = make_master_node(recipe);
-    if (node.key() != job.node_key) {
-      stop(error_category::invalid_input, "master.node_mismatch", "la ricetta non corrisponde al nodo dello slot",
-           {{"nodo_slot", job.node_key}, {"nodo_ricetta", node.key()}});
-    }
+    const node_spec& node = *requested;
     // Apertura, fase e linearita' dai soli header, piano dei file: nessun campione letto.
     std::vector<fits_input> inputs;
     std::vector<fits_plan> plans;
@@ -1112,19 +1114,11 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
-    details.set("resource_plan", resource_plan_json(chosen));
-    const cpu_capabilities caps = read_cpu_capabilities();
-    details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
-    return job_files_result{std::move(files), std::move(warnings), std::move(details)};
+    job_files_result out{std::move(files), std::move(warnings), std::move(details)};
+    out.plan = std::make_shared<const resource_plan>(chosen);
+    return out;
   };
-  // L'ambiente FP si controlla prima di serializzare le risorse nel budget (ADR-07).
-  std::optional<budget_snapshot> recorded;
-  prepare_job_start(store, slot_name, [&] {
-    require_fp_environment();
-    recorded = budget;
-    if (recorded) recorded->resources = resource_config_json(options.resources);
-  });
-  return run_job_files(store, slot_name, work, recorded, &cancel);
+  return run_job_files(store, slot_name, work, budget, &cancel, request);
 }
 
 }  // namespace astro

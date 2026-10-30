@@ -437,7 +437,6 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
   const job_report report = scheduler.run(plan, spec, cancel);
   json details = json::object();
   details.set("observed_inputs", std::move(observed));
-  details.set("resource_plan", resource_plan_json(rp));
   details.set("scheduler", scheduler_details(report));
   details.set("admission", admission_json(report));
   return job_files_result{std::move(files), std::move(warnings), std::move(details)};

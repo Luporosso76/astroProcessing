@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -69,12 +70,30 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
                     const std::optional<budget_snapshot>& budget = std::nullopt,
                     const cancel_token* cancel = nullptr);
 
+struct resource_config;
+struct resource_plan;
+
 // Output multipli (ruoli distinti) gia' scritti con write_files.
 struct job_files_result {
   std::vector<stored_file> files;
   std::vector<std::string> warnings;
-  // Osservazioni per la provenance di un job riuscito (`details`, ADR-05).
+  // Osservazioni dell'operatore per la provenance di un job riuscito (`details`, ADR-05). Le chiavi `cpu` e
+  // `resource_plan` le compone run_job_files.
   std::optional<json> details = std::nullopt;
+  // Piano scelto da plan_resources ed eseguito: run_job_files lo registra in details.resource_plan.
+  std::shared_ptr<const resource_plan> plan = nullptr;
+};
+
+// Richiesta del job al runner (docs/contracts/BASE-confini.md, OB-09 e OB-10).
+struct job_request {
+  // Nodo ricostruito dalla richiesta. run_job_files lo costruisce dopo il controllo dell'ambiente FP e dopo aver letto
+  // il nodo dello slot, prima di `work`: chiave diversa da quella dello slot = arresto invalid_input `mismatch_code`
+  // con le due chiavi (`nodo_slot`, `nodo_richiesta`). Vuoto: nessun confronto (composizioni come run_branches).
+  std::function<node_spec()> node;
+  std::string mismatch_code = "job.node_mismatch";
+  // Configurazione delle risorse ricevuta dal job: con `budget`, run_job_files la serializza in budget.resources dopo
+  // il controllo dell'ambiente FP. Valida per tutta la chiamata.
+  const resource_config* resources = nullptr;
 };
 
 // Come run_job per uno store durevole: `work` scrive i file con write_files e la pubblicazione e' un'unica
@@ -86,10 +105,14 @@ struct job_files_result {
 // `completed`, un solo record `failed` dag.stale_publish. La provenance rispecchia sempre stato e causa gia' registrati
 // nel job (riletti dallo store); un errore successivo va in `subsequent_error`. Eccezione non stop_error: job `failed`
 // `job.unexpected_exception` (categoria integrity), provenance persistita, eccezione originale rilanciata invariata.
+// Osservazioni comuni (OB-09): con `budget` e `request.resources` il budget registrato porta budget.resources; la
+// provenance di un job riuscito porta details.cpu se il backend del nodo e' `cpu_*` (backend e `simd` dal nodo,
+// capacita' lette dalla CPU) e details.resource_plan se `work` dichiara il piano. Una chiave gia' presente nei
+// `details` dell'operatore e' un arresto invalid_input dag.param_duplicate_key.
 job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
                           const std::function<job_files_result(const job_record&)>& work,
                           const std::optional<budget_snapshot>& budget = std::nullopt,
-                          const cancel_token* cancel = nullptr);
+                          const cancel_token* cancel = nullptr, const job_request& request = {});
 
 // Solo test (suite di conformita', docs/contracts/BASE-confini.md §3.2): involucro del `work` che run_job_files invoca.
 // Si imposta prima del job e non cambia durante l'esecuzione. Vuoto: run_job_files invoca `work` direttamente.
@@ -100,8 +123,10 @@ void set_work_wrapper(work_wrapper w);
 job_files_result run_work(const job_record& job, const work_fn& work);
 }  // namespace job_probe
 
-// Preparazione di un job durevole sullo slot prima di run_job_files (controllo dell'ambiente FP, serializzazione delle
-// risorse nel budget): un'eccezione di `prepare` e' un arresto prima del lavoro, registrato e propagato come sopra.
+// Preparazione di un job durevole sullo slot prima del lavoro (in run_job_files: controllo dell'ambiente FP e
+// serializzazione delle risorse nel budget): un'eccezione di `prepare` e' un arresto prima del lavoro, registrato e
+// propagato come sopra. `prepare` non costruisce nodi ne' serializza numeri in virgola mobile se e' chiamata prima di
+// run_job_files: il controllo dell'ambiente FP del runner non l'ha ancora preceduta.
 void prepare_job_start(sqlite_dag_store& store, const std::string& slot_name, const std::function<void()>& prepare);
 
 }  // namespace astro

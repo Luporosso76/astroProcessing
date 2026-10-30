@@ -7,6 +7,7 @@
 #include <span>
 
 #include "astro/cpu_dispatch.hpp"
+#include "astro/resources.hpp"
 
 namespace astro {
 
@@ -269,14 +270,30 @@ job_outcome run_job(dag_store& store, const std::string& slot_name,
 
 job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
                           const std::function<job_files_result(const job_record&)>& work,
-                          const std::optional<budget_snapshot>& budget, const cancel_token* cancel) {
-  // Prima di leggere il nodo, che analizza i parametri numerici, anche subnormali (ADR-07).
-  prepare_job_start(store, slot_name, require_fp_environment);
+                          const std::optional<budget_snapshot>& budget, const cancel_token* cancel,
+                          const job_request& request) {
+  // L'ambiente FP si controlla prima di leggere il nodo, che analizza i parametri numerici anche subnormali, e prima di
+  // serializzare le risorse nel budget (ADR-07, OB-04).
+  std::optional<budget_snapshot> recorded;
+  prepare_job_start(store, slot_name, [&] {
+    require_fp_environment();
+    recorded = budget;
+    if (recorded && request.resources != nullptr) recorded->resources = resource_config_json(*request.resources);
+  });
   const job_record job = store.start_job(slot_name);
   const node_spec spec = node_of(store, &store, job);
   std::vector<std::string> warnings;
   std::optional<provenance_record> provenance;
   try {
+    // Nodo della richiesta uguale a quello dello slot prima di `work`, quindi prima di aprire un input (OB-10).
+    if (request.node) {
+      const node_spec requested = request.node();
+      if (requested.key() != job.node_key) {
+        throw stop_error(error_category::invalid_input, request.mismatch_code,
+                         "la richiesta non corrisponde al nodo dello slot",
+                         {{"nodo_slot", job.node_key}, {"nodo_richiesta", requested.key()}});
+      }
+    }
     job_files_result result = job_probe::run_work(job, work);
     warnings = std::move(result.warnings);
     if (cancel != nullptr && cancel->requested()) {
@@ -284,16 +301,25 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
     }
     std::vector<content_digest> digests;
     for (const stored_file& f : result.files) digests.push_back(f.digest());
+    // Osservazioni comuni del job riuscito (OB-09): percorso CPU dal nodo, piano dichiarato da `work`.
+    if (spec.backend().rfind("cpu_", 0) == 0) {
+      if (!result.details) result.details = json::object();
+      result.details->set("cpu", cpu_dispatch_json(spec.params().find("simd"), spec.backend(), read_cpu_capabilities()));
+    }
+    if (result.plan) {
+      if (!result.details) result.details = json::object();
+      result.details->set("resource_plan", resource_plan_json(*result.plan));
+    }
     provenance.emplace(provenance_record{spec, current_library_versions(), job.generation, job_state::completed, warnings,
-                                         std::move(digests), std::nullopt, budget, std::move(result.details)});
+                                         std::move(digests), std::nullopt, recorded, std::move(result.details)});
     provenance->resume = store.resume_context();
     std::vector<stored_file> files = std::move(result.files);
     files.push_back(write_provenance(store, *provenance));
     store.commit_job(job.id, files);
   } catch (const stop_error& e) {
-    return stopped(store, &store, job, e, spec, std::move(warnings), budget);
+    return stopped(store, &store, job, e, spec, std::move(warnings), recorded);
   } catch (...) {
-    unexpected(store, &store, job, spec, std::move(warnings), budget);
+    unexpected(store, &store, job, spec, std::move(warnings), recorded);
   }
   return job_outcome{0, *store.get_job(job.id), std::nullopt, std::move(*provenance), std::nullopt, std::nullopt};
 }

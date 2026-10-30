@@ -102,12 +102,12 @@ double pixel_sum(cpu_path path, const double* x, std::size_t n) {
   return path == cpu_path::avx2 ? kernels::sum_avx2(x, n) : kernels::sum_scalar(x, n);
 }
 
-json cpu_dispatch_json(simd_request request, const cpu_capabilities& caps, cpu_path path) {
+json cpu_dispatch_json(const json* simd, const std::string& backend, const cpu_capabilities& caps) {
   json capabilities = json::object();
   capabilities.set("avx2", json::boolean(caps.avx2));
   json o = json::object();
-  o.set("simd", json::string(simd_request_name(request)));
-  o.set("backend", json::string(backend_name(path)));
+  if (simd != nullptr) o.set("simd", *simd);
+  o.set("backend", json::string(backend));
   o.set("capabilities", std::move(capabilities));
   return o;
 }

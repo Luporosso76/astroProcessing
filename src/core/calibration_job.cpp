@@ -140,14 +140,14 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
                                 const calibration_recipe& recipe, memory_pool& pool,
                                 const calibration_job_options& options, const cancel_token& cancel,
                                 const std::optional<budget_snapshot>& budget) {
-  const auto work = [&](const job_record& job) -> job_files_result {
-    require_fp_environment();
-    validate_calibration_recipe(recipe);
-    const node_spec node = make_calibration_node(recipe);
-    if (node.key() != job.node_key) {
-      fail(error_category::invalid_input, "calib.node_mismatch", "la ricetta non corrisponde al nodo dello slot",
-           {{"nodo_slot", job.node_key}, {"nodo_ricetta", node.key()}});
-    }
+  // Nodo della ricetta: lo costruisce e lo confronta con lo slot run_job_files, prima di `work`.
+  std::optional<node_spec> requested;
+  job_request request;
+  request.node = [&] { return requested.emplace(make_calibration_node(recipe)); };
+  request.mismatch_code = "calib.node_mismatch";
+  if (options.resources) request.resources = &*options.resources;
+  const auto work = [&](const job_record&) -> job_files_result {
+    const node_spec& node = *requested;
     const std::array<const calibration_input_spec*, 4> specs = {&recipe.light, &recipe.dark, &recipe.flat,
                                                                 &recipe.dark_flat};
     constexpr const char* names[4] = {"light", "dark", "flat", "dark_flat"};
@@ -226,9 +226,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       if (chosen.spill) {
         job_files_result blocks = calib_detail::run_block_calibration(
             store, pool, calib_detail::block_job_request{recipe, node, chosen, *options.resources, plans, options}, cancel);
-        const cpu_capabilities caps = read_cpu_capabilities();
-        if (!blocks.details) blocks.details = json::object();
-        blocks.details->set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
+        blocks.plan = std::make_shared<const resource_plan>(chosen);
         return blocks;
       }
       plan.shared_bytes = chosen.shared_bytes;
@@ -329,23 +327,13 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     const job_report report = scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
-    if (chosen_plan) {
-      details.set("resource_plan", resource_plan_json(*chosen_plan));
-      details.set("scheduler", calib_detail::scheduler_details(report));
-    }
+    if (chosen_plan) details.set("scheduler", calib_detail::scheduler_details(report));
     if (options.pressure) details.set("admission", calib_detail::admission_details(report));
-    const cpu_capabilities caps = read_cpu_capabilities();
-    details.set("cpu", cpu_dispatch_json(*recipe.simd, caps, resolve_cpu_path(*recipe.simd, caps)));
-    return job_files_result{std::move(files), std::move(warnings), std::move(details)};
+    job_files_result result{std::move(files), std::move(warnings), std::move(details)};
+    if (chosen_plan) result.plan = std::make_shared<const resource_plan>(*chosen_plan);
+    return result;
   };
-  // L'ambiente FP si controlla prima di serializzare le risorse nel budget (ADR-07).
-  std::optional<budget_snapshot> recorded;
-  prepare_job_start(store, slot_name, [&] {
-    require_fp_environment();
-    recorded = budget;
-    if (recorded && options.resources) recorded->resources = resource_config_json(*options.resources);
-  });
-  job_outcome outcome = run_job_files(store, slot_name, work, recorded, &cancel);
+  job_outcome outcome = run_job_files(store, slot_name, work, budget, &cancel, request);
   // Checkpoint e staging restano dopo stop e annullamento (stato del resume); dopo la pubblicazione si rimuovono.
   if (outcome.exit_code == 0 && options.checkpoint) {
     remove_checkpoint(options.resources->scratch->dir, options.checkpoint->name);

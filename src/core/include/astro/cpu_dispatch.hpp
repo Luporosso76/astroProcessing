@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 
 #include "astro/fault_injector.hpp"
 #include "astro/json.hpp"
@@ -40,8 +41,9 @@ void begin_kernel_task();
 // cpu.empty_sum.
 double pixel_sum(cpu_path path, const double* x, std::size_t n);
 
-// `{"simd": richiesta, "backend": percorso, "capabilities": {"avx2": bool}}` per la provenance.
-json cpu_dispatch_json(simd_request request, const cpu_capabilities& caps, cpu_path path);
+// `{"simd": richiesta, "backend": percorso, "capabilities": {"avx2": bool}}` per la provenance, con richiesta e percorso
+// del nodo del job; `simd` nullo: il nodo non porta la richiesta e la chiave manca.
+json cpu_dispatch_json(const json* simd, const std::string& backend, const cpu_capabilities& caps);
 
 // Seam dei test (ADR-07, aggiunte di R5): si imposta prima del job e non cambia durante l'esecuzione.
 namespace cpu_test {

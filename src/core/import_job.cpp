@@ -154,10 +154,18 @@ std::span<const std::uint8_t> bytes_of(const std::string& s) {
   return {reinterpret_cast<const std::uint8_t*>(s.data()), s.size()};
 }
 
-void check_node(const node_spec& expected, const job_record& job) {
-  if (expected.key() != job.node_key) {
-    fail(error_category::invalid_input, "import.node_mismatch", "la richiesta non corrisponde al nodo dello slot",
-         {{"nodo_slot", job.node_key}, {"nodo_richiesta", expected.key()}});
+// Nodo della richiesta, costruito e confrontato con lo slot da run_job_files prima di `work`.
+job_request import_node_request(std::function<node_spec()> node) {
+  job_request r;
+  r.node = std::move(node);
+  r.mismatch_code = "import.node_mismatch";
+  return r;
+}
+
+// Confronto di stringhe, nessun numero in virgola mobile: ammesso prima del controllo FP del runner.
+void require_rebuild_cause(const std::string& cause) {
+  if (cause != cache_rebuild_cause_corrupt && cause != cache_rebuild_cause_user) {
+    fail(error_category::invalid_input, "cache.rebuild_cause", "causa di ricostruzione non valida", {{"causa", cause}});
   }
 }
 
@@ -224,9 +232,7 @@ node_spec make_thumbnail_node(const content_digest& source, const preview_reques
 }
 
 node_spec make_cache_rebuild_node(const content_digest& source, const preview_request& request, const std::string& cause) {
-  if (cause != cache_rebuild_cause_corrupt && cause != cache_rebuild_cause_user) {
-    fail(error_category::invalid_input, "cache.rebuild_cause", "causa di ricostruzione non valida", {{"causa", cause}});
-  }
+  require_rebuild_cause(cause);
   json params = cache_params(request);
   params.set("target", json::string("thumbnail"));
   params.set("cause", json::string(cause));
@@ -337,8 +343,7 @@ std::string import_report_text(const json& report) {
 
 job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
                            memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget) {
-  const auto work = [&](const job_record& job) -> job_files_result {
-    check_node(make_import_node(request), job);
+  const auto work = [&](const job_record&) -> job_files_result {
     if (cancel.requested()) fail(error_category::cancelled, "sched.cancelled", "annullamento prima dell'import");
     fits_input input = open_verified(request.path, request.digest, pool, request.hook);
     const fits_inventory inv = inventory_fits(input, request.read_options, pool);  // verifica anche che il file non sia cambiato
@@ -356,15 +361,15 @@ job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name
     result.details = std::move(details);
     return result;
   };
-  return run_job_files(store, slot_name, work, budget, &cancel);
+  return run_job_files(store, slot_name, work, budget, &cancel,
+                       import_node_request([&] { return make_import_node(request); }));
 }
 
 job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
                               const content_digest& digest, const preview_request& request, thumbnail_cache& cache,
                               memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
                               const job_hook& hook) {
-  const auto work = [&](const job_record& job) -> job_files_result {
-    check_node(make_thumbnail_node(digest, request), job);
+  const auto work = [&](const job_record&) -> job_files_result {
     fits_input input = open_verified(path, digest, pool, hook);
     const thumbnail_result r = cache.get(input, digest, request, pool, &cancel);
     fits_detail::check_unchanged(input);
@@ -376,7 +381,8 @@ job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_n
     result.details = std::move(details);
     return result;
   };
-  return run_job_files(store, slot_name, work, budget, &cancel);
+  return run_job_files(store, slot_name, work, budget, &cancel,
+                       import_node_request([&] { return make_thumbnail_node(digest, request); }));
 }
 
 job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
@@ -384,10 +390,8 @@ job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& sl
                                   thumbnail_cache& cache, memory_pool& pool, const cancel_token& cancel,
                                   const std::optional<budget_snapshot>& budget, const job_hook& hook) {
   // Una causa non valida e' un arresto prima del lavoro sullo slot (job.hpp).
-  std::optional<node_spec> node;
-  prepare_job_start(store, slot_name, [&] { node = make_cache_rebuild_node(digest, request, cause); });
-  const auto work = [&](const job_record& job) -> job_files_result {
-    check_node(*node, job);
+  prepare_job_start(store, slot_name, [&] { require_rebuild_cause(cause); });
+  const auto work = [&](const job_record&) -> job_files_result {
     fits_input input = open_verified(path, digest, pool, hook);
     std::string replaced_name;
     std::string replaced_found;
@@ -407,7 +411,8 @@ job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& sl
     result.details = std::move(details);
     return result;
   };
-  return run_job_files(store, slot_name, work, budget, &cancel);
+  return run_job_files(store, slot_name, work, budget, &cancel,
+                       import_node_request([&] { return make_cache_rebuild_node(digest, request, cause); }));
 }
 
 }  // namespace astro
