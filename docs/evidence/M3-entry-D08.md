@@ -58,7 +58,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/datasets/M3-candidates.md` | `a6414361632bad160c9ffeeb3d3fefecd1544354ce9f09b079a751c8f4f519e8` |
+| `docs/datasets/M3-candidates.md` | `b49904fe41633a9d35b7a1d8467443c12b9eac6f4045b7759c4985b1c719c5a8` |
 | `docs/datasets/PUB-CFA-01.md` | `59e9b5c084a2938ef6487697e1bdbeb5ef8d3ec320c3a38c11d29a8625f31edd` |
 | `docs/datasets/PUB-LFC-01.md` | `50e2b701f428d5bfbc8d5a8fb3dd5500668f44d2d6c180416e87c3d62f28c5e3` |
 | `docs/datasets/PUB-RAW-01.md` | `a0ff1c535ca37abee9fde2aaf7117a14af87bfcc5cc71e04ab95e876d7631000` |

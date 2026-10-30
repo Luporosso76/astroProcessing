@@ -105,15 +105,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `CMakeLists.txt` | `f7fe6082d3f46ee63e7c84598a97bcbd44473b56d87742f8a0f1e839dfe1177f` |
-| `docs/contracts/ADR-08-decoder-pack.md` | `8268d69f2d07206c8f86f7c775c6823e82061b173f736cb115929e0f43bc2359` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `cccff25b9f7bdb7745856ec949b28c7e781fc561b4d6a611a0739c9d2cf47e1d` |
 | `docs/licenses.md` | `a166e854e75428fa8678b20afe2f44886c57ffdbb85ec76bcf9af61f11c56cd2` |
-| `src/core/CMakeLists.txt` | `44de095ca8c5788eeda9cd73dbd1ad92ac29a64306f59994daf63060369e507e` |
+| `src/core/CMakeLists.txt` | `af5cffaf63a3aa914983c398ba7f290ac2d4a5b6170bcf7bb02156c3e6b085f3` |
 | `src/core/include/astro/raw_decode.hpp` | `b815a0b7eec8bb76052c3bc6308d91f7c9a82db4e611f7d1b8624c4acbf8ff6e` |
 | `src/core/raw_decode.cpp` | `5b22c188cbe1474546fa66d45e0d87048a05b73eb466233d8981944315b28af7` |
 | `tests/fixtures/syn_dng.hpp` | `dd62bccd32bc239e8389eb9aa5b8457e74850030888fc07e6413b9ee8d39162c` |
-| `tests/unit/CMakeLists.txt` | `c49c893b1cbe379af40808e62ac8b35375f8a8b26391892420a4bb55e114a239` |
+| `tests/unit/CMakeLists.txt` | `7e155a4514b618f4433889c5237aa4c0cb03fe36da770f71d9ee3defa4f97382` |
 | `tests/unit/test_raw_decode.cpp` | `50357cb9f7128d966e091e0c8aa0f964a4cb807647e112288f6578442f8f5469` |
 
-- Test release (`tmp/release-junit.xml`): totali 769, fast 762, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 763, fast 763, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 805, fast 798, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 799, fast 799, slow 0, falliti 0
 <!-- evidence:end -->

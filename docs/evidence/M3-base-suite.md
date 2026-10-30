@@ -169,7 +169,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
-| `src/core/CMakeLists.txt` | `44de095ca8c5788eeda9cd73dbd1ad92ac29a64306f59994daf63060369e507e` |
+| `src/core/CMakeLists.txt` | `af5cffaf63a3aa914983c398ba7f290ac2d4a5b6170bcf7bb02156c3e6b085f3` |
 | `src/core/fits.cpp` | `f6f18576e927dcedd3c8c920f9923058fb2c9e8d7dc5523114272f75ad046967` |
 | `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
 | `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
@@ -182,7 +182,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/node.cpp` | `b697838dd840f877c2b41a63ab83679d03a2ec6700e784438d052532b8bf7e3c` |
 | `src/core/scheduler.cpp` | `9588b0adfc402c790329ee0f837972128a3548ef82b5012055f228c429d38069` |
 | `tests/fixtures/conformance_inputs.hpp` | `d680048d26f707487062942ff19145a417364f677fdfc12901a7f4a93a88d94d` |
-| `tests/unit/CMakeLists.txt` | `c49c893b1cbe379af40808e62ac8b35375f8a8b26391892420a4bb55e114a239` |
+| `tests/unit/CMakeLists.txt` | `7e155a4514b618f4433889c5237aa4c0cb03fe36da770f71d9ee3defa4f97382` |
 | `tests/unit/conformance_network.cpp` | `72392f9b1d8d37b68d762da2c73f83b26c4428bdeee02d16c572612fff98d9fc` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tools/check_job_types.py` | `5744c2ceeda8f738b7147003014398fea8f9d5163227f8739ca314e8e2126c7b` |

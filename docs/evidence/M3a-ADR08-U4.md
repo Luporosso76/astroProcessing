@@ -110,6 +110,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `8268d69f2d07206c8f86f7c775c6823e82061b173f736cb115929e0f43bc2359` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `cccff25b9f7bdb7745856ec949b28c7e781fc561b4d6a611a0739c9d2cf47e1d` |
 
 <!-- evidence:end -->

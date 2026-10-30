@@ -73,6 +73,7 @@ add_library(astrocore STATIC
   import_job.cpp
   workflow.cpp
   pack.cpp
+  pack_coverage.cpp
   raw_decode.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})

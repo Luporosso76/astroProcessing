@@ -112,10 +112,10 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-PACK-03 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-04 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-05 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
-| T-M3A-PACK-06 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
+| T-M3A-PACK-06 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U11) |
 | T-M3A-PACK-07 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
-| T-M3A-PACK-08 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
-| T-M3A-PACK-09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
+| T-M3A-PACK-08 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U11) |
+| T-M3A-PACK-09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10, U11) |
 | T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | verde (U10) |
 
 ## M3.entry: ID di lavoro di ADR-03.b

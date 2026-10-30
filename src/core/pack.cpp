@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cmath>
+#include <cstring>
 #include <limits>
 #include <map>
 #include <set>
@@ -312,7 +314,91 @@ void verify_licenses(const pack_manifest& m, const walk_state& files, const pack
   }
 }
 
+std::uint64_t le(const std::uint8_t* b, std::size_t n) {
+  std::uint64_t v = 0;
+  for (std::size_t i = n; i-- > 0;) v = (v << 8) | b[i];
+  return v;
+}
+
+std::size_t type_size(const std::string& t) { return t == "f64" ? 8 : t == "u16" ? 2 : 4; }
+
+std::uint64_t record_size(const pack_manifest& m) {
+  std::uint64_t n = 0;
+  for (const pack_column& c : m.columns) n += type_size(c.type);
+  return n;
+}
+
+const pack_file& listed(const pack_manifest& m, const std::string& rel) {
+  return *std::find_if(m.files.begin(), m.files.end(), [&](const pack_file& f) { return f.path == rel; });
+}
+
+constexpr std::uint64_t index_entry_bytes = 24;
+
+[[noreturn]] void count_mismatch(const char* why, stop_error::context_list context = {}) {
+  stop(error_category::integrity, "pack.count_mismatch", why, std::move(context));
+}
+
+[[noreturn]] void index_invalid(const char* why, stop_error::context_list context = {}) {
+  stop(error_category::integrity, "pack.index_invalid", why, std::move(context));
+}
+
+// Apre un file elencato in sola lettura: assente (o link, o percorso che attraversa un non-directory) e' `pack.file_missing`, ogni altro errore del sistema `pack.io`.
+unique_fd open_listed(int dirfd, const pack_file& f) {
+  unique_fd fd(::openat(dirfd, f.path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
+  if (!fd && (errno == ENOENT || errno == ENOTDIR || errno == ELOOP)) stop(error_category::integrity, "pack.file_missing", "file elencato assente", {{"file", f.path}});
+  if (!fd) throw_errno(error_category::io, io_code, "apertura fallita", errno, {{"file", f.path}});
+  return fd;
+}
+
+// Il file indice si rilegge e se ne riverifica l'hash: le voci usate sono i byte che l'hash ha coperto.
+std::vector<std::uint8_t> read_index(int dirfd, const pack_manifest& m) {
+  const pack_file& f = listed(m, m.index_file);
+  if (f.size_bytes != index_entry_bytes * m.coverage_cells.size()) index_invalid("dimensione dell'indice diversa da 24 byte per cella");
+  const unique_fd fd = open_listed(dirfd, f);
+  struct stat st {};
+  if (::fstat(fd.get(), &st) != 0) throw_errno(error_category::io, io_code, "fstat fallita", errno, {{"file", f.path}});
+  const auto size_stop = [&](const char* why) { stop(error_category::integrity, "pack.size_mismatch", why, {{"file", f.path}}); };
+  if (!S_ISREG(st.st_mode)) stop(error_category::integrity, "pack.file_missing", "file elencato non regolare", {{"file", f.path}});
+  if (static_cast<std::uint64_t>(st.st_size) != f.size_bytes) size_stop("dimensione diversa dal manifest");
+  std::vector<std::uint8_t> bytes;
+  try {
+    bytes = sqlint::read_all(fd.get(), f.size_bytes, io_code, f.path);
+  } catch (const stop_error& e) {
+    if (e.category() != error_category::limit_exceeded) throw;
+    sqlint::rethrow_as(e, error_category::integrity, "pack.size_mismatch", "file cresciuto durante la lettura");
+  }
+  if (bytes.size() != f.size_bytes) size_stop("dimensione diversa dal manifest");
+  if (sha256_hex(bytes) != f.sha256) stop(error_category::integrity, "pack.hash_mismatch", "SHA-256 diverso dal manifest", {{"file", f.path}});
+  return bytes;
+}
+
+// §3.3 punto 5. Le righe del file dati sono quelle che il file ha per dimensione; le verifica read_pack_cell.
+void verify_counts(int dirfd, const pack_manifest& m) {
+  const std::uint64_t record = record_size(m), data_bytes = listed(m, m.data_file).size_bytes;
+  if (data_bytes % record != 0) count_mismatch("dimensione del file dati non multipla del record");
+  const std::uint64_t rows = data_bytes / record;
+  std::uint64_t sum = 0;
+  for (const pack_component& c : m.components) {
+    if (c.count > std::numeric_limits<std::uint64_t>::max() - sum) count_mismatch("somma dei count dei componenti oltre u64");
+    sum += c.count;
+  }
+  if (sum != m.count || rows != m.count) count_mismatch("count dei componenti, del manifest e righe del file dati diversi");
+  const std::vector<std::uint8_t> index = read_index(dirfd, m);
+  std::uint64_t next = 0;
+  for (std::size_t i = 0; i < m.coverage_cells.size(); ++i) {
+    const std::uint8_t* e = &index[index_entry_bytes * i];
+    const std::uint64_t cell = le(e, 8), first = le(e + 8, 8), n = le(e + 16, 8);
+    if (cell != m.coverage_cells[i]) index_invalid("cella dell'indice diversa da coverage", {{"voce", std::to_string(i)}});
+    if (first != next || n > rows - first) index_invalid("intervallo non contiguo o oltre il file dati", {{"voce", std::to_string(i)}});
+    next = first + n;
+  }
+  if (next != rows) count_mismatch("somma delle righe dell'indice diversa dalle righe del file dati");
+}
+
 verified_pack verify(const pack_recipe& recipe, const pack_use& use, const pack_audit& audit) {
+  if (recipe.directory.empty() || recipe.directory[0] != '/' || audit.evidence_root.empty() || audit.evidence_root[0] != '/') {
+    stop(error_category::invalid_input, "pack.path_not_absolute", "directory del pack e radice delle evidenze devono essere percorsi assoluti");
+  }
   // Un NUL troncherebbe il percorso in un prefisso diverso da quello della ricetta: nessuna directory ha quel nome.
   if (recipe.directory.find('\0') != std::string::npos) stop(error_category::metadata_missing, "pack.missing", "percorso del pack con un NUL");
   const unique_fd dir(::open(recipe.directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));
@@ -355,6 +441,7 @@ verified_pack verify(const pack_recipe& recipe, const pack_use& use, const pack_
   for (const pack_file& f : out.manifest.files) {
     if (files.verified.count(f.path) == 0) stop(error_category::integrity, "pack.file_missing", "file elencato assente", {{"file", f.path}});
   }
+  verify_counts(dir.get(), out.manifest);
   verify_licenses(out.manifest, files, audit);
 
   const auto& purpose = out.manifest.purpose;
@@ -380,6 +467,99 @@ verified_pack verify(const pack_recipe& recipe, const pack_use& use, const pack_
 verified_pack verify_pack(const pack_recipe& recipe, const pack_use& use, const pack_audit& audit) {
   try {
     return verify(recipe, use, audit);
+  } catch (stop_error& e) {
+    e.add_context("pack", recipe.directory);
+    throw;
+  }
+}
+
+std::vector<pack_row> read_pack_cell(const pack_recipe& recipe, const verified_pack& pack, std::uint64_t cell) {
+  try {
+    const pack_manifest& m = pack.manifest;
+    if (recipe.directory.empty() || recipe.directory[0] != '/') {
+      stop(error_category::invalid_input, "pack.path_not_absolute", "directory del pack non assoluta");
+    }
+    if (recipe.directory.find('\0') != std::string::npos) stop(error_category::metadata_missing, "pack.missing", "percorso del pack con un NUL");
+    if (recipe.pack_digest != pack.pack_digest) {
+      stop(error_category::incompatible, "pack.digest_mismatch", "digest della ricetta diverso dal pack verificato");
+    }
+    const auto pos = std::lower_bound(m.coverage_cells.begin(), m.coverage_cells.end(), cell);
+    if (pos == m.coverage_cells.end() || *pos != cell) {
+      stop(error_category::incompatible, "pack.out_of_coverage", "cella fuori da coverage", {{"cella", std::to_string(cell)}});
+    }
+    const unique_fd dir(::open(recipe.directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));
+    if (!dir && (errno == ENOENT || errno == ENOTDIR)) stop(error_category::metadata_missing, "pack.missing", "directory del pack assente");
+    if (!dir) throw_errno(error_category::io, io_code, "apertura della directory del pack fallita", errno);
+    const std::vector<std::uint8_t> index = read_index(dir.get(), m);
+    const std::uint8_t* entry = &index[index_entry_bytes * static_cast<std::size_t>(pos - m.coverage_cells.begin())];
+    const std::uint64_t first = le(entry + 8, 8), n = le(entry + 16, 8);
+    const pack_file& data = listed(m, m.data_file);
+    const std::uint64_t record = record_size(m), rows = data.size_bytes / record;
+    if (le(entry, 8) != cell || first > rows || n > rows - first) index_invalid("voce dell'indice incoerente col file dati", {{"cella", std::to_string(cell)}});
+
+    const unique_fd fd = open_listed(dir.get(), data);
+    struct stat st {};
+    if (::fstat(fd.get(), &st) != 0) throw_errno(error_category::io, io_code, "fstat fallita", errno, {{"file", data.path}});
+    if (!S_ISREG(st.st_mode)) stop(error_category::integrity, "pack.file_missing", "file elencato non regolare", {{"file", data.path}});
+    if (static_cast<std::uint64_t>(st.st_size) != data.size_bytes) {
+      stop(error_category::integrity, "pack.size_mismatch", "file dati diverso dal manifest", {{"file", data.path}});
+    }
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(n * record));
+    for (std::size_t done = 0; done < bytes.size();) {
+      const ssize_t got = ::pread(fd.get(), bytes.data() + done, bytes.size() - done, static_cast<off_t>(first * record + done));
+      if (got < 0 && errno == EINTR) continue;
+      if (got < 0) throw_errno(error_category::io, io_code, "lettura fallita", errno, {{"file", data.path}});
+      if (got == 0) stop(error_category::integrity, "pack.size_mismatch", "file dati piu' corto del manifest", {{"file", data.path}});
+      done += static_cast<std::size_t>(got);
+    }
+
+    std::uint32_t declared = 0;
+    std::vector<std::size_t> offset;
+    std::size_t flags_column = 0, at_byte = 0;
+    for (std::size_t c = 0; c < m.columns.size(); ++c) {
+      offset.push_back(at_byte);
+      at_byte += type_size(m.columns[c].type);
+      if (m.columns[c].null_bit) declared |= std::uint32_t{1} << *m.columns[c].null_bit;
+      if (m.columns[c].name == "flags") flags_column = c;
+    }
+    for (const pack_flag_bit& f : m.flag_bits) declared |= std::uint32_t{1} << f.index;
+
+    std::vector<pack_row> out;
+    out.reserve(static_cast<std::size_t>(n));
+    for (std::uint64_t r = 0; r < n; ++r) {
+      const std::uint8_t* b = &bytes[static_cast<std::size_t>(r * record)];
+      const auto row_stop = [&](const char* why, const pack_column& c) {
+        stop(error_category::integrity, "pack.row_invalid", why,
+             {{"cella", std::to_string(cell)}, {"riga", std::to_string(first + r)}, {"colonna", c.name}});
+      };
+      const auto flags = static_cast<std::uint32_t>(le(b + offset[flags_column], 4));
+      if ((flags & ~declared) != 0) row_stop("bit di flags non dichiarato a 1", m.columns[flags_column]);
+      pack_row row;
+      for (std::size_t c = 0; c < m.columns.size(); ++c) {
+        const pack_column& col = m.columns[c];
+        double v = 0;
+        if (col.type == "f64") {
+          const std::uint64_t u = le(b + offset[c], 8);
+          std::memcpy(&v, &u, sizeof v);
+        } else if (col.type == "f32") {
+          const auto u = static_cast<std::uint32_t>(le(b + offset[c], 4));
+          float f = 0;
+          std::memcpy(&f, &u, sizeof f);
+          v = f;
+        } else {
+          v = static_cast<double>(le(b + offset[c], type_size(col.type)));
+        }
+        if (std::isinf(v)) row_stop("valore infinito", col);
+        if (col.null_bit) {
+          if (((flags >> *col.null_bit) & 1u) != (std::isnan(v) ? 1u : 0u)) row_stop("assenza incoerente fra bit e valore", col);
+        } else if (std::isnan(v)) {
+          row_stop("NaN in colonna non nullabile", col);
+        }
+        row.values.push_back(v);
+      }
+      out.push_back(std::move(row));
+    }
+    return out;
   } catch (stop_error& e) {
     e.add_context("pack", recipe.directory);
     throw;
