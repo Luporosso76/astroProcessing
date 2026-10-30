@@ -115,6 +115,25 @@ log="tmp/review-${slug}.log"
 out=".omc/artifacts/ask/codex-${slug}-$(date +%Y%m%d-%H%M).md"
 prompt="$(cat tools/review-template.md "$extra")"
 
+# Istantanea del lavoro non committato a ogni giro (file modificati e nuovi, escluso il collegamento `data`): il delta
+# del giro 2 lo calcola lo strumento, non l'autore.
+unit="${slug%-*}"
+snap="tmp/review-snap/${unit}-${BASH_REMATCH[1]}${round}"
+rm -rf "$snap"
+mkdir -p "$snap"
+{ git diff --name-only HEAD; git ls-files -o --exclude-standard; } | grep -v -x 'data' | grep -v '^tmp/' | sort -u | while IFS= read -r f; do
+  [ -f "$f" ] && cp --parents -- "$f" "$snap/"
+done
+if [ "$round" = 2 ]; then
+  prev="tmp/review-snap/${unit}-${BASH_REMATCH[1]}1"
+  [ -d "$prev" ] || { echo "manca l'istantanea del giro 1 ($prev): il giro 1 non è passato da questo strumento" >&2; exit 2; }
+  delta="tmp/review-delta-${unit}-round2.diff"
+  diff -ruN "$prev" "$snap" > "$delta" || true
+  prompt="${prompt}
+
+Delta del giro 2 rispetto al giro 1, calcolato dallo strumento: \`${delta}\`."
+fi
+
 if ! TMPDIR="$root/tmp" timeout 3600 codex exec -m gpt-6-astra -c model_reasoning_effort="high" -s read-only \
   -o "$out" "$prompt" < /dev/null > "$log" 2>&1; then
   echo "codex ha fallito (uscita non nulla o timeout); artefatto: $out, log: $log" >&2
