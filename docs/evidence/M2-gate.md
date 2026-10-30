@@ -43,7 +43,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `88f49d622fec06c7961711712eb22598f7b460546da351f35b78452d1d39d29a` |
+| `docs/test-matrix.md` | `2d179f1dece0f5bc4bed7b4e3926e4dd12918e8099e5df0b793cb9da9cbcca80` |
 | `tests/trace/M2.tsv` | `94527d5b4ed6c5e0675999398974bc97c433be16b5f25741c32e092deefa335b` |
 | `tools/check_m2_trace.py` | `2ff5df7acdcc07ef45edd4c80fdb6ed7c7d5decd9e5f4629cc1751842c216a9b` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |

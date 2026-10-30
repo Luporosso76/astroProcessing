@@ -103,7 +103,7 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-RAW-06 | ADR-06; ADR-08.b §2.8 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-07 | ADR-13, NFR-SEC-04; ADR-08.b §2.1, §5 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-08 | ADR-06; ADR-08.b §2.7 (H6, creazioni di thread con `pthread_create` interposto) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-RAW-09 | F-IO-02 (più marche); ADR-08.b §2.3, §2.6 | ADR-08.b | M3.a | PIANIFICATO — non eseguito; richiede il record `PUB-*` dei campioni raw.pixls.us CC0 |
+| T-M3A-RAW-09 | F-IO-02 (più marche); ADR-08.b §2.3, §2.6 | ADR-08.b | M3.a | PIANIFICATO — non eseguito; richiede `PUB-RAW-01` acquisito (record scritto, stato DA ACQUISIRE) |
 | T-M3A-RAW-10 | NFR-SEC-04; ADR-08.b §2.5 (H5) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-11 | F-IO-04, §9.6; ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-12 | ADR-05 (chiave del nodo, determinismo); ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
@@ -151,6 +151,37 @@ Definiti in `docs/contracts/ADR-16-stati-master.md` §b.13, con tolleranze e cri
 | T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | PIANIFICATO — non eseguito |
 | T-M3A-CAL-10 | G-STOP, resume; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+
+## M3.entry: ID di lavoro di C-01.b
+
+Definiti in `docs/contracts/C-01-calibrazione-light.md` §9, con soglie e criteri fissati prima di ogni misura. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3A-C01-01 | G-OFFSET, F-IO-04; C-01.b §1 (stato dell'offset del light) | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-02 | G-OFFSET, P-OFFSET; C-01.b §1, ADR-16.b §b.5 | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-03 | G-OFFSET, F-IO-04; C-01.b §10 (voce `light_offset`) | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-04 | G-OFFSET, F-CAL-02.b, T-CAL-08; C-01.b §1, §9 (bias residuo, nero non sottratto) | C-01.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-C01-05 | G-OFFSET, P-OFFSET; C-01.b §6 (residuo del percorso parziale) | C-01.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-C01-06 | G-CAL; C-01.b §2 (dominio del light), ADR-16.b §b.2 | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-07 | F-CAL-06.b, §9.8; C-01.b §7 (coverage) | C-01.b | M3.a (analisi), M3.c (esecuzione) | PIANIFICATO — non eseguito |
+| T-M3A-C01-08 | F-CAL-06.b; C-01.b §6 (varianza delle catene) | C-01.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-C01-09 | F-CAL-02.b, F-CAL-03.b; C-01.b §7, §9 (perdita di segnale) | C-01.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-C01-10 | F-CAL-02.b, T-CAL-08; C-01.b §9 (otto combinazioni, flat residuo) | C-01.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-C01-11 | F-CAL-02.b; C-01.b §8 (determinismo) | C-01.b | M3.c | PIANIFICATO — non eseguito |
+
+## M3.entry: ID di lavoro di D-08 e NFR-TEST-02
+
+Definiti in `docs/decisions/D-08-dataset.md` §6, con criteri fissati prima di ogni esecuzione. Nessuno è eseguito: le righe sono piani, non prove.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3A-DAT-01 | D-08, NFR-TEST-02, NFR-LIC-01.d; D-08 §3, §4 regole 1-2 (record dei dataset) | D-08 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-DAT-02 | NFR-TEST-02; D-08 §4 regola 3 (una sola casa dell'hash) | D-08 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-DAT-03 | NFR-TEST-02, NC-21, NC-16; D-08 §4 regole 4-7 (verifica prima dell'uso, dato assente, sola lettura, solo file registrati) | D-08 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-DAT-04 | NFR-TEST-02, NC-21; D-08 §4 regola 5 (nessuno skip, guardia «0 tests») | D-08 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-DAT-05 | NFR-TEST-02, F-ANA-05.a; D-08 §4 regola 9 (corpus separato) | D-08 | M3.r | PIANIFICATO — non eseguito |
+| T-M3A-DAT-06 | NFR-TEST-02; D-08 §5 (copertura delle fixture sintetiche) | D-08 | Gate M3 (M3.s) | PIANIFICATO — non eseguito |
 
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
 

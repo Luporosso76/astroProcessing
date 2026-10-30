@@ -429,7 +429,7 @@ Test del piano che questi alimentano: T-IO-01 (import RAW, M3.s), i test di deba
 
 Grandezza (§7.3 righe 697-704, §8.6.2): canale di composizione o di trasparenza per il display e per l'export. Non è una maschera di invalidità, né una coverage, né una maschera fotografica. Serve all'export TIFF di C-10.b (NFR-EXP-01.b, M3.s).
 
-Dipendenza: §§b.12–b.18 citano ADR-16.b nella versione in scrittura in `.claude/worktrees/agent-ae93e7a97ecbe3a23/docs/contracts/ADR-16-stati-master.md` (SHA-256 `320218d1dc2c689c77afd0141e990e937b066395886dd3f4402d9a9097a5681a`), non ancora nel repository. Un cambio dei paragrafi citati riapre i punti che li citano.
+Dipendenza: §§b.12–b.18 citano ADR-16.b in `docs/contracts/ADR-16-stati-master.md`, con §b.2 e §b.3 allineati a §b.14 da [C-01.b](C-01-calibrazione-light.md) (light fuori dominio: stop; master: `excluded`). Un cambio dei paragrafi citati riapre i punti che li citano.
 
 `alpha_plane`: un valore f32 per pixel, un solo piano, buffer allineato a 64 byte. Non è un campo di `image`, non entra in `equivalent_content` e nessun operatore che produce campioni, varianza, `invalid` o `coverage` lo riceve. Invarianti (`validate_alpha(const image&, const alpha_plane&)`, T-M3A-TYP-13): `width` e `height` uguali a quelli dell'immagine, altrimenti `invalid_input`, `alpha.geometry`; ogni valore finito in `[0, 1]`, altrimenti `invalid_input`, `alpha.range`.
 
@@ -552,4 +552,4 @@ Criteri fissati qui, prima di ogni misura; oracle scritti a mano nel test.
 - I codici di limitazione coprono solo ciò che i contratti di M3 definiscono. Il «master di qualità dubbia» di §9.8 non ha un codice: ADR-16.b classifica i master solo come `usable` o `excluded`.
 - `history.unknown` si basa sulla fase dichiarata: un file dichiarato `raw` ma elaborato fuori dal prodotto non si riconosce.
 - Gli insiemi accettati dalle misure appartengono ai contratti delle misure, non ancora scritti.
-- I riferimenti ad ADR-16.b valgono per la versione indicata in §b.12, non ancora nel repository.
+- I riferimenti ad ADR-16.b valgono per la versione indicata in §b.12.

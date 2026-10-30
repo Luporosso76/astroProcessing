@@ -15,3 +15,4 @@ Parti degli ADR usate da M2.a–e. Errori: modello comune in ADR-05. ID di test 
 Contratti di M3.entry (ID di test `T-M3<slice>-<tema>-NN`):
 
 - [ADR-08-decoder-pack.md](ADR-08-decoder-pack.md): decoder RAW con LibRaw da memoria (§9.6), catalog pack (schema, manifest, G-PACK, pack mancante, corrotto o fuori copertura), cataloghi scelti, regola NFR-LIC-01.d (ADR-08.b).
+- [C-01-calibrazione-light.md](C-01-calibrazione-light.md): calibrazione del light, forma completa (C-01.b): nero del decoder mai sottratto e usato come sentinella, voce `light_offset` e residuo dichiarato del percorso parziale (G-OFFSET), dominio del light, coverage attraverso la calibrazione, metriche e test; C-01.a resta nella parte `.a` di ADR-16.

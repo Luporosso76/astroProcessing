@@ -1,5 +1,6 @@
 # PUB-LFC-01: Palomar LFC, chip 0 (Astropy CCD Guide, esempio 1)
 
+- Stato: ACQUISITO. Licenza SPDX: `CC-BY-4.0`.
 - Fonte: Zenodo, DOI 10.5281/zenodo.3254683, https://zenodo.org/records/3254683, file `example-cryo-LFC.tar.bz2` (161627346 byte, MD5 pubblicato `6ea21afd854eac1da770daa1a548cf6e`, verificato).
 - Licenza: Creative Commons Attribution 4.0 International, dichiarata nella pagina del record. Ridistribuibile con attribuzione. Attribuzione: Matt Craig et al., "CCD Data Reduction Guide", dati di esempio LFC.
 - Copia locale: `data/public/zenodo-3254683/` (esclusa da git). Estrazione senza file `._*` e `.DS_Store`, senza owner né permessi dell'archivio.
