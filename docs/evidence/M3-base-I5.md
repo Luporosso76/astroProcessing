@@ -89,17 +89,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `42e71a3ae24e99fe26b0edf8006d9b1737b8621cde9d04dde2e63d02c93235a4` |
-| `docs/evidence/M3-base-I2.md` | `fd2fdd72e7a635e1789625c068bf5fcf2cbcc4348486c254f4023d79b1b164b5` |
-| `docs/evidence/M3-base-I3.md` | `517c5aa4e4f8d065142192d06a3f10f091698d246534863c25d024bc42942256` |
-| `src/core/calibration_blocks.cpp` | `52ef8cb2d248f4f2905ec2dbbd4ca3dbfe7912a828326bffee8b496db76d58c5` |
-| `src/core/hash.cpp` | `ac0c01dc84e9d8cc9efcc324060788206fb4dcc2c34e2bf54b4a559d027e7135` |
-| `src/core/import_job.cpp` | `f524e0c1b79a5b1525845ab9615abb8dffc8abec6380e3d174c161192a57e123` |
-| `src/core/master.cpp` | `062e3f341aeb95b9f9d8aa9e233a7bfa8cee4f9af0f4d56a56f2ae683940dcb2` |
-| `tests/unit/CMakeLists.txt` | `5a37acdfb12f9083333052be0a60164038e9d02947338c813746b429a3c58160` |
+| `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
+| `docs/evidence/M3-base-I2.md` | `d6a86a508260ca1051fa82fc6855ad4e3ceef99f9d157a7b25d38367bc4d4306` |
+| `docs/evidence/M3-base-I3.md` | `d14d526853d5f8f7b3c7feb43621f458d15dcf5c295a73d92cc443ed7c1f83fc` |
+| `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
+| `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
+| `src/core/import_job.cpp` | `c3b73a0b879a25cccf50ab38f5c4ee4806647c807f73bcb79deea05610b1c5ed` |
+| `src/core/master.cpp` | `1aba5a2b6688d8d1c4e198b065589283ce62a35e30bf3866933e1c3d4b35aa9b` |
+| `tests/unit/CMakeLists.txt` | `11692a0d0102fa9e69f0e241a2c1ca72a8543622c451f34819721dd20946914e` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
-| `tests/unit/test_conformance_gaps.cpp` | `cc40565c32980a908be6535c0ae6366ff0b326997c67d177a071850e4846b227` |
+| `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 
-- Test release (`tmp/release-junit.xml`): totali 622, fast 615, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 616, fast 616, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 633, fast 626, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 627, fast 627, slow 0, falliti 0
 <!-- evidence:end -->

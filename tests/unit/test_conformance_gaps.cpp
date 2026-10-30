@@ -132,7 +132,7 @@ planned_case make_planned_case(const std::string& name) {
 void expect_header_stop(const planned_case& c, const fits_plan& planned, const char* code, const char* field) {
   const fits_input input = open_fits_input(c.path.string());
   try {
-    (void)read_verified_input(input, c.path.string(), digest_of(c.bytes), std::uint64_t{1} << 30, planned);
+    (void)read_verified_input(input, c.path.string(), digest_of(c.bytes), std::uint64_t{1} << 30, &planned);
     ADD_FAILURE() << "nessuno stop per il campo " << field;
   } catch (const stop_error& e) {
     EXPECT_EQ(e.category(), error_category::integrity) << field << ": " << e.what();
@@ -147,7 +147,7 @@ TEST(HashGaps, T_M3BASE_11_each_planned_header_field_alone_stops_the_read) {
   const planned_case c = make_planned_case("header_fields.fits");
   {  // controllo: il piano del file stesso passa
     const fits_input input = open_fits_input(c.path.string());
-    EXPECT_NO_THROW((void)read_verified_input(input, c.path.string(), digest_of(c.bytes), std::uint64_t{1} << 30, c.plan));
+    EXPECT_NO_THROW((void)read_verified_input(input, c.path.string(), digest_of(c.bytes), std::uint64_t{1} << 30, &c.plan));
   }
   {  // dimensione sola: ogni altro valore del piano e' quello del file
     fits_plan p = c.plan;
@@ -224,7 +224,7 @@ TEST(HashGaps, T_M3BASE_11_read_verified_input_stops_a_file_modified_after_the_o
   changed[offset] ^= 0x01;
   flip_byte_in_place(c.path, offset);
   set_mtime(c.path, gap_epoch + 10);
-  EXPECT_STOP(read_verified_input(input, c.path.string(), digest_of(changed), std::uint64_t{1} << 30, planned),
+  EXPECT_STOP(read_verified_input(input, c.path.string(), digest_of(changed), std::uint64_t{1} << 30, &planned),
               error_category::integrity, "input.modified");
 }
 
@@ -237,13 +237,13 @@ TEST(HashGaps, T_M3BASE_11_reverify_input_stops_an_opened_input_modified_since_t
   changed[offset] ^= 0x01;
   std::vector<std::byte> work(2880);
   {  // controllo: input aperto invariato
-    EXPECT_NO_THROW(reverify_input(c.path.string(), &opened, digest_of(c.bytes), work, {}));
+    EXPECT_NO_THROW(reverify_input(c.path.string(), fits_input_format(), &opened, digest_of(c.bytes), work, {}));
   }
   flip_byte_in_place(c.path, offset);
   set_mtime(c.path, gap_epoch + 10);
-  EXPECT_NO_THROW(reverify_input(c.path.string(), nullptr, digest_of(changed), work, {}));
-  EXPECT_STOP(reverify_input(c.path.string(), &opened, digest_of(changed), work, {}), error_category::integrity,
-              "input.modified");
+  EXPECT_NO_THROW(reverify_input(c.path.string(), fits_input_format(), nullptr, digest_of(changed), work, {}));
+  EXPECT_STOP(reverify_input(c.path.string(), fits_input_format(), &opened, digest_of(changed), work, {}),
+              error_category::integrity, "input.modified");
 }
 
 // ---------------------------------------------------------------- T-M3BASE-07 (OB-07): prepare dei tipi di I/O, input di piu' blocchi

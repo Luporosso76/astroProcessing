@@ -88,8 +88,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `42e71a3ae24e99fe26b0edf8006d9b1737b8621cde9d04dde2e63d02c93235a4` |
-| `src/core/calibration_job.cpp` | `2df6c380778cd9d89fe255edfa0f019369122f2b46d781b7abc172a294f8959e` |
+| `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
+| `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
 | `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
 | `src/core/include/astro/sqlite_dag_store.hpp` | `83e225a4f173a1cfc3001b46b22394338edd1d6519130ada960957dec48b9505` |
 | `src/core/include/astro/workflow.hpp` | `9afee58d34b3b806c1183e6eefe236fd5c5d43b14a73377623f9b8713df94358` |
@@ -100,6 +100,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 
-- Test release (`tmp/release-junit.xml`): totali 622, fast 615, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 616, fast 616, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 633, fast 626, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 627, fast 627, slow 0, falliti 0
 <!-- evidence:end -->

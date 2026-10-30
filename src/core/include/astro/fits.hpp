@@ -11,6 +11,7 @@
 
 #include "astro/fault_injector.hpp"
 #include "astro/image.hpp"
+#include "astro/input_format.hpp"
 
 namespace astro {
 
@@ -18,12 +19,12 @@ class fits_input;
 
 namespace fits_detail {
 void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::size_t n);
-// Confronta dimensione, mtime e ctime del file aperto con quelli di open_fits_input: dimensione diversa =
-// integrity input.size_changed; mtime o ctime diversi = integrity input.modified.
+// Confronta dimensione, mtime e ctime del file aperto con quelli dell'apertura: dimensione diversa =
+// integrity input.size_changed; mtime o ctime diversi = integrity input.modified; fstat fallita io <prefisso>.fstat.
 void check_unchanged(const fits_input& input);
 // (st_dev, st_ino) del file aperto.
 std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input);
-// `path` indica il file aperto: assente io input.missing, non accessibile io fits.fstat, un altro file integrity
+// `path` indica il file aperto: assente io input.missing, non accessibile io <prefisso>.fstat, un altro file integrity
 // input.modified.
 void check_path_names(const std::string& path, const fits_input& input);
 }
@@ -53,7 +54,8 @@ struct fits_plan {
   std::uint64_t peak_bytes = 0;
 };
 
-// File aperto in sola lettura, con dimensione fissata da fstat sullo stesso fd.
+// Input aperto in sola lettura da open_input, con dimensione fissata da fstat sullo stesso fd e con la dichiarazione
+// del formato di apertura: i codici propri del formato (`.fstat`, `.read`) usano il suo prefisso.
 class fits_input {
  public:
   fits_input(const fits_input&) = delete;
@@ -63,36 +65,45 @@ class fits_input {
   ~fits_input();
 
   std::uint64_t size_bytes() const noexcept { return size_; }
+  const input_format& format() const noexcept { return *format_; }
 
   // Solo test: il punto "input.pread" e' chiamato prima di ogni pread; un valore diverso da zero fa restituire 0 byte
   // (fine file) alla lettura, con la dimensione del file invariata.
   void set_fault_injector(fault_injector injector) { fault_ = std::move(injector); }
 
   // Solo test: chiamato con offset e lunghezza di ogni lettura prima del pread; un valore diverso da zero e' l'errno
-  // dell'errore di I/O che la lettura produce (io, fits.read), senza eseguire il pread.
+  // dell'errore di I/O che la lettura produce (io, <prefisso>.read), senza eseguire il pread.
   using pread_observer = std::function<int(std::uint64_t offset, std::size_t length)>;
   void set_pread_observer(pread_observer observer) { observer_ = std::move(observer); }
 
  private:
-  friend fits_input open_fits_input(const std::string& path);
+  friend fits_input open_input(const std::string& path, const input_format& format);
   friend fits_plan plan_fits(const fits_input& input);
   friend std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_t budget_bytes);
   friend std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t budget_bytes);
   friend void fits_detail::read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::size_t n);
   friend void fits_detail::check_unchanged(const fits_input& input);
   friend std::pair<std::uint64_t, std::uint64_t> fits_detail::identity_of(const fits_input& input);
-  fits_input(int fd, std::uint64_t size, std::int64_t mtime_ns, std::int64_t ctime_ns) noexcept
-      : fd_(fd), size_(size), mtime_ns_(mtime_ns), ctime_ns_(ctime_ns) {}
+  fits_input(int fd, std::uint64_t size, std::int64_t mtime_ns, std::int64_t ctime_ns,
+             const input_format* format) noexcept
+      : fd_(fd), size_(size), mtime_ns_(mtime_ns), ctime_ns_(ctime_ns), format_(format) {}
 
   int fd_ = -1;
   std::uint64_t size_ = 0;
   std::int64_t mtime_ns_ = 0;
   std::int64_t ctime_ns_ = 0;
+  const input_format* format_ = nullptr;
   fault_injector fault_;
   pread_observer observer_;
 };
 
-// open + fstat. Non regolare: invalid_input fits.not_regular; oltre max_file_bytes: limit_exceeded fits.max_file_bytes.
+// Protocollo di apertura unico degli input, nel formato dichiarato dal chiamante (BASE §2.5, emendamento L1): open
+// O_RDONLY, fstat sullo stesso descrittore, file regolare, limite del formato prima di ogni lettura e allocazione.
+// Assente: io input.missing; altro errore di open: io <prefisso>.open; fstat: io <prefisso>.fstat; non regolare:
+// invalid_input <prefisso>.not_regular; oltre il limite: limit_exceeded <prefisso>.max_file_bytes (dimensione, limite).
+fits_input open_input(const std::string& path, const input_format& format);
+
+// open_input con la dichiarazione FITS.
 fits_input open_fits_input(const std::string& path);
 
 // Legge con pread i soli header e applica i limiti prima di qualunque allocazione dei campioni.

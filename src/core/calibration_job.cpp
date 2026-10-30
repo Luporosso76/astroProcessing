@@ -270,7 +270,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
         jc.check_cancel();
         try {
           images[i] = decode_fits(
-              read_verified_input(*opened[i], specs[i]->path, specs[i]->digest, budget_bytes, plans[i]), budget_bytes,
+              read_verified_input(*opened[i], specs[i]->path, specs[i]->digest, budget_bytes, &plans[i]), budget_bytes,
               specs[i]->read_options);
         } catch (stop_error& e) {
           e.add_context("input", names[i]);
@@ -290,8 +290,8 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
         for (std::size_t i = 0; i < specs.size(); ++i) {
           try {
             jc.check_cancel();
-            reverify_input(specs[i]->path, &*opened[i], specs[i]->digest, {chunk.data(), chunk.size()},
-                           [&jc] { jc.check_cancel(); });
+            reverify_input(specs[i]->path, fits_input_format(), &*opened[i], specs[i]->digest,
+                           {chunk.data(), chunk.size()}, [&jc] { jc.check_cancel(); });
           } catch (stop_error& e) {
             e.add_context("fase", "riverifica prima della pubblicazione");
             e.add_context("input", names[i]);

@@ -1041,7 +1041,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         const master_frame_spec& f = *p.frames[k].spec;
         image im;
         try {
-          im = decode_fits(read_verified_input(inputs[k], f.path, f.digest, budget_bytes, plans[k]), budget_bytes,
+          im = decode_fits(read_verified_input(inputs[k], f.path, f.digest, budget_bytes, &plans[k]), budget_bytes,
                            f.read_options);
         } catch (stop_error& e) {
           e.add_context("frame", p.frames[k].name);
@@ -1062,8 +1062,8 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
       for (std::size_t k = 0; k < p.n; ++k) {
         try {
           jc.check_cancel();
-          reverify_input(p.frames[k].spec->path, &inputs[k], p.frames[k].spec->digest, {chunk.data(), chunk.size()},
-                         [&jc] { jc.check_cancel(); });
+          reverify_input(p.frames[k].spec->path, fits_input_format(), &inputs[k], p.frames[k].spec->digest,
+                         {chunk.data(), chunk.size()}, [&jc] { jc.check_cancel(); });
         } catch (stop_error& e) {
           e.add_context("frame", p.frames[k].name);
           e.add_context("fase", "riverifica prima della pubblicazione");

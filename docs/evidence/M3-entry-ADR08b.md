@@ -71,7 +71,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `a99c276abc16976badd7cfe5650d3e989e8ea2228a399555b32fb1fcf8637207` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `281b2a5ae80092dca1b534ee7dd6044e0dd877e3d57484ebfc02892c802fb169` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
 | `docs/licenses.md` | `737e288a42d54f0c367084a08b68e7a9effbc92aeb95e6951b679de698586c21` |

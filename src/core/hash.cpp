@@ -7,6 +7,7 @@
 
 #include "astro/error.hpp"
 #include "astro/fits.hpp"
+#include "astro/input_format.hpp"
 
 namespace astro {
 
@@ -111,11 +112,12 @@ void require_planned_header(const fits_plan& planned, const fits_plan& verified,
 
 std::vector<std::uint8_t> read_verified_input(const fits_input& input, const std::string& path,
                                               const content_digest& expected, std::uint64_t budget_bytes,
-                                              const fits_plan& planned) {
+                                              const fits_plan* planned) {
+  ASTRO_ASSERT((planned != nullptr) == input.format().header_plan);
   fits_detail::check_path_names(path, input);
   std::vector<std::uint8_t> bytes = read_input_bytes(input, budget_bytes);
   require_input_digest(digest_of(bytes), expected, path);
-  require_planned_header(planned, plan_fits(bytes), path);
+  if (planned != nullptr) require_planned_header(*planned, plan_fits(bytes), path);
   fits_detail::check_unchanged(input);
   return bytes;
 }
@@ -133,9 +135,11 @@ content_digest digest_input(const fits_input& input, std::span<std::byte> work, 
   return hasher.finish();
 }
 
-void reverify_input(const std::string& path, const fits_input* opened, const content_digest& expected,
-                    std::span<std::byte> work, const std::function<void()>& check_cancel) {
-  const fits_input input = open_fits_input(path);
+void reverify_input(const std::string& path, const input_format& format, const fits_input* opened,
+                    const content_digest& expected, std::span<std::byte> work,
+                    const std::function<void()>& check_cancel) {
+  ASTRO_ASSERT(opened == nullptr || &opened->format() == &format);
+  const fits_input input = open_input(path, format);
   if (input.size_bytes() != expected.size_bytes) {
     throw stop_error(error_category::integrity, "input.size_changed", "la dimensione del file differisce dal record",
                      {{"percorso", path}, {"atteso", std::to_string(expected.size_bytes)},

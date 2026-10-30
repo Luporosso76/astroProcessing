@@ -10,6 +10,7 @@
 #include "astro/budget.hpp"
 #include "astro/cancel.hpp"
 #include "astro/hash.hpp"
+#include "astro/input_format.hpp"
 #include "astro/job.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/node.hpp"
@@ -57,6 +58,9 @@ struct job_type_variant {
 struct job_type_entry {
   const char* operator_id;
   std::vector<std::string> input_roles;
+  // Formato dichiarato di ogni ruolo (BASE §2.5, emendamento L1): l'operatore apre e riverifica il ruolo con questa
+  // dichiarazione.
+  std::map<std::string, const input_format*> role_formats;
   std::vector<job_type_variant> variants;
   bool scheduler = false;
   // Costruisce nodo e chiamata del job minimo dagli input per ruolo, per la variante indicata. `project_root` e' la

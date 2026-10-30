@@ -154,19 +154,29 @@ minimal_job make_master(const job_type_inputs& inputs, const std::string& varian
           }};
 }
 
+// I tipi registrati decodificano FITS: ogni loro ruolo ha la dichiarazione FITS.
+std::map<std::string, const input_format*> fits_roles(std::initializer_list<const char*> roles) {
+  std::map<std::string, const input_format*> formats;
+  for (const char* role : roles) formats.emplace(role, &fits_input_format());
+  return formats;
+}
+
 }  // namespace
 
 const std::vector<job_type_entry>& registered_job_types() {
   static const std::vector<job_type_entry> entries{
-      {import_operator_id, {"file"}, {{"unica", false, false}}, true, make_import},
-      {thumbnail_operator_id, {"file"}, {{"unica", false, false}}, true, make_thumbnail},
-      {cache_rebuild_operator_id, {"file"}, {{"unica", false, false}}, true, make_cache_rebuild},
+      {import_operator_id, {"file"}, fits_roles({"file"}), {{"unica", false, false}}, true, make_import},
+      {thumbnail_operator_id, {"file"}, fits_roles({"file"}), {{"unica", false, false}}, true, make_thumbnail},
+      {cache_rebuild_operator_id, {"file"}, fits_roles({"file"}), {{"unica", false, false}}, true,
+       make_cache_rebuild},
       {calibration_operator_id,
        {"light", "dark", "flat", "dark_flat"},
+       fits_roles({"light", "dark", "flat", "dark_flat"}),
        {{"intera", false, false}, {"blocchi", true, true}},
        true,
        make_calibration},
-      {master_operator_id, {"frame0", "frame1", "frame2"}, {{"unica", false, true}}, true, make_master},
+      {master_operator_id, {"frame0", "frame1", "frame2"}, fits_roles({"frame0", "frame1", "frame2"}),
+       {{"unica", false, true}}, true, make_master},
   };
   return entries;
 }

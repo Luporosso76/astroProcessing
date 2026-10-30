@@ -27,7 +27,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 Lacuna L1. Correzione della base secondo `plans/M3.md` «Base comune» punto 3, con emendamento di BASE §2.5 e review prima del codice. ID: prerequisito di F-IO-02.
 1. Apertura in sola lettura con limite e codice del formato (`raw.max_file_bytes`, ADR-08.b §2.1) prima di ogni allocazione — proprietario: lettura degli input (`open_fits_input` generalizzata con la dichiarazione del formato, BASE §2.5 emendamento L1; una seconda funzione che ricopia il protocollo è vietata), OB-12.
 2. Lettura intera verificata senza `fits_plan` (piano = dimensione da `fstat`), digest prima di `open_buffer`, riverifica prima della pubblicazione — proprietario: `read_verified_input` / `reverify_input` (`hash.cpp`), OB-11.
-Test: T-M3BASE-20, T-M3BASE-21, T-M3BASE-22 (BASE §3.2, emendamento L1); T-M3BASE-11/12 sulla variante RAW. Uscita: suite di conformità verde, nessun digest confrontato fuori da `hash.cpp`.
+Test: T-M3BASE-20, T-M3BASE-21, T-M3BASE-22 (BASE §3.2, emendamento L1). Le varianti RAW di T-M3BASE-11/12 passano a U4, che registra il primo tipo di job con un ruolo RAW. Uscita: suite di conformità verde, nessun digest confrontato fuori da `hash.cpp`.
 
 ### U1. Tipi del decoder (ADR-03.b §b.1, §b.2, §b.9 righe 1-2) — ~250 righe
 
@@ -66,7 +66,7 @@ ID: F-IO-02, F-IO-04.
 2. Record del decoder di §2.9 in provenance e nella chiave del nodo, identità della libreria (`LibRaw::version()`, SHA-256 di `libraw_r.so` caricata) — `raw_decode.cpp`.
 3. Export della provenance con hash dell'originale e offset applicato dal decoder (`none`) (F-IO-04; C-01.b §10) — `provenance.cpp` (solo campi; scrittura nel runner).
 4. Simboli vietati assenti (§5) — `tools/check_offline.sh`.
-Test: T-M3A-RAW-07, 09, 11, 12, 13 (chiavi `null` di ADR-08.b §2.6, emendamento L4); T-M3A-02 (export F-IO-04: hash della sorgente, `black_applied_by_decoder = none`, campi assenti restano assenti); T-M2F-02 e T-M2R0-01 rieseguiti con i binari che collegano LibRaw e libtiff. Dati: `PUB-RAW-01` (7 Bayer, X-E1 → `raw.xtrans`). Uscita: suite di conformità verde sul nuovo tipo.
+Test: T-M3BASE-11 e T-M3BASE-12 sulla variante RAW (da U0); T-M3A-RAW-07, 09, 11, 12, 13 (chiavi `null` di ADR-08.b §2.6, emendamento L4); T-M3A-02 (export F-IO-04: hash della sorgente, `black_applied_by_decoder = none`, campi assenti restano assenti); T-M2F-02 e T-M2R0-01 rieseguiti con i binari che collegano LibRaw e libtiff. Dati: `PUB-RAW-01` (7 Bayer, X-E1 → `raw.xtrans`). Uscita: suite di conformità verde sul nuovo tipo.
 
 ### U5. G-OFFSET: stato dell'offset e voce `light_offset` (C-01.b §1, §10; ADR-16.b §b.5 colonna offset, §b.10) — ~200 righe
 

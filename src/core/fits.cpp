@@ -16,6 +16,7 @@
 #include <fitsio.h>
 
 #include "astro/hash.hpp"
+#include "astro/input_format.hpp"
 #include "astro/job_probe.hpp"
 #include "fits_internal.hpp"
 
@@ -450,6 +451,20 @@ void verify_structure(fitsfile* f, const std::vector<hdu_scan>& hdus) {
 
 namespace {
 
+// Stop con il codice proprio del formato dichiarato all'apertura: `<prefisso><suffix>`.
+[[noreturn]] void format_fail(const input_format& format, error_category category, const char* suffix,
+                              std::string message, stop_error::context_list context = {}) {
+  throw stop_error(category, std::string(format.prefix) + suffix, std::move(message), std::move(context));
+}
+
+// Errore di sistema su un input aperto: io `<prefisso dell'input><suffix>`, con `errno` in coda al contesto. Il
+// prefisso viene solo dall'input, mai dal chiamante.
+[[noreturn]] void input_syscall_fail(const fits_input& input, const char* suffix, const char* message, int e,
+                                     stop_error::context_list context = {}) {
+  context.emplace_back("errno", std::to_string(e));
+  format_fail(input.format(), error_category::io, suffix, message, std::move(context));
+}
+
 // Fine file prima della dimensione aperta: un file cambiato dall'apertura (dimensione, mtime o ctime) e' integrity
 // (input.size_changed, input.modified); solo un file con identita' invariata resta io input.short_read.
 [[noreturn]] void unexpected_eof(const fits_input& input) {
@@ -462,9 +477,7 @@ void pread_exact(const fits_input& input, int fd, std::uint64_t offset, void* ds
   job_probe::notify("input.read");
   if (observer) {
     const int injected = observer(offset, n);
-    if (injected != 0) {
-      fail(error_category::io, "fits.read", "pread non riuscita", {{"errno", std::to_string(injected)}});
-    }
+    if (injected != 0) input_syscall_fail(input, ".read", "pread non riuscita", injected);
   }
   auto* p = static_cast<char*>(dst);
   std::size_t done = 0;
@@ -473,7 +486,7 @@ void pread_exact(const fits_input& input, int fd, std::uint64_t offset, void* ds
     const ssize_t r = eof ? 0 : ::pread(fd, p + done, n - done, static_cast<off_t>(offset + done));
     if (r < 0) {
       if (errno == EINTR) continue;
-      fail(error_category::io, "fits.read", "pread non riuscita", {{"errno", std::to_string(errno)}});
+      input_syscall_fail(input, ".read", "pread non riuscita", errno);
     }
     if (r == 0) unexpected_eof(input);
     done += static_cast<std::size_t>(r);
@@ -484,7 +497,7 @@ void pread_exact(const fits_input& input, int fd, std::uint64_t offset, void* ds
 
 fits_input::fits_input(fits_input&& other) noexcept
     : fd_(other.fd_), size_(other.size_), mtime_ns_(other.mtime_ns_), ctime_ns_(other.ctime_ns_),
-      fault_(std::move(other.fault_)), observer_(std::move(other.observer_)) {
+      format_(other.format_), fault_(std::move(other.fault_)), observer_(std::move(other.observer_)) {
   other.fd_ = -1;
 }
 
@@ -495,6 +508,7 @@ fits_input& fits_input::operator=(fits_input&& other) noexcept {
     size_ = other.size_;
     mtime_ns_ = other.mtime_ns_;
     ctime_ns_ = other.ctime_ns_;
+    format_ = other.format_;
     fault_ = std::move(other.fault_);
     observer_ = std::move(other.observer_);
     other.fd_ = -1;
@@ -518,9 +532,7 @@ void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::s
 
 void check_unchanged(const fits_input& input) {
   struct stat sb {};
-  if (::fstat(input.fd_, &sb) != 0) {
-    fail(error_category::io, "fits.fstat", "fstat non riuscita", {{"errno", std::to_string(errno)}});
-  }
+  if (::fstat(input.fd_, &sb) != 0) input_syscall_fail(input, ".fstat", "fstat non riuscita", errno);
   if (static_cast<std::uint64_t>(sb.st_size) != input.size_) {
     fail(error_category::integrity, "input.size_changed", "la dimensione del file e' cambiata dopo fstat",
          {{"atteso", std::to_string(input.size_)}, {"trovata", std::to_string(sb.st_size)}});
@@ -533,9 +545,7 @@ void check_unchanged(const fits_input& input) {
 
 std::pair<std::uint64_t, std::uint64_t> identity_of(const fits_input& input) {
   struct stat sb {};
-  if (::fstat(input.fd_, &sb) != 0) {
-    fail(error_category::io, "fits.fstat", "fstat non riuscita", {{"errno", std::to_string(errno)}});
-  }
+  if (::fstat(input.fd_, &sb) != 0) input_syscall_fail(input, ".fstat", "fstat non riuscita", errno);
   return {static_cast<std::uint64_t>(sb.st_dev), static_cast<std::uint64_t>(sb.st_ino)};
 }
 
@@ -543,8 +553,11 @@ void check_path_names(const std::string& path, const fits_input& input) {
   struct stat named {};
   if (::stat(path.c_str(), &named) != 0) {
     const int e = errno;
-    fail(error_category::io, e == ENOENT ? "input.missing" : "fits.fstat", "file dell'ingresso non accessibile",
-         {{"percorso", path}, {"errno", std::to_string(e)}});
+    const char* message = "file dell'ingresso non accessibile";
+    if (e == ENOENT) {
+      fail(error_category::io, "input.missing", message, {{"percorso", path}, {"errno", std::to_string(e)}});
+    }
+    input_syscall_fail(input, ".fstat", message, e, {{"percorso", path}});
   }
   const auto [dev, ino] = identity_of(input);
   if (static_cast<std::uint64_t>(named.st_dev) != dev || static_cast<std::uint64_t>(named.st_ino) != ino) {
@@ -555,33 +568,38 @@ void check_path_names(const std::string& path, const fits_input& input) {
 
 }  // namespace fits_detail
 
-fits_input open_fits_input(const std::string& path) {
+fits_input open_input(const std::string& path, const input_format& format) {
   job_probe::notify("input.open", path);
+  job_probe::notify("input.open_format", std::string(format.prefix) + "\t" + path);
   int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
   if (fd < 0) {
     const int e = errno;
-    fail(error_category::io, e == ENOENT ? "input.missing" : "fits.open", "apertura del file non riuscita",
-         {{"percorso", path}, {"errno", std::to_string(e)}});
+    stop_error::context_list context{{"percorso", path}, {"errno", std::to_string(e)}};
+    if (e == ENOENT) fail(error_category::io, "input.missing", "apertura del file non riuscita", std::move(context));
+    format_fail(format, error_category::io, ".open", "apertura del file non riuscita", std::move(context));
   }
   struct stat sb {};
   if (::fstat(fd, &sb) != 0) {
     const int e = errno;
     ::close(fd);
-    fail(error_category::io, "fits.fstat", "fstat non riuscita", {{"percorso", path}, {"errno", std::to_string(e)}});
+    format_fail(format, error_category::io, ".fstat", "fstat non riuscita",
+                {{"percorso", path}, {"errno", std::to_string(e)}});
   }
   if (!S_ISREG(sb.st_mode)) {
     ::close(fd);
-    fail(error_category::invalid_input, "fits.not_regular", "il file non e' regolare", {{"percorso", path}});
+    format_fail(format, error_category::invalid_input, ".not_regular", "il file non e' regolare", {{"percorso", path}});
   }
   const auto size = static_cast<std::uint64_t>(sb.st_size);
-  if (size > fits_limits::max_file_bytes) {
+  if (size > format.max_file_bytes) {
     ::close(fd);
-    fail(error_category::limit_exceeded, "fits.max_file_bytes", "file oltre il limite",
-         {{"dimensione", std::to_string(size)}, {"limite", std::to_string(fits_limits::max_file_bytes)}});
+    format_fail(format, error_category::limit_exceeded, ".max_file_bytes", "file oltre il limite",
+                {{"dimensione", std::to_string(size)}, {"limite", std::to_string(format.max_file_bytes)}});
   }
   const auto ns = [](const struct timespec& t) { return std::int64_t{t.tv_sec} * 1000000000 + t.tv_nsec; };
-  return fits_input(fd, size, ns(sb.st_mtim), ns(sb.st_ctim));
+  return fits_input(fd, size, ns(sb.st_mtim), ns(sb.st_ctim), &format);
 }
+
+fits_input open_fits_input(const std::string& path) { return open_input(path, fits_input_format()); }
 
 fits_plan plan_fits(const fits_input& input) {
   const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) {
@@ -613,7 +631,7 @@ std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_
   do {
     extra = ::pread(input.fd_, &probe, 1, static_cast<off_t>(buffer.size()));
   } while (extra < 0 && errno == EINTR);
-  if (extra < 0) fail(error_category::io, "fits.read", "pread non riuscita", {{"errno", std::to_string(errno)}});
+  if (extra < 0) input_syscall_fail(input, ".read", "pread non riuscita", errno);
   if (extra > 0) {
     fail(error_category::integrity, "input.size_changed", "il file e' cresciuto dopo fstat",
          {{"atteso", std::to_string(buffer.size())}});

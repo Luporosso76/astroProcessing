@@ -1,12 +1,19 @@
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
+#include <cerrno>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <map>
+#include <optional>
 
 #include "astro/fits.hpp"
 #include "astro/hash.hpp"
 #include "expect_stop.hpp"
+#include "no_crash_report.hpp"
 #include "syn_fits.hpp"
 
 namespace {
@@ -158,11 +165,86 @@ TEST(Hash, reverify_input_stops_a_file_appended_during_the_reading) {
     std::ofstream out(p, std::ios::binary | std::ios::app);
     out.put('x');
   };
-  EXPECT_STOP(reverify_input(p.string(), nullptr, digest_of(data), work, append_once), error_category::integrity,
-              "input.size_changed");
+  EXPECT_STOP(reverify_input(p.string(), fits_input_format(), nullptr, digest_of(data), work, append_once),
+              error_category::integrity, "input.size_changed");
   EXPECT_TRUE(appended);
   write_file(p, data);
-  EXPECT_NO_THROW(reverify_input(p.string(), nullptr, digest_of(data), work, {}));
+  EXPECT_NO_THROW(reverify_input(p.string(), fits_input_format(), nullptr, digest_of(data), work, {}));
+}
+
+// Precondizioni (BASE §2.5, emendamento L1): il piano c'e' se e solo se il formato dell'input ha il piano degli header;
+// la riverifica di un input aperto usa il formato con cui e' stato aperto.
+TEST(HashDeathTest, verified_read_and_reverify_require_the_declared_format_of_the_input) {
+  const fs::path p = tmp_file("formato.bin");
+  const std::vector<std::uint8_t> data = pattern(4096);
+  write_file(p, data);
+  const fits_plan plan{};
+  const fits_input raw = open_input(p.string(), raw_input_format());
+  const fits_input fits = open_input(p.string(), fits_input_format());
+  std::vector<std::byte> work(512);
+  EXPECT_DEATH(
+      {
+        exit_instead_of_core_dump();
+        (void)read_verified_input(raw, p.string(), digest_of(data), big_budget, &plan);
+      },
+      "ASTRO_ASSERT");
+  EXPECT_DEATH(
+      {
+        exit_instead_of_core_dump();
+        (void)read_verified_input(fits, p.string(), digest_of(data), big_budget, nullptr);
+      },
+      "ASTRO_ASSERT");
+  EXPECT_DEATH(
+      {
+        exit_instead_of_core_dump();
+        reverify_input(p.string(), raw_input_format(), &fits, digest_of(data), work, {});
+      },
+      "ASTRO_ASSERT");
+  EXPECT_EQ(read_verified_input(raw, p.string(), digest_of(data), big_budget, nullptr), data);
+  EXPECT_NO_THROW(reverify_input(p.string(), raw_input_format(), &raw, digest_of(data), work, {}));
+}
+
+// I codici propri del formato dopo l'apertura (`.read` della lettura, `.fstat` del controllo del percorso) usano il
+// prefisso della dichiarazione con cui l'input e' stato aperto.
+TEST(Hash, read_and_path_codes_use_the_prefix_of_the_declared_format) {
+  const fs::path dir = tmp_file("prefisso");
+  fs::create_directories(dir);
+  const fs::path p = dir / "in.bin";
+  const std::vector<std::uint8_t> data = pattern(4096);
+  write_file(p, data);
+  ASSERT_NE(::geteuid(), 0u) << "il caso richiede un utente non root";
+  const auto stop_of = [](const std::function<void()>& f) -> std::optional<stop_error> {
+    try {
+      f();
+    } catch (const stop_error& e) {
+      return e;
+    }
+    return std::nullopt;
+  };
+  const auto context = [](const stop_error& e) {
+    std::map<std::string, std::string> m;
+    for (const auto& [k, v] : e.context()) m[k] = v;
+    return m;
+  };
+  for (const input_format* f : input_formats()) {
+    const std::string prefix = f->prefix;
+    SCOPED_TRACE(prefix);
+    fits_input input = open_input(p.string(), *f);
+    input.set_pread_observer([](std::uint64_t, std::size_t) { return EIO; });
+    const std::optional<stop_error> read = stop_of([&] { (void)read_input_bytes(input, big_budget); });
+    ASSERT_TRUE(read.has_value()) << "nessuno stop con la lettura in errore";
+    EXPECT_EQ(read->category(), error_category::io) << read->what();
+    EXPECT_EQ(read->code(), prefix + ".read") << read->what();
+    EXPECT_EQ(context(*read), (std::map<std::string, std::string>{{"errno", std::to_string(EIO)}}));
+    fs::permissions(dir, fs::perms::none);
+    const std::optional<stop_error> path = stop_of([&] { fits_detail::check_path_names(p.string(), input); });
+    fs::permissions(dir, fs::perms::owner_all);
+    ASSERT_TRUE(path.has_value()) << "nessuno stop con la directory non attraversabile";
+    EXPECT_EQ(path->category(), error_category::io) << path->what();
+    EXPECT_EQ(path->code(), prefix + ".fstat") << path->what();
+    EXPECT_EQ(context(*path),
+              (std::map<std::string, std::string>{{"percorso", p.string()}, {"errno", std::to_string(EACCES)}}));
+  }
 }
 
 TEST(Hash, stream_matches_one_shot_for_any_chunking) {

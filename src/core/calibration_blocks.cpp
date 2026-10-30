@@ -384,7 +384,7 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     json report = calibration_report(p, counts, invalid_pixels);
     for (std::size_t k = 0; k < 4; ++k) {
       sources[k]->check_identity();
-      reverify_input(specs[k]->path, nullptr, specs[k]->digest, {buffer.data(), buffer.size()},
+      reverify_input(specs[k]->path, fits_input_format(), nullptr, specs[k]->digest, {buffer.data(), buffer.size()},
                      [&jc] { jc.check_cancel(); });
     }
     const fits_stream_writer writer(p.out, invalid_pixels > 0);

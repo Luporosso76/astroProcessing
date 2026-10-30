@@ -32,6 +32,7 @@ add_library(astrocore STATIC
   error.cpp
   image.cpp
   fits.cpp
+  input_format.cpp
   fits_scan.cpp
   fits_header.cpp
   hash.cpp

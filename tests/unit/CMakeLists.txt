@@ -59,6 +59,17 @@ target_compile_definitions(test_conformance_gaps PRIVATE
 gtest_discover_tests(test_conformance_gaps NO_PRETTY_VALUES TEST_FILTER "*ConformanceGaps*:HashGaps.*"
   PROPERTIES LABELS fast)
 
+# T-M3BASE-20…22 (emendamento L1, unita' U0 di plans/M3a.md): lettura degli input indipendente dal formato. Il file
+# include test_conformance.cpp per il banco di prova; il filtro limita ctest ai casi nuovi.
+add_executable(test_conformance_format test_conformance_format.cpp)
+target_link_libraries(test_conformance_format PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_conformance_format PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_conformance_format PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_conformance_format NO_PRETTY_VALUES TEST_FILTER "*ConformanceFormat*"
+  PROPERTIES LABELS fast)
+
 # T-M3BASE-18: un job per ogni tipo registrato sotto strace, zero chiamate di rete.
 add_executable(conformance_network conformance_network.cpp)
 target_link_libraries(conformance_network PRIVATE astrocore)
@@ -179,6 +190,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_m1d_protocol.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance_gaps.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_conformance_format.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conformance_network.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 

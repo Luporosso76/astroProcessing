@@ -201,7 +201,7 @@ std::shared_ptr<const resource_plan> run_single_task(const node_spec& node, cons
   };
   spec.finalize = [&](job_context& jc) {
     pool_buffer work(jc.shared, static_cast<std::size_t>(shared_bytes));
-    reverify_input(path, &input, digest, {work.data(), work.size()}, [&jc] { jc.check_cancel(); });
+    reverify_input(path, fits_input_format(), &input, digest, {work.data(), work.size()}, [&jc] { jc.check_cancel(); });
   };
   job_scheduler scheduler(pool, system_affinity, resources ? scheduler_tuning_of(*resources) : scheduler_tuning{});
   (void)scheduler.run(plan, spec, cancel);

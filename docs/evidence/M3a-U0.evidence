@@ -1,0 +1,15 @@
+# Sorgente del blocco generato di M3a-U0.md (tools/evidence.py)
+file docs/contracts/BASE-confini.md
+file src/core/include/astro/input_format.hpp
+file src/core/input_format.cpp
+file src/core/include/astro/fits.hpp
+file src/core/fits.cpp
+file src/core/include/astro/hash.hpp
+file src/core/hash.cpp
+file src/core/include/astro/job_types.hpp
+file src/core/job_types.cpp
+file tests/unit/test_conformance_format.cpp
+file tests/unit/test_hash.cpp
+file tests/unit/test_conformance_gaps.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

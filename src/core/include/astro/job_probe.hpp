@@ -9,7 +9,8 @@ namespace astro::job_probe {
 // Si imposta prima del job e non cambia durante l'esecuzione; e' chiamato anche dai thread dei worker, quindi deve
 // essere thread-safe. Vuoto: nessun effetto. Punti e dettaglio:
 // - `node.build` (operator_id): costruzione di un node_spec;
-// - `input.open` (percorso): ingresso in open_fits_input; `input.read`: ogni lettura di un input aperto;
+// - `input.open` (percorso) e `input.open_format` ("<prefisso del formato>\t<percorso>"): ingresso in open_input, il
+//   protocollo di apertura unico; `input.read`: ogni lettura di un input aperto;
 // - `input.samples`: uso dei campioni di un input, con `ino:<inode>` del file aperto oppure `sha256:<digest>` dei byte
 //   decodificati da memoria (decodifica, righe, blocchi, anteprima, controlli per campione);
 // - `sched.plan` (job_plan serializzato): ingresso in job_scheduler::run; `sched.prepare`: prima di `prepare`;

@@ -14,6 +14,7 @@ namespace astro {
 
 class fits_input;
 struct fits_plan;
+struct input_format;
 
 constexpr std::size_t sha256_chunk_bytes = std::size_t{1} << 20;
 
@@ -74,21 +75,24 @@ void require_input_digest(const content_digest& found, const content_digest& exp
 // (BITPIX e scala), presenza di INVALID o VARIANCE integrity input.header_changed.
 void require_planned_header(const fits_plan& planned, const fits_plan& verified, const std::string& path);
 
-// Intero `input`, gia' aperto e letto per il piano `planned`, entro budget_bytes, prima che un campione sia
-// decodificato: `path` indica ancora il file aperto (fits_detail::check_path_names), digest verificato, header dei byte
-// verificati uguale a `planned`, file invariato dall'apertura (quindi ogni header letto per il piano e' del file
-// verificato).
+// Intero `input`, gia' aperto (e letto per il piano `planned`, se il formato ne ha uno), entro budget_bytes, prima che
+// un campione sia decodificato: `path` indica ancora il file aperto (fits_detail::check_path_names), digest verificato,
+// header dei byte verificati uguale a `planned`, file invariato dall'apertura (quindi ogni header letto per il piano e'
+// del file verificato). `planned` e' presente se e solo se il formato dell'input ha il piano degli header; senza piano
+// nessuna lettura precede la lettura intera. Il buffer restituito e' l'unico da passare alla decodifica.
 std::vector<std::uint8_t> read_verified_input(const fits_input& input, const std::string& path,
                                               const content_digest& expected, std::uint64_t budget_bytes,
-                                              const fits_plan& planned);
+                                              const fits_plan* planned);
 
 // Digest dell'input aperto a pezzi di `work` (non vuoto), con `check_cancel`, se presente, prima di ogni pezzo.
 content_digest digest_input(const fits_input& input, std::span<std::byte> work, const std::function<void()>& check_cancel);
 
-// Riverifica prima della pubblicazione: `path` riaperto (io input.missing) ha la dimensione attesa (integrity
-// input.size_changed) e il digest atteso, letto a pezzi di `work`, ed e' invariato durante la lettura; poi `opened`, se
-// presente, e' invariato dall'apertura (integrity input.modified, input.size_changed).
-void reverify_input(const std::string& path, const fits_input* opened, const content_digest& expected,
-                    std::span<std::byte> work, const std::function<void()>& check_cancel);
+// Riverifica prima della pubblicazione: `path` riaperto con `format`, il formato dichiarato del ruolo (io
+// input.missing, limite e codici di quel formato), ha la dimensione attesa (integrity input.size_changed) e il digest
+// atteso, letto a pezzi di `work`, ed e' invariato durante la lettura; poi `opened`, se presente (aperto con lo stesso
+// `format`), e' invariato dall'apertura (integrity input.modified, input.size_changed).
+void reverify_input(const std::string& path, const input_format& format, const fits_input* opened,
+                    const content_digest& expected, std::span<std::byte> work,
+                    const std::function<void()>& check_cancel);
 
 }  // namespace astro
