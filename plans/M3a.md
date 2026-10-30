@@ -6,7 +6,7 @@ Stato: **PLANNED**. Base: commit `311fb7a` (base comune I1–I4 chiusa, suite di
 
 Perimetro dal registro (`python3 -S tools/trace.py ids --stage M3.a`): F-IO-02, F-IO-03, F-IO-04, F-IO-08, G-CAL, G-OFFSET, G-PACK e la consegna M3.a. Testi di accettazione: F-IO-02 riga 1813, F-IO-03 riga 1814, F-IO-04 riga 1815, F-IO-08 riga 1819 del piano attivo; G-CAL, G-OFFSET, G-PACK righe 3559-3561; uscita §21.5 riga 2683; contratto del decoder §9.6 riga 1276.
 
-Fuori: F-IO-01, F-IO-05 e F-IO-10 (consegnati da M2, qui solo usati: `plans/M3.md` riga 18); esecuzione delle ricette `.b`, P-LOST nel job di calibrazione, T-M3A-CAL-03/04/05/09/10 e T-M3A-C01-04/05/08…11 (M3.c); master `.b` e T-M3A-CAL-07 (M3.b); debayer, coverage, maschere, alpha, `measure` (T-M3A-TYP-04…10, 13…18: M3.d, g, j, c); estratti 2MASS e SDSS (M3.p, q).
+Fuori: F-IO-01, F-IO-05 e F-IO-10 (consegnati da M2, qui solo usati: `plans/M3.md` riga 18); esecuzione delle ricette `.b`, P-LOST nel job di calibrazione, T-M3A-CAL-03/04/05/10, la parte M3.c di T-M3A-CAL-09 (preflight all'esecuzione) e T-M3A-C01-04/05/08…11 (M3.c); master `.b` e T-M3A-CAL-07 (M3.b); debayer, coverage, maschere, alpha, `measure` (T-M3A-TYP-04…10, 13, 14, 17: M3.d, g, j, c, s; T-M3A-TYP-15, 16 e 18 restano in M3.a secondo `docs/test-matrix.md`: U1b e U6); estratti 2MASS e SDSS (M3.p, q).
 
 ## Dipendenze (D.6)
 
@@ -21,6 +21,22 @@ Ciclo di `AGENTS.md` («Ciclo di un'unità»): test scritti da un agente diverso
 Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFFClientOpen` in memoria) dall'autore dei test, con pattern, `ActiveArea`, `BlackLevel`, `BlackLevelRepeatDim`, `WhiteLevel`, `LinearizationTable` noti: verità indipendente dal parser di LibRaw (ADR-08.b §6). Versione della specifica DNG di Adobe registrata nel record. Dati reali: `PUB-RAW-01` (8 file CC0 con SHA-256, `/opt/workspace/astroProcessor/data/public/raw-pixls-us/`, sola lettura), solo coerenza, nessuna verità sui campioni.
 
 ## Unità
+
+### Modelli per unità (AGENTS.md, «Modelli per competenza»; si legge prima di ogni delega)
+
+| Unità | Test (agente diverso dal codice) | Codice | Review |
+|---|---|---|---|
+| U0 | Sonnet | Opus (confine della base) | Codex `gpt-6-astra` |
+| U1 | Sonnet | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
+| U1b | Sonnet | Sonnet | Codex |
+| U2, U3 | Sonnet | Opus (numerica del decoder, fuzz) | Codex |
+| U4, U5 | Sonnet | Sonnet | Codex |
+| U6, U7 | Opus (predicati e compatibilità) | Opus | Codex |
+| U8a, U8b, U9 | Sonnet | Sonnet | Codex |
+| U10 | Sonnet | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
+| U11 | Opus (oracolo HEALPix) | Sonnet | Codex |
+
+Ricognizione, allineamento di piani e record, controlli di stato: Haiku. Testi e lingue: Gemini via `agy`. Il coordinatore copia il modello da questa tabella nella chiamata di delega.
 
 ### U0. Lettura degli input RAW nel confine (base, non slice) — ~120 righe
 
@@ -37,6 +53,11 @@ ID: F-IO-02 (`decided_by` ADR-03.b), F-IO-04.
 3. Scrittura FITS di un'immagine con `decoder_state` → `fits.decoder_state`, nessun buffer (§b.2) — scrittore FITS (`fits.cpp`).
 4. `capture_time_libraw` e keyword `ASTRTSTP` (§b.1) — `fits_header.cpp`.
 Test: T-M3A-TYP-01, 02, 03, 12 (solo le coppie `decoder_state`). Uscita: test verdi, mutazioni sugli invarianti uccise.
+
+### U1b. Capacità di misura `measure` (ADR-03.b §b.13) — ~200 righe
+
+ID: tipi di §9.8 usati da G-CAL (stadio M3.a in `docs/test-matrix.md`). Proprietari: `image.hpp`/`image.cpp` (`measure`, `history_limits`, `measure_limits`, `merge_measure`), scrittore e lettore FITS (`ASTRMCAP`, `ASTRMLnn`).
+Test: T-M3A-TYP-15, 16. Uscita: test verdi, mutazioni rilevate.
 
 ### U2. Decoder puro: geometria, pattern, livelli (ADR-08.b §2.2–2.4, §2.6) — ~380 righe
 
@@ -81,7 +102,7 @@ ID: G-CAL. Proprietario: `calibration_analysis.cpp`, funzione di compatibilità 
 1. Stati `usable`/`excluded` per ruolo, unità, fase, linearità, layout, piedistallo, coverage (§b.2; C-01.b §2, §7).
 2. Compatibilità per coppia e per catena, lista chiusa dei motivi (§b.3).
 3. Compatibilità del decoder: campi strutturali, nero effettivo in interi a 64 bit contro `decoder_black_abs_tol_adu` obbligatorio senza default, `decoder_state_mixed` (§b.7).
-Test: T-M3A-CAL-08; T-M3A-C01-06; T-M3A-C01-07 (parte di analisi). Uscita: zero calcoli negli stop (contatore del `fault_injector`).
+Test: T-M3A-CAL-08; T-M3A-TYP-18 (tabella delle operazioni di ADR-03.b §b.14); T-M3A-C01-06; T-M3A-C01-07 (parte di analisi). Uscita: zero calcoli negli stop (contatore del `fault_injector`).
 
 ### U7. G-CAL, parte 2: predicati, ammissibili, default, selezione (ADR-16.b §b.1 punti 1-2, §b.4–b.6, §b.9) — ~400 righe
 
@@ -100,7 +121,7 @@ ID: F-IO-03. Bloccata finché il contratto non copre L2 e L5.
 2. Controlli di dimensioni, CFA, esposizione, gain, binning, filtro, temperatura, offset prima della scelta: delegati a U6/U7, nessuna copia.
 3. Proposta di sole ricette ammissibili e omissioni motivate (uscita di U7); input prestacked e RGB: nessuna ricetta di calibrazione, motivo `op.phase_blocked` (ADR-03.b §b.14).
 4. Dopo la scelta, mismatch → stop del ramo senza sostituzione, progetto riapribile (L5).
-Test: T-M3A-04 (batch con un campo incompatibile alla volta: motivo e proposta uguali all'oracle), T-M3A-05 (prestacked e RGB nel batch; ruolo cambiato dall'utente → nuova analisi), T-M3A-06 (file cambiato e stato del decoder cambiato dopo la scelta: stop del solo ramo con `run_branches`, altri rami completati, riapertura del progetto con stato logico identico).
+Test: T-M3A-CAL-09 parte M3.a (luce: `verify_selection` e stop del ramo, U8b; F-IO-03 tabella di L5); T-M3A-04 (batch con un campo incompatibile alla volta: motivo e proposta uguali all'oracle), T-M3A-05 (prestacked e RGB nel batch; ruolo cambiato dall'utente → nuova analisi), T-M3A-06 (file cambiato e stato del decoder cambiato dopo la scelta: stop del solo ramo con `run_branches`, altri rami completati, riapertura del progetto con stato logico identico).
 
 ### U9. F-IO-08: ricollegamento — stima ~300 righe, dopo la Lacuna L3
 

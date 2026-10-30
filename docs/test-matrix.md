@@ -107,8 +107,16 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-RAW-10 | NFR-SEC-04; ADR-08.b §2.5 (H5) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-11 | F-IO-04, §9.6; ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-12 | ADR-05 (chiave del nodo, determinismo); ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-PACK-01…09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
-| T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-PACK-01 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-02 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-03 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-04 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-05 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-06 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
+| T-M3A-PACK-07 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-08 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
+| T-M3A-PACK-09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | TEST SCRITTI, codice in corso |
 
 ## M3.entry: ID di lavoro di ADR-03.b
 
@@ -116,9 +124,9 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3A-TYP-01 | F-IO-02; ADR-03.b §b.1 (origine `decoder`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-TYP-02 | F-IO-02, §9.6; ADR-03.b §b.2 (`decoder_state`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-TYP-03 | F-IO-02; ADR-03.b §b.1 (`capture_time_libraw`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-01 | F-IO-02; ADR-03.b §b.1 (origine `decoder`) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
+| T-M3A-TYP-02 | F-IO-02, §9.6; ADR-03.b §b.2 (`decoder_state`) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
+| T-M3A-TYP-03 | F-IO-02; ADR-03.b §b.1 (`capture_time_libraw`) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
 | T-M3A-TYP-04 | F-CAL-08, C-03; ADR-03.b §b.3 (`demosaic`, `sample_kind`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-05 | F-CAL-08; ADR-03.b §b.3 (keyword `ASTRD*`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-06 | ADR-17; ADR-03.b §b.4 (`variance_scope`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
@@ -127,7 +135,7 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 | T-M3A-TYP-09 | C-11, F-POST-08.a.1; ADR-03.b §b.7 (tipi distinti) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-10 | C-11, §7.14; ADR-03.b §b.7 (`mask_info`) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
-| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi; coppia «solo provenienza» di §b.15) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-12 | ADR-03.b §b.8 (`equivalent_content` sui campi nuovi; coppia «solo provenienza» di §b.15) | ADR-03.b | M3.a | TEST SCRITTI, codice in corso |
 | T-M3A-TYP-13 | §8.6.2, C-10.b; ADR-03.b §b.12 (`alpha_plane`, tipi distinti) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
 | T-M3A-TYP-14 | NFR-EXP-01.b, C-10.b; ADR-03.b §b.12 (`derive_alpha`) | ADR-03.b | M3.s | PIANIFICATO — non eseguito |
 | T-M3A-TYP-15 | §9.8; ADR-03.b §b.13 (`measure`, keyword `ASTRMCAP`/`ASTRMLnn`) | ADR-03.b | M3.a | PIANIFICATO — non eseguito |
@@ -273,6 +281,9 @@ Definita in `docs/contracts/BASE-confini.md` §3; eseguita una volta sul preset 
 | T-M3BASE-17 | OB-17 | `Types/Conformance.T_M3BASE_17_*`, `ConformanceSource.T_M3BASE_17_*` | verde |
 | T-M3BASE-18 | OB-18 | `T-M3BASE-18.network` | verde |
 | T-M3BASE-19 | OB-19 | `Types/ConformanceCheckpoint.T_M3BASE_19_*` | verde (debito OB-19 non osservabile al confine, vedi il record) |
+| T-M3BASE-20 | OB-11, OB-12 (L1) | `ConformanceFormat.T_M3BASE_20_*` | verde (U0) |
+| T-M3BASE-21 | OB-11 (L1) | `ConformanceFormat.T_M3BASE_21_*` | verde (U0) |
+| T-M3BASE-22 | OB-11, OB-12 (L1) | `ConformanceFormatRole.T_M3BASE_22_*` | verde (U0) |
 | Registro | §3.1 punto 3 | `T-M3BASE.job_types_registry`, `T-M3BASE.job_types_registry_negative` | verde |
 
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)
@@ -344,3 +355,18 @@ Fonte: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, appendice D. Piano di lavoro: `pla
 | M2.f | M2.f | 3495 | 2672 | aggregato: M2.g, NFR-TEST-01.a (archi 4219, 4220) | — | `M2-f.md`, `M2-gate.md` | CHIUSO al gate: tutti i componenti M2 del registro passano nell'esecuzione finale (`M2-gate.md`) | abilitata in R0.b, chiusa al gate |
 | M2.g | M2.g | 3496 | 2673 | aggregato: M1, `decided_by` ADR-03.a…ADR-17.a (archi 4210-4218) | — | `M2-g.md`, `M2-gate.md` | CHIUSO al gate: tutti i componenti M2 del registro passano nell'esecuzione finale (`M2-gate.md`) | abilitata in R0.b, chiusa al gate |
 | G-STOP | M2.d | 3566 | 3571 | T-FBK-01 (parte M2); `Simd.T_M2R5_07_job_with_ftz_*`, `Simd.T_M2R5_07_denormal_mask_off_*` (R5.c); `Simd.T_M2R5_07_every_exception_unmasked_*`, `Job.T_M2B_12_*`, `Store.T_M2B_12_*`, `Thumbnail.T_M2R1_04_T_M2R1_11_*` (R5.d) | — | `M2-e.md`, `M2-R32.md`, `M2-R5c.md`, `M2-R5d.md`, `M2-gate.md` | CHIUSO al gate: test nominati passati nell'esecuzione finale dev e release (`M2-gate.md`); i test di R5.c e R5.d entrano nella prossima esecuzione finale | R3.b, R5.c, R5.d |
+
+## M3.a: test pianificati
+
+Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime restano la casa degli altri ID). Definiti nei contratti di M3.a e nel piano `plans/M3a.md`, unità per unità. Le righe `PIANIFICATO` non sono eseguite; `TEST SCRITTI, codice in corso` indica test rossi scritti prima del codice e non ancora verdi.
+
+| ID | Requisito o gate | Contratto | Unità | Stato |
+|---|---|---|---|---|
+| T-M3A-RAW-13 | F-IO-04 | ADR-08.b §2.6 (emendamento L4) | U4 | PIANIFICATO |
+| T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
+| T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
+| T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
+| T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
+| T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
+| T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
+| T-M3A-02 | F-IO-04 | nessun contratto: plans/M3a.md U4 | U4 | PIANIFICATO |
