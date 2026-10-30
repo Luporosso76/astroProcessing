@@ -253,7 +253,7 @@ Confini condivisi:
 
 **OB-20 — `measure` presente in ogni uscita di operatore.**
 - Testo: ogni immagine prodotta da un operatore registrato porta il campo `measure` (anche vuoto) e `operator_output_invariants_hold` è falso se manca; con `demosaic` vale anche la regola dei codici `samples.interpolated` e `variance.fixed_weight_approximation`.
-- Fonte: ADR-03.b §b.4 («`operator_output_invariants_hold`: `measure` presente e valido in ogni immagine prodotta da un operatore»).
+- Fonte: ADR-03.b §b.13 («`operator_output_invariants_hold`: `measure` presente e valido in ogni immagine prodotta da un operatore»).
 - Proprietario: `operator_output_invariants_hold` (`image.cpp`), chiamata dalla suite di conformità sull'uscita di ogni tipo registrato; ogni operatore imposta `measure` nella propria uscita.
 - Nasce: costruzione dell'immagine di uscita dell'operatore. Si estingue: pubblicazione dell'uscita.
 - Stato: DEBITO (intervento I6). Oggi `measure` assente non rende falso l'invariante.
