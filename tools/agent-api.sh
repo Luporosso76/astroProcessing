@@ -28,11 +28,19 @@ case "$workdir/" in "$root"/*) ;; *) echo "directory di lavoro fuori dal progett
 [[ "$budget" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo "budget non valido: '$budget'" >&2; exit 2; }
 mkdir -p "$(dirname "$out")"
 
-rc=0
-(cd "$workdir" && ANTHROPIC_API_KEY="$(cat "$key")" TMPDIR="$root/tmp" timeout 7200 claude -p --model "$model" \
-  --permission-mode auto --max-budget-usd "$budget" --output-format json < "$prompt") > "$out" 2> "$out.stderr" || rc=$?
+# La chiave arriva a claude tramite apiKeyHelper, non per variabile d'ambiente: i comandi che l'agente lancia non la
+# ereditano. Lettura e scrittura di .secrets/ negate all'agente. Limite: un comando Bash che legge il file non è
+# bloccato da queste regole; contano la modalità auto e il tetto di spesa della chiave impostato nella console.
+settings="$(python3 -I -S -c 'import json, sys; k, s = sys.argv[1], sys.argv[2]
+print(json.dumps({"apiKeyHelper": "cat " + k, "permissions": {"deny": [f"Read({s}/**)", f"Edit({s}/**)"]}}))' \
+  "$key" "$root/.secrets")"
 
-verdict="$(python3 -S - "$out" <<'EOF'
+rc=0
+(cd "$workdir" && env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN TMPDIR="$root/tmp" timeout 7200 claude -p \
+  --model "$model" --settings "$settings" --permission-mode auto --max-budget-usd "$budget" --output-format json \
+  < "$prompt") > "$out" 2> "$out.stderr" || rc=$?
+
+verdict="$(cd "$root" && python3 -I -S - "$out" <<'EOF'
 import json, sys
 try:
     with open(sys.argv[1], encoding="utf-8") as f:
