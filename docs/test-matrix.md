@@ -256,15 +256,15 @@ Definita in `docs/contracts/BASE-confini.md` §3; eseguita una volta sul preset 
 |---|---|---|---|
 | T-M3BASE-01 | OB-01 | `Types/Conformance.T_M3BASE_01_*` | verde |
 | T-M3BASE-02 | OB-02 | `Types/Conformance.T_M3BASE_02_*` | verde |
-| T-M3BASE-03 | OB-03 | `ConformanceWorkflow.T_M3BASE_03_*` | rosso atteso, debito OB-03 |
-| T-M3BASE-04 | OB-04 | `Types/Conformance.T_M3BASE_04_*` | rosso atteso, debito OB-04 (`cache.rebuild`); verde gli altri tipi |
-| T-M3BASE-05 | OB-05 | `Types/ConformanceScheduler.T_M3BASE_05_*` | rosso atteso, debito OB-05 (calibrazione intera e a blocchi, master) |
+| T-M3BASE-03 | OB-03 | `ConformanceWorkflow.T_M3BASE_03_*` | verde (I4) |
+| T-M3BASE-04 | OB-04 | `Types/Conformance.T_M3BASE_04_*` | verde (I1) |
+| T-M3BASE-05 | OB-05 | `Types/ConformanceScheduler.T_M3BASE_05_*` | verde (I3; dall'I3 anche import, miniatura, ricostruzione) |
 | T-M3BASE-06 | OB-06 | `Types/Conformance.T_M3BASE_06_*` | verde |
-| T-M3BASE-07 | OB-07 | `Types/Conformance.T_M3BASE_07_*` | rosso atteso, debito OB-07 (import, miniatura, ricostruzione anche OB-08; calibrazione intera e a blocchi); verde master |
-| T-M3BASE-08 | OB-08 | `Types/Conformance.T_M3BASE_08_*` | rosso atteso, debito OB-08 (import, miniatura, ricostruzione); verde calibrazione e master |
-| T-M3BASE-09 | OB-09 | `Types/Conformance.T_M3BASE_09_*` | rosso atteso, debito OB-09 (import, miniatura, ricostruzione); verde calibrazione e master |
-| T-M3BASE-10 | OB-10 | `Types/Conformance.T_M3BASE_10_*` | rosso atteso, debito OB-10 (tutti i tipi) |
-| T-M3BASE-11 | OB-11 | `Types/Conformance.T_M3BASE_11_*` | rosso atteso, debito OB-11 (tutti i tipi; import, miniatura, ricostruzione anche OB-08) |
+| T-M3BASE-07 | OB-07 | `Types/Conformance.T_M3BASE_07_*` | verde (I2) |
+| T-M3BASE-08 | OB-08 | `Types/Conformance.T_M3BASE_08_*` | verde (I2) |
+| T-M3BASE-09 | OB-09 | `Types/Conformance.T_M3BASE_09_*` | verde (I2) |
+| T-M3BASE-10 | OB-10 | `Types/Conformance.T_M3BASE_10_*` | verde (I1) |
+| T-M3BASE-11 | OB-11 | `Types/Conformance.T_M3BASE_11_*` | verde (I2 per i tipi di I/O, I3 per calibrazione e master) |
 | T-M3BASE-12 | OB-12 | `Types/Conformance.T_M3BASE_12_*` e verifica (e) di ogni caso | verde |
 | T-M3BASE-13 | OB-13 | `Types/Conformance.T_M3BASE_13_*` | verde |
 | T-M3BASE-14 | OB-14 | `Types/Conformance.T_M3BASE_14_*` | verde |

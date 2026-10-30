@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -82,6 +83,14 @@ struct job_files_result {
   std::optional<json> details = std::nullopt;
   // Piano scelto da plan_resources ed eseguito: run_job_files lo registra in details.resource_plan.
   std::shared_ptr<const resource_plan> plan = nullptr;
+  // Checkpoint e staging nominato del job nella directory di scratch (OB-19): restano dopo stop e annullamento, come
+  // stato del resume; run_job_files li rimuove solo dopo un commit_job riuscito.
+  struct scratch_state {
+    std::filesystem::path dir;
+    std::string checkpoint_name;  // remove_checkpoint
+    std::string staging_name;     // remove_named_spill_file
+  };
+  std::optional<scratch_state> scratch = std::nullopt;
 };
 
 // Richiesta del job al runner (docs/contracts/BASE-confini.md, OB-09 e OB-10).
@@ -109,6 +118,8 @@ struct job_request {
 // provenance di un job riuscito porta details.cpu se il backend del nodo e' `cpu_*` (backend e `simd` dal nodo,
 // capacita' lette dalla CPU) e details.resource_plan se `work` dichiara il piano. Una chiave gia' presente nei
 // `details` dell'operatore e' un arresto invalid_input dag.param_duplicate_key.
+// Con `scratch` dichiarato da `work`, dopo commit_job riuscito si rimuovono checkpoint e staging; un errore della
+// rimozione (io sched.checkpoint_remove, spill.staging_remove) si propaga col job gia' `completed` e pubblicato.
 job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
                           const std::function<job_files_result(const job_record&)>& work,
                           const std::optional<budget_snapshot>& budget = std::nullopt,

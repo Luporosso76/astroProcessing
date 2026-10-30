@@ -15,22 +15,22 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-05-dag-provenance.md` | `a8696aa524e860dae2c1ff6d984530fe90963fef5ad9dee6a3b0254547da7cc4` |
 | `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
-| `src/core/calibration_job.cpp` | `35824e7b097097ad0a256037436f2644b6a1a50bae2ce656cb80fe4e99c15c6b` |
+| `src/core/calibration_job.cpp` | `2df6c380778cd9d89fe255edfa0f019369122f2b46d781b7abc172a294f8959e` |
 | `src/core/import_job.cpp` | `f524e0c1b79a5b1525845ab9615abb8dffc8abec6380e3d174c161192a57e123` |
-| `src/core/include/astro/job.hpp` | `e594f0e97270251ee9a73983a0c55d3b3e219615cf6c71872b1fbe0b90f49cc0` |
+| `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
 | `src/core/include/astro/provenance.hpp` | `9d95b56f73c0a046c18c737013fa8dfceea31f43a3c959ec89aaa9e54f98417d` |
-| `src/core/job.cpp` | `f9681bccbd5d14b4bdec111fb72f1213b5f802cf249a0e78448f8855acc77805` |
+| `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
 | `src/core/master.cpp` | `062e3f341aeb95b9f9d8aa9e233a7bfa8cee4f9af0f4d56a56f2ae683940dcb2` |
 | `src/core/provenance.cpp` | `ba81e4469d42f3836dc7aa3ab5ef53509d17ad3526a5dca94e4c206e7e7db55e` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tests/unit/test_import.cpp` | `1da08927791cc7e1a1df0f238e77bfdb50c724ec1afff7d0ac52eef28f228f79` |
 | `tests/unit/test_job.cpp` | `d01fee9cd6c8b2219a033df916676311c5f9fc59c8d9a01fac4d8b64614a6da1` |
 | `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
-| `tests/unit/test_store.cpp` | `128770486cc46b2d1fc2fd6bc54e74b1215a5373957fd16c336c5c48280059a2` |
+| `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 | `tests/unit/test_store_review.cpp` | `23e1dc408879523e5fe06725dd029ee0968f07ef21d7ee76aac76381987d034e` |
 
-- Test release (`tmp/release-junit.xml`): totali 608, fast 601, slow 7, falliti 1
-- Test dev (`tmp/dev-junit.xml`): totali 602, fast 602, slow 0, falliti 1
+- Test release (`tmp/release-junit.xml`): totali 611, fast 604, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 605, fast 605, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

@@ -89,18 +89,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `f337acc5a5a0780bdaf784ffe9a87b62fd36c6ef902e0bf98c578ba8d46d63bb` |
+| `docs/contracts/BASE-confini.md` | `d7bd08eb722c826d25e89f436742dc3f3bb21ab1ff1e2dfd31d391447d61221c` |
 | `src/core/calibration_blocks.cpp` | `52ef8cb2d248f4f2905ec2dbbd4ca3dbfe7912a828326bffee8b496db76d58c5` |
-| `src/core/calibration_job.cpp` | `35824e7b097097ad0a256037436f2644b6a1a50bae2ce656cb80fe4e99c15c6b` |
+| `src/core/calibration_job.cpp` | `2df6c380778cd9d89fe255edfa0f019369122f2b46d781b7abc172a294f8959e` |
 | `src/core/cpu_dispatch.cpp` | `73c737a9f1ce03e297be90126d47d85c1fe5f451fbdacde579478bb5bff367ae` |
 | `src/core/import_job.cpp` | `f524e0c1b79a5b1525845ab9615abb8dffc8abec6380e3d174c161192a57e123` |
 | `src/core/include/astro/cpu_dispatch.hpp` | `21c32fbd9c9416789ec7d31bf3c561d631b460a9ae9ce4162a1e7aab4fb7adb2` |
-| `src/core/include/astro/job.hpp` | `e594f0e97270251ee9a73983a0c55d3b3e219615cf6c71872b1fbe0b90f49cc0` |
-| `src/core/job.cpp` | `f9681bccbd5d14b4bdec111fb72f1213b5f802cf249a0e78448f8855acc77805` |
+| `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
+| `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
 | `src/core/master.cpp` | `062e3f341aeb95b9f9d8aa9e233a7bfa8cee4f9af0f4d56a56f2ae683940dcb2` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 | `tools/lint-allowlist.txt` | `8c0deba2fa1011e5938f8b50a9633acedb5652e513e35080b3bb9bae2ff444b4` |
 
-- Test release (`tmp/release-junit.xml`): totali 608, fast 601, slow 7, falliti 1
-- Test dev (`tmp/dev-junit.xml`): totali 602, fast 602, slow 0, falliti 1
+- Test release (`tmp/release-junit.xml`): totali 611, fast 604, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 605, fast 605, slow 0, falliti 0
 <!-- evidence:end -->

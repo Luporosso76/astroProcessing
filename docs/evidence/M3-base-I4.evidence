@@ -1,0 +1,14 @@
+# Sorgente del blocco generato di M3-base-I4.md (tools/evidence.py)
+file docs/contracts/BASE-confini.md
+file src/core/stop_internal.hpp
+file src/core/job.cpp
+file src/core/include/astro/job.hpp
+file src/core/calibration_job.cpp
+file src/core/include/astro/sqlite_dag_store.hpp
+file src/core/sqlite_dag_store.cpp
+file src/core/include/astro/workflow.hpp
+file src/core/workflow.cpp
+file tests/unit/test_store.cpp
+file tests/unit/test_conformance.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

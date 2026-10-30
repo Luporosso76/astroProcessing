@@ -6,10 +6,17 @@
 #include <optional>
 #include <span>
 
+#include "astro/checkpoint.hpp"
 #include "astro/cpu_dispatch.hpp"
 #include "astro/resources.hpp"
+#include "astro/spill.hpp"
+#include "stop_internal.hpp"
 
 namespace astro {
+
+using stopint::cause_of;
+using stopint::rethrow_with_record_failure;
+using stopint::what_of;
 
 int exit_code_for(error_category category) noexcept {
   return category == error_category::cancelled ? exit_code_cancelled : exit_code_stop;
@@ -30,8 +37,9 @@ stored_file write_provenance(sqlite_dag_store& store, const provenance_record& p
   return write_provenance_text(store, provenance_canonical(provenance));
 }
 
-// Senza allocazioni: il puntatore resta valido finche' `ep` e' vivo.
-const char* what_of(const std::exception_ptr& ep) noexcept {
+}  // namespace
+
+const char* stopint::what_of(const std::exception_ptr& ep) noexcept {
   try {
     std::rethrow_exception(ep);
   } catch (const std::exception& ex) {
@@ -40,6 +48,8 @@ const char* what_of(const std::exception_ptr& ep) noexcept {
     return "eccezione sconosciuta";
   }
 }
+
+namespace {
 
 void persist_provenance_text(sqlite_dag_store& durable, const job_record& job, const std::string& text) {
   const stored_file file = write_provenance_text(durable, text);
@@ -151,8 +161,9 @@ job_outcome stopped(dag_store& store, sqlite_dag_store* durable, const job_recor
   std::rethrow_exception(original);
 }
 
-// Causa registrata per un arresto prima del lavoro: lo stop_error stesso, oppure integrity job.unexpected_exception.
-stop_error cause_of(const std::exception_ptr& ep) {
+}  // namespace
+
+stop_error stopint::cause_of(const std::exception_ptr& ep) {
   try {
     std::rethrow_exception(ep);
   } catch (const stop_error& e) {
@@ -162,10 +173,9 @@ stop_error cause_of(const std::exception_ptr& ep) {
   }
 }
 
-// Rilancia `original` dopo una registrazione fallita: uno stop_error con stessa categoria, codice, messaggio e contesto
-// piu' `registrazione_arresto` con l'errore secondario; ogni altra eccezione invariata. Se il contesto non si puo'
-// aggiungere (memoria esaurita) si rilancia lo stop originale invariato: la diagnosi secondaria e' gia' su stderr.
-[[noreturn]] void rethrow_with_record_failure(const std::exception_ptr& original, const char* secondary) {
+// Se il contesto non si puo' aggiungere (memoria esaurita) si rilancia lo stop originale invariato: la diagnosi
+// secondaria e' gia' su stderr.
+[[noreturn]] void stopint::rethrow_with_record_failure(const std::exception_ptr& original, const char* secondary) {
   try {
     std::rethrow_exception(original);
   } catch (const stop_error& e) {
@@ -180,6 +190,8 @@ stop_error cause_of(const std::exception_ptr& ep) {
     throw;
   }
 }
+
+namespace {
 
 // Arresto al confine prima del lavoro del job (NFR-FBK-01.a, ADR-05): registra `original` e lo rilancia invariato. Lo
 // stop_error e' la causa; ogni altra eccezione si registra come integrity job.unexpected_exception. Senza `job` il job si
@@ -284,6 +296,7 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
   const node_spec spec = node_of(store, &store, job);
   std::vector<std::string> warnings;
   std::optional<provenance_record> provenance;
+  std::optional<job_files_result::scratch_state> scratch;
   try {
     // Nodo della richiesta uguale a quello dello slot prima di `work`, quindi prima di aprire un input (OB-10).
     if (request.node) {
@@ -296,6 +309,7 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
     }
     job_files_result result = job_probe::run_work(job, work);
     warnings = std::move(result.warnings);
+    scratch = std::move(result.scratch);
     if (cancel != nullptr && cancel->requested()) {
       throw stop_error(error_category::cancelled, "sched.cancelled", "annullamento richiesto prima della pubblicazione");
     }
@@ -320,6 +334,11 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
     return stopped(store, &store, job, e, spec, std::move(warnings), recorded);
   } catch (...) {
     unexpected(store, &store, job, spec, std::move(warnings), recorded);
+  }
+  // Solo dopo commit_job riuscito (OB-19); fuori dal try: il job e' gia' completed, l'errore si propaga invariato.
+  if (scratch) {
+    remove_checkpoint(scratch->dir, scratch->checkpoint_name);
+    remove_named_spill_file(scratch->dir, scratch->staging_name);
   }
   return job_outcome{0, *store.get_job(job.id), std::nullopt, std::move(*provenance), std::nullopt, std::nullopt};
 }

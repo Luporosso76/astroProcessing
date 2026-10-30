@@ -458,6 +458,14 @@ std::vector<std::string> sqlite_dag_store::apply_recipe(const std::vector<resolv
 }
 
 void sqlite_dag_store::put_setting(const std::string& key, const std::string& value_canonical) {
+  write_setting(key, value_canonical, true);
+}
+
+void sqlite_dag_store::insert_setting(const std::string& key, const std::string& value_canonical) {
+  write_setting(key, value_canonical, false);
+}
+
+void sqlite_dag_store::write_setting(const std::string& key, const std::string& value_canonical, bool replace) {
   require_writable();
   if (key.empty()) {
     throw stop_error(error_category::invalid_input, "store.bad_setting", "chiave di impostazione vuota");
@@ -468,6 +476,13 @@ void sqlite_dag_store::put_setting(const std::string& key, const std::string& va
   }
   std::lock_guard lock(mutex_);
   transaction tx(db_);
+  if (!replace) {
+    statement present(db_, "SELECT 1 FROM settings WHERE key=?1");
+    present.bind(1, key);
+    if (present.step()) {
+      throw stop_error(error_category::invalid_input, "store.setting_exists", "impostazione gia' presente", {{"key", key}});
+    }
+  }
   statement st(db_, "INSERT INTO settings(key, value_canonical) VALUES(?1,?2) "
                     "ON CONFLICT(key) DO UPDATE SET value_canonical=excluded.value_canonical");
   st.bind(1, key).bind(2, value_canonical).run();

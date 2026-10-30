@@ -255,6 +255,8 @@ class sqlite_dag_store : public dag_store {
 
   // `settings`: `value_canonical` deve essere JSON canonico (altrimenti invalid_input store.setting_not_canonical).
   void put_setting(const std::string& key, const std::string& value_canonical);
+  // Come put_setting senza sostituzione: chiave gia' presente = invalid_input store.setting_exists, nulla scritto.
+  void insert_setting(const std::string& key, const std::string& value_canonical);
   std::optional<std::string> get_setting(const std::string& key) const;
 
   // Registra l'originale con la sua identita' (dev, ino) letta con stat. Assente: io input.missing; non regolare:
@@ -299,6 +301,8 @@ class sqlite_dag_store : public dag_store {
   // `expected_node`: se non nullo deve coincidere con il nodo del job (invalid_input dag.artifact_node_mismatch).
   std::vector<artifact_record> commit_locked(std::uint64_t job_id, const std::vector<stored_file>& files,
                                              const std::string* expected_node);
+  // put_setting (`replace`) e insert_setting.
+  void write_setting(const std::string& key, const std::string& value_canonical, bool replace);
 
   // Chiamare con mutex_ preso.
   void check_fault(std::string_view point) const;

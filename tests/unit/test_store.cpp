@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include "astro/workflow.hpp"
 #include "store_test_support.hpp"
 
 namespace {
@@ -649,6 +650,120 @@ TEST(Store, T_M2B_12_cancelled_stop_before_work_keeps_the_resume_context) {
   EXPECT_EQ(doc.find("state")->as_string(), "cancelled");
   EXPECT_EQ(canonical_json(*doc.find("resume")), canonical_json(resume));
   EXPECT_EQ(doc.find("stop")->find("code")->as_string(), "sched.cancelled");
+}
+
+// OB-03: insert_setting non sostituisce, cosi' un record di arresto del workflow non ne copre un altro.
+TEST(Store, insert_setting_refuses_an_existing_key_and_keeps_the_value) {
+  auto store = make_project("i4set");
+  store->insert_setting("k", "{\"a\":1}");
+  EXPECT_STOP(store->insert_setting("k", "{\"a\":2}"), error_category::invalid_input, "store.setting_exists");
+  EXPECT_EQ(store->get_setting("k"), std::optional<std::string>("{\"a\":1}"));
+}
+
+workflow refused_workflow() {
+  const node_spec node("op.seed", 1, 1, params_of(1.0), {}, sample_type::f64, "cpu_scalar", std::nullopt);
+  return workflow{"wf", {workflow_step{"s", node, []() -> job_outcome { throw std::runtime_error("passo eseguito"); }}},
+                  nullptr};
+}
+
+std::string stop_key(const workflow& wf, int execution) {
+  json steps = json::array();
+  for (const auto& s : wf.steps) {
+    json o = json::object();
+    o.set("slot_name", json::string(s.slot_name));
+    o.set("node_key", json::string(s.node.key()));
+    steps.push(std::move(o));
+  }
+  json doc = json::object();
+  doc.set("format", json::string(workflow_format));
+  doc.set("name", json::string(wf.name));
+  doc.set("steps", std::move(steps));
+  const std::string c = canonical_json(doc);
+  return std::string("workflow_stop.") + sha256_hex({reinterpret_cast<const std::uint8_t*>(c.data()), c.size()}) + "." +
+         std::to_string(execution);
+}
+
+bool only_text_and_integers(const json& v) {
+  switch (v.type()) {
+    case json::kind::string:
+    case json::kind::integer:
+      return true;
+    case json::kind::array:
+    case json::kind::object:
+      return std::all_of(v.items().begin(), v.items().end(), only_text_and_integers);
+    default:
+      return false;
+  }
+}
+
+stop_error refusal_of(const std::function<void()>& call) {
+  try {
+    call();
+  } catch (const stop_error& e) {
+    return e;
+  }
+  throw std::runtime_error("rifiuto atteso");
+}
+
+// Contesto del record: coppie [chiave, valore] nell'ordine dell'eccezione.
+void expect_context(const json& record, const stop_error& e) {
+  const json* ctx = record.find("context");
+  ASSERT_NE(ctx, nullptr);
+  ASSERT_EQ(ctx->items().size(), e.context().size());
+  for (std::size_t i = 0; i < e.context().size(); ++i) {
+    const json& pair = ctx->items()[i];
+    ASSERT_EQ(pair.items().size(), 2u);
+    EXPECT_EQ(pair.items()[0].as_string(), e.context()[i].first);
+    EXPECT_EQ(pair.items()[1].as_string(), e.context()[i].second);
+  }
+}
+
+// OB-03: ogni rifiuto ha il proprio record, numerato per esecuzione; nessuno sostituisce il precedente.
+TEST(Store, every_workflow_refusal_leaves_its_own_stop_record) {
+  auto store = make_project("i4wfstop");
+  const workflow wf = refused_workflow();
+  const stop_error unknown = refusal_of([&] { (void)resume_workflow(*store, wf); });
+  const stop_error target = refusal_of([&] { (void)run_workflow(*store, wf); });
+  EXPECT_EQ(unknown.code(), "resume.unknown_workflow");
+  EXPECT_EQ(target.code(), "workflow.slot_target");
+  const std::optional<std::string> first = store->get_setting(stop_key(wf, 1));
+  const std::optional<std::string> second = store->get_setting(stop_key(wf, 2));
+  ASSERT_TRUE(first.has_value());
+  ASSERT_TRUE(second.has_value());
+  EXPECT_FALSE(store->get_setting(stop_key(wf, 3)).has_value());
+  const json a = parse_json(*first);
+  const json b = parse_json(*second);
+  EXPECT_EQ(a.find("operation")->as_string(), "resume");
+  EXPECT_EQ(a.find("code")->as_string(), "resume.unknown_workflow");
+  EXPECT_EQ(a.find("execution")->as_integer(), 1);
+  EXPECT_EQ(b.find("operation")->as_string(), "run");
+  EXPECT_EQ(b.find("code")->as_string(), "workflow.slot_target");
+  EXPECT_EQ(b.find("category")->as_string(), "invalid_input");
+  EXPECT_EQ(b.find("execution")->as_integer(), 2);
+  EXPECT_TRUE(only_text_and_integers(a)) << *first;
+  EXPECT_TRUE(only_text_and_integers(b)) << *second;
+  expect_context(a, unknown);
+  expect_context(b, target);
+}
+
+// OB-03: record non scrivibile (store in sola lettura): si propaga l'arresto originale con `registrazione_arresto`.
+TEST(Store, workflow_refusal_on_a_read_only_store_propagates_the_original_stop) {
+  fs::path dir;
+  make_project("i4wfro", &dir).reset();
+  auto store = sqlite_dag_store::open(dir, open_intent::read_only);
+  testing::internal::CaptureStderr();
+  try {
+    (void)resume_workflow(*store, refused_workflow());
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.code(), "resume.unknown_workflow");
+    EXPECT_EQ(e.category(), error_category::resume_mismatch);
+    ASSERT_FALSE(e.context().empty());
+    EXPECT_EQ(e.context().front().first, "workflow");
+    EXPECT_EQ(e.context().back().first, "registrazione_arresto");
+  }
+  const std::string err = testing::internal::GetCapturedStderr();
+  EXPECT_NE(err.find("registrazione dell'arresto del workflow fallita"), std::string::npos) << err;
 }
 
 }  // namespace

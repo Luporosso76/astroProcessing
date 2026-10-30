@@ -336,13 +336,17 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     if (chosen_plan) result.plan = std::make_shared<const resource_plan>(*chosen_plan);
     return result;
   };
-  job_outcome outcome = run_job_files(store, slot_name, work, budget, &cancel, request);
-  // Checkpoint e staging restano dopo stop e annullamento (stato del resume); dopo la pubblicazione si rimuovono.
-  if (outcome.exit_code == 0 && options.checkpoint) {
-    remove_checkpoint(options.resources->scratch->dir, options.checkpoint->name);
-    remove_named_spill_file(options.resources->scratch->dir, options.checkpoint->name + ".stage");
-  }
-  return outcome;
+  // Checkpoint e staging del job: li rimuove run_job_files dopo la pubblicazione riuscita (OB-19). `work` ritorna solo
+  // dopo il controllo calib.checkpoint_scratch.
+  const auto declared = [&](const job_record& job) {
+    job_files_result result = work(job);
+    if (options.checkpoint) {
+      result.scratch = job_files_result::scratch_state{options.resources->scratch->dir, options.checkpoint->name,
+                                                       options.checkpoint->name + ".stage"};
+    }
+    return result;
+  };
+  return run_job_files(store, slot_name, declared, budget, &cancel, request);
 }
 
 }  // namespace astro
