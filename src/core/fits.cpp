@@ -450,16 +450,14 @@ void verify_structure(fitsfile* f, const std::vector<hdu_scan>& hdus) {
 
 namespace {
 
-[[noreturn]] void unexpected_eof(int fd, std::uint64_t expected_size) {
-  struct stat sb {};
-  if (::fstat(fd, &sb) != 0 || static_cast<std::uint64_t>(sb.st_size) != expected_size) {
-    fail(error_category::integrity, "input.size_changed", "la dimensione del file e' cambiata dopo fstat",
-         {{"atteso", std::to_string(expected_size)}});
-  }
+// Fine file prima della dimensione aperta: un file cambiato dall'apertura (dimensione, mtime o ctime) e' integrity
+// (input.size_changed, input.modified); solo un file con identita' invariata resta io input.short_read.
+[[noreturn]] void unexpected_eof(const fits_input& input) {
+  fits_detail::check_unchanged(input);
   fail(error_category::io, "input.short_read", "lettura incompleta con dimensione invariata");
 }
 
-void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::uint64_t expected_size,
+void pread_exact(const fits_input& input, int fd, std::uint64_t offset, void* dst, std::size_t n,
                  const fault_injector& fault, const fits_input::pread_observer& observer) {
   job_probe::notify("input.read");
   if (observer) {
@@ -477,7 +475,7 @@ void pread_exact(int fd, std::uint64_t offset, void* dst, std::size_t n, std::ui
       if (errno == EINTR) continue;
       fail(error_category::io, "fits.read", "pread non riuscita", {{"errno", std::to_string(errno)}});
     }
-    if (r == 0) unexpected_eof(fd, expected_size);
+    if (r == 0) unexpected_eof(input);
     done += static_cast<std::size_t>(r);
   }
 }
@@ -515,7 +513,7 @@ void read_exact(const fits_input& input, std::uint64_t offset, void* dst, std::s
     fail(error_category::invalid_input, "fits.malformed", "lettura oltre la fine del file",
          {{"offset", std::to_string(offset)}, {"lunghezza", std::to_string(n)}});
   }
-  pread_exact(input.fd_, offset, dst, n, input.size_, input.fault_, input.observer_);
+  pread_exact(input, input.fd_, offset, dst, n, input.fault_, input.observer_);
 }
 
 void check_unchanged(const fits_input& input) {
@@ -587,7 +585,7 @@ fits_input open_fits_input(const std::string& path) {
 
 fits_plan plan_fits(const fits_input& input) {
   const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) {
-    pread_exact(input.fd_, offset, dst, n, input.size_, input.fault_, input.observer_);
+    pread_exact(input, input.fd_, offset, dst, n, input.fault_, input.observer_);
   };
   return analyse(input.size_, read).plan;
 }
@@ -609,7 +607,7 @@ std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_
          {{"dimensione", std::to_string(input.size_)}, {"budget", std::to_string(budget_bytes)}});
   }
   std::vector<std::uint8_t> buffer(static_cast<std::size_t>(input.size_));
-  pread_exact(input.fd_, 0, buffer.data(), buffer.size(), input.size_, input.fault_, input.observer_);
+  pread_exact(input, input.fd_, 0, buffer.data(), buffer.size(), input.fault_, input.observer_);
   std::uint8_t probe = 0;
   ssize_t extra;
   do {

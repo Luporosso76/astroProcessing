@@ -37,7 +37,8 @@ Prima di ogni uso numerico, il file si legge per intero in un buffer (dimensione
 | Digest o dimensione diversi dal record | `integrity` | `input.digest_mismatch` |
 | File assente | `io` | `input.missing` |
 | Dimensione del file cambiata rispetto a `fstat` (cresciuto, o fine file prima del previsto) | `integrity` | `input.size_changed` |
-| Lettura che restituisce meno byte senza cambio di dimensione | `io` | `input.short_read` |
+| Lettura che restituisce meno byte senza cambio di dimensione, mtime o ctime dall'apertura | `io` | `input.short_read` |
+| Lettura che restituisce meno byte con mtime o ctime cambiati dall'apertura (file riscritto durante la lettura) | `integrity` | `input.modified` |
 
 L'errore ferma solo i nodi che dipendono da quell'input; i rami indipendenti proseguono (T-M2B-09).
 

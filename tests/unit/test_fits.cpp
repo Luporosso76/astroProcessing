@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -437,6 +438,71 @@ TEST(Fits, T_M2A_short_read_with_unchanged_size_stops_as_io) {
     EXPECT_STOP(plan_fits(in), error_category::io, "input.short_read");
     EXPECT_EQ(calls, 1);
   }
+}
+
+TEST(Fits, T_M2A_short_read_after_a_rewrite_stops_as_modified) {
+  const std::string path = tmp_file("short_read_rewrite.fits");
+  const fx::synth_frame f = fx::make_synth_frame(fx::frame_kind::light, 32, 16, 1);
+  write_file(path, f.file);
+  const auto shift_mtime = [&] {
+    const timespec ts[2] = {{0, UTIME_OMIT}, {1000000000, 0}};
+    return ::utimensat(AT_FDCWD, path.c_str(), ts, 0);
+  };
+  {
+    fits_input in = open_fits_input(path);
+    int calls = 0;
+    in.set_fault_injector([&](std::string_view point) {
+      if (point != "input.pread" || ++calls != 1) return 0;
+      EXPECT_EQ(shift_mtime(), 0);
+      return 5;
+    });
+    EXPECT_STOP(read_input_bytes(in, big_budget), error_category::integrity, "input.modified");
+    EXPECT_EQ(calls, 1);
+  }
+  write_file(path, f.file);
+  {
+    fits_input in = open_fits_input(path);
+    int calls = 0;
+    in.set_fault_injector([&](std::string_view point) {
+      if (point != "input.pread" || ++calls != 1) return 0;
+      EXPECT_EQ(shift_mtime(), 0);
+      return 5;
+    });
+    EXPECT_STOP(plan_fits(in), error_category::integrity, "input.modified");
+    EXPECT_EQ(calls, 1);
+  }
+  fs::remove(path);
+}
+
+TEST(Fits, T_M2A_short_read_after_a_truncation_stops_as_size_changed) {
+  const std::string path = tmp_file("short_read_truncate.fits");
+  const fx::synth_frame f = fx::make_synth_frame(fx::frame_kind::light, 32, 16, 1);
+  write_file(path, f.file);
+  const auto truncate_file = [&] { return ::truncate(path.c_str(), static_cast<off_t>(f.file.size() - 2880)); };
+  {
+    fits_input in = open_fits_input(path);
+    int calls = 0;
+    in.set_fault_injector([&](std::string_view point) {
+      if (point != "input.pread" || ++calls != 1) return 0;
+      EXPECT_EQ(truncate_file(), 0);
+      return 5;
+    });
+    EXPECT_STOP(read_input_bytes(in, big_budget), error_category::integrity, "input.size_changed");
+    EXPECT_EQ(calls, 1);
+  }
+  write_file(path, f.file);
+  {
+    fits_input in = open_fits_input(path);
+    int calls = 0;
+    in.set_fault_injector([&](std::string_view point) {
+      if (point != "input.pread" || ++calls != 1) return 0;
+      EXPECT_EQ(truncate_file(), 0);
+      return 5;
+    });
+    EXPECT_STOP(plan_fits(in), error_category::integrity, "input.size_changed");
+    EXPECT_EQ(calls, 1);
+  }
+  fs::remove(path);
 }
 
 TEST(Fits, T_M2A_05_file_changing_size_after_fstat_stops) {
