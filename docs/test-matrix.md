@@ -107,16 +107,16 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-RAW-10 | NFR-SEC-04; ADR-08.b §2.5 (H5) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-11 | F-IO-04, §9.6; ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-12 | ADR-05 (chiave del nodo, determinismo); ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-PACK-01 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
-| T-M3A-PACK-02 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
-| T-M3A-PACK-03 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
-| T-M3A-PACK-04 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
-| T-M3A-PACK-05 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-01 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
+| T-M3A-PACK-02 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
+| T-M3A-PACK-03 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
+| T-M3A-PACK-04 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
+| T-M3A-PACK-05 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-06 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
-| T-M3A-PACK-07 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-07 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-08 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | PIANIFICATO — non eseguito |
-| T-M3A-PACK-09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | TEST SCRITTI, codice in corso |
-| T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | TEST SCRITTI, codice in corso |
+| T-M3A-PACK-09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
+| T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | verde (U10) |
 
 ## M3.entry: ID di lavoro di ADR-03.b
 

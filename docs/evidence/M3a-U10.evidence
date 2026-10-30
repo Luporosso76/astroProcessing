@@ -1,0 +1,9 @@
+# Sorgente del blocco generato di M3a-U10.md (tools/evidence.py)
+file docs/contracts/ADR-08-decoder-pack.md
+file src/core/include/astro/pack.hpp
+file src/core/pack.cpp
+file src/core/CMakeLists.txt
+file tests/unit/test_pack.cpp
+file tests/unit/CMakeLists.txt
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

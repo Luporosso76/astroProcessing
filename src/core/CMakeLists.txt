@@ -72,6 +72,7 @@ add_library(astrocore STATIC
   thumbnail_cache.cpp
   import_job.cpp
   workflow.cpp
+  pack.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
 # ADR-07: il percorso cpu_scalar si compila senza vettorizzazione; cpu_avx2 usa target("avx2") solo nelle sue funzioni.

@@ -113,6 +113,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
 | `tests/unit/test_conformance.cpp` | `a75bee61a509be32163cfe862cbb4f25a1a9187a256a4fd7c404c96d6799683b` |
 
-- Test release (`tmp/release-junit.xml`): totali 666, fast 659, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 660, fast 660, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 694, fast 687, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 688, fast 688, slow 0, falliti 0
 <!-- evidence:end -->

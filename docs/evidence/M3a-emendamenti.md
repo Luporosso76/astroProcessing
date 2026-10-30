@@ -49,8 +49,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `281b2a5ae80092dca1b534ee7dd6044e0dd877e3d57484ebfc02892c802fb169` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `88bb68c9bb1dd30e8b81661e96dd0e6a70f0abc69c9f43517a1938f5bbdda688` |
 | `docs/contracts/BASE-confini.md` | `573fba6402d89abb5a8df3566792f36a85602519ff6525da755d7d5c0472eccb` |
-| `plans/M3a.md` | `17d4bf7f5f78a124f63a068bad3e2e54ade49c91bbc3310f11efbb35186e61a8` |
+| `plans/M3a.md` | `a61482234c908f32c9e932d2f20dc085d33ac343f57cfbe107e8a70e7bf31a2f` |
 
 <!-- evidence:end -->

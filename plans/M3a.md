@@ -33,7 +33,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 | U4, U5 | Sonnet | Sonnet | Codex |
 | U6, U7 | Opus (predicati e compatibilità) | Opus | Codex |
 | U8a, U8b, U9 | Sonnet | Sonnet | Codex |
-| U10 | Sonnet | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
+| U10 | Sonnet (5 casi aggiunti dall'autore del codice: deviazione dichiarata) | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U11 | Opus (oracolo HEALPix) | Sonnet | Codex |
 
 Ricognizione, allineamento di piani e record, controlli di stato: Haiku. Testi e lingue: Gemini via `agy`. Il coordinatore copia il modello da questa tabella nella chiamata di delega.
@@ -146,7 +146,7 @@ Test: T-M3A-PACK-01, 02 (vedi L6), 03, 04, 05, 07, 09; T-M3A-LIC-01. Pack sintet
 ID: G-PACK. Proprietario: `pack.cpp` (conteggi, indice, righe), `healpix.cpp` (celle NESTED, Górski et al. 2005).
 1. Conteggi, indice contiguo e ordinato, righe coerenti con `null_bit` e `NaN`.
 2. Copertura conservativa: regione allargata del raggio massimo di una cella; mai un falso accetto.
-Test: T-M3A-PACK-06, 08. Oracle di PACK-06, fissato qui prima della misura: l'autore dei test scrive un proprio `ang2pix` NESTED dalle formule di Górski et al. 2005, lo controlla sui centri analitici delle 12 celle di base e sulla regola di annidamento dei 4 figli, e campiona fittamente ogni regione (calotta) a ordine 1–2; regione esterna o a cavallo = almeno un campione in una cella fuori `coverage`; regione interna = calotta allargata di due raggi massimi tutta in `coverage`. Criterio binario.
+Test: T-M3A-PACK-06, 08; T-M3A-PACK-09 sulla parte dell'indice (in U10 il fuzz dell'indice prova solo i file elencati); casi aperti di ADR-08.b §3.6 (directory relativa, `evidence_root` vuoto, `flag_bits: []`). Oracle di PACK-06, fissato qui prima della misura: l'autore dei test scrive un proprio `ang2pix` NESTED dalle formule di Górski et al. 2005, lo controlla sui centri analitici delle 12 celle di base e sulla regola di annidamento dei 4 figli, e campiona fittamente ogni regione (calotta) a ordine 1–2; regione esterna o a cavallo = almeno un campione in una cella fuori `coverage`; regione interna = calotta allargata di due raggi massimi tutta in `coverage`. Criterio binario.
 
 ## Gate M3.a
 

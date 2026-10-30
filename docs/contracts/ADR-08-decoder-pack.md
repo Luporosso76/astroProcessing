@@ -231,7 +231,10 @@ I test di U10 (`tests/unit/test_pack.cpp`, review Codex PASS al giro 2) fissano 
 - `CC-BY-4.0` senza attribuzione: `pack.license_not_allowed`; `license_file` assente o fuori da `licenses/`: `pack.license_file`.
 - Percorso assoluto o con `..` in `files[]`: `pack.manifest_invalid`.
 - Dimensione diversa: `pack.size_mismatch`, controllata prima dell'hash; file elencato sostituito da una directory: `pack.file_missing`; percorso della ricetta che è un file, o `manifest.json` che è una directory: `pack.missing`.
-- Aperti, da chiudere in U11 con un caso di test: codice per una directory relativa nella ricetta (§3.2 la vieta, §3.4 non assegna un codice); significato di `flag_bits: []`.
+- Errore del sistema operativo che non è un'assenza (per esempio `EACCES`) su un file del pack o del record di audit: `io` `pack.io` (aggiunto con U10, arbitraggio del coordinatore).
+- `flag_bits` è un campo obbligatorio non vuoto: `flag_bits: []` è `pack.manifest_invalid` (lettura letterale di §3.1, applicata in U10).
+- Link simbolici: un link elencato in `files[]` è `pack.file_missing`, uno non elencato `pack.unlisted_file`, un `manifest.json` link `pack.missing`; la directory della ricetta segue un eventuale link.
+- Aperti, da chiudere in U11 con un caso di test di un autore diverso: codice per una directory relativa nella ricetta (§3.2 la vieta, §3.4 non assegna un codice; oggi si apre relativa alla directory corrente); `audit.evidence_root` vuoto (oggi non rifiutato); caso di `flag_bits: []`.
 
 ## 4. Regola di licenza all'ingresso M3 (NFR-LIC-01.d)
 

@@ -71,10 +71,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `281b2a5ae80092dca1b534ee7dd6044e0dd877e3d57484ebfc02892c802fb169` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `88bb68c9bb1dd30e8b81661e96dd0e6a70f0abc69c9f43517a1938f5bbdda688` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
 | `docs/licenses.md` | `737e288a42d54f0c367084a08b68e7a9effbc92aeb95e6951b679de698586c21` |
-| `docs/test-matrix.md` | `46029cf97cd57f6a4733c626ddf40ae83eb4d7f577353e65579cd71c9ea5af55` |
+| `docs/test-matrix.md` | `abf4570b92b5dfbb79d6e0be45f8d2ba376bf5f7fe27fd3efcb24267e23036b5` |
 
 <!-- evidence:end -->
