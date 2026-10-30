@@ -116,9 +116,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/image.cpp` | `0bf364c331bc3ac121092ebaf5de0a54e65417db2799da583fcd71ccf1cd64cf` |
 | `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/include/astro/image.hpp` | `ae2b9a16b24e01f1b8873bd5da28d0447cabe02b5941e5d8dd05c8e8a5302637` |
-| `tests/unit/CMakeLists.txt` | `cf3c2e72eaf191e3c214891af21292c91cfcd432a8cd3fe6f2c4b666364fe798` |
+| `tests/unit/CMakeLists.txt` | `4267f6971ca4151314880728172f5ceaa9c6fdd21a9f569aed2605d03a386e10` |
 | `tests/unit/test_decoder_types.cpp` | `63adee44ced66be345321731e77d2b4a352d9055410f057890ae82a1c457dc46` |
 
-- Test release (`tmp/release-junit.xml`): totali 694, fast 687, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 688, fast 688, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 719, fast 712, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 713, fast 713, slow 0, falliti 0
 <!-- evidence:end -->

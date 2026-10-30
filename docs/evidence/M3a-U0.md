@@ -115,6 +115,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 694, fast 687, slow 7, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 688, fast 688, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 719, fast 712, slow 7, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 713, fast 713, slow 0, falliti 0
 <!-- evidence:end -->

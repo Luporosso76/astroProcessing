@@ -95,10 +95,10 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3A-RAW-01 | F-IO-02; ADR-08.b §2.3 (H2) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-RAW-02 | F-IO-02, F-IO-04; ADR-08.b §2.2, §2.4 (H1, H3) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-RAW-03 | F-IO-02; ADR-08.b §2.3 (stop) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-RAW-04 | F-IO-04; ADR-08.b §2.4 (H4) | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-01 | F-IO-02; ADR-08.b §2.3 (H2) | ADR-08.b | M3.a | verde (U2) |
+| T-M3A-RAW-02 | F-IO-02, F-IO-04; ADR-08.b §2.2, §2.4 (H1, H3) | ADR-08.b | M3.a | verde (U2) |
+| T-M3A-RAW-03 | F-IO-02; ADR-08.b §2.3 (stop) | ADR-08.b | M3.a | verde (U2) |
+| T-M3A-RAW-04 | F-IO-04; ADR-08.b §2.4 (H4) | ADR-08.b | M3.a | verde (U2) |
 | T-M3A-RAW-05 | NFR-SEC-01, NC-21; ADR-08.b §2.1, §2.5 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-06 | ADR-06; ADR-08.b §2.8 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
 | T-M3A-RAW-07 | ADR-13, NFR-SEC-04; ADR-08.b §2.1, §5 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |

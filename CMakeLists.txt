@@ -24,6 +24,7 @@ find_package(OpenSSL REQUIRED COMPONENTS Crypto)
 pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
 pkg_check_modules(FFTW3 REQUIRED IMPORTED_TARGET fftw3)
 pkg_check_modules(FFTW3F REQUIRED IMPORTED_TARGET fftw3f)
+pkg_check_modules(LIBRAW REQUIRED IMPORTED_TARGET libraw_r=0.21.5)
 
 enable_testing()
 add_subdirectory(src/core)

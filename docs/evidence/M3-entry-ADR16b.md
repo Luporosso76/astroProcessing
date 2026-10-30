@@ -56,6 +56,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/D-16-calibrazione-incompleta.md` | `17d99880649e716815e5a57741c71362fee41710535c0e2b99662a392649abb7` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
-| `docs/test-matrix.md` | `abf4570b92b5dfbb79d6e0be45f8d2ba376bf5f7fe27fd3efcb24267e23036b5` |
+| `docs/test-matrix.md` | `dd4f291ba425007343bc91dce4ac1f973a9c4ee37f533695b498f30f9e32fd0c` |
 
 <!-- evidence:end -->

@@ -29,7 +29,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 | U0 | Sonnet | Opus (confine della base) | Codex `gpt-6-astra` |
 | U1 | Sonnet | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U1b | Sonnet | Sonnet | Codex |
-| U2, U3 | Sonnet | Opus (numerica del decoder, fuzz) | Codex |
+| U2, U3 | Sonnet (U2: 3 casi aggiunti dall'autore del codice su rilievi della review, deviazione dichiarata) | Opus (numerica del decoder, fuzz) | Codex |
 | U4, U5 | Sonnet | Sonnet | Codex |
 | U6, U7 | Opus (predicati e compatibilità) | Opus | Codex |
 | U8a, U8b, U9 | Sonnet | Sonnet | Codex |
@@ -88,7 +88,7 @@ ID: F-IO-02, F-IO-04.
 2. Record del decoder di §2.9 in provenance e nella chiave del nodo, identità della libreria (`LibRaw::version()`, SHA-256 di `libraw_r.so` caricata) — `raw_decode.cpp`.
 3. Export della provenance con hash dell'originale e offset applicato dal decoder (`none`) (F-IO-04; C-01.b §10) — `provenance.cpp` (solo campi; scrittura nel runner).
 4. Simboli vietati assenti (§5) — `tools/check_offline.sh`.
-Prima del codice: decisione su `LIBRAW_WARN_PARSEFUJI_PROCESSED` (0x10000, Fujifilm X-A1 e X-E1 dopo `unpack`) in ADR-08.b §2.5, altrimenti X-A1 si ferma con `raw.warning` in T-M3A-RAW-09. Test: T-M3BASE-11 e T-M3BASE-12 sulla variante RAW (da U0); T-M3A-RAW-07, 09, 11, 12, 13 (chiavi `null` di ADR-08.b §2.6, emendamento L4); T-M3A-02 (export F-IO-04: hash della sorgente, `black_applied_by_decoder = none`, campi assenti restano assenti); T-M2F-02 e T-M2R0-01 rieseguiti con i binari che collegano LibRaw e libtiff. Dati: `PUB-RAW-01` (7 Bayer, X-E1 → `raw.xtrans`). Uscita: suite di conformità verde sul nuovo tipo.
+Prima del codice: fuso orario di `capture_time_libraw` (ADR-08.b §7, `other.timestamp` locale al processo); decisione su `LIBRAW_WARN_PARSEFUJI_PROCESSED` (0x10000, Fujifilm X-A1 e X-E1 dopo `unpack`) in ADR-08.b §2.5, altrimenti X-A1 si ferma con `raw.warning` in T-M3A-RAW-09. Test: T-M3BASE-11 e T-M3BASE-12 sulla variante RAW (da U0); T-M3A-RAW-07, 09, 11, 12, 13 (chiavi `null` di ADR-08.b §2.6, emendamento L4); T-M3A-02 (export F-IO-04: hash della sorgente, `black_applied_by_decoder = none`, campi assenti restano assenti); T-M2F-02 e T-M2R0-01 rieseguiti con i binari che collegano LibRaw e libtiff. Dati: `PUB-RAW-01` (7 Bayer, X-E1 → `raw.xtrans`). Uscita: suite di conformità verde sul nuovo tipo.
 
 ### U5. G-OFFSET: stato dell'offset e voce `light_offset` (C-01.b §1, §10; ADR-16.b §b.5 colonna offset, §b.10) — ~200 righe
 

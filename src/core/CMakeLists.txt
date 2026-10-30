@@ -73,6 +73,7 @@ add_library(astrocore STATIC
   import_job.cpp
   workflow.cpp
   pack.cpp
+  raw_decode.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
 # ADR-07: il percorso cpu_scalar si compila senza vettorizzazione; cpu_avx2 usa target("avx2") solo nelle sue funzioni.
@@ -81,4 +82,4 @@ add_dependencies(astrocore astro_source_revision)
 target_include_directories(astrocore PUBLIC include)
 target_compile_features(astrocore PUBLIC cxx_std_20)
 target_link_libraries(astrocore PUBLIC PkgConfig::CFITSIO)
-target_link_libraries(astrocore PRIVATE OpenSSL::Crypto SQLite::SQLite3)
+target_link_libraries(astrocore PRIVATE OpenSSL::Crypto SQLite::SQLite3 PkgConfig::LIBRAW)
