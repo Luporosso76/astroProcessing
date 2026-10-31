@@ -36,10 +36,15 @@ settings="$(python3 -I -S -c 'import json, sys; k, s = sys.argv[1], sys.argv[2]
 print(json.dumps({"apiKeyHelper": "cat " + k, "permissions": {"deny": [f"Read({s}/**)", f"Edit({s}/**)"]}}))' \
   "$key" "$root/.secrets")"
 
+# In modalità -p un comando lanciato in background lascia claude in attesa di una notifica che non arriva: l'agente
+# resta fermo fino al timeout e l'esito JSON va perso. La regola precede ogni prompt.
+preamble='Regola dello strumento: mai `run_in_background` né comandi lasciati in background. Ogni comando gira in primo piano, con un timeout fino a 600000 ms; le build e i test lunghi si spezzano in comandi più corti. Chiudi il turno solo a lavoro finito, con il rapporto finale.'
+
 rc=0
-(cd "$workdir" && env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN TMPDIR="$root/tmp" timeout "${ASTRO_API_TIMEOUT:-7200}" claude -p \
-  --model "$model" --settings "$settings" --permission-mode auto --max-budget-usd "$budget" --output-format json \
-  < "$prompt") > "$out" 2> "$out.stderr" || rc=$?
+(cd "$workdir" && { printf '%s\n\n' "$preamble"; cat "$prompt"; } | env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+  TMPDIR="$root/tmp" timeout "${ASTRO_API_TIMEOUT:-7200}" claude -p \
+  --model "$model" --settings "$settings" --permission-mode auto --max-budget-usd "$budget" --output-format json) \
+  > "$out" 2> "$out.stderr" || rc=$?
 
 verdict="$(cd "$root" && python3 -I -S - "$out" <<'EOF'
 import json, sys
