@@ -624,4 +624,17 @@ TEST(Measure, T_M3A_TYP_16_merge_refuses_a_derived_code_of_its_own) {
   EXPECT_STOP(merge_measure({}, {ml::linearity_unknown}), error_category::invalid_input, "image.measure");
 }
 
+// OB-20 (BASE-confini §2): ogni uscita di operatore porta `measure`, anche vuoto; senza, le invarianti non valgono.
+TEST(MeasureOutput, T_M3BASE_OB_20_output_with_empty_measure_holds_the_invariants) {
+  image img = make_image({4, 3, 1}, sample_type::f32, plane_layout::mono);
+  img.measure = measure_capability{};
+  EXPECT_TRUE(operator_output_invariants_hold(img));
+}
+
+TEST(MeasureOutput, T_M3BASE_OB_20_output_without_measure_violates_the_invariants) {
+  image img = make_image({4, 3, 1}, sample_type::f32, plane_layout::mono);
+  ASSERT_FALSE(img.measure.has_value());
+  EXPECT_FALSE(operator_output_invariants_hold(img));
+}
+
 }  // namespace

@@ -10,6 +10,7 @@
 #include "astro/operations.hpp"
 #include "calibration_internal.hpp"
 #include "cpu_kernels.hpp"
+#include "fits_internal.hpp"
 
 namespace astro {
 
@@ -735,9 +736,12 @@ std::unique_ptr<prepared_calibration::impl> prepare_impl(const calibration_recip
   p->out.unit = im.light.unit;
   p->out.lin = im.light.lin;
   p->out.metadata = im.light.metadata;
+  p->out.measure = merge_measure({&im.light, &im.dark, &im.flat, &im.dark_flat}, {});
   p->out.phase = metadata_value<process_phase>{process_phase::calibrated, {metadata_origin::header, "ASTRPHAS"}};
+  // Fase e capacità di misura dell'uscita differiscono da quelle del light: il writer le scrive dai campi interpretati.
   for (const std::string& card : im.light.header_cards) {
-    if (card.compare(0, 8, "ASTRPHAS") != 0) p->out.header_cards.push_back(card);
+    const std::string key = fits_detail::parse_card(card).key;
+    if (key != "ASTRPHAS" && !fits_detail::is_measure_key(key)) p->out.header_cards.push_back(card);
   }
   p->out.uninterpreted_keywords = im.light.uninterpreted_keywords;
   p->out.variance = pixels ? variance_plane{aligned_buffer(p->out.samples.size())} : variance_plane{};

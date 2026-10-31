@@ -116,7 +116,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `CMakeLists.txt` | `0e29f2648037ec69e84817b30bd02d327b60e24339719d9744fdeaf926b556f1` |
 | `docs/contracts/ADR-08-decoder-pack.md` | `b5abcafc55e824f9d7b2ac19a08fae98e66e70e125e33561ee38a8841c93ae98` |
 | `src/core/CMakeLists.txt` | `bef3d72e6dc57ba4fc51eb21d27c640dcb3852b6054ec1853dd40609abef94b6` |
-| `src/core/include/astro/image.hpp` | `5f3daed9b8b4043dada4c5fe7224d3a867c7c6f7824db9102a7a57c425f76f21` |
+| `src/core/include/astro/image.hpp` | `2ae3c4cc2192a8c3b6822ec390dcde0e62dbc2282178162a744d98a0ef20f626` |
 | `src/core/include/astro/input_format.hpp` | `e30c81080600aec605fd3730bad533e1b77774d531a26441e4269990b986831f` |
 | `src/core/include/astro/raw_decode.hpp` | `fcf18c63c1701e15b61ba50ecc24c443f9fe5cb4b6661386b5e765b36362ba9d` |
 | `src/core/raw_decode.cpp` | `c256ae77394996d6f763ccbf02fca67c5fc11d0e85502685299a837f8de17b6c` |
@@ -129,8 +129,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_raw_decode_u2b.cpp` | `2abd37934df5eeb669eb141ee86b79e21a1f358bde3e693ccd288117723d43ce` |
 | `tests/unit/test_raw_robust.cpp` | `c1b188f6e5054694a46150a591ba3ab57d5710a0c2da6bab500c32333276fa1b` |
 
-- Test release (`tmp/release-junit.xml`): totali 867, fast 851, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 852, fast 852, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
 - Test release-giro2 (`tmp/release-junit-r2.xml`): totali 812, fast 812, slow 0, falliti 0
 - Test fuzz-asan (`tmp/u3-fuzz-asan-junit.xml`): totali 9, fast 0, slow 9, falliti 0
 <!-- evidence:end -->

@@ -258,6 +258,7 @@ void validate_image(const image& img) {
 
 bool operator_output_invariants_hold(const image& img) {
   validate_image(img);
+  if (!img.measure) return false;
   const std::size_t n = img.invalid.bits.size();
   for (std::size_t i = 0; i < n; ++i) {
     const bool nonfinite = img.type == sample_type::f32

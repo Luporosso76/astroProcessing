@@ -794,8 +794,9 @@ TEST(Fits, T_M2A_09_invalid_and_variance_extensions_roundtrip_identically) {
     image img = make_image({5, 4, 1}, t, plane_layout::mono);
     img.encoding = source_encoding{t == sample_type::f32 ? -32 : -64, 0, 1, 2};
     img.unit = pixel_unit::adu;
-    img.header_cards = {fx::card_str("BUNIT", "adu"), fx::card_str("OBJECT", "t")};
+    img.header_cards = {fx::card_str("BUNIT", "adu"), fx::card_str("OBJECT", "t"), fx::card_bool("ASTRMCAP", true)};
     img.uninterpreted_keywords = {"OBJECT"};
+    img.measure = measure_capability{};
     img.variance = variance_plane{aligned_buffer(img.samples.size())};
     for (int i = 0; i < 20; ++i) {
       if (t == sample_type::f32) {

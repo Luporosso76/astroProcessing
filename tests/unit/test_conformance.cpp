@@ -26,6 +26,8 @@
 #include "astro/calibration.hpp"
 #include "astro/checkpoint.hpp"
 #include "astro/cpu_dispatch.hpp"
+#include "astro/fits.hpp"
+#include "astro/image.hpp"
 #include "astro/job_probe.hpp"
 #include "astro/job_types.hpp"
 #include "astro/workflow.hpp"
@@ -1718,6 +1720,22 @@ TEST_P(ConformanceCheckpoint, T_M3BASE_19_checkpoint_removed_only_after_publicat
     ASSERT_TRUE(r.outcome.has_value() && r.outcome->exit_code == 0) << describe(r);
     EXPECT_FALSE(fs::exists(c.dir / "scratch" / "ckpt.ckpt.json")) << "checkpoint rimasto dopo la pubblicazione";
     EXPECT_FALSE(fs::exists(c.dir / "scratch" / "ckpt.stage")) << "staging rimasto dopo la pubblicazione";
+  }
+}
+
+// OB-20: ogni immagine pubblicata da un job di ogni tipo registrato porta `measure` e rispetta le invarianti. I tipi che
+// non pubblicano un'immagine (artefatto `image`) non hanno uscita da controllare.
+TEST_P(Conformance, T_M3BASE_23_OB_20_published_images_carry_measure) {
+  type_case c(GetParam());
+  const ran r = c.run_default();
+  ASSERT_TRUE(r.outcome.has_value() && r.outcome->exit_code == 0) << describe(r);
+  for (const artifact_record& a : c.new_artifacts()) {
+    if (a.kind != "image") continue;
+    const std::string text = read_text(c.store->artifact_path(a.rel_path));
+    const std::vector<std::uint8_t> bytes(text.begin(), text.end());
+    const image out = decode_fits(bytes, std::uint64_t{1} << 40);
+    EXPECT_TRUE(out.measure.has_value()) << "measure assente nell'uscita " << a.rel_path;
+    EXPECT_TRUE(operator_output_invariants_hold(out)) << "invarianti violate dall'uscita " << a.rel_path;
   }
 }
 

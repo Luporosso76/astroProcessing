@@ -114,6 +114,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/CMakeLists.txt` | `65928a9dbb372c3c5ab3391437d077979aa1a2b00ba98ecfb3956ac8ce361af9` |
 | `tests/unit/test_raw_decode.cpp` | `9836b507fe29d2c51793288674d1d91fae061d273d0c814111107e006e8d8570` |
 
-- Test release (`tmp/release-junit.xml`): totali 867, fast 851, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 852, fast 852, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
 <!-- evidence:end -->

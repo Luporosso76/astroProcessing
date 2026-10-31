@@ -40,6 +40,23 @@ void expect_exact(const master_result& m, const group& g) {
   }
 }
 
+// OB-20: l'uscita porta esattamente l'unione dei codici dei frame, in ordine canonico e senza duplicati; l'intestazione
+// del frame conserva `measure` dell'immagine.
+TEST(Master, T_M3BASE_23_OB_20_output_measure_is_the_exact_union_of_the_frames) {
+  using ml = measure_limit;
+  group g = make_group(master_role::dark, 4, 2, 4);
+  std::vector<image> frames = images_of(g);
+  frames[0].measure = measure_capability{{ml::calib_offset_unknown, ml::samples_interpolated}};
+  frames[1].measure = measure_capability{{ml::calib_omitted_bias_subtraction, ml::samples_interpolated}};
+  frames[2].measure = measure_capability{{ml::calib_offset_unknown, ml::calib_assumption_decoder_black}};
+  frames[3].measure = measure_capability{};
+  const master_result m = combine_master(recipe_of(g), std::move(frames));
+  ASSERT_TRUE(m.output.measure.has_value());
+  EXPECT_EQ(m.output.measure->limits, (std::vector<ml>{ml::calib_omitted_bias_subtraction, ml::calib_offset_unknown,
+                                                        ml::calib_assumption_decoder_black,
+                                                        ml::samples_interpolated}));
+}
+
 TEST(Master, T_M2R2_01_dyadic_values_give_exact_mean_and_plane) {
   // n = 4, uscita f32: per pixel i quattro campioni dei frame 0..3.
   const std::vector<std::array<double, 4>> px4 = {

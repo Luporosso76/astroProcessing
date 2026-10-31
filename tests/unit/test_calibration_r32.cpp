@@ -320,6 +320,36 @@ TEST(CalibBlocks, T_M2R3_01_cfa_planes_invalid_and_saturation_are_identical_betw
   EXPECT_EQ(m2d::entry_count(c.dir / "scratch"), 0u) << "checkpoint e staging rimossi dopo la pubblicazione";
 }
 
+// OB-20: il FITS pubblicato, a residenza intera e a blocchi, porta esattamente l'unione dei codici dei quattro ingressi.
+TEST(CalibBlocks, T_M3BASE_23_OB_20_published_measure_is_the_exact_union_in_both_residencies) {
+  set_def s = synth_set(12, 9, -32);
+  add_distinct_overlapping_measures(s);
+  const disk_case c = make_case("ob20_union", s);
+  for (const bool blocks : {false, true}) {
+    project p = make_project(c, blocks ? "blocks" : "whole");
+    memory_pool pool(big_budget);
+    calibration_job_options o;
+    o.resources = config_for(c);
+    if (blocks) o.checkpoint = calibration_job_options::checkpoint_options{"ob20", 1000, false};
+    std::optional<job_plan> seen;
+    o.on_job_plan = [&](const job_plan& jp) { seen = jp; };
+    const job_outcome out = run_quiet(p, c, pool, o);
+    ASSERT_EQ(out.exit_code, 0) << blocks << (out.stop ? out.stop->what() : "");
+    ASSERT_TRUE(seen);
+    EXPECT_EQ(seen->spill.has_value(), blocks) << "residenza effettiva diversa da quella del caso";
+    int images = 0;
+    for (const artifact_record& a : p.store->artifacts_for(p.node.key())) {
+      if (a.output_role != "primary") continue;
+      ++images;
+      const std::string text = read_text(p.store->artifact_path(a.rel_path));
+      const image img = decode_fits(std::vector<std::uint8_t>(text.begin(), text.end()), big_budget);
+      ASSERT_TRUE(img.measure.has_value()) << blocks;
+      EXPECT_EQ(img.measure->limits, distinct_overlapping_union()) << blocks;
+    }
+    EXPECT_EQ(images, 1) << blocks;
+  }
+}
+
 stop_error stop_of(const disk_case& c, const std::string& name, bool blocks) {
   project p = make_project(c, name);
   memory_pool pool(big_budget);

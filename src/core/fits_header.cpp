@@ -295,14 +295,6 @@ std::optional<measure_capability> read_measure(const card_index& idx) {
   return m;
 }
 
-bool is_measure_key(const std::string& key) {
-  if (key == "ASTRMCAP") return true;
-  for (std::size_t n = 1; n <= max_measure_cards; ++n) {
-    if (key == measure_key(n)) return true;
-  }
-  return false;
-}
-
 bool is_interpreted(const std::string& key, bool rgb) {
   if (rgb && key == "CTYPE3") return true;
   if (is_measure_key(key)) return true;
@@ -313,6 +305,14 @@ bool is_interpreted(const std::string& key, bool rgb) {
 }
 
 }  // namespace
+
+bool is_measure_key(const std::string& key) {
+  if (key == "ASTRMCAP") return true;
+  for (std::size_t n = 1; n <= max_measure_cards; ++n) {
+    if (key == measure_key(n)) return true;
+  }
+  return false;
+}
 
 header_info interpret_header(const std::vector<std::string>& cards, std::uint32_t planes,
                              const fits_read_options& options) {

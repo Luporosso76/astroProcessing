@@ -330,8 +330,8 @@ image make_image(const image_geometry& geometry, sample_type type, plane_layout 
 // Coerenza di buffer, maschere, layout e cfa. Violazione: invalid_input, codice image.*.
 void validate_image(const image& img);
 
-// Invarianti di un'immagine prodotta da un operatore: un campione non finito ha almeno un bit acceso;
-// un pixel con un bit acceso ha campione e varianza NaN.
+// Invarianti di un'immagine prodotta da un operatore: `measure` presente (anche vuoto); un campione non finito ha almeno
+// un bit acceso; un pixel con un bit acceso ha campione e varianza NaN.
 bool operator_output_invariants_hold(const image& img);
 
 // `measure->limits` se presente; altrimenti `{history.unknown}` se la fase non è `raw` o è assente, vuoto se è `raw`.

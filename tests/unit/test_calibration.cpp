@@ -72,6 +72,15 @@ void expect_all_close(const calibration_result& r, const std::vector<oracle_pixe
   EXPECT_TRUE(operator_output_invariants_hold(r.output));
 }
 
+// OB-20: l'uscita porta esattamente l'unione dei codici dei quattro ingressi, in ordine canonico e senza duplicati.
+TEST(CalibM2E, T_M3BASE_23_OB_20_output_measure_is_the_exact_union_of_the_four_inputs) {
+  set_def s = dyadic_set(-64);
+  add_distinct_overlapping_measures(s);
+  const calibration_result r = calibrate(recipe_of(s), images_of(s));
+  ASSERT_TRUE(r.output.measure.has_value());
+  EXPECT_EQ(r.output.measure->limits, distinct_overlapping_union());
+}
+
 // ---------------------------------------------------------------- T-M2E-01 / 02 / 03 / 20 / 24
 
 TEST(CalibM2E, T_M2E_01_dyadic_exact_zero_tolerance) {

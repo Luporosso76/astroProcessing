@@ -53,6 +53,30 @@ inline content_digest digest_for(const frame_def& f, std::uint32_t w, std::uint3
   return digest_of(file_of(f, w, h));
 }
 
+// Card ASTRMCAP e ASTRMLnn (ADR-03.b §b.13) di un ingresso con i codici dati, già in ordine canonico.
+inline void add_measure_cards(frame_def& f, const std::vector<const char*>& codes) {
+  f.hdr.extra.push_back(fx::card_bool("ASTRMCAP", true));
+  for (std::size_t i = 0; i < codes.size(); ++i) {
+    const std::string key = std::string("ASTRML") + static_cast<char>('0' + (i + 1) / 10) + static_cast<char>('0' + (i + 1) % 10);
+    f.hdr.extra.push_back(fx::card_str(key, codes[i]));
+  }
+}
+
+// Ingressi di OB-20: ogni ruolo porta un codice proprio, h_dprime sta in dark e flat, interpolated in light e dark_flat.
+inline void add_distinct_overlapping_measures(set_def& s) {
+  add_measure_cards(s.light, {"calib.omitted.dark_subtraction", "samples.interpolated"});
+  add_measure_cards(s.dark, {"calib.omitted.bias_subtraction", "calib.assumption.h_dprime"});
+  add_measure_cards(s.flat, {"calib.omitted.flat_normalization", "calib.assumption.h_dprime"});
+  add_measure_cards(s.dark_flat, {"calib.omitted.dark_flat_subtraction", "samples.interpolated"});
+}
+
+// Unione scritta a mano dei quattro insiemi sopra: ordine canonico della tabella, nessun duplicato.
+inline std::vector<measure_limit> distinct_overlapping_union() {
+  return {measure_limit::calib_omitted_dark_subtraction,      measure_limit::calib_omitted_bias_subtraction,
+          measure_limit::calib_omitted_dark_flat_subtraction, measure_limit::calib_omitted_flat_normalization,
+          measure_limit::calib_assumption_h_dprime,           measure_limit::samples_interpolated};
+}
+
 inline calibration_images images_of(const set_def& s) {
   return {decode(s.light, s.w, s.h), decode(s.dark, s.w, s.h), decode(s.flat, s.w, s.h),
           decode(s.dark_flat, s.w, s.h)};

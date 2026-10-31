@@ -32,6 +32,8 @@ struct parsed_card {
 
 parsed_card parse_card(const std::string& card);
 bool is_structural_key(const std::string& key);
+// ASTRMCAP o ASTRMLnn: card della capacità di misura, che il writer rigenera da `image::measure`.
+bool is_measure_key(const std::string& key);
 
 // Tipi numerici: nullopt se il testo non e' un intero (o reale) FITS completo.
 std::optional<std::int64_t> try_integer(const parsed_card& card);

@@ -284,6 +284,7 @@ Definita in `docs/contracts/BASE-confini.md` §3; eseguita una volta sul preset 
 | T-M3BASE-20 | OB-11, OB-12 (L1) | `ConformanceFormat.T_M3BASE_20_*` | verde (U0) |
 | T-M3BASE-21 | OB-11 (L1) | `ConformanceFormat.T_M3BASE_21_*` | verde (U0) |
 | T-M3BASE-22 | OB-11, OB-12 (L1) | `ConformanceFormatRole.T_M3BASE_22_*` | verde (U0) |
+| T-M3BASE-23 | OB-20 | `Types/Conformance.T_M3BASE_23_OB_20_*`, `MeasureOutput.T_M3BASE_OB_20_*`, `CalibM2E`/`Master`/`CalibBlocks` `T_M3BASE_23_OB_20_*_exact_union_*` | verde (I6) |
 | Registro | §3.1 punto 3 | `T-M3BASE.job_types_registry`, `T-M3BASE.job_types_registry_negative` | verde |
 
 ## ID del piano → test (registro dell'appendice D, stadi M2.* e M2.entry)

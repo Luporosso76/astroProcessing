@@ -152,6 +152,7 @@ image header_of(const image& im) {
   h.lin = im.lin;
   h.lin_origin = im.lin_origin;
   h.phase = im.phase;
+  h.measure = im.measure;
   h.cfa = im.cfa;
   h.metadata = im.metadata;
   h.uninterpreted_keywords = im.uninterpreted_keywords;
@@ -526,6 +527,9 @@ void finish_preflight(master_plan& p) {
   p.out.lin_origin.value = metadata_origin::header;
   p.out.phase = metadata_value<process_phase>{process_phase::raw, {metadata_origin::header, "ASTRPHAS"}};
   p.out.metadata = master_metadata_of(p);
+  std::vector<const image*> frame_headers;
+  for (const frame_state& f : p.frames) frame_headers.push_back(&f.header);
+  p.out.measure = merge_measure(frame_headers, {});
   p.out.variance = variance_plane{aligned_buffer(p.out.samples.size())};
   const std::size_t px = static_cast<std::size_t>(p.w) * p.h;
   if (p.flat) {

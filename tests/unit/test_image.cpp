@@ -105,6 +105,7 @@ TEST(Image, T_M2A_08_operator_output_invariants) {
   const float nan = std::numeric_limits<float>::quiet_NaN();
   image img = make_image({3, 3, 1}, sample_type::f32, plane_layout::mono);
   img.variance = variance_plane{aligned_buffer(img.samples.size())};
+  img.measure = measure_capability{};  // OB-20: l'uscita porta `measure`
   EXPECT_TRUE(operator_output_invariants_hold(img));
 
   img.data<float>()[4] = nan;  // non finito senza bit
