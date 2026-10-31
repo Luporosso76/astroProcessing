@@ -369,10 +369,10 @@ TEST(RawRobust, T_M3A_RAW_05_data_error_handler_called_more_than_once_still_stop
 struct oracle_report {
   int calls = 0;
   std::optional<std::string> file;
-  int offset = -1;
+  INT64 offset = -1;
 };
 
-void oracle_handler(void* data, const char* file, const int offset) {
+void oracle_handler(void* data, const char* file, const INT64 offset) {
   auto& r = *static_cast<oracle_report*>(data);
   if (r.calls++ == 0) {
     if (file != nullptr) r.file = file;

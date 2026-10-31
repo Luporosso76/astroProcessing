@@ -1,19 +1,15 @@
-// U3 (M3.a): T-M3A-RAW-08, creazioni di thread negli intervalli open_buffer e unpack (H6), ADR-08.b §2.7, §6.
-// Un processo nuovo per campione e per fase, perché libgomp riusa i thread di una regione precedente:
-//   --product <campione>  (a) decodifica del prodotto con omp_set_num_threads(4) preimpostato dal chiamante:
-//                         esito atteso per campione (expected_for): immagine, oppure lo stop del contratto; ganci presenti
-//                         e in ordine; 0 creazioni negli intervalli attraversati (un intervallo non eseguito, come unpack
-//                         dopo `raw.xtrans`, è dichiarato «non eseguito» e non è una prova); omp_get_max_threads() == 1
-//                         prima di open_buffer;
-//   --libraw2 <campione>  (b) stessa decodifica con LibRaw diretta e omp_set_num_threads(2): solo registrata, stampa
-//                         «H6 provata» (almeno una creazione) o «H6 non provata», esce 0 in entrambi i casi;
-//   --control             (c) regione parallela propria a due thread, nessuna decodifica: almeno una creazione, altrimenti
-//                         esce con errore. Prova solo che l'interposizione vede i thread di libgomp, non H6.
+// U3 (M3.a): T-M3A-RAW-08, creazioni di thread negli intervalli open_buffer e unpack, ADR-08.b §2.7, §6.
+// LibRaw è compilata senza OpenMP (U12): la garanzia di un solo thread viene dalla build. Un processo nuovo per campione:
+//   --product <campione>  (a) decodifica del prodotto: esito atteso per campione (expected_for): immagine, oppure lo stop
+//                         del contratto; ganci presenti e in ordine; 0 creazioni negli intervalli attraversati (un
+//                         intervallo non eseguito, come unpack dopo `raw.xtrans`, è dichiarato «non eseguito» e non è
+//                         una prova);
+//   --libraw2 <campione>  (b) stessa decodifica con LibRaw diretta: solo registrata, esce 0;
+//   --control             (c) thread proprio, nessuna decodifica: almeno una creazione, altrimenti esce con errore.
+//                         Prova solo che l'interposizione vede i thread creati con pthread_create.
 // <campione>: `syn` (DNG sintetico 2048x1040) oppure l'indice 0..7 di PUB-RAW-01 (hash verificato, mai un salto).
-// Nessuna regione OpenMP a più thread precede (b): nel processo di (b) il test non apre regioni proprie.
 #include <dlfcn.h>
 #include <libraw/libraw.h>
-#include <omp.h>
 #include <pthread.h>
 
 #include <atomic>
@@ -23,6 +19,7 @@
 #include <cstring>
 #include <ctime>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "astro/error.hpp"
@@ -81,25 +78,20 @@ expectation expected_for(const std::string& sample) {
 int run_product(const std::vector<std::uint8_t>& bytes, const std::string& sample) {
   using namespace astro;
   const expectation expect = expected_for(sample);
-  omp_set_num_threads(4);
   std::vector<std::string> order;
   std::uint64_t open_start = 0, open_end = 0, unpack_start = 0, unpack_end = 0;
-  int before_open = -1, after_open = -1, before_unpack = -1;
   raw_decode_hooks hooks;
   hooks.before_open = [&](raw_user_params&) {
     order.emplace_back("before_open");
     open_start = creations();
-    before_open = omp_get_max_threads();
   };
   hooks.after_open = [&](raw_probe_fields&) {
     order.emplace_back("after_open");
     open_end = creations();
-    after_open = omp_get_max_threads();
   };
   hooks.before_unpack = [&] {
     order.emplace_back("before_unpack");
     unpack_start = creations();
-    before_unpack = omp_get_max_threads();
   };
   hooks.after_unpack = [&](raw_unpack_fields&) {
     order.emplace_back("after_unpack");
@@ -135,14 +127,9 @@ int run_product(const std::vector<std::uint8_t>& bytes, const std::string& sampl
   }
   const bool open_measured = order.size() >= 2;
   const bool unpack_measured = order.size() == 4;
-  std::printf("(a) esito %s; open_buffer %s%llu, unpack %s%llu creazioni; omp_get_max_threads prima di open %d, dopo open %d, prima di unpack %d\n",
+  std::printf("(a) esito %s; open_buffer %s%llu, unpack %s%llu creazioni\n",
               outcome.c_str(), open_measured ? "" : "non eseguito ", open_measured ? static_cast<unsigned long long>(open_end - open_start) : 0ull,
-              unpack_measured ? "" : "non eseguito ", unpack_measured ? static_cast<unsigned long long>(unpack_end - unpack_start) : 0ull,
-              before_open, after_open, before_unpack);
-  if (before_open != 1 || after_open != 1 || (unpack_measured && before_unpack != 1)) {
-    std::fputs("FALLITO: omp_set_num_threads(1) va chiamata nel thread del chiamante prima di open_buffer\n", stderr);
-    rc = 1;
-  }
+              unpack_measured ? "" : "non eseguito ", unpack_measured ? static_cast<unsigned long long>(unpack_end - unpack_start) : 0ull);
   if ((open_measured && open_end != open_start) || (unpack_measured && unpack_end != unpack_start)) {
     std::fputs("FALLITO: creazioni di thread nella decodifica del prodotto\n", stderr);
     rc = 1;
@@ -151,7 +138,6 @@ int run_product(const std::vector<std::uint8_t>& bytes, const std::string& sampl
 }
 
 int run_libraw2(const std::vector<std::uint8_t>& bytes) {
-  omp_set_num_threads(2);
   LibRaw lr;
   const std::uint64_t t0 = creations();
   const int rc_open = lr.open_buffer(bytes.data(), bytes.size());
@@ -163,22 +149,21 @@ int run_libraw2(const std::vector<std::uint8_t>& bytes) {
     return 1;
   }
   const bool proven = (t1 - t0) + (t2 - t1) >= 1;
-  std::printf("(b) open_buffer %llu, unpack %llu creazioni con due thread OpenMP: %s\n",
+  std::printf("(b) open_buffer %llu, unpack %llu creazioni con LibRaw diretta senza OpenMP: %s\n",
               static_cast<unsigned long long>(t1 - t0), static_cast<unsigned long long>(t2 - t1),
-              proven ? "H6 provata (a condizione che (a) dia 0)" : "H6 non provata");
+              proven ? "creazioni viste" : "nessuna creazione");
   return 0;
 }
 
 int run_control() {
-  omp_set_num_threads(2);
   const std::uint64_t before = creations();
   int sum = 0;
-#pragma omp parallel reduction(+ : sum)
-  { sum += 1; }
+  std::thread worker([&sum] { sum += 1; });
+  worker.join();
   const std::uint64_t created = creations() - before;
-  std::printf("(c) regione propria a due thread: %d thread, %llu creazioni\n", sum, static_cast<unsigned long long>(created));
+  std::printf("(c) thread proprio: %d thread, %llu creazioni\n", sum, static_cast<unsigned long long>(created));
   if (created < 1) {
-    std::fputs("FALLITO: l'interposizione non vede la creazione dei thread di libgomp\n", stderr);
+    std::fputs("FALLITO: l'interposizione non vede la creazione dei thread con pthread_create\n", stderr);
     return 1;
   }
   return 0;

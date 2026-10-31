@@ -116,6 +116,18 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-PACK-07 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-08 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U11) |
 | T-M3A-PACK-09 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10, U11) |
+| T-U12-01 | U12 obbligo 1 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-02 | U12 obbligo 2 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-03 | U12 obbligo 3 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-04 | U12 obbligo 4 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-05 | U12 obbligo 5 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-06 | U12 obbligo 6 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-07 | U12 obbligo 7 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-08 | U12 obbligo 8 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-09 | U12 obbligo 9 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-10 | U12 obbligo 10 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-11 | U12 obbligo 11 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U12-12 | U12 obbligo 12 | U12-third-party | M3.a (U12) | verde (U12) |
 | T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | verde (U10) |
 
 ## M3.entry: ID di lavoro di ADR-03.b

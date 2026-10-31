@@ -614,6 +614,57 @@ TEST(RawDecode, T_M3A_RAW_03_injected_floating_point_stops_before_unpack) {
   EXPECT_EQ(unpack_calls, 0);
 }
 
+// T-M3A-RAW-03 (§2.3): DNG con Compression JPEG XL (52546) o VC-5 (9): open_buffer riesce, get_decoder_info dichiara il formato
+// non supportato. Lo stop e' unsupported/raw.file_unsupported con funzione, nome e flag del decoder, prima della prenotazione
+// delle risorse (before_unpack_plan) e di unpack.
+void expect_unsupported_compression(std::uint16_t compression, memory_pool* pool = nullptr) {
+  fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
+  s.compression = compression;
+  raw_decode_context ctx;
+  ctx.pool = pool;
+  int plan_calls = 0;
+  int unpack_calls = 0;
+  raw_decode_hooks hooks;
+  hooks.before_unpack_plan = [&](const raw_unpack_plan&) { ++plan_calls; };
+  hooks.before_unpack = [&] { ++unpack_calls; };
+  try {
+    (void)decode_raw_buffer(fx::make_dng(s), hooks, ctx);
+    ADD_FAILURE() << "stop_error attesto, nessuna eccezione";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::unsupported) << e.what();
+    EXPECT_EQ(e.code(), "raw.file_unsupported") << e.what();
+    std::string function, name, flags;
+    for (const auto& [k, v] : e.context()) {
+      if (k == "funzione") function = v;
+      if (k == "decoder_name") name = v;
+      if (k == "decoder_flags") flags = v;
+    }
+    EXPECT_EQ(function, "get_decoder_info");
+    EXPECT_FALSE(name.empty());
+    EXPECT_FALSE(flags.empty());
+  }
+  EXPECT_EQ(plan_calls, 0) << "nessuna prenotazione prima dello stop";
+  EXPECT_EQ(unpack_calls, 0) << "nessun unpack prima dello stop";
+  if (pool != nullptr) {
+    EXPECT_EQ(pool->reserved_bytes(), 0u) << "nessuna prenotazione dopo lo stop";
+    EXPECT_EQ(pool->peak_reserved_bytes(), 0u) << "nessuna prenotazione durante lo stop";
+  }
+}
+
+TEST(RawDecode, T_M3A_RAW_03_dng_jpeg_xl_unsupported_before_reservation) { expect_unsupported_compression(52546); }
+TEST(RawDecode, T_M3A_RAW_03_dng_vc5_unsupported_before_reservation) { expect_unsupported_compression(9); }
+
+// Con pool reale e budget sotto la prenotazione del decoder lo stop resta unsupported/raw.file_unsupported: il formato si
+// controlla prima del budget e della prenotazione, non dopo.
+TEST(RawDecode, T_M3A_RAW_03_dng_jpeg_xl_unsupported_before_reservation_with_pool) {
+  memory_pool pool(1);
+  expect_unsupported_compression(52546, &pool);
+}
+TEST(RawDecode, T_M3A_RAW_03_dng_vc5_unsupported_before_reservation_with_pool) {
+  memory_pool pool(1);
+  expect_unsupported_compression(9, &pool);
+}
+
 // T-M3A-RAW-01 (indici per sito, §2.3): con `filters` iniettati con assegnazioni note, l'indice di LibRaw di ogni sito e'
 // quello iniettato; scambiare i due verdi (1 e 3) cambia il risultato.
 TEST(RawDecode, T_M3A_RAW_01_color_index_exact_per_site) {

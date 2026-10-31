@@ -100,6 +100,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `3b5afd8777a27ca02f4c5a8004a51b2e1dfa1285ae70a3019a19d93b157bdd9d` |
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 
-- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
 <!-- evidence:end -->

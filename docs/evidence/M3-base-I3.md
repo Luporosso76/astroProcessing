@@ -123,11 +123,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `docs/evidence/M3-base-I2.md` | `c12af80c52a15862d4dc1c60c14012c82e07e682e2a81bf8c26c8bcbfb90b845` |
+| `docs/evidence/M3-base-I2.md` | `e388b2cd9c898c0105260c5e6c1286d682871ad444e8e450c7f41afa129c3ff3` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
 | `src/core/cpu_dispatch.cpp` | `73c737a9f1ce03e297be90126d47d85c1fe5f451fbdacde579478bb5bff367ae` |
-| `src/core/fits.cpp` | `f6f18576e927dcedd3c8c920f9923058fb2c9e8d7dc5523114272f75ad046967` |
+| `src/core/fits.cpp` | `1b6a71e5ac9a3e16963c3764bca55ea21471d05882c0bd0bc05753757d7ba842` |
 | `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
 | `src/core/fits_scan.cpp` | `0caccd3aac283689838f4fa060c5c1fd28fbc1d04351a60d5e5088b3f1d84b0e` |
 | `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
@@ -143,6 +143,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `3b5afd8777a27ca02f4c5a8004a51b2e1dfa1285ae70a3019a19d93b157bdd9d` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
 <!-- evidence:end -->

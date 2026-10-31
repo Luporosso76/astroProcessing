@@ -429,7 +429,7 @@ TEST(Provenance, T_M2B_12_stop_before_work_record_text_and_rejections) {
 TEST(Provenance, current_library_versions_are_all_reported) {
   const library_versions v = current_library_versions();
   EXPECT_FALSE(v.product.empty());
-  EXPECT_EQ(v.cfitsio, "4.6.3");
+  EXPECT_EQ(v.cfitsio, "4.7.0");
   EXPECT_FALSE(v.source_revision.empty());
   EXPECT_FALSE(v.sqlite.empty());
   EXPECT_NE(v.openssl.find("OpenSSL"), std::string::npos);

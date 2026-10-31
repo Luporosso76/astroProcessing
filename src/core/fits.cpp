@@ -18,6 +18,7 @@
 #include "astro/hash.hpp"
 #include "astro/input_format.hpp"
 #include "astro/job_probe.hpp"
+#include "astro/third_party.hpp"
 #include "fits_internal.hpp"
 
 namespace astro {
@@ -88,6 +89,7 @@ class memory_fits {
  public:
   explicit memory_fits(std::span<const std::uint8_t> bytes)
       : buf_(const_cast<std::uint8_t*>(bytes.data())), size_(bytes.size()) {
+    third_party::verify_once();
     int st = 0;
     fits_open_memfile(&handle_.ptr(), "memory", READONLY, &buf_, &size_, 0, nullptr, &st);
     check_read(st, "fits_open_memfile");
@@ -727,6 +729,7 @@ std::vector<std::uint8_t> encode_fits(const image& img) {
   if (mem.ptr == nullptr) throw std::bad_alloc();
   std::size_t buf_size = block_size;
   fits_handle handle;
+  third_party::verify_once();
   int st = 0;
   fits_create_memfile(&handle.ptr(), &mem.ptr, &buf_size, std::size_t{1} << 20, std::realloc, &st);
   check_write(st, "fits_create_memfile");

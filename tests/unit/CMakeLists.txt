@@ -13,7 +13,7 @@ gtest_discover_tests(test_build_info PROPERTIES LABELS fast)
 
 add_executable(test_deps test_deps.cpp)
 target_link_libraries(test_deps PRIVATE
-  PkgConfig::CFITSIO SQLite::SQLite3 OpenSSL::Crypto
+  astro_cfitsio SQLite::SQLite3 OpenSSL::Crypto
   PkgConfig::FFTW3 PkgConfig::FFTW3F GTest::gtest_main)
 gtest_discover_tests(test_deps PROPERTIES LABELS fast)
 
@@ -30,7 +30,7 @@ foreach(t test_error test_image test_fits test_json test_hash test_dag test_job 
   gtest_discover_tests(${t} PROPERTIES LABELS fast)
 endforeach()
 target_link_libraries(test_fits PRIVATE OpenSSL::Crypto)
-target_link_libraries(test_blocks PRIVATE PkgConfig::CFITSIO)
+target_link_libraries(test_blocks PRIVATE astro_cfitsio)
 target_link_libraries(test_budget PRIVATE SQLite::SQLite3)
 target_link_libraries(test_resources PRIVATE SQLite::SQLite3)
 foreach(t test_store test_store_history test_store_contract test_store_crash test_export test_store_review test_job_alloc
@@ -196,7 +196,7 @@ gtest_discover_tests(test_pack_index NO_PRETTY_VALUES PROPERTIES LABELS fast)
 # processo per seme: ctest -j non oltre 4 per restare nel 70% delle CPU). PUB-RAW-01 in sola lettura da data/public.
 set(ASTRO_RAW_PIXLS_ENV "ASTRO_RAW_PIXLS_DIR=${PROJECT_SOURCE_DIR}/data/public/raw-pixls-us")
 add_executable(test_raw_robust test_raw_robust.cpp main_utc0.cpp)
-target_link_libraries(test_raw_robust PRIVATE astrocore GTest::gtest PkgConfig::LIBRAW OpenMP::OpenMP_CXX ${CMAKE_DL_LIBS})
+target_link_libraries(test_raw_robust PRIVATE astrocore astro_libraw GTest::gtest ${CMAKE_DL_LIBS})
 target_include_directories(test_raw_robust PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_raw_robust PROPERTIES LABELS fast TIMEOUT 600)
 
@@ -214,7 +214,7 @@ set_tests_properties(${ASTRO_U3_FUZZ_TESTS} PROPERTIES LABELS slow TIMEOUT 14400
 
 # T-M3A-RAW-08: un processo nuovo per campione e per fase; (a) prima di (b), (c) dopo tutti (ADR-08.b §2.7).
 add_executable(raw_threads raw_threads.cpp)
-target_link_libraries(raw_threads PRIVATE astrocore PkgConfig::LIBRAW OpenMP::OpenMP_CXX ${CMAKE_DL_LIBS})
+target_link_libraries(raw_threads PRIVATE astrocore astro_libraw ${CMAKE_DL_LIBS})
 target_include_directories(raw_threads PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 set(ASTRO_U3_THREAD_B_TESTS "")
 foreach(sample syn 0 1 2 3 4 5 6 7)
@@ -334,3 +334,6 @@ add_test(NAME TOOLS.trace_selftest COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tool
 add_test(NAME TOOLS.lint_selftest COMMAND ${PROJECT_SOURCE_DIR}/tools/lint.sh --selftest)
 add_test(NAME TOOLS.check_m2_trace COMMAND python3 -S ${PROJECT_SOURCE_DIR}/tests/tools/test_check_m2_trace.py)
 set_tests_properties(TOOLS.trace_selftest TOOLS.lint_selftest TOOLS.check_m2_trace PROPERTIES LABELS fast TIMEOUT 120)
+
+# T-U12-01…12: contratto U12 (librerie compilate nel progetto).
+add_subdirectory(${PROJECT_SOURCE_DIR}/tests/u12 ${CMAKE_BINARY_DIR}/tests/u12)

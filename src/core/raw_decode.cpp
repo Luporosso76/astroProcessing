@@ -1,7 +1,6 @@
 #include "astro/raw_decode.hpp"
 
 #include <libraw/libraw.h>
-#include <omp.h>
 
 #include <cstdlib>
 #include <ctime>
@@ -13,6 +12,7 @@
 
 #include "astro/hash.hpp"
 #include "astro/memory_pool.hpp"
+#include "astro/third_party.hpp"
 
 namespace astro {
 namespace {
@@ -28,7 +28,7 @@ context rc_context(const char* function, int rc) {
   return {{"funzione", function}, {"valore", std::to_string(rc)}, {"libraw", libraw_strerror(rc)}};
 }
 
-// Codice di ritorno non nullo di open_buffer o unpack (ADR-08.b §2.5).
+// Codice di ritorno non nullo di open_buffer, get_decoder_info o unpack (ADR-08.b §2.5).
 [[noreturn]] void libraw_stop(const char* function, int rc) {
   error_category category = error_category::invalid_input;
   const char* code = "raw.libraw_error";
@@ -64,11 +64,11 @@ struct unpack_watch {
   const cancel_token* cancel = nullptr;
   bool data_error = false;
   std::optional<std::string> file;  // assente se LibRaw passa un nome nullo (sorgente in memoria)
-  int offset = 0;
+  INT64 offset = 0;
 };
 
 // Si registra la prima segnalazione; lo stop avviene dopo il ritorno di unpack, qualunque sia il suo codice.
-void on_data_error(void* data, const char* file, const int offset) {
+void on_data_error(void* data, const char* file, const INT64 offset) {
   auto& w = *static_cast<unpack_watch*>(data);
   if (w.data_error) return;
   w.data_error = true;
@@ -273,9 +273,9 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   if (bytes.size() > raw_limits::max_file_bytes)
     throw stop_error(error_category::limit_exceeded, "raw.max_file_bytes", "file RAW oltre il limite",
                      {{"byte", std::to_string(bytes.size())}, {"limite", std::to_string(raw_limits::max_file_bytes)}});
+  // U12 obbligo 5: versione e capacita' di LibRaw verificate prima della prima chiamata alla libreria.
+  third_party::verify_once();
   check_process_tz();
-  // §2.7: le regioni OpenMP di LibRaw in questo thread usano un solo thread.
-  omp_set_num_threads(1);
   const auto returned = [&hooks](const char* function, int rc) {
     return hooks.libraw_return ? hooks.libraw_return(function, rc) : rc;
   };
@@ -307,6 +307,15 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
 
   if (const int rc = returned("open_buffer", lr->open_buffer(bytes.data(), bytes.size())); rc != LIBRAW_SUCCESS)
     libraw_stop("open_buffer", rc);
+
+  // §2.3: per i formati che LibRaw dichiara non supportati (DNG JPEG XL, VC-5) open_buffer riesce e unpack no.
+  libraw_decoder_info_t decoder{};
+  if (const int rc = lr->get_decoder_info(&decoder); rc != LIBRAW_SUCCESS) libraw_stop("get_decoder_info", rc);
+  if ((decoder.decoder_flags & LIBRAW_DECODER_UNSUPPORTED_FORMAT) != 0)
+    unsupported("raw.file_unsupported", "formato non supportato dichiarato da LibRaw",
+                {{"funzione", "get_decoder_info"},
+                 {"decoder_name", decoder.decoder_name != nullptr ? decoder.decoder_name : "null"},
+                 {"decoder_flags", std::to_string(decoder.decoder_flags)}});
 
   raw_probe_fields probe{d.idata.filters,
                          d.idata.colors,
@@ -345,7 +354,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   if (hooks.before_unpack_plan) hooks.before_unpack_plan(plan);
   if (hooks.with_handlers)
     hooks.with_handlers(raw_unpack_callbacks{
-        [&watch](const char* file, int offset) { on_data_error(&watch, file, offset); },
+        [&watch](const char* file, INT64 offset) { on_data_error(&watch, file, offset); },
         [&watch](int stage, int iteration, int expected) {
           return on_progress(&watch, static_cast<LibRaw_progress>(stage), iteration, expected);
         }});

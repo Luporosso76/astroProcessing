@@ -45,7 +45,7 @@ TEST(Deps, SqliteInMemoryRoundtrip) {
 TEST(Deps, CfitsioVersion) {
   float v = 0;
   fits_get_version(&v);
-  EXPECT_NEAR(v, 4.0603f, 0.0001f);
+  EXPECT_NEAR(v, 4.0700f, 0.0001f);
 }
 
 TEST(Deps, FftwDoubleDeltaIsAllOnes) {

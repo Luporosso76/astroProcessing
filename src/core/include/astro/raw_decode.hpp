@@ -48,7 +48,7 @@ struct raw_unpack_fields {
 // Gestori installati in LibRaw (§2.5), esposti ai test: errore di dati (file e offset) e progresso (valore non nullo =
 // cancel richiesto).
 struct raw_unpack_callbacks {
-  std::function<void(const char* file, int offset)> data_error;
+  std::function<void(const char* file, long long offset)> data_error;
   std::function<int(int stage, int iteration, int expected)> progress;
 };
 // Piano di memoria subito prima di `unpack` (§2.1, §2.8): parte per `raw_image` (M * 2^20), byte prenotati nel pool (0

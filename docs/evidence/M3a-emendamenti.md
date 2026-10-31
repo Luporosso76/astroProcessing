@@ -51,6 +51,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-08-decoder-pack.md` | `b5abcafc55e824f9d7b2ac19a08fae98e66e70e125e33561ee38a8841c93ae98` |
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `plans/M3a.md` | `fa1649f1cf8c01dd2f836687c18ec993893cf0941c4649d5f89d5d3196583500` |
+| `plans/M3a.md` | `f67f25e229c2069af87fded7be33a8f06f8592732d9e9f87bc8379bf6581bfd2` |
 
 <!-- evidence:end -->

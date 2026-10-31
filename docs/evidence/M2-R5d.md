@@ -24,13 +24,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/provenance.cpp` | `ba81e4469d42f3836dc7aa3ab5ef53509d17ad3526a5dca94e4c206e7e7db55e` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tests/unit/test_import.cpp` | `1da08927791cc7e1a1df0f238e77bfdb50c724ec1afff7d0ac52eef28f228f79` |
-| `tests/unit/test_job.cpp` | `d01fee9cd6c8b2219a033df916676311c5f9fc59c8d9a01fac4d8b64614a6da1` |
+| `tests/unit/test_job.cpp` | `b2152761e26c834002db4c02538d07ad9d2402dd7a6bb44bd3ff5a48ce862c2e` |
 | `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 | `tests/unit/test_store_review.cpp` | `23e1dc408879523e5fe06725dd029ee0968f07ef21d7ee76aac76381987d034e` |
 
-- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

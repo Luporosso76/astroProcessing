@@ -90,16 +90,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `docs/evidence/M3-base-I2.md` | `c12af80c52a15862d4dc1c60c14012c82e07e682e2a81bf8c26c8bcbfb90b845` |
-| `docs/evidence/M3-base-I3.md` | `6163620983b153799a5cebd91fa1a7137656f0cb30054e2a0cab56f3b5b44444` |
+| `docs/evidence/M3-base-I2.md` | `e388b2cd9c898c0105260c5e6c1286d682871ad444e8e450c7f41afa129c3ff3` |
+| `docs/evidence/M3-base-I3.md` | `009280cfd71f4f9e1d90155219940a9ad2c0205f815fc33d847b00b7576a2c7c` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
 | `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
-| `tests/unit/CMakeLists.txt` | `65928a9dbb372c3c5ab3391437d077979aa1a2b00ba98ecfb3956ac8ce361af9` |
+| `tests/unit/CMakeLists.txt` | `53f1f2db0e4a35cc76c32860527eee14cdaa94756f5b43ee2e33b172b737615b` |
 | `tests/unit/test_conformance.cpp` | `3b5afd8777a27ca02f4c5a8004a51b2e1dfa1285ae70a3019a19d93b157bdd9d` |
 | `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 
-- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
 <!-- evidence:end -->

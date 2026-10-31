@@ -33,6 +33,7 @@ struct dng_spec {
   std::uint16_t samples_per_pixel = 1;
   std::uint16_t bits = 16;
   std::uint16_t sample_format = 1;     // 1 intero senza segno, 3 virgola mobile
+  std::uint16_t compression = 1;       // tag 259: 1 nessuna; 9 VC-5, 52546 JPEG XL (dati non compressi, solo per le intestazioni)
   std::uint16_t photometric = 32803;   // 32803 CFA, 34892 LinearRaw
   std::uint16_t cfa_rows = 2;
   std::uint16_t cfa_cols = 2;
@@ -156,7 +157,7 @@ inline ifd_position append_ifd(std::vector<std::uint8_t>& out, const dng_spec& s
   es.push_back(e_longs(256, {s.width}));
   es.push_back(e_longs(257, {s.height}));
   es.push_back(e_shorts(258, std::vector<std::uint16_t>(s.samples_per_pixel, s.bits)));
-  es.push_back(e_shorts(259, {1}));
+  es.push_back(e_shorts(259, {s.compression}));
   es.push_back(e_shorts(262, {s.photometric}));
   es.push_back(e_ascii(271, s.make));
   es.push_back(e_ascii(272, s.model));

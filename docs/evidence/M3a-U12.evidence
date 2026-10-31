@@ -1,0 +1,26 @@
+# Sorgente del blocco generato di M3a-U12.md (tools/evidence.py)
+file CMakeLists.txt
+file cmake/third_party_libs.cmake
+file src/core/CMakeLists.txt
+file src/core/include/astro/third_party.hpp
+file src/core/third_party.cpp
+file src/core/raw_decode.cpp
+file src/core/include/astro/raw_decode.hpp
+file src/core/fits.cpp
+file docs/licenses.md
+file third_party/libraw/SHA256SUMS
+file third_party/cfitsio/SHA256SUMS
+file third_party/wcslib/SHA256SUMS
+file tests/unit/CMakeLists.txt
+file tests/unit/raw_threads.cpp
+file tests/unit/test_raw_robust.cpp
+file tests/unit/test_deps.cpp
+file tests/unit/test_job.cpp
+file tests/u12/CMakeLists.txt
+file tests/u12/test_third_party_verify.cpp
+file tests/unit/test_raw_decode.cpp
+file tests/fixtures/syn_dng.hpp
+file tests/u12/test_u12_order_static.py
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml
+junit fuzz-asan tmp/u12-fuzz-asan-junit.xml

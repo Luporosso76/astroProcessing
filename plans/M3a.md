@@ -91,7 +91,7 @@ Test: T-M3A-RAW-05, 06, 08, 10 (fuzz: zero crash e zero abort, H5). Uscita: fuzz
 
 ID: F-IO-02, F-IO-04.
 1. Tipo di job `io.raw_import` registrato in `job_types.cpp` con costruttore minimo (BASE §3.1) — `raw_import_job.cpp`.
-2. Record del decoder di §2.9 in provenance e nella chiave del nodo, identità della libreria (`LibRaw::version()`, SHA-256 di `libraw_r.so` caricata) — `raw_decode.cpp`.
+2. Record del decoder di §2.9 in provenance e nella chiave del nodo, identità della libreria come da ADR-08.b §2.9 emendato da U12 (`LibRaw::version()`, `versionNumber()`, `libraw_capabilities()`, SHA-256 del tarball di `third_party/libraw/`) — `raw_decode.cpp`.
 3. Export della provenance con hash dell'originale e offset applicato dal decoder (`none`) (F-IO-04; C-01.b §10) — `provenance.cpp` (solo campi; scrittura nel runner).
 4. Simboli vietati assenti (§5) — `tools/check_offline.sh`.
 Decisi il 30 ottobre (ADR-08.b §2.5, §2.6, §2.9): `PARSEFUJI_PROCESSED` ammesso e registrato (X-A1 si decodifica); ora di acquisizione col processo a `TZ=UTC0`, nel record e nella chiave. Test: T-M3BASE-11 e T-M3BASE-12 sulla variante RAW (da U0); T-M3A-RAW-07, 09, 11, 12, 13 (chiavi `null` di ADR-08.b §2.6, emendamento L4); T-M3A-02 (export F-IO-04: hash della sorgente, `black_applied_by_decoder = none`, campi assenti restano assenti); T-M2F-02 e T-M2R0-01 rieseguiti con i binari che collegano LibRaw e libtiff. Dati: `PUB-RAW-01` (7 Bayer, X-E1 → `raw.xtrans`). Uscita: suite di conformità verde sul nuovo tipo.

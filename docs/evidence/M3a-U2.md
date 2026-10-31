@@ -104,16 +104,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `CMakeLists.txt` | `0e29f2648037ec69e84817b30bd02d327b60e24339719d9744fdeaf926b556f1` |
+| `CMakeLists.txt` | `7b1a76ed5d18e95b267d724998b1b2d0715382de9618a9e3b71af246afc9ac63` |
 | `docs/contracts/ADR-08-decoder-pack.md` | `b5abcafc55e824f9d7b2ac19a08fae98e66e70e125e33561ee38a8841c93ae98` |
-| `docs/licenses.md` | `b9ffb9334ff642779c86cbd8c553b36f6b07887526801a5571e66fb0f2b6ffe1` |
-| `src/core/CMakeLists.txt` | `bef3d72e6dc57ba4fc51eb21d27c640dcb3852b6054ec1853dd40609abef94b6` |
-| `src/core/include/astro/raw_decode.hpp` | `fcf18c63c1701e15b61ba50ecc24c443f9fe5cb4b6661386b5e765b36362ba9d` |
-| `src/core/raw_decode.cpp` | `c256ae77394996d6f763ccbf02fca67c5fc11d0e85502685299a837f8de17b6c` |
-| `tests/fixtures/syn_dng.hpp` | `dd62bccd32bc239e8389eb9aa5b8457e74850030888fc07e6413b9ee8d39162c` |
-| `tests/unit/CMakeLists.txt` | `65928a9dbb372c3c5ab3391437d077979aa1a2b00ba98ecfb3956ac8ce361af9` |
-| `tests/unit/test_raw_decode.cpp` | `9836b507fe29d2c51793288674d1d91fae061d273d0c814111107e006e8d8570` |
+| `docs/licenses.md` | `7a50e18608d22fb2041d030963630844ce886ac76df937a5ca6085c223ab8d46` |
+| `src/core/CMakeLists.txt` | `fe9a944f4ea51259575a5d88018d97173853d4ce757b2075e09b132787d851f2` |
+| `src/core/include/astro/raw_decode.hpp` | `d9e325e089f3d38794676b9d3ea0bd17a7495ddb5781ef6c75eab6f72df548e4` |
+| `src/core/raw_decode.cpp` | `4a76d4d4d227196cb74a318528ea725e1da470d01452d0518d9a741afec97653` |
+| `tests/fixtures/syn_dng.hpp` | `7f87df440051ceb37f142e03f1e8e15f6cbafdfe3e99f26e1bd9d20bf87defb6` |
+| `tests/unit/CMakeLists.txt` | `53f1f2db0e4a35cc76c32860527eee14cdaa94756f5b43ee2e33b172b737615b` |
+| `tests/unit/test_raw_decode.cpp` | `8e3347b6ef24a9f61c153428898623c5e70c9daee03128190c9e501a149dc3cd` |
 
-- Test release (`tmp/release-junit.xml`): totali 878, fast 862, slow 16, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 863, fast 863, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
 <!-- evidence:end -->
