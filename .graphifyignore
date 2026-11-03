@@ -1,0 +1,6 @@
+# Fuori dal grafo: piani storici, artefatti di strumenti e worktree degli agenti.
+doc_old/
+.playwright-mcp/
+.claude/
+.remember/
+third_party/
