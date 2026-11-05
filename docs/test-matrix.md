@@ -128,6 +128,19 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-U12-10 | U12 obbligo 10 | U12-third-party | M3.a (U12) | verde (U12) |
 | T-U12-11 | U12 obbligo 11 | U12-third-party | M3.a (U12) | verde (U12) |
 | T-U12-12 | U12 obbligo 12 | U12-third-party | M3.a (U12) | verde (U12) |
+| T-U13-01 | U13 §3 | U13-dng-decoder | M3.a (U13a) | PIANIFICATO |
+| T-U13-02 | U13 §3 | U13-dng-decoder | M3.a (U13a) | PIANIFICATO |
+| T-U13-03 | U13 §4, §5 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-04 | U13 §5 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-05 | U13 §4 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-06 | U13 §4, §6 | U13-dng-decoder | M3.a (U13a) | PIANIFICATO |
+| T-U13-07 | U13 §4 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-08 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-09 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-10 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-11 | U13 §3-§6 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-12 | U13 §8 | U13-dng-decoder | M3.a (U13b; con T-M3A-RAW-11 e 12) | PIANIFICATO |
+| T-U13-24 | U13 §10 | U13-dng-decoder | M3.a (U13b; documentazione in M5) | PIANIFICATO |
 | T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | verde (U10) |
 
 ## M3.entry: ID di lavoro di ADR-03.b

@@ -36,6 +36,7 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 | U10 | Sonnet (5 casi aggiunti dall'autore del codice: deviazione dichiarata) | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U11 | Opus (oracolo HEALPix) | Sonnet | Codex |
 | U12 (librerie migliori) | Sonnet (Opus per rifare le sonde dei fatti di ADR-08 su LibRaw 0.22) | Sonnet | Codex |
+| U13a, U13b (decoder DNG del progetto) | Opus (numerica del decoder: AGENTS.md, «Ciclo di un'unità», punto 2) | Opus (parser di un formato non fidato, numerica del decoder, fuzz) | Argon (`tools/review.sh`; se non risponde, Claude Opus) |
 
 Ricognizione, allineamento di piani e record, controlli di stato: Haiku. Testi e lingue: Gemini via `agy`. Il coordinatore copia il modello da questa tabella nella chiamata di delega. Una mutazione sopravvissuta o un caso mancante trovato dall'autore del codice non diventa un test suo: lo riporta, e i casi li scrive l'agente dei test (regola ripetuta nei prompt da U3 in poi).
 
@@ -231,9 +232,11 @@ Conseguenza: i test esistenti che si aspettano true per immagini senza `measure`
 - Le sonde dei fatti LibRaw di ADR-08 (H3, origine dispari, float, curva, `cblack`, memoria M, thread, TZ, Fuji) si rifanno sulla nuova versione prima del codice; ogni differenza è un emendamento del contratto.
 - `docs/licenses.md`: licenza di ogni dipendenza diretta letta dal LICENSE upstream, non dal `copyright` Debian.
 
-### U13, in M3.a dopo U12: DNG intero deflate e JPEG XL
+### U13, in M3.a dopo U12: DNG intero deflate (JPEG XL fermato sui tag)
 - Fatto di U12: LibRaw 0.22.3 decodifica il deflate solo in virgola mobile («Only float deflated supported»); il DNG intero deflate e il JPEG XL richiedono l'Adobe DNG SDK, la cui licenza (indennizzo §5, legge della California §8) non è compatibile con GPL-3.0-or-later ed è esclusa.
-- Scelta: decoder indipendente scritto dal progetto dalla specifica DNG 1.7 pubblica, con zlib per il deflate e libjxl (implementazione di riferimento, BSD-3-Clause) per il JPEG XL, compilata in `third_party/` con le regole di U12. Contratto e test prima del codice; avviso di brevetto DNG di Adobe nella documentazione (M5).
+- Scelta: decoder indipendente scritto dal progetto dalla specifica DNG 1.7.1.0 pubblica, con zlib di sistema per il deflate intero a 32 bit; i DNG JPEG XL si fermano sui tag e libjxl (BSD-3-Clause) è valutata e non adottata (contratto §6, §9). Contratto e test prima del codice; avviso di brevetto DNG di Adobe nei sorgenti del decoder e nella documentazione (M5).
+- Contratto: `docs/contracts/U13-dng-decoder.md` (specifica DNG 1.7.1.0). Fatti della specifica (p. 21): il deflate è ammesso per l'IFD raw solo con interi a 32 bit, quindi i DNG deflate interi a 16 bit di U12 non sono conformi e si fermano con `raw.dng_nonconformant`; il JPEG XL non è ammesso per un IFD raw CFA (solo LinearRaw e altre interpretazioni non CFA), quindi ogni DNG JPEG XL si ferma sui tag (`raw.dng_nonconformant` o `raw.not_cfa`) e libjxl non entra nel prodotto (versioni, licenze e sonde in §9 e §14 per un'unità successiva). Il LinearRaw JPEG XL è fuori dal prodotto come ogni LinearRaw: portarlo dentro è una scelta di perimetro del proprietario. Test T-U13-01…12 e 24 (§12), emendamenti ad ADR-08.b in §11, da applicare prima del codice.
+- Sotto-unità, in ordine, una review ciascuna: U13a instradamento, parser DNG e stop sui tag (T-U13-01, 02, 06); U13b deflate, immagine, livelli, metadati, limiti (T-U13-03…05, 07…12, 24). T-U13-12 si esegue con T-M3A-RAW-11 e 12; T-U13-24 parte in U13b (sorgente) e si chiude in M5. Modelli nella tabella «Modelli per unità».
 
 ### Emendamenti alle slice successive (prima del loro codice)
 - M3.d: debayer edge-aware (RCD) come default più CFA/Bayer drizzle per lo stacking; il bilineare a pesi fissi resta per la varianza esatta (ADR-09).
