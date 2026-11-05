@@ -5,7 +5,7 @@
 # non risponde (assente da `agy models`, rifiuto, crediti finiti) lo strumento esce con 4 e la review si rilancia
 # esplicitamente con `--reviewer claude`: nessun cambio automatico di revisore.
 # Il prompt è il template fisso più il file di fatti dell'unità (ID, contratto, log): niente giudizi dell'autore.
-# Il log del revisore va in tmp/review-<slug>.log; a video solo il percorso dell'artefatto e il verdetto.
+# Il log del revisore va in tmp/review-<slug>-<revisore>.log; a video solo il percorso dell'artefatto e il verdetto.
 # Il revisore legge e basta: se durante la review cambia lo stato di git (file tracciati o nuovi), uscita 2.
 # Verdetto: l'ultima riga non vuota dell'artefatto inizia con "Verdetto: PASS|FAIL"; tutte le occorrenze di
 # "Verdetto: PASS|FAIL" nell'artefatto (anche a metà riga, per le code ripetute dal revisore) devono concordare.
@@ -126,7 +126,7 @@ if [ "${#round}" -gt 2 ] || [ "$round" -gt 2 ]; then
   echo "limite di 2 giri raggiunto per '$slug': fermati e consegna al coordinatore l'ultimo artefatto con i rilievi aperti (arbitraggio)" >&2
   exit 3
 fi
-log="tmp/review-${slug}.log"
+log="tmp/review-${slug}-${reviewer}.log"
 out=".omc/artifacts/ask/review-${slug}-${reviewer}-$(date +%Y%m%d-%H%M).md"
 prompt="$(cat tools/review-template.md "$extra")"
 
