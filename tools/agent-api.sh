@@ -9,15 +9,17 @@
 # rilancia il compito sull'abbonamento e lo registra); 5 errore riportato da claude (dettaglio nell'esito).
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-key="$root/.secrets/anthropic-api-key"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# La chiave sta solo nel checkout principale: da un worktree la si trova dalla directory git comune.
+main_root="$(cd "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)/.." && pwd -P)"
+key="$main_root/.secrets/anthropic-api-key"
 
 if [ "$#" -ne 4 ]; then
   echo "uso: tools/agent-api.sh <haiku|sonnet|opus> <directory-di-lavoro> <file-prompt> <file-esito.json>" >&2
   exit 2
 fi
 model="$1"
-workdir="$(cd "$2" && pwd)"
+workdir="$(cd "$2" && pwd -P)"
 prompt="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
 out="$4"
 
@@ -33,7 +35,7 @@ mkdir -p "$(dirname "$out")"
 # bloccato da queste regole; contano la modalità auto e il credito della chiave.
 settings="$(python3 -I -S -c 'import json, sys; k, s = sys.argv[1], sys.argv[2]
 print(json.dumps({"apiKeyHelper": "cat " + k, "permissions": {"deny": [f"Read({s}/**)", f"Edit({s}/**)"]}}))' \
-  "$key" "$root/.secrets")"
+  "$key" "$main_root/.secrets")"
 
 # In modalità -p un comando lanciato in background lascia claude in attesa di una notifica che non arriva: l'agente
 # resta fermo fino al timeout e l'esito JSON va perso. La regola precede ogni prompt.
