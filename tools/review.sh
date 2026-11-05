@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# Review indipendente con Codex. Uso: tools/review.sh <slug> <file-fatti.md>
+# Review indipendente. Uso: tools/review.sh [--reviewer argon|claude] <slug> <file-fatti.md>
+# Revisore (AGENTS.md, "Delega e review"): `argon` (default) è Gemini 4 Argon (High) via `agy` in modalità plan e sandbox;
+# `claude` è Claude Opus headless sull'abbonamento, contesto separato dall'autore, senza strumenti di scrittura. Se Argon
+# non risponde (assente da `agy models`, rifiuto, crediti finiti) lo strumento esce con 4 e la review si rilancia
+# esplicitamente con `--reviewer claude`: nessun cambio automatico di revisore.
 # Il prompt è il template fisso più il file di fatti dell'unità (ID, contratto, log): niente giudizi dell'autore.
-# Il log di Codex va in tmp/review-<slug>.log; a video solo il percorso dell'artefatto e il verdetto.
+# Il log del revisore va in tmp/review-<slug>.log; a video solo il percorso dell'artefatto e il verdetto.
+# Il revisore legge e basta: se durante la review cambia lo stato di git (file tracciati o nuovi), uscita 2.
 # Verdetto: l'ultima riga non vuota dell'artefatto inizia con "Verdetto: PASS|FAIL"; tutte le occorrenze di
-# "Verdetto: PASS|FAIL" nell'artefatto (anche a metà riga, per le code ripetute da Codex) devono concordare.
+# "Verdetto: PASS|FAIL" nell'artefatto (anche a metà riga, per le code ripetute dal revisore) devono concordare.
 # Un PASS con rilievi [BLOCCANTE] o [MED] è incoerente (uscita 2).
 # Uso: tools/review.sh --selftest   prova il giudizio su artefatti sintetici e sulla fixture tests/fixtures/review/.
 # Criterio: FAIL se c'è almeno un rilievo BLOCCANTE o MED, PASS solo con LOW o senza rilievi; un verdetto che
 # contraddice i rilievi (PASS con BLOCCANTE/MED, FAIL con soli LOW) è incoerente (uscita 2).
-# Uscita: 0 PASS, 1 FAIL, 2 errore di Codex, artefatto incoerente o argomenti non validi, 3 limite di giri raggiunto.
+# Uscita: 0 PASS, 1 FAIL, 2 errore del revisore, artefatto incoerente o argomenti non validi, 3 limite di giri raggiunto,
+# 4 Argon non disponibile (rilanciare con --reviewer claude).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -74,13 +80,19 @@ if [ "${1:-}" = "--selftest" ]; then
   printf '[LOW] a — b — c\n' > "$d/none.md";                                  expect "nessun verdetto" 2 "$d/none.md"
   real="$root/tests/fixtures/review/codex-r0-review3.md"
   [ -f "$real" ] || { echo "artefatto reale assente: $real" >&2; exit 2; }
-  cp -- "$real" "$d/real.md";                                                   expect "artefatto reale di Codex" 1 "$d/real.md"
+  cp -- "$real" "$d/real.md";                                                   expect "artefatto reale di una review" 1 "$d/real.md"
   echo "review selftest: ok"
   exit 0
 fi
 
+reviewer=argon
+if [ "${1:-}" = "--reviewer" ]; then
+  reviewer="${2:-}"
+  shift 2 || { echo "uso: tools/review.sh [--reviewer argon|claude] <slug> <file-fatti.md>" >&2; exit 2; }
+fi
+case "$reviewer" in argon|claude) ;; *) echo "revisore non ammesso: '$reviewer' (argon o claude)" >&2; exit 2 ;; esac
 if [ "$#" -ne 2 ]; then
-  echo "uso: tools/review.sh <slug> <file-checklist-extra.md>" >&2
+  echo "uso: tools/review.sh [--reviewer argon|claude] <slug> <file-fatti.md>" >&2
   exit 2
 fi
 slug="$1"
@@ -91,12 +103,15 @@ if ! [[ "$slug" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 [ -f "$extra" ] || { echo "file extra assente: $extra" >&2; exit 2; }
 [ -f tools/review-template.md ] || { echo "template assente: tools/review-template.md" >&2; exit 2; }
-command -v codex >/dev/null || { echo "codex non trovato nel PATH" >&2; exit 2; }
-# gpt-6-astra richiede codex-cli >= 0.164.0; una versione più vecchia nel PATH ferma la review.
-codex_version="$(codex --version 2>/dev/null | sed -n 's/^codex-cli //p')"
-if [ -z "$codex_version" ] || [ "$(printf '%s\n0.164.0\n' "$codex_version" | sort -V | head -1)" != "0.164.0" ]; then
-  echo "codex-cli ${codex_version:-sconosciuta} in $(command -v codex): serve >= 0.164.0 per gpt-6-astra" >&2
-  exit 2
+argon_model="gemini-4-argon-high"
+if [ "$reviewer" = argon ]; then
+  command -v agy >/dev/null || { echo "agy non trovato nel PATH" >&2; exit 2; }
+  if ! timeout 120 agy models < /dev/null 2>/dev/null | grep -q "^${argon_model}[[:space:]]"; then
+    echo "Argon ($argon_model) assente da 'agy models': rilanciare con --reviewer claude" >&2
+    exit 4
+  fi
+else
+  command -v claude >/dev/null || { echo "claude non trovato nel PATH" >&2; exit 2; }
 fi
 
 mkdir -p .omc/artifacts/ask tmp
@@ -112,7 +127,7 @@ if [ "${#round}" -gt 2 ] || [ "$round" -gt 2 ]; then
   exit 3
 fi
 log="tmp/review-${slug}.log"
-out=".omc/artifacts/ask/codex-${slug}-$(date +%Y%m%d-%H%M).md"
+out=".omc/artifacts/ask/review-${slug}-${reviewer}-$(date +%Y%m%d-%H%M).md"
 prompt="$(cat tools/review-template.md "$extra")"
 
 # Istantanea del lavoro non committato a ogni giro (file modificati e nuovi, escluso il collegamento `data`): il delta
@@ -136,9 +151,27 @@ if [ "$round" = 2 ]; then
 Delta del giro 2 rispetto al giro 1, calcolato dallo strumento: \`${delta}\`."
 fi
 
-if ! TMPDIR="$root/tmp" timeout 3600 codex exec -m gpt-6-astra -c model_reasoning_effort="high" -s read-only \
-  -o "$out" "$prompt" < /dev/null > "$log" 2>&1; then
-  echo "codex ha fallito (uscita non nulla o timeout); artefatto: $out, log: $log" >&2
+git_state() { { git status --porcelain=v1 --untracked-files=all; git diff HEAD; } | sha256sum; }
+before="$(git_state)"
+prompt="${prompt}
+
+Sei in sola lettura: leggi file ed esegui solo comandi che non modificano nulla (git diff, git log, cat, grep). Scrivi la
+review come risposta finale, senza creare file."
+rc=0
+if [ "$reviewer" = argon ]; then
+  TMPDIR="$root/tmp" timeout 3600 agy -p "$prompt" --model "$argon_model" --mode plan --sandbox --print-timeout 3500s \
+    --log-file "$log" < /dev/null > "$out" 2>> "$log" || rc=$?
+else
+  printf '%s\n' "$prompt" | TMPDIR="$root/tmp" timeout 3600 env -u ANTHROPIC_API_KEY claude -p --model opus \
+    --permission-mode auto --disallowedTools "Edit,Write,NotebookEdit" --output-format text > "$out" 2> "$log" || rc=$?
+fi
+[ "$(git_state)" = "$before" ] || { echo "lo stato di git è cambiato durante la review: il revisore non è in sola lettura (log: $log)" >&2; exit 2; }
+if [ "$rc" -ne 0 ]; then
+  if [ "$reviewer" = argon ]; then
+    echo "Argon ha fallito (uscita $rc; rifiuto, crediti o timeout): rilanciare con --reviewer claude; artefatto: $out, log: $log" >&2
+    exit 4
+  fi
+  echo "il revisore Claude ha fallito (uscita $rc o timeout); artefatto: $out, log: $log" >&2
   exit 2
 fi
 [ -s "$out" ] || { echo "artefatto vuoto o assente: $out" >&2; exit 2; }

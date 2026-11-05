@@ -10,7 +10,7 @@ Ultimo aggiornamento: 30 ottobre 2026. Unica fonte dello stato corrente; risulta
 - Procedura snellita (`AGENTS.md`, sezione "Ritmo di lavoro"): un record per unità, errori corretti nello stesso turno, harness minimi; gate scientifici e divieto di fallback nel prodotto invariati.
 - D-19/D-20 approvate P0. D-21: preferenza per pack inclusi, subordinata alle verifiche di licenza.
 - Repository su `work/m0-m1`, origin ufficiale. Ultimo commit pubblicato: vedi `git log` su `work/m0-m1`.
-- Review indipendenti: Codex `gpt-6-astra` in sola lettura finché ha token, poi revisori Claude; Gemini 4 Argon non disponibile; Gemini Flash via `agy` solo per testi e lingue (`AGENTS.md`).
+- Review indipendenti con `tools/review.sh`: Gemini 4 Argon (High) via `agy`, poi, se non risponde, agente Claude Opus separato (`--reviewer claude`); Codex non si usa più (`AGENTS.md`).
 
 ## Evidenze principali
 

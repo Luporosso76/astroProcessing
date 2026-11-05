@@ -30,9 +30,9 @@ Fixture: `FIX-SYN-DNG-01`, DNG non compressi a 16 bit scritti con libtiff (`TIFF
 | U1 | Sonnet | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U1b | Sonnet (6 casi aggiunti dall'autore del codice per mutazioni sopravvissute, deviazione dichiarata) | Sonnet | Codex |
 | U2, U2b, U3 | Sonnet (U2: 3 casi aggiunti dall'autore del codice su rilievi della review, deviazione dichiarata) | Opus (numerica del decoder, fuzz) | Codex |
-| U4, U5 | Sonnet | Sonnet | Codex |
-| U6, U7 | Opus (predicati e compatibilità) | Opus | Codex |
-| U8a, U8b, U9 | Sonnet | Sonnet | Codex |
+| U4, U5 | Sonnet | Sonnet | Argon (`tools/review.sh`; se non risponde, Claude Opus) |
+| U6, U7 | Opus (predicati e compatibilità) | Opus | Argon (`tools/review.sh`; se non risponde, Claude Opus) |
+| U8a, U8b, U9 | Sonnet | Sonnet | Argon (`tools/review.sh`; se non risponde, Claude Opus) |
 | U10 | Sonnet (5 casi aggiunti dall'autore del codice: deviazione dichiarata) | Sonnet (eseguito con Opus: deviazione dichiarata) | Codex |
 | U11 | Opus (oracolo HEALPix) | Sonnet | Codex |
 | U12 (librerie migliori) | Sonnet (Opus per rifare le sonde dei fatti di ADR-08 su LibRaw 0.22) | Sonnet | Codex |
