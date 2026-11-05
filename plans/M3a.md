@@ -87,7 +87,7 @@ ID: F-IO-02. Proprietario: `raw_decode.cpp` (stesso file, funzioni distinte).
 5. Prenotazione nel pool prima di `unpack`, `max_raw_memory_mb` (§2.8).
 Test: T-M3A-RAW-05, 06, 08, 10 (fuzz: zero crash e zero abort, H5). Uscita: fuzz pulito sotto ASan/UBSan entro il 70% delle CPU.
 
-### U4. Job di import RAW, record del decoder, export (ADR-08.b §2.9, §5) — ~300 righe
+### U4. Job di import RAW, record del decoder, export (ADR-08.b §2.9, §5) — ~300 righe — CHIUSA il 5 novembre 2026 (`docs/evidence/M3a-U4.md`)
 
 ID: F-IO-02, F-IO-04.
 1. Tipo di job `io.raw_import` registrato in `job_types.cpp` con costruttore minimo (BASE §3.1) — `raw_import_job.cpp`.

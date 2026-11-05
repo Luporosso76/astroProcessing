@@ -2,6 +2,8 @@
 // da riga di comando sotto strace (tools/check_m2f02_network.sh).
 // Uso: conformance_network <directory di lavoro nuova>. Uscita 0 solo se ogni job pubblica.
 #include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include <filesystem>
 
 #include "astro/job_types.hpp"
@@ -10,6 +12,12 @@
 int main(int argc, char** argv) {
   namespace fs = std::filesystem;
   using namespace astro;
+  // ADR-08.b §2.6: TZ=UTC0 dal main, prima di ogni thread (il decoder RAW lo verifica).
+  if (setenv("TZ", "UTC0", 1) != 0) {
+    std::fputs("setenv(TZ) fallita\n", stderr);
+    return 2;
+  }
+  tzset();
   if (argc != 2) {
     std::fputs("uso: conformance_network <directory di lavoro>\n", stderr);
     return 1;

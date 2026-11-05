@@ -4,7 +4,7 @@ __pycache__/
 .pytest_cache/
 .omc/
 /build/
-/data/
+/data
 /.codegraph/
 /graphify-out/
 /.claude/worktrees/

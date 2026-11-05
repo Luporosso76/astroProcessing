@@ -97,9 +97,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/sqlite_dag_store.cpp` | `e9575e27461fb15a7bf18889abab11aa06ecb1e01cfadaa223885a2ac680d961` |
 | `src/core/stop_internal.hpp` | `583e74243a3e8c28fa0cc15e918639a0acc083e95a69ded2241066b1a52eb9c4` |
 | `src/core/workflow.cpp` | `9eaadacfce9fb87b2d5dc4998411efc27d15c4d6084cd48595ae446a50ffa84a` |
-| `tests/unit/test_conformance.cpp` | `3b5afd8777a27ca02f4c5a8004a51b2e1dfa1285ae70a3019a19d93b157bdd9d` |
+| `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
 | `tests/unit/test_store.cpp` | `3c4a68c93a20f81cd826cf867c7917df63e6b22b44868758396630d53314d9de` |
 
-- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
 <!-- evidence:end -->

@@ -110,11 +110,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/include/astro/input_format.hpp` | `e30c81080600aec605fd3730bad533e1b77774d531a26441e4269990b986831f` |
 | `src/core/include/astro/job_types.hpp` | `98d1f80ede5ecb0da92cdb55f2aa8cec050b0cb163b6df1c7968b7367ace70e6` |
 | `src/core/input_format.cpp` | `343f626aebe72b9496007a01d144a40fd24613d94b58f814a9afcdd608570704` |
-| `src/core/job_types.cpp` | `fda920302c2e974237f08f4ff6c1a0a86f7da20548d419fdfed899937b5d5255` |
+| `src/core/job_types.cpp` | `5041b210e2aeb2f3c76f1f81e5fbb02932505886e55df9f4d2754953a047ecdc` |
 | `tests/unit/test_conformance_format.cpp` | `34d9def5399ec94003cb775a88f9ae2697ed5e26fb6fddcb4d3e6264dad7910e` |
 | `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
 <!-- evidence:end -->

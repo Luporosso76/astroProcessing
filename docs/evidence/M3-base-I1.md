@@ -98,9 +98,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
 | `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
 | `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
-| `tests/unit/test_conformance.cpp` | `3b5afd8777a27ca02f4c5a8004a51b2e1dfa1285ae70a3019a19d93b157bdd9d` |
+| `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
 | `tools/lint-allowlist.txt` | `8c0deba2fa1011e5938f8b50a9633acedb5652e513e35080b3bb9bae2ff444b4` |
 
-- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
 <!-- evidence:end -->

@@ -212,13 +212,16 @@ struct decoder_state {
   std::optional<std::array<std::uint8_t, 32>> curve_sha256;
   // Bit di `process_warnings` di LibRaw dopo `unpack`, tutti fra quelli ammessi da ADR-08.b §2.5; 0 se nessuno.
   std::uint32_t process_warnings = 0;
+  // `sizes.raw_inset_crops[2]` ({cleft, ctop, cwidth, cheight}) e `sizes.flip` di LibRaw: registrati, mai applicati (§2.3, §2.9).
+  std::array<std::array<std::uint32_t, 4>, 2> raw_inset_crops{};
+  std::int32_t flip = 0;
   metadata_source source;
   // `source` e' provenienza (origine e keyword): l'uguaglianza non la confronta.
   friend bool operator==(const decoder_state& a, const decoder_state& b) {
     const auto content = [](const decoder_state& s) {
       return std::tie(s.raw_width, s.raw_height, s.window, s.black, s.cfa_color_index, s.black_per_color,
                       s.black_pattern_rows, s.black_pattern_cols, s.black_pattern, s.white, s.data_maximum,
-                      s.linear_max, s.linearization, s.curve_sha256, s.process_warnings);
+                      s.linear_max, s.linearization, s.curve_sha256, s.process_warnings, s.raw_inset_crops, s.flip);
     };
     return content(a) == content(b);
   }

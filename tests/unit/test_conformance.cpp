@@ -202,6 +202,9 @@ std::size_t data_offset(const std::vector<std::uint8_t>& b) {
   throw std::runtime_error("header senza END");
 }
 
+// Offset di un byte di dati la cui modifica cambia il digest (per il RAW basta un byte qualunque: il file non va decodificato).
+std::size_t data_byte(const std::vector<std::uint8_t>& b, bool raw) { return raw ? b.size() / 2 : data_offset(b); }
+
 // Sostituisce il valore di una card intera (colonne 11-30, allineato a destra) senza cambiare la dimensione del file.
 void set_card(std::vector<std::uint8_t>& b, const std::string& key, long long value) {
   std::string k = key;
@@ -788,7 +791,7 @@ TEST(ConformanceWorkflow, T_M3BASE_03_workflow_refusal_leaves_a_stop_record) {
     job_type_inputs other_inputs = cf::write_inputs(c.entry, c.dir / "other");
     for (auto& [role, in] : other_inputs) {
       std::vector<std::uint8_t> b = read_bytes(in.path);
-      set_card(b, "FRAMENO", 7);
+      if (cf::raw_role(c.entry, role)) b = cf::dng_frame(1); else set_card(b, "FRAMENO", 7);
       overwrite(in.path, b);
       in.digest = digest_of(b);
     }
@@ -1169,7 +1172,7 @@ TEST_P(Conformance, T_M3BASE_10_node_of_the_job_equals_the_request) {
   job_type_inputs other = cf::write_inputs(c.entry, c.dir / "other");
   for (auto& [role, in] : other) {
     std::vector<std::uint8_t> b = read_bytes(in.path);
-    set_card(b, "FRAMENO", 7);
+    if (cf::raw_role(c.entry, role)) b = cf::dng_frame(1); else set_card(b, "FRAMENO", 7);
     overwrite(in.path, b);
     in.digest = digest_of(b);
   }
@@ -1207,6 +1210,7 @@ TEST_P(Conformance, T_M3BASE_10_node_of_the_job_equals_the_request) {
 TEST_P(Conformance, T_M3BASE_11_inputs_verified_before_use) {
   for (const std::string& role : registered_job_types()[GetParam().entry].input_roles) {
     SCOPED_TRACE(role);
+    const bool raw = cf::raw_role(registered_job_types()[GetParam().entry], role);
     {  // file assente
       type_case c(GetParam(), "_missing_" + role);
       fs::remove(c.inputs.at(role).path);
@@ -1217,7 +1221,7 @@ TEST_P(Conformance, T_M3BASE_11_inputs_verified_before_use) {
     {  // un byte cambiato: lo stop precede ogni uso dei campioni
       type_case c(GetParam(), "_byte_" + role);
       std::vector<std::uint8_t> b = read_bytes(c.inputs.at(role).path);
-      b[data_offset(b)] ^= 0x01;
+      b[data_byte(b, raw)] ^= 0x01;
       overwrite(c.inputs.at(role).path, b);
       c.refresh(role);
       const std::set<std::string> ids = sample_ids(c.inputs.at(role).path, {b});
@@ -1235,7 +1239,7 @@ TEST_P(Conformance, T_M3BASE_11_inputs_verified_before_use) {
         if (p != "sched.task" || changed.exchange(true)) return;
         std::lock_guard lock(m);
         std::vector<std::uint8_t> b = read_bytes(c.inputs.at(role).path);
-        b[data_offset(b)] ^= 0x01;
+        b[data_byte(b, raw)] ^= 0x01;
         overwrite(c.inputs.at(role).path, b);
         c.refresh(role);
       };
@@ -1251,6 +1255,9 @@ TEST_P(Conformance, T_M3BASE_11_inputs_verified_before_use) {
     }
     // header cambiato fra il piano e la verifica: il file letto per il piano ha la card mutata, quello verificato e'
     // l'originale (ripristinato all'ingresso dello scheduler, sched.plan); stop integrity prima di usare un pixel.
+    // Un formato senza piano degli header (RAW) non ha questa iniezione: nessun header si legge prima del digest
+    // (BASE-confini.md §3.2, nota sotto la tabella dei casi; emendamento L1).
+    if (raw) continue;
     for (const std::pair<const char*, long long> mutation :
          {std::pair<const char*, long long>{"NAXIS1", cf::width - 1}, {"NAXIS2", cf::height - 1}, {"BITPIX", -cf::bitpix}}) {
       SCOPED_TRACE(mutation.first);
@@ -1737,6 +1744,27 @@ TEST_P(Conformance, T_M3BASE_23_OB_20_published_images_carry_measure) {
     EXPECT_TRUE(out.measure.has_value()) << "measure assente nell'uscita " << a.rel_path;
     EXPECT_TRUE(operator_output_invariants_hold(out)) << "invarianti violate dall'uscita " << a.rel_path;
   }
+}
+
+// T-M3BASE-11 e T-M3BASE-12, variante RAW (plans/M3a.md U4): la suite non ha un elenco di tipi, quindi la variante RAW
+// esiste solo se il registro ha la voce `io.raw_import` con ruolo `file` dichiarato RAW e il passaggio dallo scheduler.
+// Senza la voce i casi parametrici sopra non girano per il RAW e restano verdi a vuoto: questo caso le rende rosse.
+TEST(ConformanceRaw, T_M3BASE_11_12_raw_import_type_is_registered_with_a_raw_role) {
+  const job_type_entry* raw = nullptr;
+  for (const job_type_entry& e : registered_job_types()) {
+    if (std::string(e.operator_id) == "io.raw_import") raw = &e;
+  }
+  ASSERT_NE(raw, nullptr) << "tipo io.raw_import assente dal registro dei tipi di job (BASE-confini.md §3.1)";
+  ASSERT_EQ(raw->input_roles, std::vector<std::string>{"file"});
+  EXPECT_TRUE(cf::raw_role(*raw, "file")) << "il ruolo `file` deve dichiarare raw_input_format()";
+  EXPECT_TRUE(raw->scheduler) << "l'import RAW passa dallo scheduler (ADR-08.b §2.7: un task nel worker)";
+  EXPECT_FALSE(raw->variants.empty());
+  EXPECT_TRUE(static_cast<bool>(raw->make)) << "costruttore del job minimo assente";
+  std::size_t raw_params = 0;
+  for (const type_param& p : all_types()) {
+    if (std::string(registered_job_types()[p.entry].operator_id) == "io.raw_import") ++raw_params;
+  }
+  EXPECT_EQ(raw_params, raw->variants.size()) << "ogni variante del tipo RAW gira nella suite parametrica";
 }
 
 INSTANTIATE_TEST_SUITE_P(Types, Conformance, testing::ValuesIn(all_types()), param_name);

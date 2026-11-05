@@ -1,6 +1,6 @@
 #pragma once
 
-// Input sintetici della suite di conformita' (docs/contracts/BASE-confini.md §3.1, punto 2): un file FITS per ruolo
+// Input sintetici della suite di conformità (docs/contracts/BASE-confini.md §3.1, punto 2): un file FITS per ruolo
 // dichiarato dal registro dei tipi di job, con il digest del file scritto. Frame f32 13x6 del modello FIX-SYN-FITS-01
 // (header di calibrazione completi, fase raw, linearita' dichiarata): 6 righe, quindi 6 blocchi con tile_rows = 1.
 
@@ -12,7 +12,9 @@
 #include <vector>
 
 #include "astro/hash.hpp"
+#include "astro/input_format.hpp"
 #include "astro/job_types.hpp"
+#include "syn_dng.hpp"
 #include "syn_fits.hpp"
 
 namespace conformance_fixture {
@@ -64,13 +66,43 @@ inline fx::bytes frame_for_role(const std::string& role) {
   throw std::runtime_error("ruolo senza fixture: " + role);
 }
 
-// Scrive in `dir` un file per ruolo e restituisce percorsi e digest.
+// Vero se il formato dichiarato dalla voce per il ruolo è il RAW (prefisso `raw`, BASE-confini.md §2.5).
+inline bool raw_role(const astro::job_type_entry& entry, const std::string& role) {
+  const auto it = entry.role_formats.find(role);
+  return it != entry.role_formats.end() && it->second == &astro::raw_input_format();
+}
+
+constexpr std::uint32_t dng_width = 64;
+constexpr std::uint32_t dng_height = 48;
+
+// DNG sintetico del ruolo RAW (FIX-SYN-DNG-01): 64x48 non compresso, RGGB, bianco 4000, nero scalare 0, esposizione 60 s,
+// ISO 100, ora «2026:10:30 12:34:56». `variant` cambia il solo valore del primo campione: stesso layout, digest diverso.
+inline fx::bytes dng_frame(std::uint16_t variant = 0) {
+  fx::dng_spec s;
+  s.width = dng_width;
+  s.height = dng_height;
+  s.cfa = {0, 1, 1, 2};
+  s.white = 4000;
+  s.exposure_time = std::make_pair(std::uint32_t{60}, std::uint32_t{1});
+  s.iso = 100;
+  s.datetime_original = "2026:10:30 12:34:56";
+  std::vector<std::uint16_t> v(static_cast<std::size_t>(dng_width) * dng_height);
+  for (std::uint32_t r = 0; r < dng_height; ++r) {
+    for (std::uint32_t c = 0; c < dng_width; ++c) v[static_cast<std::size_t>(r) * dng_width + c] = static_cast<std::uint16_t>(100 + (r * 37 + c * 11) % 3500);
+  }
+  v[0] = static_cast<std::uint16_t>(v[0] + variant);
+  s.pixels = fx::pixels_u16(v);
+  return fx::make_dng(s);
+}
+
+// Scrive in `dir` un file per ruolo e restituisce percorsi e digest. I ruoli con formato RAW ricevono un DNG.
 inline astro::job_type_inputs write_inputs(const astro::job_type_entry& entry, const fs::path& dir) {
   fs::create_directories(dir);
   astro::job_type_inputs inputs;
   for (const std::string& role : entry.input_roles) {
-    const fx::bytes b = frame_for_role(role);
-    const fs::path p = fs::absolute(dir / (role + ".fits"));
+    const bool raw = raw_role(entry, role);
+    const fx::bytes b = raw ? dng_frame() : frame_for_role(role);
+    const fs::path p = fs::absolute(dir / (role + (raw ? ".dng" : ".fits")));
     std::ofstream out(p, std::ios::binary | std::ios::trunc);
     out.write(reinterpret_cast<const char*>(b.data()), static_cast<std::streamsize>(b.size()));
     out.close();

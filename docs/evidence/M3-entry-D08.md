@@ -64,6 +64,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/datasets/PUB-RAW-01.md` | `a0ff1c535ca37abee9fde2aaf7117a14af87bfcc5cc71e04ab95e876d7631000` |
 | `docs/datasets/PUB-REG-01.md` | `c9376dacca580a1fc47f6c67ab682f01661a704866a57634fe5044632133679f` |
 | `docs/decisions/D-08-dataset.md` | `9bfd000039b91e2ff363cc5ce5016ee49538dc293d3c940101c147885e3653d4` |
-| `docs/test-matrix.md` | `4ada80591d89089787f9bc30488017eedde76da63012d34a14980ad01f000fe0` |
+| `docs/test-matrix.md` | `eb8cd30413f1ba00b09071cfa0c244b18c3ab28ec899b486deaed6f095447246` |
 
 <!-- evidence:end -->

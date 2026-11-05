@@ -11,8 +11,13 @@
 #include <vector>
 
 #include "astro/hash.hpp"
+#include "astro/json.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/third_party.hpp"
+
+#ifndef ASTRO_LIBRAW_TARBALL_SHA256
+#error "ASTRO_LIBRAW_TARBALL_SHA256 deve venire da cmake/third_party_libs.cmake"
+#endif
 
 namespace astro {
 namespace {
@@ -325,7 +330,10 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
                          lr->is_fuji_rotated(),
                          lr->is_floating_point(),
                          d.sizes.raw_width,
-                         d.sizes.raw_height};
+                         d.sizes.raw_height,
+                         d.other.focal_len,
+                         d.lens.makernotes.FocalLengthIn35mmFormat,
+                         d.other.parsed_gps.gpsparsed != 0};
   if (hooks.after_open) hooks.after_open(probe);
   const std::optional<cfa_pattern> pattern = check_probe(probe);
   // §2.1: prodotto a 64 bit, limite incluso.
@@ -340,11 +348,12 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   raw_unpack_plan plan{m << 20, 0, 0};
   const std::uint64_t needed = plan.raw_image_bytes + 6 * std::uint64_t{d.sizes.width} * d.sizes.height;
   if (ctx.pool != nullptr) {
-    // Il job tiene già i byte del file: se file e prenotazione insieme superano il budget, l'attesa nel pool non
-    // finirebbe mai.
-    if (bytes.size() + needed > ctx.pool->budget_bytes())
+    // I byte che il chiamante tiene già nel pool (`held_bytes`, altrimenti il file): se insieme alla prenotazione
+    // superano il budget, l'attesa nel pool non finirebbe mai.
+    const std::uint64_t held_by_caller = ctx.held_bytes.value_or(bytes.size());
+    if (held_by_caller + needed > ctx.pool->budget_bytes())
       throw stop_error(error_category::budget, "sched.job_exceeds_budget", "budget sotto la prenotazione del decoder",
-                       {{"minimo", std::to_string(bytes.size() + needed)},
+                       {{"minimo", std::to_string(held_by_caller + needed)},
                         {"file", std::to_string(bytes.size())},
                         {"budget", std::to_string(ctx.pool->budget_bytes())}});
     held = ctx.pool->reserve(needed, "raw_decode", ctx.cancel);
@@ -413,6 +422,11 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   st.curve_sha256 = curve_digest(d.color.curve);
   st.linearization = st.curve_sha256 ? decoder_linearization::decoder_curve : decoder_linearization::identity;
   st.process_warnings = levels.process_warnings;
+  for (std::size_t i = 0; i < 2; ++i) {
+    const libraw_raw_inset_crop_t& c = sz.raw_inset_crops[i];
+    st.raw_inset_crops[i] = {c.cleft, c.ctop, c.cwidth, c.cheight};
+  }
+  st.flip = sz.flip;
 
   image img = make_image(image_geometry(sz.width, sz.height), sample_type::f32, plane_layout::cfa,
                          cfa_layout{*pattern, 0, 0});
@@ -430,6 +444,125 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   img.decoder_state = std::move(st);
   set_metadata(img.metadata, d, levels);
   return img;
+}
+
+}  // namespace astro
+
+namespace astro {
+namespace {
+
+json integers(const std::vector<std::uint32_t>& values) {
+  json a = json::array();
+  for (const std::uint32_t v : values) a.push(json::integer(static_cast<std::int64_t>(v)));
+  return a;
+}
+
+json crop_json(std::uint32_t x0, std::uint32_t y0, std::uint32_t w, std::uint32_t h) {
+  json c = json::object();
+  c.set("x0", json::integer(x0));
+  c.set("y0", json::integer(y0));
+  c.set("w", json::integer(w));
+  c.set("h", json::integer(h));
+  return c;
+}
+
+const char* pattern_name(cfa_pattern p) {
+  switch (p) {
+    case cfa_pattern::rggb: return "rggb";
+    case cfa_pattern::bggr: return "bggr";
+    case cfa_pattern::grbg: return "grbg";
+    case cfa_pattern::gbrg: return "gbrg";
+  }
+  ASTRO_ASSERT(false);
+  return "";
+}
+
+std::string hex_of(const std::array<std::uint8_t, 32>& digest) {
+  static constexpr char digits[] = "0123456789abcdef";
+  std::string out;
+  for (const std::uint8_t b : digest) {
+    out += digits[b >> 4];
+    out += digits[b & 15];
+  }
+  return out;
+}
+
+// Nomi dei campi interpretati e presenti, nell'ordine di frame_metadata.
+json metadata_present_names(const frame_metadata& m) {
+  json names = json::array();
+  const auto add = [&names](const char* name, bool present) {
+    if (present) names.push(json::string(name));
+  };
+  add("exposure_s", m.exposure_s.has_value());
+  add("gain", m.gain.has_value());
+  add("conversion_gain_e_per_adu", m.conversion_gain_e_per_adu.has_value());
+  add("offset_adu", m.offset_adu.has_value());
+  add("temperature_c", m.temperature_c.has_value());
+  add("filter", m.filter.has_value());
+  add("camera", m.camera.has_value());
+  add("imagetyp", m.imagetyp.has_value());
+  add("saturation_adu", m.saturation_adu.has_value());
+  add("pedestal_adu", m.pedestal_adu.has_value());
+  add("roi_x", m.roi_x.has_value());
+  add("roi_y", m.roi_y.has_value());
+  add("readout_mode", m.readout_mode.has_value());
+  add("row_order", m.row_order.has_value());
+  add("capture_time_libraw", m.capture_time_libraw.has_value());
+  return names;
+}
+
+}  // namespace
+
+json raw_decoder_record(const image& img) {
+  if (!img.decoder_state || !img.cfa)
+    throw stop_error(error_category::invalid_input, "raw.record_source", "immagine non prodotta dal decoder RAW");
+  const decoder_state& s = *img.decoder_state;
+  json r = json::object();
+  r.set("libraw_version", json::string(LibRaw::version()));
+  r.set("libraw_version_number", json::integer(LibRaw::versionNumber()));
+  r.set("libraw_capabilities", json::integer(libraw_capabilities()));
+  r.set("libraw_tarball_sha256", json::string(ASTRO_LIBRAW_TARBALL_SHA256));
+  r.set("black_applied_by_decoder", json::string("none"));
+  r.set("scale_applied_by_decoder", json::string("none"));
+  json black = json::object();
+  black.set("scalar", json::integer(s.black));
+  black.set("per_color", integers({s.black_per_color.begin(), s.black_per_color.end()}));
+  black.set("pattern_rows", json::integer(s.black_pattern_rows));
+  black.set("pattern_cols", json::integer(s.black_pattern_cols));
+  black.set("pattern", integers(s.black_pattern));
+  r.set("black", std::move(black));
+  r.set("white", json::integer(s.white));
+  r.set("data_maximum", s.data_maximum ? json::integer(*s.data_maximum) : json::null());
+  if (s.linear_max) {
+    json lm = json::array();
+    for (const std::int64_t v : *s.linear_max) lm.push(json::integer(v));
+    r.set("linear_max", std::move(lm));
+  } else {
+    r.set("linear_max", json::null());
+  }
+  r.set("linearization", json::string(s.linearization == decoder_linearization::decoder_curve ? "decoder_curve" : "identity"));
+  r.set("linearization_curve_sha256", s.curve_sha256 ? json::string(hex_of(*s.curve_sha256)) : json::null());
+  r.set("crop", crop_json(s.window.x0, s.window.y0, s.window.width, s.window.height));
+  r.set("margin_parity", integers({s.window.x0 % 2, s.window.y0 % 2}));
+  r.set("cfa_pattern", json::string(pattern_name(img.cfa->pattern)));
+  json insets = json::array();
+  for (const auto& c : s.raw_inset_crops) insets.push(crop_json(c[0], c[1], c[2], c[3]));
+  r.set("raw_inset_crops", std::move(insets));
+  r.set("flip", json::integer(s.flip));
+  r.set("metadata_present", metadata_present_names(img.metadata));
+  json not_kept = json::array();
+  for (const char* c : {"makernote", "thumbnail", "profiles", "camera_white_balance"}) not_kept.push(json::string(c));
+  r.set("metadata_not_kept", std::move(not_kept));
+  r.set("data_state", json::string("raw"));
+  r.set("camera_processing", json::string("unknown"));
+  r.set("process_warnings", json::integer(s.process_warnings));
+  for (const char* absent : {"sensor", "pixel_size_um", "pixel_scale_arcsec", "wcs"}) r.set(absent, json::null());
+  r.set("absent_reason", json::string("not_provided_by_decoder"));
+  r.set("capture_time_libraw", img.metadata.capture_time_libraw ? json::integer(img.metadata.capture_time_libraw->value)
+                                                                  : json::null());
+  r.set("capture_time_clock", json::string("camera_no_zone"));
+  r.set("process_tz", json::string("UTC0"));
+  return r;
 }
 
 }  // namespace astro

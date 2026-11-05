@@ -101,12 +101,12 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-M3A-RAW-04 | F-IO-04; ADR-08.b §2.4 (H4) | ADR-08.b | M3.a | verde (U2) |
 | T-M3A-RAW-05 | NFR-SEC-01, NC-21; ADR-08.b §2.1, §2.5 | ADR-08.b | M3.a | verde (U3) |
 | T-M3A-RAW-06 | ADR-06; ADR-08.b §2.8 | ADR-08.b | M3.a | verde (U3) |
-| T-M3A-RAW-07 | ADR-13, NFR-SEC-04; ADR-08.b §2.1, §5 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-07 | ADR-13, NFR-SEC-04; ADR-08.b §2.1, §5 | ADR-08.b | M3.a | verde (U4) |
 | T-M3A-RAW-08 | ADR-06; ADR-08.b §2.7 (H6, creazioni di thread con `pthread_create` interposto) | ADR-08.b | M3.a | verde (U3) |
-| T-M3A-RAW-09 | F-IO-02 (più marche); ADR-08.b §2.3, §2.6 | ADR-08.b | M3.a | PIANIFICATO — non eseguito; richiede `PUB-RAW-01` acquisito (record scritto, stato DA ACQUISIRE) |
+| T-M3A-RAW-09 | F-IO-02 (più marche); ADR-08.b §2.3, §2.6 | ADR-08.b | M3.a | verde (U4) |
 | T-M3A-RAW-10 | NFR-SEC-04; ADR-08.b §2.5 (H5) | ADR-08.b | M3.a | verde (U3) |
-| T-M3A-RAW-11 | F-IO-04, §9.6; ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-RAW-12 | ADR-05 (chiave del nodo, determinismo); ADR-08.b §2.9 | ADR-08.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-RAW-11 | F-IO-04, §9.6; ADR-08.b §2.9 | ADR-08.b | M3.a | verde (U4) |
+| T-M3A-RAW-12 | ADR-05 (chiave del nodo, determinismo); ADR-08.b §2.9 | ADR-08.b | M3.a | verde (U4) |
 | T-M3A-PACK-01 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-02 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
 | T-M3A-PACK-03 | G-PACK, P-PACK-MISSING, G-STOP; ADR-08.b §3 | ADR-08.b | M3.a (pack sintetico) | verde (U10) |
@@ -284,8 +284,8 @@ Definita in `docs/contracts/BASE-confini.md` §3; eseguita una volta sul preset 
 | T-M3BASE-08 | OB-08 | `Types/Conformance.T_M3BASE_08_*` | verde (I2) |
 | T-M3BASE-09 | OB-09 | `Types/Conformance.T_M3BASE_09_*` | verde (I2) |
 | T-M3BASE-10 | OB-10 | `Types/Conformance.T_M3BASE_10_*` | verde (I1) |
-| T-M3BASE-11 | OB-11 | `Types/Conformance.T_M3BASE_11_*` | verde (I2 per i tipi di I/O, I3 per calibrazione e master) |
-| T-M3BASE-12 | OB-12 | `Types/Conformance.T_M3BASE_12_*` e verifica (e) di ogni caso | verde |
+| T-M3BASE-11 | OB-11 | `Types/Conformance.T_M3BASE_11_*` | verde (I2 per i tipi di I/O, I3 per calibrazione e master, U4 per la variante RAW `io.raw_import`) |
+| T-M3BASE-12 | OB-12 | `Types/Conformance.T_M3BASE_12_*` e verifica (e) di ogni caso | verde (variante RAW in U4) |
 | T-M3BASE-13 | OB-13 | `Types/Conformance.T_M3BASE_13_*` | verde |
 | T-M3BASE-14 | OB-14 | `Types/Conformance.T_M3BASE_14_*` | verde |
 | T-M3BASE-15 | OB-15 | `Types/ConformanceCheckpoint.T_M3BASE_15_*` | verde |
@@ -375,11 +375,11 @@ Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime 
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3A-RAW-13 | F-IO-04 | ADR-08.b §2.6 (emendamento L4) | U4 | PIANIFICATO |
+| T-M3A-RAW-13 | F-IO-04 | ADR-08.b §2.6 (emendamento L4) | U4 | verde (U4) |
 | T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
 | T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
 | T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
 | T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
 | T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
 | T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
-| T-M3A-02 | F-IO-04 | nessun contratto: plans/M3a.md U4 | U4 | PIANIFICATO |
+| T-M3A-02 | F-IO-04 | nessun contratto: plans/M3a.md U4 | U4 | verde (U4) |

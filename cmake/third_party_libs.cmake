@@ -23,12 +23,15 @@ function(astro_tp_import target project dir archive include_dir)
   set_property(TARGET ${target} APPEND PROPERTY INTERFACE_LINK_LIBRARIES ${ARGN})
 endfunction()
 
+# SHA-256 del tarball di LibRaw: unica fonte per URL_HASH (verifica del file) e per il record del decoder (ADR-08.b §2.9).
+set(ASTRO_LIBRAW_TARBALL_SHA256 "789f3c33466210a1a0907f747a97c715d21bbf4af712f257fcbbd90111b227e4")
+
 # LibRaw 0.22.3 (LGPL-2.1): variante libraw_r senza OpenMP, solo zlib e JPEG.
 ExternalProject_Add(libraw_project
   PREFIX "${ASTRO_TP_ROOT}/libraw"
   URL "${CMAKE_SOURCE_DIR}/third_party/libraw/LibRaw-0.22.3.tar.gz"
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-  URL_HASH SHA256=789f3c33466210a1a0907f747a97c715d21bbf4af712f257fcbbd90111b227e4
+  URL_HASH SHA256=${ASTRO_LIBRAW_TARBALL_SHA256}
   BUILD_IN_SOURCE 1
   CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
     --enable-static --disable-shared --with-pic --disable-openmp --enable-zlib --enable-jpeg --disable-lcms

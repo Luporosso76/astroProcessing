@@ -38,10 +38,11 @@ foreach(t test_store test_store_history test_store_contract test_store_crash tes
   target_link_libraries(${t} PRIVATE SQLite::SQLite3)
 endforeach()
 
+# I tre eseguibili della suite usano main_utc0.cpp: il decoder RAW (tipo io.raw_import) esige TZ=UTC0 dal main (ADR-08.b §2.6).
 # Suite di conformita' della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
 # registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finche' l'unita' di codice non li paga.
-add_executable(test_conformance test_conformance.cpp)
-target_link_libraries(test_conformance PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+add_executable(test_conformance test_conformance.cpp main_utc0.cpp)
+target_link_libraries(test_conformance PRIVATE astrocore GTest::gtest SQLite::SQLite3)
 target_include_directories(test_conformance PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 target_compile_definitions(test_conformance PRIVATE
   ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
@@ -50,8 +51,8 @@ gtest_discover_tests(test_conformance NO_PRETTY_VALUES PROPERTIES LABELS fast)
 
 # Casi che pagano il debito «Prove» (§4): mutazioni sopravvissute alla suite sopra. Il file include test_conformance.cpp per
 # il banco di prova; il filtro limita ctest ai casi nuovi.
-add_executable(test_conformance_gaps test_conformance_gaps.cpp)
-target_link_libraries(test_conformance_gaps PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+add_executable(test_conformance_gaps test_conformance_gaps.cpp main_utc0.cpp)
+target_link_libraries(test_conformance_gaps PRIVATE astrocore GTest::gtest SQLite::SQLite3)
 target_include_directories(test_conformance_gaps PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 target_compile_definitions(test_conformance_gaps PRIVATE
   ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
@@ -61,8 +62,8 @@ gtest_discover_tests(test_conformance_gaps NO_PRETTY_VALUES TEST_FILTER "*Confor
 
 # T-M3BASE-20…22 (emendamento L1, unita' U0 di plans/M3a.md): lettura degli input indipendente dal formato. Il file
 # include test_conformance.cpp per il banco di prova; il filtro limita ctest ai casi nuovi.
-add_executable(test_conformance_format test_conformance_format.cpp)
-target_link_libraries(test_conformance_format PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+add_executable(test_conformance_format test_conformance_format.cpp main_utc0.cpp)
+target_link_libraries(test_conformance_format PRIVATE astrocore GTest::gtest SQLite::SQLite3)
 target_include_directories(test_conformance_format PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 target_compile_definitions(test_conformance_format PRIVATE
   ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
@@ -277,7 +278,9 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode_u2b.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_robust.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/fuzz_raw_decode.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_threads.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_threads.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_import.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_import_run.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.
@@ -337,3 +340,37 @@ set_tests_properties(TOOLS.trace_selftest TOOLS.lint_selftest TOOLS.check_m2_tra
 
 # T-U12-01…12: contratto U12 (librerie compilate nel progetto).
 add_subdirectory(${PROJECT_SOURCE_DIR}/tests/u12 ${CMAKE_BINARY_DIR}/tests/u12)
+
+# U4 (M3.a): job `io.raw_import`, record del decoder, export. T-M3A-RAW-07, 09, 11, 12, 13 e T-M3A-02 sul tipo registrato
+# (test_raw_import, raw_import_run, tests/u4); la variante RAW di T-M3BASE-11 e T-M3BASE-12 è la voce del registro nella
+# suite di conformità (ConformanceRaw in test_conformance.cpp). PUB-RAW-01 in sola lettura da data/public.
+option(ASTRO_U4_RECORD_TESTS "Compila test_raw_import_record (richiede i simboli di U4)" ON)
+add_executable(test_raw_import test_raw_import.cpp main_utc0.cpp)
+target_link_libraries(test_raw_import PRIVATE astrocore GTest::gtest SQLite::SQLite3)
+target_include_directories(test_raw_import PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_raw_import PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp"
+  ASTRO_U4_RECORD_TESTS_ENABLED=$<BOOL:${ASTRO_U4_RECORD_TESTS}>)
+gtest_discover_tests(test_raw_import NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
+
+add_executable(raw_import_run raw_import_run.cpp)
+target_link_libraries(raw_import_run PRIVATE astrocore)
+target_include_directories(raw_import_run PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+
+add_test(NAME T-M3A-RAW-07.offline
+  COMMAND ${ASTRO_PYTHON3} -S ${PROJECT_SOURCE_DIR}/tests/u4/test_raw07_offline.py
+    ${PROJECT_SOURCE_DIR}/tools/check_offline.sh ${CMAKE_CXX_COMPILER} $<TARGET_FILE:raw_import_run>
+    ${CMAKE_BINARY_DIR}/test_tmp/raw07 $<TARGET_FILE:astrocore> $<TARGET_FILE:raw_import_run>
+    $<TARGET_FILE:conformance_network>)
+set_tests_properties(T-M3A-RAW-07.offline PROPERTIES LABELS fast TIMEOUT 300)
+
+# T-M3A-RAW-12 (chiave per campo) e T-M3A-RAW-13 (iniezione di focale e GPS): usano simboli che U4 deve ancora introdurre
+# (astro/raw_import_job.hpp, campi di raw_probe_fields). Il target non compila finché mancano: opzione spenta di
+# default perché non rompa la build; il codice di U4 la accende (-DASTRO_U4_RECORD_TESTS=ON) e poi la rimuove insieme alla definizione
+# ASTRO_U4_RECORD_TESTS_ENABLED e al caso spia.
+if(ASTRO_U4_RECORD_TESTS)
+  add_executable(test_raw_import_record test_raw_import_record.cpp main_utc0.cpp)
+  target_link_libraries(test_raw_import_record PRIVATE astrocore GTest::gtest SQLite::SQLite3)
+  target_include_directories(test_raw_import_record PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+  target_compile_definitions(test_raw_import_record PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+  gtest_discover_tests(test_raw_import_record NO_PRETTY_VALUES PROPERTIES LABELS fast)
+endif()

@@ -49,10 +49,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
-| `docs/contracts/ADR-16-stati-master.md` | `e443567e3fbb04693c761fd3dd7243a96a20806a49aa76cb42d63c26a43479fc` |
+| `docs/contracts/ADR-16-stati-master.md` | `748fe437f87082f2bab80aa7469ad97a3aac90712dd7220c38d2ab2b43799d11` |
 | `docs/contracts/C-01-calibrazione-light.md` | `063e14eacdbf25c92b31cf78c4bb6e19934d39fada23a06ba0c24d7fe8212162` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
-| `docs/test-matrix.md` | `4ada80591d89089787f9bc30488017eedde76da63012d34a14980ad01f000fe0` |
+| `docs/test-matrix.md` | `eb8cd30413f1ba00b09071cfa0c244b18c3ab28ec899b486deaed6f095447246` |
 | `plans/M3.md` | `ce79c62f5bbec62930a675fc28415ed6ff0b37162bf4444ae203b2aee2bd2f01` |
 
 <!-- evidence:end -->

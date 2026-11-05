@@ -107,12 +107,12 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/include/astro/scheduler.hpp` | `617d499fe6c5177b3d588e5f00f77a705fbc67a1ebf2b08c8fcfd0f14dd064ad` |
 | `src/core/include/astro/thumbnail_cache.hpp` | `3495a68da974abc44ea5814d8e7e552d3fc0bfa4d3429834c03676904fc2f289` |
 | `src/core/inventory.cpp` | `6b2fee4bf475ca554a8647c2418da24741465ac2f63d0cdd7fbae81b30e17ef1` |
-| `src/core/job_types.cpp` | `fda920302c2e974237f08f4ff6c1a0a86f7da20548d419fdfed899937b5d5255` |
+| `src/core/job_types.cpp` | `5041b210e2aeb2f3c76f1f81e5fbb02932505886e55df9f4d2754953a047ecdc` |
 | `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
 | `src/core/scheduler.cpp` | `9588b0adfc402c790329ee0f837972128a3548ef82b5012055f228c429d38069` |
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
-| `tests/unit/test_conformance.cpp` | `3b5afd8777a27ca02f4c5a8004a51b2e1dfa1285ae70a3019a19d93b157bdd9d` |
+| `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
 
-- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
 <!-- evidence:end -->

@@ -94,10 +94,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/fits_header.cpp` | `0ac963b56356149b128339563f688294664ca9c8770a523bbcf925fc690e1b45` |
 | `src/core/fits_internal.hpp` | `e8b62f0bd808166ecaf603449199bfc7df1e3beb69f109a27e0466bfe8d4b09f` |
 | `src/core/image.cpp` | `053fe85fa341c93294522f72de472ef37a6156dbbe500a53044da8d62e0bf0dd` |
-| `src/core/include/astro/image.hpp` | `2ae3c4cc2192a8c3b6822ec390dcde0e62dbc2282178162a744d98a0ef20f626` |
-| `tests/unit/CMakeLists.txt` | `53f1f2db0e4a35cc76c32860527eee14cdaa94756f5b43ee2e33b172b737615b` |
+| `src/core/include/astro/image.hpp` | `8e2a0b29675358ed71959620f5cfe4c9f364bf2a7219ccabc9fa276586ef22e4` |
+| `tests/unit/CMakeLists.txt` | `f5863caa240e9d59938e1493dcfc585e4d667f2d0cbf023d8d71b7eb5d6b5272` |
 | `tests/unit/test_measure.cpp` | `358d003a21b6bd1b560f036bb390657de7c904416cdace9813a789bdb54d0419` |
 
-- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
 <!-- evidence:end -->

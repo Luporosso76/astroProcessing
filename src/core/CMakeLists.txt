@@ -75,11 +75,13 @@ add_library(astrocore STATIC
   pack.cpp
   pack_coverage.cpp
   raw_decode.cpp
+  raw_import_job.cpp
   third_party.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp
   ${ASTRO_REVISION_FILE})
 # ADR-07: il percorso cpu_scalar si compila senza vettorizzazione; cpu_avx2 usa target("avx2") solo nelle sue funzioni.
 set_source_files_properties(kernels_scalar.cpp PROPERTIES COMPILE_OPTIONS "-fno-tree-vectorize;-fno-tree-slp-vectorize")
+set_source_files_properties(raw_decode.cpp PROPERTIES COMPILE_DEFINITIONS "ASTRO_LIBRAW_TARBALL_SHA256=\"${ASTRO_LIBRAW_TARBALL_SHA256}\"")
 add_dependencies(astrocore astro_source_revision)
 target_include_directories(astrocore PUBLIC include)
 target_compile_features(astrocore PUBLIC cxx_std_20)

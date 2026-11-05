@@ -3,12 +3,14 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <span>
 
 #include "astro/cancel.hpp"
 #include "astro/image.hpp"
 #include "astro/input_format.hpp"
+#include "astro/json.hpp"
 #include "astro/memory_pool.hpp"
 
 namespace astro {
@@ -34,6 +36,11 @@ struct raw_probe_fields {
   int is_floating_point = 0;
   unsigned raw_width = 0;   // sizes.raw_width: base di max_pixels e di M (§2.1)
   unsigned raw_height = 0;  // sizes.raw_height
+  // Campi che LibRaw espone dopo `open_buffer` e che il decoder non usa (§2.6, emendamento L4): focale, focale
+  // equivalente a 35 mm e presenza della posizione GPS non producono sensore, scala pixel ne' WCS.
+  float focal_len = 0.0f;                      // other.focal_len
+  float focal_length_in_35mm_format = 0.0f;    // lens.makernotes.FocalLengthIn35mmFormat
+  bool parsed_gps_present = false;             // other.parsed_gps.gpsparsed
 };
 
 // Campi letti dopo `unpack` (ADR-08.b §2.4, §2.6).
@@ -64,6 +71,10 @@ struct raw_decode_context {
   memory_pool* pool = nullptr;
   const cancel_token* cancel = nullptr;
   std::uint64_t max_pixels = raw_limits::max_pixels;
+  // Byte che il chiamante tiene gia' nel pool durante la decodifica (file e prenotazioni del job); assente: i soli byte
+  // del file. Con `pool` il decoder si ferma con sched.job_exceeds_budget se questi byte piu' la prenotazione di §2.8
+  // superano il budget, invece di attendere una prenotazione che non puo' entrare.
+  std::optional<std::uint64_t> held_bytes;
 };
 
 // Ganci di iniezione dei test: ricevono i campi letti dalla libreria e possono sostituirli prima delle decisioni.
@@ -84,5 +95,10 @@ struct raw_decode_hooks {
 // Precondizione (§2.6): il processo ha `TZ=UTC0` dal `main`, prima dei thread; altrimenti ASTRO_ASSERT.
 image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks = {},
                          const raw_decode_context& ctx = {});
+
+// Record del decoder (ADR-08.b §2.9) di un'immagine prodotta da `decode_raw_buffer`: oggetto JSON con le trenta chiavi
+// del contratto, valori `null` espliciti per i dati che il decoder non fornisce. Immagine senza `decoder_state` o `cfa`:
+// invalid_input raw.record_source.
+json raw_decoder_record(const image& decoded);
 
 }  // namespace astro

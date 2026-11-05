@@ -1,0 +1,18 @@
+# Sorgente del blocco generato di M3a-U4.md (tools/evidence.py)
+file src/core/raw_import_job.cpp
+file src/core/include/astro/raw_import_job.hpp
+file src/core/raw_decode.cpp
+file src/core/include/astro/raw_decode.hpp
+file src/core/include/astro/image.hpp
+file src/core/job_types.cpp
+file src/core/CMakeLists.txt
+file tools/check_offline.sh
+file docs/contracts/ADR-08-decoder-pack.md
+file tests/unit/test_raw_import.cpp
+file tests/unit/test_raw_import_record.cpp
+file tests/unit/raw_import_run.cpp
+file tests/unit/raw_record_keys.hpp
+file tests/u4/test_raw07_offline.py
+file tests/unit/CMakeLists.txt
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

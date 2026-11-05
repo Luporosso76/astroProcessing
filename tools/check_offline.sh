@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-forbidden_symbols='^(socket|connect|bind|listen|accept|accept4|getaddrinfo|gethostbyname|gethostbyname_r|curl_.*|BIO_s_connect|BIO_new_connect|OSSL_HTTP_.*|ffopen|ffopentest|ffdkopn|ffdopn|fftopn|ffiopn|ffeopn|ffinit|ffdkinit)(@.*)?$'
+forbidden_symbols='^(socket|connect|bind|listen|accept|accept4|getaddrinfo|gethostbyname|gethostbyname_r|curl_.*|BIO_s_connect|BIO_new_connect|OSSL_HTTP_.*|ffopen|ffopentest|ffdkopn|ffdopn|fftopn|ffiopn|ffeopn|ffinit|ffdkinit|libraw_open_file|libraw_open_wfile|_ZN6LibRaw9open_file.*|TIFFOpen|TIFFOpenW|TIFFOpenExt|TIFFFdOpen)(@.*)?$'
 forbidden_needed='^(libcurl|libssl|libgnutls)'
 
 [[ $# -gt 0 ]] || { echo "uso: $0 <binario|archivio|directory di oggetti>..." >&2; exit 2; }

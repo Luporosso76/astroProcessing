@@ -114,13 +114,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `CMakeLists.txt` | `7b1a76ed5d18e95b267d724998b1b2d0715382de9618a9e3b71af246afc9ac63` |
-| `docs/contracts/ADR-08-decoder-pack.md` | `b5abcafc55e824f9d7b2ac19a08fae98e66e70e125e33561ee38a8841c93ae98` |
-| `src/core/CMakeLists.txt` | `fe9a944f4ea51259575a5d88018d97173853d4ce757b2075e09b132787d851f2` |
-| `src/core/include/astro/image.hpp` | `2ae3c4cc2192a8c3b6822ec390dcde0e62dbc2282178162a744d98a0ef20f626` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `e9f7a6f719f7f406de8a5fab80db9d6b43f6b07fb126d9ac53c4437052f38168` |
+| `src/core/CMakeLists.txt` | `cd2a4dbfe6be91dfac1815ce83752d086c16de15b91c5dc1541ff906cfce6678` |
+| `src/core/include/astro/image.hpp` | `8e2a0b29675358ed71959620f5cfe4c9f364bf2a7219ccabc9fa276586ef22e4` |
 | `src/core/include/astro/input_format.hpp` | `e30c81080600aec605fd3730bad533e1b77774d531a26441e4269990b986831f` |
-| `src/core/include/astro/raw_decode.hpp` | `d9e325e089f3d38794676b9d3ea0bd17a7495ddb5781ef6c75eab6f72df548e4` |
-| `src/core/raw_decode.cpp` | `4a76d4d4d227196cb74a318528ea725e1da470d01452d0518d9a741afec97653` |
-| `tests/unit/CMakeLists.txt` | `53f1f2db0e4a35cc76c32860527eee14cdaa94756f5b43ee2e33b172b737615b` |
+| `src/core/include/astro/raw_decode.hpp` | `ef65ebd958672813ff0bc931b2e2faf84fe58191cd8543623a5f8d10ef496a14` |
+| `src/core/raw_decode.cpp` | `7f3aa00829bf1911fe9400f87626ff2df01fd95a5cb1cbc6eea7b1bd75f42042` |
+| `tests/unit/CMakeLists.txt` | `f5863caa240e9d59938e1493dcfc585e4d667f2d0cbf023d8d71b7eb5d6b5272` |
 | `tests/unit/fuzz_raw_decode.cpp` | `77b64344305fea6c59e90d9e3da126c45487fc8b75bd6a0c612981f4620846bc` |
 | `tests/unit/main_utc0.cpp` | `c09d5a99f17d099218f9de3a664622749534fe3c3379c81143d669c1ac334081` |
 | `tests/unit/pub_raw_01.hpp` | `cd18843a0885f569d49f4c2c34852b3afbf93df329e9967b04a331204de12c24` |
@@ -129,8 +129,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_raw_decode_u2b.cpp` | `2abd37934df5eeb669eb141ee86b79e21a1f358bde3e693ccd288117723d43ce` |
 | `tests/unit/test_raw_robust.cpp` | `7afc89f0f2b4ebb0ca2e71d83c020a85a3b30002725b134d2370cdc47aa90513` |
 
-- Test release (`tmp/release-junit.xml`): totali 902, fast 884, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 884, fast 884, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
 - Test release-giro2 (`tmp/release-junit-r2.xml`): totali 812, fast 812, slow 0, falliti 0
 - Test fuzz-asan (`tmp/u3-fuzz-asan-junit.xml`): totali 9, fast 0, slow 9, falliti 0
 <!-- evidence:end -->

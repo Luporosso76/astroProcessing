@@ -3,6 +3,7 @@
 #include "astro/calibration.hpp"
 #include "astro/import_job.hpp"
 #include "astro/master.hpp"
+#include "astro/raw_import_job.hpp"
 #include "astro/thumbnail_cache.hpp"
 
 namespace astro {
@@ -44,6 +45,16 @@ minimal_job make_import(const job_type_inputs& inputs, const std::string& varian
   return {make_import_node(request), [request](const job_type_env& env) {
             const resource_config resources = io_resources(env);
             return run_import_job(env.store, env.slot_name, request, env.pool, env.cancel, env.budget, &resources);
+          }};
+}
+
+minimal_job make_raw_import(const job_type_inputs& inputs, const std::string& variant, const std::filesystem::path&) {
+  require_single(raw_import_operator_id, variant);
+  const job_type_input in = input_of(inputs, "file");
+  const raw_import_request request = make_raw_import_request(in.path, in.digest);
+  return {request.node, [request](const job_type_env& env) {
+            const resource_config resources = io_resources(env);
+            return run_raw_import_job(env.store, env.slot_name, request, env.pool, env.cancel, env.budget, &resources);
           }};
 }
 
@@ -166,6 +177,8 @@ std::map<std::string, const input_format*> fits_roles(std::initializer_list<cons
 const std::vector<job_type_entry>& registered_job_types() {
   static const std::vector<job_type_entry> entries{
       {import_operator_id, {"file"}, fits_roles({"file"}), {{"unica", false, false}}, true, make_import},
+      {raw_import_operator_id, {"file"}, {{"file", &raw_input_format()}}, {{"unica", false, false}}, true,
+       make_raw_import},
       {thumbnail_operator_id, {"file"}, fits_roles({"file"}), {{"unica", false, false}}, true, make_thumbnail},
       {cache_rebuild_operator_id, {"file"}, fits_roles({"file"}), {{"unica", false, false}}, true,
        make_cache_rebuild},
