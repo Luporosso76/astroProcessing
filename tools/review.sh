@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Review indipendente. Uso: tools/review.sh [--reviewer argon|claude] <slug> <file-fatti.md>
 # Revisore (AGENTS.md, "Delega e review"): `argon` (default) è Gemini 4 Argon (High) via `agy` in modalità plan e sandbox;
-# `claude` è Claude Opus headless sull'abbonamento, contesto separato dall'autore, senza strumenti di scrittura. Se Argon
+# `claude` è Claude Opus headless sui crediti API del progetto (tools/agent-api.sh, indipendente dal login), contesto
+# separato dall'autore; a credito finito (uscita 4 di agent-api.sh) la stessa review gira sull'abbonamento, e il log lo dice. Se Argon
 # non risponde (assente da `agy models`, rifiuto, crediti finiti) lo strumento esce con 4 e la review si rilancia
 # esplicitamente con `--reviewer claude`: nessun cambio automatico di revisore.
 # Il prompt è il template fisso più il file di fatti dell'unità (ID, contratto, log): niente giudizi dell'autore.
@@ -162,8 +163,16 @@ if [ "$reviewer" = argon ]; then
   TMPDIR="$root/tmp" timeout 3600 agy -p "$prompt" --model "$argon_model" --mode plan --sandbox --print-timeout 3500s \
     --log-file "$log" < /dev/null > "$out" 2>> "$log" || rc=$?
 else
-  printf '%s\n' "$prompt" | TMPDIR="$root/tmp" timeout 3600 env -u ANTHROPIC_API_KEY claude -p --model opus \
-    --permission-mode auto --disallowedTools "Edit,Write,NotebookEdit" --output-format text > "$out" 2> "$log" || rc=$?
+  pf="tmp/review-${slug}-claude.prompt"; printf '%s\n' "$prompt" > "$pf"
+  ASTRO_API_TIMEOUT=3600 ASTRO_API_READONLY=1 tools/agent-api.sh opus "$root" "$pf" "$log.json" 2> "$log" || rc=$?
+  if [ "$rc" -eq 4 ]; then
+    echo "credito API finito: review sull'abbonamento" >> "$log"
+    rc=0
+    TMPDIR="$root/tmp" timeout 3600 env -u ANTHROPIC_API_KEY claude -p --model opus --permission-mode auto \
+      --disallowedTools "Edit,Write,NotebookEdit" --output-format text < "$pf" > "$out" 2>> "$log" || rc=$?
+  elif [ "$rc" -eq 0 ]; then
+    python3 -I -S -c 'import json, sys; sys.stdout.write(str(json.load(open(sys.argv[1], encoding="utf-8"))["result"]))' "$log.json" > "$out" || rc=$?
+  fi
 fi
 [ "$(git_state)" = "$before" ] || { echo "lo stato di git è cambiato durante la review: il revisore non è in sola lettura (log: $log)" >&2; exit 2; }
 if [ "$rc" -ne 0 ]; then

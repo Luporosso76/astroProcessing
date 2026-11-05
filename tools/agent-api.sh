@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Agente Claude headless pagato con la chiave API del progetto (.secrets/anthropic-api-key, fuori da git), non con
-# l'abbonamento. Solo Haiku e Sonnet: Opus e il coordinamento restano sull'abbonamento.
-# Uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json>
+# l'abbonamento. La chiave non dipende dal login dell'abbonamento: le API restano usabili anche a login scaduto.
+# Uso: tools/agent-api.sh <haiku|sonnet|opus> <directory-di-lavoro> <file-prompt> <file-esito.json>
 # Nessun tetto di spesa per esecuzione: il limite è il credito della chiave; a credito finito l'uscita è 4.
 # La directory di lavoro sta dentro il progetto (di norma un worktree); il prompt arriva da file su stdin.
-# Tempo massimo in secondi da ASTRO_API_TIMEOUT (default 7200).
+# Tempo massimo in secondi da ASTRO_API_TIMEOUT (default 7200). ASTRO_API_READONLY=1 toglie gli strumenti di scrittura (review).
 # Uscita: 0 esito scritto e senza errore; 2 argomenti o chiave non validi; 4 credito API esaurito (il coordinatore
 # rilancia il compito sull'abbonamento e lo registra); 5 errore riportato da claude (dettaglio nell'esito).
 set -euo pipefail
@@ -13,7 +13,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 key="$root/.secrets/anthropic-api-key"
 
 if [ "$#" -ne 4 ]; then
-  echo "uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json>" >&2
+  echo "uso: tools/agent-api.sh <haiku|sonnet|opus> <directory-di-lavoro> <file-prompt> <file-esito.json>" >&2
   exit 2
 fi
 model="$1"
@@ -21,7 +21,7 @@ workdir="$(cd "$2" && pwd)"
 prompt="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
 out="$4"
 
-case "$model" in haiku|sonnet) ;; *) echo "modello non ammesso sulle API: '$model' (solo haiku o sonnet)" >&2; exit 2 ;; esac
+case "$model" in haiku|sonnet|opus) ;; *) echo "modello non ammesso sulle API: '$model' (haiku, sonnet o opus)" >&2; exit 2 ;; esac
 case "$workdir/" in "$root"/*) ;; *) echo "directory di lavoro fuori dal progetto: $workdir" >&2; exit 2 ;; esac
 [ -f "$prompt" ] || { echo "file di prompt assente: $prompt" >&2; exit 2; }
 [ -f "$key" ] || { echo "chiave API assente: $key" >&2; exit 2; }
@@ -39,10 +39,13 @@ print(json.dumps({"apiKeyHelper": "cat " + k, "permissions": {"deny": [f"Read({s
 # resta fermo fino al timeout e l'esito JSON va perso. La regola precede ogni prompt.
 preamble='Regola dello strumento: mai `run_in_background` né comandi lasciati in background. Ogni comando gira in primo piano, con un timeout fino a 600000 ms; le build e i test lunghi si spezzano in comandi più corti. Chiudi il turno solo a lavoro finito, con il rapporto finale.'
 
+readonly_args=()
+[ "${ASTRO_API_READONLY:-0}" = 1 ] && readonly_args=(--disallowedTools "Edit,Write,NotebookEdit")
+
 rc=0
 (cd "$workdir" && { printf '%s\n\n' "$preamble"; cat "$prompt"; } | env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
   TMPDIR="$root/tmp" timeout "${ASTRO_API_TIMEOUT:-7200}" claude -p \
-  --model "$model" --settings "$settings" --permission-mode auto --output-format json) \
+  --model "$model" --settings "$settings" --permission-mode auto "${readonly_args[@]}" --output-format json) \
   > "$out" 2> "$out.stderr" || rc=$?
 
 verdict="$(cd "$root" && python3 -I -S - "$out" <<'EOF'
