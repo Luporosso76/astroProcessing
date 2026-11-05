@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Agente Claude headless pagato con la chiave API del progetto (.secrets/anthropic-api-key, fuori da git), non con
 # l'abbonamento. Solo Haiku e Sonnet: Opus e il coordinamento restano sull'abbonamento.
-# Uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json> [budget-usd, default 10]
+# Uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json>
+# Nessun tetto di spesa per esecuzione: il limite è il credito della chiave; a credito finito l'uscita è 4.
 # La directory di lavoro sta dentro il progetto (di norma un worktree); il prompt arriva da file su stdin.
 # Tempo massimo in secondi da ASTRO_API_TIMEOUT (default 7200).
 # Uscita: 0 esito scritto e senza errore; 2 argomenti o chiave non validi; 4 credito API esaurito (il coordinatore
@@ -11,27 +12,25 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 key="$root/.secrets/anthropic-api-key"
 
-if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then
-  echo "uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json> [budget-usd]" >&2
+if [ "$#" -ne 4 ]; then
+  echo "uso: tools/agent-api.sh <haiku|sonnet> <directory-di-lavoro> <file-prompt> <file-esito.json>" >&2
   exit 2
 fi
 model="$1"
 workdir="$(cd "$2" && pwd)"
 prompt="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
 out="$4"
-budget="${5:-10}"
 
 case "$model" in haiku|sonnet) ;; *) echo "modello non ammesso sulle API: '$model' (solo haiku o sonnet)" >&2; exit 2 ;; esac
 case "$workdir/" in "$root"/*) ;; *) echo "directory di lavoro fuori dal progetto: $workdir" >&2; exit 2 ;; esac
 [ -f "$prompt" ] || { echo "file di prompt assente: $prompt" >&2; exit 2; }
 [ -f "$key" ] || { echo "chiave API assente: $key" >&2; exit 2; }
 [ "$(stat -c %a "$key")" = 600 ] || { echo "permessi della chiave diversi da 600: $key" >&2; exit 2; }
-[[ "$budget" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo "budget non valido: '$budget'" >&2; exit 2; }
 mkdir -p "$(dirname "$out")"
 
 # La chiave arriva a claude tramite apiKeyHelper, non per variabile d'ambiente: i comandi che l'agente lancia non la
 # ereditano. Lettura e scrittura di .secrets/ negate all'agente. Limite: un comando Bash che legge il file non è
-# bloccato da queste regole; contano la modalità auto e il tetto di spesa della chiave impostato nella console.
+# bloccato da queste regole; contano la modalità auto e il credito della chiave.
 settings="$(python3 -I -S -c 'import json, sys; k, s = sys.argv[1], sys.argv[2]
 print(json.dumps({"apiKeyHelper": "cat " + k, "permissions": {"deny": [f"Read({s}/**)", f"Edit({s}/**)"]}}))' \
   "$key" "$root/.secrets")"
@@ -43,7 +42,7 @@ preamble='Regola dello strumento: mai `run_in_background` né comandi lasciati i
 rc=0
 (cd "$workdir" && { printf '%s\n\n' "$preamble"; cat "$prompt"; } | env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
   TMPDIR="$root/tmp" timeout "${ASTRO_API_TIMEOUT:-7200}" claude -p \
-  --model "$model" --settings "$settings" --permission-mode auto --max-budget-usd "$budget" --output-format json) \
+  --model "$model" --settings "$settings" --permission-mode auto --output-format json) \
   > "$out" 2> "$out.stderr" || rc=$?
 
 verdict="$(cd "$root" && python3 -I -S - "$out" <<'EOF'
