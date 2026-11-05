@@ -64,8 +64,10 @@ ExternalProject_Add(wcslib_project
     --without-cfitsio --without-pgplot --disable-fortran --disable-utils
     "CC=${ASTRO_TP_CC}" "CFLAGS=-O2 -g -fPIC"
   BUILD_COMMAND make -j${ASTRO_TP_JOBS}
-  # `make install` crea libwcs.a come collegamento a libwcs-8.10.a: il prodotto collega un file regolare libwcs.a.
-  INSTALL_COMMAND make install
+  # `make install` crea libwcs.a come collegamento a libwcs-8.10.a: il prodotto collega un file regolare libwcs.a. La copia
+  # regolare di un'installazione precedente si toglie prima, altrimenti `ln` di `make install` fallisce («Already exists»).
+  INSTALL_COMMAND ${CMAKE_COMMAND} -E rm -f <INSTALL_DIR>/lib/libwcs.a
+    COMMAND make install
     COMMAND ${CMAKE_COMMAND} -E rm -f <INSTALL_DIR>/lib/libwcs.a
     COMMAND ${CMAKE_COMMAND} -E copy <INSTALL_DIR>/lib/libwcs-8.10.a <INSTALL_DIR>/lib/libwcs.a
   BUILD_BYPRODUCTS "${ASTRO_TP_ROOT}/wcslib/lib/libwcs.a"
