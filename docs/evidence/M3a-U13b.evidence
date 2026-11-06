@@ -1,0 +1,17 @@
+# Sorgente del blocco generato di M3a-U13b.md (tools/evidence.py)
+file src/core/dng_decode.cpp
+file src/core/dng_internal.hpp
+file src/core/raw_decode.cpp
+file src/core/include/astro/raw_decode.hpp
+file src/core/include/astro/image.hpp
+file docs/contracts/U13-dng-decoder.md
+file docs/contracts/ADR-08-decoder-pack.md
+file docs/licenses.md
+file third_party/libtiff/SHA256SUMS
+file tests/fixtures/syn_dng_deflate.hpp
+file tests/unit/test_dng_u13b.cpp
+file tests/unit/test_dng_u13b_hooks.cpp
+file tests/unit/dng_u13b_support.hpp
+file tests/unit/raw_record_keys.hpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

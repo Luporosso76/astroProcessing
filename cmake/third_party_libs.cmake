@@ -76,6 +76,23 @@ ExternalProject_Add(wcslib_project
   BUILD_BYPRODUCTS "${ASTRO_TP_ROOT}/wcslib/lib/libwcs.a"
 )
 
+# libtiff 4.7.2 (libtiff license, stile BSD): oracolo dei soli test di U13b (segmenti deflate e Predictor 2 delle fixture).
+# Solo Deflate con la zlib di sistema: senza jpeg, lzma, zstd, webp, jbig, lerc, libdeflate, C++, strumenti, test e docs.
+ExternalProject_Add(libtiff_project
+  PREFIX "${ASTRO_TP_ROOT}/libtiff"
+  URL "${CMAKE_SOURCE_DIR}/third_party/libtiff/tiff-4.7.2.tar.gz"
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  URL_HASH SHA256=672bd7d10aee4606171afb864f3570b83340f6a33e2c186dc0512f7145ffdf6a
+  CMAKE_GENERATOR "${CMAKE_GENERATOR}"
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON "-DCMAKE_C_COMPILER=${ASTRO_TP_CC}"
+    -DBUILD_SHARED_LIBS=OFF -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF -Dtiff-cxx=OFF
+    -Dzlib=ON -Dlibdeflate=OFF -Djpeg=OFF -Dold-jpeg=OFF -Djpeg12=OFF -Dlzma=OFF -Dzstd=OFF -Dwebp=OFF -Djbig=OFF
+    -Dlerc=OFF -Dpixarlog=OFF -Dsphinx=OFF
+  BUILD_BYPRODUCTS "${ASTRO_TP_ROOT}/libtiff/lib/libtiff.a"
+)
+
 find_package(ZLIB REQUIRED)
 find_package(JPEG REQUIRED)
 find_package(Threads REQUIRED)
@@ -83,3 +100,4 @@ find_package(Threads REQUIRED)
 astro_tp_import(astro_libraw libraw_project libraw libraw_r.a include JPEG::JPEG ZLIB::ZLIB m Threads::Threads)
 astro_tp_import(astro_cfitsio cfitsio_project cfitsio libcfitsio.a include ZLIB::ZLIB m Threads::Threads)
 astro_tp_import(astro_wcslib wcslib_project wcslib libwcs.a include m)
+astro_tp_import(astro_libtiff libtiff_project libtiff libtiff.a include ZLIB::ZLIB m)

@@ -151,8 +151,16 @@ TEST(RelinkBlocked, T_M3A_09a_twin_identical_copy_is_warning_changed_bytes_stop)
   const std::string recorded = primary_artifact_row(b.w.proj, "imp0", true);
   ASSERT_FALSE(recorded.empty());
 
+  // Un collegamento fisico tiene allocato l'inode registrato: dopo la prima sostituzione il filesystem non può
+  // riassegnarlo alla seconda, e "inode nuovo" vale in entrambi i casi (altrimenti lo stato sarebbe `present`).
+  const fs::path anchor = a.path.parent_path() / (a.path.filename().string() + ".ancora");
+  fs::remove(anchor);
+  fs::create_hard_link(a.path, anchor);
+  const std::uint64_t recorded_ino = stat_of(a.path).ino();
+
   // Copia byte-identica con inode nuovo: bloccato come `input.modified`; il job completa con lo stesso output.
   replace_with_new_inode(a.path, a.content);
+  ASSERT_NE(stat_of(a.path).ino(), recorded_ino);
   {
     const auto blocks = b.store->blocked_slots(b.store->input_status());
     EXPECT_EQ(blocked_names(blocks), (std::set<std::string>{"cal0", "imp0"}));
@@ -169,6 +177,7 @@ TEST(RelinkBlocked, T_M3A_09a_twin_identical_copy_is_warning_changed_bytes_stop)
   bytes flipped = a.content;
   flipped[3003] ^= 0x01;
   replace_with_new_inode(a.path, flipped);
+  ASSERT_NE(stat_of(a.path).ino(), recorded_ino);
   {
     const auto blocks = b.store->blocked_slots(b.store->input_status());
     expect_blocked_by(blocks, "imp0", b.ids[0], a, "input.modified");

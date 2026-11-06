@@ -222,6 +222,14 @@ std::optional<slot_record> sqlite_dag_store::get_slot(const std::string& slot_na
   return slot_from(st);
 }
 
+std::vector<slot_record> sqlite_dag_store::slots() const {
+  std::lock_guard lock(mutex_);
+  statement st(db_, (std::string("SELECT ") + slot_columns + " FROM slots ORDER BY slot_name").c_str());
+  std::vector<slot_record> out;
+  while (st.step()) out.push_back(slot_from(st));
+  return out;
+}
+
 std::uint64_t sqlite_dag_store::retarget_slot(const std::string& slot_name, const std::string& target_node_key) {
   require_writable();
   std::lock_guard lock(mutex_);

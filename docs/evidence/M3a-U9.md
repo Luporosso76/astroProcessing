@@ -55,17 +55,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/F-IO-08-ricollegamento.md` | `9e5498a4661fd7f5685bf37edeb52093b3fd0112a54f05d4219de90b54f7515f` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/include/astro/hash.hpp` | `2043851aa8b5e01288e40841a44bd77476bfe12f9a6ff2100984117409256481` |
-| `src/core/include/astro/sqlite_dag_store.hpp` | `8a170294fae877b41b24ea6c80031cb8b3d6aba5042933ec835354d048e09052` |
-| `src/core/sqlite_dag_store.cpp` | `4a7145ae4ff5616dd4bff2361676595a6bf399b932911946311feada7f272ff7` |
+| `src/core/include/astro/sqlite_dag_store.hpp` | `783fa87a3f6778e1976a1f4846635a500683887a0dabfcd99ff7753eb083fe16` |
+| `src/core/sqlite_dag_store.cpp` | `141422518f46f6367902eab709e6a9203d74fef453096db8f4f9fc04e16a06d3` |
 | `src/core/sqlite_project.cpp` | `4defa68b1292f66d893ba24b6ca17222a82e126376ab8fc438704515d214b9c5` |
 | `src/core/sqlite_relink.cpp` | `1394326d8151c68dc22d815af66a65817fc217ab6b72c0936316559fa5d76f0b` |
 | `tests/fixtures/fs_probe.hpp` | `c14734822290c68094bb0f12798193d085e5b55ce380c5063ab4b24ccec401e3` |
 | `tests/unit/relink_support.hpp` | `bda3adf4df1f20770469f7d8acf3db5d036d5f669e1e0af97cdaba407c324291` |
 | `tests/unit/test_relink.cpp` | `eea897da6d62ba969b397cf3342043c49c20f89e4dacfa52ff59759dfee3585f` |
-| `tests/unit/test_relink_blocked.cpp` | `64127d4ff764b4fcd9915a139b2d28e5031b2658986dc5c6e369319f902b63e5` |
+| `tests/unit/test_relink_blocked.cpp` | `e25c319228fe26616f720611cf81e945fda0b4de30c22400ed479f4f157adace` |
 | `tests/unit/test_relink_nostat.cpp` | `f384b46e5748ddb13a32cd34170546d5f05231a750bcb0c8887f43d56fa77b07` |
 | `tests/unit/test_relink_status.cpp` | `457386c57cbedbb6f31a96ad70d531bf1e7762fbf064fb7d5cb39ac53f61fa9d` |
 
-- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
 <!-- evidence:end -->

@@ -320,7 +320,13 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_import.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_import_run.dir
 
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_selection.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_selection.dir
+
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b_hooks.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_threads_dng.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/fuzz_dng_decode.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.
@@ -477,3 +483,51 @@ if(ASTRO_U8A_TESTS)
   target_compile_definitions(test_batch_classification PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
   gtest_discover_tests(test_batch_classification NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
 endif()
+
+# U8b (M3.a): F-IO-03 CL-05…CL-12 (T-M3A-04, 05c, 05d, 06, T-M3A-CAL-09 parte M3.a).
+foreach(t test_batch_analysis test_verify_selection)
+  add_executable(${t} ${t}.cpp main_utc0.cpp)
+  target_link_libraries(${t} PRIVATE astrocore GTest::gtest SQLite::SQLite3)
+  target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+  target_compile_definitions(${t} PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+  gtest_discover_tests(${t} NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
+endforeach()
+# Light DNG del decoder del progetto sullo store (fixture deflate di syn_dng_deflate.hpp: zlib e libtiff del progetto).
+target_link_libraries(test_batch_analysis PRIVATE ZLIB::ZLIB astro_libtiff)
+
+# U13b (M3.a): immagine del decoder DNG del progetto. T-U13-03, 04, 05, 07, 08, 12, 24 (test_dng_u13b), T-U13-04 tetto e
+# picco di zlib e T-U13-09 (test_dng_u13b_hooks), T-U13-10 (raw_threads_dng), T-U13-11 (fuzz_dng_decode, label slow, un
+# processo per seme). Segmenti deflate delle fixture da libtiff di third_party (contratto §12).
+add_executable(test_dng_u13b test_dng_u13b.cpp main_utc0.cpp)
+target_link_libraries(test_dng_u13b PRIVATE astrocore GTest::gtest SQLite::SQLite3 ZLIB::ZLIB astro_libtiff ${CMAKE_DL_LIBS})
+target_include_directories(test_dng_u13b PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_dng_u13b PRIVATE ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+gtest_discover_tests(test_dng_u13b NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
+add_executable(test_dng_u13b_hooks test_dng_u13b_hooks.cpp main_utc0.cpp)
+target_link_libraries(test_dng_u13b_hooks PRIVATE astrocore GTest::gtest ZLIB::ZLIB astro_libtiff)
+target_include_directories(test_dng_u13b_hooks PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_dng_u13b_hooks NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600)
+
+# T-U13-10: un processo nuovo per campione, (a) prima di (c), come T-M3A-RAW-08.
+add_executable(raw_threads_dng raw_threads_dng.cpp)
+target_link_libraries(raw_threads_dng PRIVATE astrocore ZLIB::ZLIB astro_libtiff ${CMAKE_DL_LIBS})
+target_include_directories(raw_threads_dng PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+set(ASTRO_U13_THREAD_TESTS "")
+foreach(sample strips tiles)
+  add_test(NAME T-U13-10.a_product.${sample} COMMAND raw_threads_dng --product ${sample})
+  list(APPEND ASTRO_U13_THREAD_TESTS T-U13-10.a_product.${sample})
+endforeach()
+set_tests_properties(${ASTRO_U13_THREAD_TESTS} PROPERTIES LABELS fast TIMEOUT 600)
+add_test(NAME T-U13-10.c_control COMMAND raw_threads_dng --control)
+set_tests_properties(T-U13-10.c_control PROPERTIES LABELS fast TIMEOUT 120 DEPENDS "${ASTRO_U13_THREAD_TESTS}")
+
+# T-U13-11: 5 000 mutazioni per seme, un processo per seme (ctest -j non oltre 4 per restare nel 70% delle CPU).
+add_executable(fuzz_dng_decode fuzz_dng_decode.cpp)
+target_link_libraries(fuzz_dng_decode PRIVATE astrocore ZLIB::ZLIB astro_libtiff)
+target_include_directories(fuzz_dng_decode PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+set(ASTRO_U13_FUZZ_TESTS "")
+foreach(seed strips tiles tiles256 jxl)
+  add_test(NAME T-U13-11.fuzz_${seed} COMMAND fuzz_dng_decode --seed ${seed})
+  list(APPEND ASTRO_U13_FUZZ_TESTS T-U13-11.fuzz_${seed})
+endforeach()
+set_tests_properties(${ASTRO_U13_FUZZ_TESTS} PROPERTIES LABELS slow TIMEOUT 600 ENVIRONMENT "OMP_NUM_THREADS=1")

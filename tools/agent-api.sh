@@ -62,7 +62,6 @@ if d.get("is_error"):
     print("credito" if "credit balance" in text.lower() else "errore")
 else:
     print("ok")
-print(f"costo_usd={d.get('total_cost_usd')}", file=sys.stderr)
 EOF
 )" || { echo "claude è uscito con $rc senza un esito JSON valido: $out, $out.stderr" >&2; exit 5; }
 

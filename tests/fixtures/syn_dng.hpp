@@ -488,9 +488,9 @@ inline tiff_entry ent(std::uint16_t tag, std::uint16_t type, std::vector<std::ui
 }
 
 // IFD raw di un DNG con campioni interi (di norma Compression 8, SampleFormat 1, 32 bit) per il decoder del progetto.
-// Campioni da un generatore a seme fisso, con 0 e il massimo sempre presenti (riga 0, colonne 0 e 1; massimo 2^24 a 32
-// bit, 2^N − 1 a N < 32 bit); ogni segmento non
-// compresso passa da `encode` (i test lo comprimono con zlib, oppure lo lasciano com'è per Compression 1 e 52546).
+// Campioni da un generatore a seme fisso, con 0 e il massimo sempre presenti (riga 0, colonne 0 e 1, salvo `forced`;
+// massimo 2^24 a 32 bit, 2^N − 1 a N < 32 bit, oppure `sample_max`); ogni segmento non compresso passa da `encode` (i
+// test lo comprimono con zlib, oppure lo lasciano com'è per Compression 1 e 52546).
 struct dng32_spec {
   std::uint32_t width = 32;
   std::uint32_t height = 32;
@@ -512,17 +512,23 @@ struct dng32_spec {
   dng_active_area active_area{2, 2, 30, 30};
   std::uint32_t white = 1u << 24;
   std::uint32_t seed = 0x13A0u;
+  std::uint16_t predictor = 1;  // tag 317, scritto com'è; la codifica dei segmenti la sceglie chi chiama `encode`
+  // Massimo dei campioni al posto del predefinito (2^24 a 32 bit, 2^N − 1 a N < 32 bit); il massimo resta sempre presente.
+  std::optional<std::uint32_t> sample_max;
+  std::vector<std::array<std::uint32_t, 3>> forced;  // {riga, colonna, valore} scritti al posto del generatore
 };
 
 inline std::uint32_t dng32_sample(const dng32_spec& s, std::uint32_t r, std::uint32_t c) {
-  const std::uint32_t top = s.bits >= 32 ? (1u << 24) : ((1u << s.bits) - 1u);
+  const std::uint32_t top = s.sample_max ? *s.sample_max : s.bits >= 32 ? (1u << 24) : ((1u << s.bits) - 1u);
+  for (const auto& f : s.forced)
+    if (f[0] == r && f[1] == c) return f[2];
   if (r == 0 && c == 0) return 0;
   if (r == 0 && c == 1) return top;
   std::uint32_t x = s.seed ^ (r * 0x9E3779B1u) ^ (c * 0x85EBCA77u);
   x ^= x >> 15;
   x *= 0x2C1B3C6Du;
   x ^= x >> 12;
-  return x % (top + 1u);
+  return top == 0xFFFFFFFFu ? x : x % (top + 1u);
 }
 
 // Segmenti non compressi nell'ordine dei byte del file: strisce di `rows_per_strip` righe (l'ultima con le righe
@@ -574,7 +580,7 @@ tiff_ifd make_dng32_ifd(const dng32_spec& s, tiff_order order, Encode encode) {
   e.push_back(ent(262, short_, {s.photometric}));
   e.push_back(ent(277, short_, {s.samples_per_pixel}));
   e.push_back(ent(284, short_, {1}));
-  e.push_back(ent(317, short_, {1}));
+  e.push_back(ent(317, short_, {s.predictor}));
   if (s.write_sample_format)
     e.push_back(ent(339, short_, std::vector<std::uint64_t>(s.samples_per_pixel, s.sample_format)));
   for (auto& seg : dng32_segments(s, order)) ifd.segments.push_back(encode(seg));

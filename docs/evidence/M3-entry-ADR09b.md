@@ -62,7 +62,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/D-09-soglie.md` | `b906fe06799f1f250f954734d54410aa443391d2efd07d8ccad6006a39d29d76` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
-| `docs/test-matrix.md` | `e5a59554679cccb79b35652442715ac606c530e81fd997b8a01f87ebd6840cac` |
+| `docs/test-matrix.md` | `4a587859ba1e405584903987598ddd4c6fb64befb518e147182d0a6e2faa53ed` |
 | `plans/M3.md` | `ce79c62f5bbec62930a675fc28415ed6ff0b37162bf4444ae203b2aee2bd2f01` |
 
 <!-- evidence:end -->

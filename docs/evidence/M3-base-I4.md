@@ -91,15 +91,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
 | `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
 | `src/core/include/astro/job.hpp` | `452dd5673b6050bb19e6c78ed94c572e704055865c7b49463c042930458bd020` |
-| `src/core/include/astro/sqlite_dag_store.hpp` | `8a170294fae877b41b24ea6c80031cb8b3d6aba5042933ec835354d048e09052` |
+| `src/core/include/astro/sqlite_dag_store.hpp` | `783fa87a3f6778e1976a1f4846635a500683887a0dabfcd99ff7753eb083fe16` |
 | `src/core/include/astro/workflow.hpp` | `9afee58d34b3b806c1183e6eefe236fd5c5d43b14a73377623f9b8713df94358` |
 | `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
-| `src/core/sqlite_dag_store.cpp` | `4a7145ae4ff5616dd4bff2361676595a6bf399b932911946311feada7f272ff7` |
+| `src/core/sqlite_dag_store.cpp` | `141422518f46f6367902eab709e6a9203d74fef453096db8f4f9fc04e16a06d3` |
 | `src/core/stop_internal.hpp` | `583e74243a3e8c28fa0cc15e918639a0acc083e95a69ded2241066b1a52eb9c4` |
 | `src/core/workflow.cpp` | `9eaadacfce9fb87b2d5dc4998411efc27d15c4d6084cd48595ae446a50ffa84a` |
 | `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
 | `tests/unit/test_store.cpp` | `06de27ef8db29c9c45d168c3858883a2a6528e6004b36518bc3adfac52bdbdac` |
 
-- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
 <!-- evidence:end -->

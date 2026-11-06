@@ -29,6 +29,7 @@
 #include "conformance_inputs.hpp"
 #include "pub_raw_01.hpp"
 #include "raw_record_keys.hpp"
+#include "record_roundtrip.hpp"
 
 namespace {
 
@@ -386,13 +387,20 @@ TEST(RawImport, T_M3A_RAW_07_decoded_buffer_is_the_hashed_buffer) {
 
 // ---------------------------------------------------------------- T-M3A-RAW-11
 
+// Insieme esatto del record di LibRaw: `all_keys` più l'instradamento, nessuna chiave del decoder del progetto (U13 §8).
+void expect_libraw_record_keys(const json& rec) {
+  std::vector<std::string_view> keys(rk::all_keys.begin(), rk::all_keys.end());
+  keys.insert(keys.end(), rk::libraw_route_keys.begin(), rk::libraw_route_keys.end());
+  record_roundtrip::expect_exact_keys(rec, keys);
+}
+
 TEST(RawImport, T_M3A_RAW_11_decoder_record_complete_for_synthetic_inputs) {
   for (const dng_case& c : cases()) {
     SCOPED_TRACE(c.name);
     const written_case w = write_case(c, "raw11_" + c.name);
     const raw_run r = run_raw(w.file, w.digest, "raw11_" + c.name);
     ASSERT_RECORD(r, rec);
-    for (std::string_view key : rk::all_keys) EXPECT_NE(member(*rec, key), nullptr) << "chiave assente: " << key;
+    expect_libraw_record_keys(*rec);
     // Libreria (U12-third-party.md §1, §2, obblighi 5 e 6).
     EXPECT_EQ(str(rec, rk::libraw_version), rk::expected_libraw_version);
     EXPECT_EQ(num(rec, rk::libraw_version_number), rk::expected_libraw_version_number);
@@ -413,6 +421,19 @@ TEST(RawImport, T_M3A_RAW_11_decoder_record_complete_for_synthetic_inputs) {
     EXPECT_EQ(num(crop, "h"), c.h);
     EXPECT_EQ(ints_in(rec, rk::margin_parity), (std::vector<std::int64_t>{0, 0})) << "i margini dei DNG sono pari (§2.3)";
     EXPECT_EQ(str(rec, rk::cfa_pattern), c.pattern);
+    // Campi strutturali di decoder_state (§2.9, emendamento U8b): dimensioni del buffer grezzo e indice colore dei siti.
+    EXPECT_EQ(num(rec, rk::raw_width), c.spec.width);
+    EXPECT_EQ(num(rec, rk::raw_height), c.spec.height);
+    {
+      const std::vector<std::int64_t> idx = ints_in(rec, rk::cfa_color_index);
+      ASSERT_EQ(idx.size(), 4u);
+      std::string letters;
+      for (std::int64_t i : idx) {
+        ASSERT_TRUE(i >= 0 && i <= 3) << "indice colore fuori da 0..3: " << i;
+        letters += i == 0 ? 'r' : (i == 2 ? 'b' : 'g');  // 1 e 3 sono i due verdi (image.cpp: invariante di decoder_state)
+      }
+      EXPECT_EQ(letters, c.pattern) << "l'indice colore dei siti deve riprodurre il pattern dichiarato";
+    }
     // Livelli (§2.4).
     EXPECT_EQ(num(member(*rec, rk::black) , "scalar"), 0);
     EXPECT_EQ(num(rec, rk::white), c.spec.white.value());
@@ -442,6 +463,54 @@ TEST(RawImport, T_M3A_RAW_11_decoder_record_complete_for_synthetic_inputs) {
       EXPECT_TRUE(is_null(rec, rk::capture_time_libraw)) << "senza DateTimeOriginal l'ora è null, non un valore di comodo";
     }
   }
+}
+
+// Andata e ritorno del record LibRaw (ADR-08.b §2.9, U13 §8, F-IO-03 CL-12): sui DNG sintetici di RAW-11 (pattern,
+// origini pari e dispari, nero a motivo, LinearizationTable) e su due file non DNG di PUB-RAW-01 (Canon EOS 6D CR2,
+// `tiff_not_dng`; Fujifilm X-A1 RAF, `not_tiff`, con avviso del parser e `raw_inset_crops` non nulli) lo stato
+// ricostruito dal record è quello della decodifica; senza una chiave alla volta: raw.record_malformed con la chiave.
+TEST(RawImport, T_M3A_RAW_11_record_rebuilds_the_libraw_decoder_state) {
+  std::vector<std::pair<std::string, std::vector<std::uint8_t>>> files;
+  for (const dng_case& c : cases()) files.emplace_back(c.name, fx::make_dng(c.spec));
+  for (const std::size_t index : {std::size_t{0}, std::size_t{3}}) {
+    std::string name, error;
+    std::vector<std::uint8_t> bytes;
+    ASSERT_TRUE(pub_raw::load(index, name, bytes, error)) << error;
+    files.emplace_back(name, std::move(bytes));
+  }
+  bool saw_warning = false, saw_inset = false;
+  for (const auto& [name, bytes] : files) {
+    SCOPED_TRACE(name);
+    const image img = decode_raw_buffer(bytes);
+    ASSERT_TRUE(img.decoder_state.has_value());
+    EXPECT_EQ(img.decoder_state->route.decoder, raw_decoder_kind::libraw);
+    EXPECT_FALSE(img.decoder_state->dng.has_value());
+    saw_warning = saw_warning || img.decoder_state->process_warnings != 0;
+    saw_inset = saw_inset || img.decoder_state->raw_inset_crops != std::array<std::array<std::uint32_t, 4>, 2>{};
+    record_roundtrip::expect_state_round_trip(img);
+    const json rec = raw_decoder_record(img);
+    for (std::string_view key : rk::state_common_keys) {
+      SCOPED_TRACE(std::string(key));
+      ASSERT_NE(member(rec, key), nullptr);
+      record_roundtrip::expect_record_malformed(record_roundtrip::without_key(rec, key), key);
+    }
+    for (std::string_view key : rk::state_libraw_keys) {
+      SCOPED_TRACE(std::string(key));
+      ASSERT_NE(member(rec, key), nullptr);
+      record_roundtrip::expect_record_malformed(record_roundtrip::without_key(rec, key), key);
+    }
+    expect_libraw_record_keys(rec);
+    // Un valore fuori dominio per ramo: la chiave del contesto è quella del valore letto.
+    using record_roundtrip::with_key;
+    record_roundtrip::expect_record_malformed(with_key(rec, rk::decoder, json::string("dcraw")), "decoder");
+    record_roundtrip::expect_record_malformed(with_key(rec, rk::decoder, json::string("astro_dng")), "dng_spec");
+    for (const char* reason : {"unknown", "", "TIFF_NOT_DNG"}) {
+      SCOPED_TRACE(std::string("route_reason = ") + reason);
+      record_roundtrip::expect_record_malformed(with_key(rec, rk::route_reason, json::string(reason)), "route_reason");
+    }
+  }
+  EXPECT_TRUE(saw_warning) << "nessun file con process_warnings non nullo: il membro non è attraversato";
+  EXPECT_TRUE(saw_inset) << "nessun file con raw_inset_crops non nulli: il membro non è attraversato";
 }
 
 // ---------------------------------------------------------------- T-M3A-RAW-12 (determinismo; la chiave per campo è in test_raw_import_record)
@@ -562,7 +631,7 @@ TEST(RawImport, T_M3A_RAW_09_pub_raw_01_bayer_samples_import) {
     ASSERT_TRUE(pub_raw::load(c.index, name, bytes, error)) << error;
     const raw_run r = run_raw(real_path(c.index), digest_of(bytes), std::string("raw09_") + c.brand);
     ASSERT_RECORD(r, rec);
-    for (std::string_view key : rk::all_keys) EXPECT_NE(member(*rec, key), nullptr) << "chiave assente: " << key;
+    expect_libraw_record_keys(*rec);
     for (std::string_view key : {rk::sensor, rk::pixel_size_um, rk::pixel_scale_arcsec, rk::wcs}) {
       EXPECT_TRUE(is_null(rec, key)) << key << " deve essere JSON null (L4)";
     }

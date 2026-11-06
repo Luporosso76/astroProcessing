@@ -1,0 +1,13 @@
+# Sorgente del blocco generato di M3a-U8b.md (tools/evidence.py)
+file src/core/batch_classification.cpp
+file src/core/include/astro/batch_classification.hpp
+file src/core/calibration_analysis.cpp
+file src/core/include/astro/calibration_analysis.hpp
+file src/core/raw_decode.cpp
+file docs/contracts/F-IO-03-classificazione.md
+file docs/contracts/ADR-08-decoder-pack.md
+file tests/unit/test_batch_analysis.cpp
+file tests/unit/test_verify_selection.cpp
+file tests/unit/raw_record_keys.hpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

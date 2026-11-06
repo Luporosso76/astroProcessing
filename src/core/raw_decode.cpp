@@ -2,11 +2,16 @@
 
 #include <libraw/libraw.h>
 
+#include <array>
+#include <charconv>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -229,25 +234,6 @@ std::vector<std::uint32_t> black_pattern(const libraw_data_t& d, std::uint32_t& 
   return values;
 }
 
-// Curva della libreria (ADR-08.b §2.4): SHA-256 delle 65 536 voci, uint16 little-endian in ordine di indice.
-std::optional<std::array<std::uint8_t, 32>> curve_digest(const unsigned short* curve) {
-  bool identity = true;
-  for (std::uint32_t i = 0; i < 0x10000; ++i)
-    if (curve[i] != i) identity = false;
-  if (identity) return std::nullopt;
-  std::vector<std::uint8_t> bytes(2 * 0x10000);
-  for (std::uint32_t i = 0; i < 0x10000; ++i) {
-    bytes[2 * i] = static_cast<std::uint8_t>(curve[i] & 0xFF);
-    bytes[2 * i + 1] = static_cast<std::uint8_t>(curve[i] >> 8);
-  }
-  const std::string hex = sha256_hex(bytes);
-  const auto nibble = [](char h) { return static_cast<std::uint8_t>(h <= '9' ? h - '0' : h - 'a' + 10); };
-  std::array<std::uint8_t, 32> out{};
-  for (std::size_t i = 0; i < out.size(); ++i)
-    out[i] = static_cast<std::uint8_t>(nibble(hex[2 * i]) << 4 | nibble(hex[2 * i + 1]));
-  return out;
-}
-
 metadata_source from_libraw(const char* field) { return {metadata_origin::decoder, field}; }
 
 void set_metadata(frame_metadata& m, const libraw_data_t& d, const raw_unpack_fields& u) {
@@ -272,6 +258,24 @@ void set_metadata(frame_metadata& m, const libraw_data_t& d, const raw_unpack_fi
 }
 
 }  // namespace
+
+std::optional<std::array<std::uint8_t, 32>> dng_detail::curve_digest(std::span<const std::uint16_t, 0x10000> curve) {
+  bool identity = true;
+  for (std::uint32_t i = 0; i < 0x10000; ++i)
+    if (curve[i] != i) identity = false;
+  if (identity) return std::nullopt;
+  std::vector<std::uint8_t> bytes(2 * 0x10000);
+  for (std::uint32_t i = 0; i < 0x10000; ++i) {
+    bytes[2 * i] = static_cast<std::uint8_t>(curve[i] & 0xFF);
+    bytes[2 * i + 1] = static_cast<std::uint8_t>(curve[i] >> 8);
+  }
+  const std::string hex = sha256_hex(bytes);
+  const auto nibble = [](char h) { return static_cast<std::uint8_t>(h <= '9' ? h - '0' : h - 'a' + 10); };
+  std::array<std::uint8_t, 32> out{};
+  for (std::size_t i = 0; i < out.size(); ++i)
+    out[i] = static_cast<std::uint8_t>(nibble(hex[2 * i]) << 4 | nibble(hex[2 * i + 1]));
+  return out;
+}
 
 image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks,
                         const raw_decode_context& ctx) {
@@ -425,7 +429,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   if (levels.linear_max != std::array<long, 4>{})
     st.linear_max = std::array<std::int64_t, 4>{levels.linear_max[0], levels.linear_max[1], levels.linear_max[2],
                                                 levels.linear_max[3]};
-  st.curve_sha256 = curve_digest(d.color.curve);
+  st.curve_sha256 = dng_detail::curve_digest(d.color.curve);
   st.linearization = st.curve_sha256 ? decoder_linearization::decoder_curve : decoder_linearization::identity;
   st.process_warnings = levels.process_warnings;
   for (std::size_t i = 0; i < 2; ++i) {
@@ -433,6 +437,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
     st.raw_inset_crops[i] = {c.cleft, c.ctop, c.cwidth, c.cheight};
   }
   st.flip = sz.flip;
+  st.route = route.result;
 
   image img = make_image(image_geometry(sz.width, sz.height), sample_type::f32, plane_layout::cfa,
                          cfa_layout{*pattern, 0, 0});
@@ -517,19 +522,51 @@ json metadata_present_names(const frame_metadata& m) {
   return names;
 }
 
-}  // namespace
+const char* to_string(raw_decoder_kind kind) {
+  switch (kind) {
+    case raw_decoder_kind::libraw: return "libraw";
+    case raw_decoder_kind::astro_dng: return "astro_dng";
+  }
+  std::abort();
+}
 
-json raw_decoder_record(const image& img) {
-  if (!img.decoder_state || !img.cfa)
-    throw stop_error(error_category::invalid_input, "raw.record_source", "immagine non prodotta dal decoder RAW");
+json optional_integer(const std::optional<std::uint32_t>& v) { return v ? json::integer(*v) : json::null(); }
+
+std::string dotted(const std::array<std::uint8_t, 4>& v) {
+  return std::to_string(v[0]) + "." + std::to_string(v[1]) + "." + std::to_string(v[2]) + "." + std::to_string(v[3]);
+}
+
+json strings(const std::vector<std::string>& values) {
+  json a = json::array();
+  for (const std::string& v : values) a.push(json::string(v));
+  return a;
+}
+
+// Valori interi come interi; un RATIONAL non intero come testo "num/den".
+json rational_pair(const std::optional<std::array<dng_rational, 2>>& v) {
+  if (!v) return json::null();
+  json a = json::array();
+  for (const dng_rational& x : *v) {
+    ASTRO_ASSERT(x.den != 0);
+    a.push(x.num % x.den == 0 ? json::integer(x.num / x.den)
+                              : json::string(std::to_string(x.num) + "/" + std::to_string(x.den)));
+  }
+  return a;
+}
+
+// Campi comuni ai due decoder (ADR-08.b §2.9, U13 §8): instradamento, livelli, geometria, metadati.
+void set_common(json& r, const image& img) {
   const decoder_state& s = *img.decoder_state;
-  json r = json::object();
-  r.set("libraw_version", json::string(LibRaw::version()));
-  r.set("libraw_version_number", json::integer(LibRaw::versionNumber()));
-  r.set("libraw_capabilities", json::integer(libraw_capabilities()));
-  r.set("libraw_tarball_sha256", json::string(ASTRO_LIBRAW_TARBALL_SHA256));
-  r.set("black_applied_by_decoder", json::string("none"));
-  r.set("scale_applied_by_decoder", json::string("none"));
+  r.set("decoder", json::string(to_string(s.route.decoder)));
+  // Identità del pacchetto di decoder (ADR-08.b §2.9, riga «Libreria»): vale per entrambi i decoder.
+  const decoder_identity identity = current_decoder_identity();
+  r.set("libraw_version", json::string(identity.libraw_version));
+  r.set("libraw_version_number", json::integer(identity.libraw_version_number));
+  r.set("libraw_capabilities", json::integer(identity.libraw_capabilities));
+  r.set("libraw_tarball_sha256", json::string(identity.libraw_tarball_sha256));
+  r.set("compression", optional_integer(s.route.compression));
+  r.set("sample_format", optional_integer(s.route.sample_format));
+  r.set("bits_per_sample", optional_integer(s.route.bits_per_sample));
   json black = json::object();
   black.set("scalar", json::integer(s.black));
   black.set("per_color", integers({s.black_per_color.begin(), s.black_per_color.end()}));
@@ -551,24 +588,314 @@ json raw_decoder_record(const image& img) {
   r.set("crop", crop_json(s.window.x0, s.window.y0, s.window.width, s.window.height));
   r.set("margin_parity", integers({s.window.x0 % 2, s.window.y0 % 2}));
   r.set("cfa_pattern", json::string(pattern_name(img.cfa->pattern)));
-  json insets = json::array();
-  for (const auto& c : s.raw_inset_crops) insets.push(crop_json(c[0], c[1], c[2], c[3]));
-  r.set("raw_inset_crops", std::move(insets));
-  r.set("flip", json::integer(s.flip));
+  r.set("raw_width", json::integer(s.raw_width));
+  r.set("raw_height", json::integer(s.raw_height));
+  json color_index = json::array();
+  for (const std::uint8_t c : s.cfa_color_index) color_index.push(json::integer(c));
+  r.set("cfa_color_index", std::move(color_index));
   r.set("metadata_present", metadata_present_names(img.metadata));
-  json not_kept = json::array();
-  for (const char* c : {"makernote", "thumbnail", "profiles", "camera_white_balance"}) not_kept.push(json::string(c));
-  r.set("metadata_not_kept", std::move(not_kept));
-  r.set("data_state", json::string("raw"));
-  r.set("camera_processing", json::string("unknown"));
-  r.set("process_warnings", json::integer(s.process_warnings));
   for (const char* absent : {"sensor", "pixel_size_um", "pixel_scale_arcsec", "wcs"}) r.set(absent, json::null());
   r.set("absent_reason", json::string("not_provided_by_decoder"));
   r.set("capture_time_libraw", img.metadata.capture_time_libraw ? json::integer(img.metadata.capture_time_libraw->value)
                                                                   : json::null());
   r.set("capture_time_clock", json::string("camera_no_zone"));
+  // ADR-08.b §2.9: nessun nero né scala applicati, dato raw, categorie non conservate; fuso verificato prima
+  // dell'instradamento per entrambi i decoder (U13 §3).
+  r.set("black_applied_by_decoder", json::string("none"));
+  r.set("scale_applied_by_decoder", json::string("none"));
+  json not_kept = json::array();
+  for (const char* c : {"makernote", "thumbnail", "profiles", "camera_white_balance"}) not_kept.push(json::string(c));
+  r.set("metadata_not_kept", std::move(not_kept));
+  r.set("data_state", json::string("raw"));
+  r.set("camera_processing", json::string("unknown"));
   r.set("process_tz", json::string("UTC0"));
+}
+
+void set_libraw(json& r, const image& img) {
+  const decoder_state& s = *img.decoder_state;
+  r.set("route_reason", json::string(s.route.reason));
+  json insets = json::array();
+  for (const auto& c : s.raw_inset_crops) insets.push(crop_json(c[0], c[1], c[2], c[3]));
+  r.set("raw_inset_crops", std::move(insets));
+  r.set("flip", json::integer(s.flip));
+  r.set("process_warnings", json::integer(s.process_warnings));
+}
+
+// U13 §8: campi propri del decoder del progetto.
+void set_astro_dng(json& r, const dng_decoder_fields& f) {
+  r.set("dng_spec", json::string("DNG 1.7.1.0"));
+  r.set("dng_version", json::string(dotted(f.dng_version)));
+  r.set("dng_backward_version", json::string(dotted(f.dng_backward_version)));
+  json seg = json::object();
+  seg.set("kind", json::string(f.tiles ? "tiles" : "strips"));
+  if (f.tiles) {
+    seg.set("tile_width", json::integer(f.tile_width));
+    seg.set("tile_length", json::integer(f.tile_length));
+  } else {
+    seg.set("rows_per_strip", json::integer(f.rows_per_strip));
+  }
+  seg.set("count", json::integer(static_cast<std::int64_t>(f.segment_count)));
+  r.set("segments", std::move(seg));
+  r.set("predictor", json::integer(f.predictor));
+  r.set("byte_order", json::string(f.little_endian ? "II" : "MM"));
+  r.set("zlib_version", json::string(f.zlib_runtime_version));
+  r.set("orientation", optional_integer(f.orientation));
+  r.set("default_crop_origin", rational_pair(f.default_crop_origin));
+  r.set("default_crop_size", rational_pair(f.default_crop_size));
+  r.set("metadata_rejected", strings(f.metadata_rejected));
+  r.set("opcode_lists", strings(f.opcode_lists));
+}
+
+}  // namespace
+
+decoder_identity current_decoder_identity() {
+  return decoder_identity{LibRaw::version(), static_cast<std::uint32_t>(LibRaw::versionNumber()),
+                          static_cast<std::uint32_t>(libraw_capabilities()), ASTRO_LIBRAW_TARBALL_SHA256};
+}
+
+json raw_decoder_record(const image& img) {
+  if (!img.decoder_state || !img.cfa)
+    throw stop_error(error_category::invalid_input, "raw.record_source", "immagine non prodotta dal decoder RAW");
+  const decoder_state& s = *img.decoder_state;
+  json r = json::object();
+  set_common(r, img);
+  switch (s.route.decoder) {
+    case raw_decoder_kind::libraw: set_libraw(r, img); break;
+    case raw_decoder_kind::astro_dng:
+      if (!s.dng)
+        throw stop_error(error_category::invalid_input, "raw.record_source",
+                         "immagine del decoder del progetto senza i suoi campi");
+      set_astro_dng(r, *s.dng);
+      break;
+  }
   return r;
+}
+
+namespace {
+
+[[noreturn]] void record_malformed(const char* key, const char* why) {
+  throw stop_error(error_category::integrity, "raw.record_malformed", "record del decoder non leggibile",
+                   {{"chiave", key}, {"motivo", why}});
+}
+
+// `name` e' la chiave riportata nella diagnosi: per un membro annidato e' il nome qualificato `<padre>.<chiave>`.
+const json& record_nested(const json& record, const char* key, const char* name) {
+  const json* v = record.type() == json::kind::object ? record.find(key) : nullptr;
+  if (v == nullptr) record_malformed(name, "assente");
+  return *v;
+}
+
+const json& record_member(const json& record, const char* key) { return record_nested(record, key, key); }
+
+std::int64_t record_integer(const json& v, const char* key, std::int64_t lo, std::int64_t hi) {
+  if (v.type() != json::kind::integer || v.as_integer() < lo || v.as_integer() > hi) record_malformed(key, "intero fuori dominio");
+  return v.as_integer();
+}
+
+std::uint32_t record_u32(const json& record, const char* key) {
+  return static_cast<std::uint32_t>(record_integer(record_member(record, key), key, 0, 4294967295LL));
+}
+
+std::vector<std::int64_t> record_integers(const json& v, const char* key, std::size_t count, std::int64_t lo, std::int64_t hi) {
+  if (v.type() != json::kind::array || v.items().size() != count) record_malformed(key, "array di lunghezza errata");
+  std::vector<std::int64_t> out;
+  for (const json& item : v.items()) out.push_back(record_integer(item, key, lo, hi));
+  return out;
+}
+
+std::array<std::uint32_t, 4> record_crop(const json& v, const char* key) {
+  const char* names[4] = {"x0", "y0", "w", "h"};
+  std::array<std::uint32_t, 4> out{};
+  for (std::size_t i = 0; i < 4; ++i) out[i] = static_cast<std::uint32_t>(record_integer(record_member(v, names[i]), key, 0, 4294967295LL));
+  return out;
+}
+
+std::array<std::uint8_t, 32> record_digest(const json& v, const char* key) {
+  if (v.type() != json::kind::string || v.as_string().size() != 64) record_malformed(key, "digest non di 64 cifre esadecimali");
+  std::array<std::uint8_t, 32> out{};
+  const auto nibble = [key](char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    record_malformed(key, "cifra non esadecimale minuscola");
+  };
+  for (std::size_t i = 0; i < 32; ++i) out[i] = static_cast<std::uint8_t>(nibble(v.as_string()[2 * i]) * 16 + nibble(v.as_string()[2 * i + 1]));
+  return out;
+}
+
+const std::string& record_text(const json& record, const char* key) {
+  const json& v = record_member(record, key);
+  if (v.type() != json::kind::string) record_malformed(key, "non è un testo");
+  return v.as_string();
+}
+
+std::optional<std::uint32_t> record_optional_u32(const json& record, const char* key) {
+  const json& v = record_member(record, key);
+  if (v.type() == json::kind::null) return std::nullopt;
+  return static_cast<std::uint32_t>(record_integer(v, key, 0, 4294967295LL));
+}
+
+std::vector<std::string> record_strings(const json& record, const char* key) {
+  const json& v = record_member(record, key);
+  if (v.type() != json::kind::array) record_malformed(key, "non è un array");
+  std::vector<std::string> out;
+  for (const json& item : v.items()) {
+    if (item.type() != json::kind::string) record_malformed(key, "elemento non testuale");
+    out.push_back(item.as_string());
+  }
+  return out;
+}
+
+// Numero decimale senza segno; la forma canonica si verifica riscrivendo il valore letto.
+std::uint32_t decimal_u32(std::string_view text, const char* key) {
+  std::uint32_t v = 0;
+  const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), v);
+  if (ec != std::errc{} || end != text.data() + text.size()) record_malformed(key, "numero non valido");
+  return v;
+}
+
+// Versione "a.b.c.d" come la scrive `dotted`.
+std::array<std::uint8_t, 4> record_version(const json& record, const char* key) {
+  const std::string& text = record_text(record, key);
+  std::array<std::uint8_t, 4> out{};
+  std::size_t from = 0;
+  for (std::size_t k = 0; k < 4; ++k) {
+    const std::size_t dot = k < 3 ? text.find('.', from) : text.size();
+    if (dot == std::string::npos) record_malformed(key, "versione non di quattro numeri");
+    const std::uint32_t part = decimal_u32(std::string_view(text).substr(from, dot - from), key);
+    if (part > 255) record_malformed(key, "componente della versione fuori dominio");
+    out[k] = static_cast<std::uint8_t>(part);
+    from = dot + 1;
+  }
+  if (dotted(out) != text) record_malformed(key, "versione non canonica");
+  return out;
+}
+
+// Inverso di `rational_pair`: intero come {v, 1}, testo "num/den" non intero come scritto.
+std::optional<std::array<dng_rational, 2>> record_rational_pair(const json& record, const char* key) {
+  const json& v = record_member(record, key);
+  if (v.type() == json::kind::null) return std::nullopt;
+  if (v.type() != json::kind::array || v.items().size() != 2) record_malformed(key, "non sono due valori");
+  std::array<dng_rational, 2> out{};
+  for (std::size_t k = 0; k < 2; ++k) {
+    const json& item = v.items()[k];
+    if (item.type() == json::kind::string) {
+      const std::string& text = item.as_string();
+      const std::size_t slash = text.find('/');
+      if (slash == std::string::npos) record_malformed(key, "razionale senza '/'");
+      const dng_rational x{decimal_u32(std::string_view(text).substr(0, slash), key),
+                           decimal_u32(std::string_view(text).substr(slash + 1), key)};
+      if (x.den == 0 || x.num % x.den == 0) record_malformed(key, "razionale nullo o intero scritto come testo");
+      if (std::to_string(x.num) + "/" + std::to_string(x.den) != text) record_malformed(key, "razionale non canonico");
+      out[k] = x;
+    } else {
+      out[k] = {static_cast<std::uint32_t>(record_integer(item, key, 0, 4294967295LL)), 1};
+    }
+  }
+  return out;
+}
+
+// U13 §8: campi propri del decoder del progetto, inverso di `set_astro_dng`.
+dng_decoder_fields record_astro_dng(const json& record) {
+  if (record_text(record, "dng_spec") != "DNG 1.7.1.0") record_malformed("dng_spec", "specifica diversa da DNG 1.7.1.0");
+  dng_decoder_fields f;
+  f.dng_version = record_version(record, "dng_version");
+  f.dng_backward_version = record_version(record, "dng_backward_version");
+  const json& seg = record_member(record, "segments");
+  const auto seg_u32 = [&seg](const char* key, const char* name) {
+    return static_cast<std::uint32_t>(record_integer(record_nested(seg, key, name), name, 0, 4294967295LL));
+  };
+  const json& kind_v = record_nested(seg, "kind", "segments.kind");
+  if (kind_v.type() != json::kind::string) record_malformed("segments.kind", "non è un testo");
+  const std::string& kind = kind_v.as_string();
+  if (kind != "tiles" && kind != "strips") record_malformed("segments.kind", "valore sconosciuto");
+  // Il decoder lascia a 0 le dimensioni dell'altra disposizione (struttura del segmento, dng_decode.cpp).
+  f.tiles = kind == "tiles";
+  if (f.tiles) {
+    f.tile_width = seg_u32("tile_width", "segments.tile_width");
+    f.tile_length = seg_u32("tile_length", "segments.tile_length");
+  } else {
+    f.rows_per_strip = seg_u32("rows_per_strip", "segments.rows_per_strip");
+  }
+  f.segment_count =
+      static_cast<std::uint64_t>(record_integer(record_nested(seg, "count", "segments.count"), "segments.count", 0, INT64_MAX));
+  f.predictor = record_u32(record, "predictor");
+  const std::string& order = record_text(record, "byte_order");
+  if (order != "II" && order != "MM") record_malformed("byte_order", "valore sconosciuto");
+  f.little_endian = order == "II";
+  f.zlib_runtime_version = record_text(record, "zlib_version");
+  f.orientation = record_optional_u32(record, "orientation");
+  f.default_crop_origin = record_rational_pair(record, "default_crop_origin");
+  f.default_crop_size = record_rational_pair(record, "default_crop_size");
+  f.metadata_rejected = record_strings(record, "metadata_rejected");
+  f.opcode_lists = record_strings(record, "opcode_lists");
+  return f;
+}
+
+}  // namespace
+
+decoder_state decoder_state_of_record(const json& record) {
+  decoder_state s;
+  s.raw_width = record_u32(record, "raw_width");
+  s.raw_height = record_u32(record, "raw_height");
+  const json& crop = record_member(record, "crop");
+  const std::array<std::uint32_t, 4> c = record_crop(crop, "crop");
+  s.window = decoder_window{c[0], c[1], c[2], c[3]};
+  const json& black = record_member(record, "black");
+  s.black = record_u32(black, "scalar");
+  const std::vector<std::int64_t> per_color = record_integers(record_member(black, "per_color"), "black.per_color", 4, 0, 4294967295LL);
+  for (std::size_t i = 0; i < 4; ++i) s.black_per_color[i] = static_cast<std::uint32_t>(per_color[i]);
+  s.black_pattern_rows = record_u32(black, "pattern_rows");
+  s.black_pattern_cols = record_u32(black, "pattern_cols");
+  const json& pattern = record_member(black, "pattern");
+  if (pattern.type() != json::kind::array) record_malformed("black.pattern", "non è un array");
+  for (const json& item : pattern.items()) s.black_pattern.push_back(static_cast<std::uint32_t>(record_integer(item, "black.pattern", 0, 4294967295LL)));
+  const std::vector<std::int64_t> color_index = record_integers(record_member(record, "cfa_color_index"), "cfa_color_index", 4, 0, 3);
+  for (std::size_t i = 0; i < 4; ++i) s.cfa_color_index[i] = static_cast<std::uint8_t>(color_index[i]);
+  s.white = record_u32(record, "white");
+  const json& data_maximum = record_member(record, "data_maximum");
+  if (data_maximum.type() != json::kind::null) s.data_maximum = static_cast<std::uint32_t>(record_integer(data_maximum, "data_maximum", 0, 4294967295LL));
+  const json& linear_max = record_member(record, "linear_max");
+  if (linear_max.type() != json::kind::null) {
+    const std::vector<std::int64_t> lm = record_integers(linear_max, "linear_max", 4, INT64_MIN, INT64_MAX);
+    s.linear_max = std::array<std::int64_t, 4>{lm[0], lm[1], lm[2], lm[3]};
+  }
+  const json& lin = record_member(record, "linearization");
+  if (lin.type() != json::kind::string || (lin.as_string() != "identity" && lin.as_string() != "decoder_curve")) {
+    record_malformed("linearization", "valore sconosciuto");
+  }
+  s.linearization = lin.as_string() == "decoder_curve" ? decoder_linearization::decoder_curve : decoder_linearization::identity;
+  const json& curve = record_member(record, "linearization_curve_sha256");
+  if (curve.type() != json::kind::null) s.curve_sha256 = record_digest(curve, "linearization_curve_sha256");
+  const std::string& decoder = record_text(record, "decoder");
+  if (decoder == to_string(raw_decoder_kind::libraw)) {
+    s.route.decoder = raw_decoder_kind::libraw;
+  } else if (decoder == to_string(raw_decoder_kind::astro_dng)) {
+    s.route.decoder = raw_decoder_kind::astro_dng;
+  } else {
+    record_malformed("decoder", "valore sconosciuto");
+  }
+  s.route.compression = record_optional_u32(record, "compression");
+  s.route.sample_format = record_optional_u32(record, "sample_format");
+  s.route.bits_per_sample = record_optional_u32(record, "bits_per_sample");
+  switch (s.route.decoder) {
+    case raw_decoder_kind::libraw: {
+      s.route.reason = record_text(record, "route_reason");
+      if (s.route.reason != "not_tiff" && s.route.reason != "tiff_not_dng" && s.route.reason != "dng_libraw_compression") {
+        record_malformed("route_reason", "valore sconosciuto");
+      }
+      s.process_warnings = record_u32(record, "process_warnings");
+      const json& insets = record_member(record, "raw_inset_crops");
+      if (insets.type() != json::kind::array || insets.items().size() != 2) record_malformed("raw_inset_crops", "non sono due ritagli");
+      for (std::size_t i = 0; i < 2; ++i) s.raw_inset_crops[i] = record_crop(insets.items()[i], "raw_inset_crops");
+      s.flip = static_cast<std::int32_t>(record_integer(record_member(record, "flip"), "flip", INT32_MIN, INT32_MAX));
+      break;
+    }
+    // Motivo vuoto (U13 §3); `process_warnings`, `raw_inset_crops` e `flip` sono di LibRaw: il decoder del progetto
+    // non li scrive e restano a zero come nello stato che produce.
+    case raw_decoder_kind::astro_dng: s.dng = record_astro_dng(record); break;
+  }
+  s.source = metadata_source{metadata_origin::decoder, "decoder_record"};
+  return s;
 }
 
 }  // namespace astro

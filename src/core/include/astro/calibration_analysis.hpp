@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "astro/calibration.hpp"
+#include "astro/error.hpp"
 #include "astro/fault_injector.hpp"
 #include "astro/hash.hpp"
 #include "astro/image.hpp"
@@ -78,6 +80,14 @@ struct analysis_candidate {
   image img;
   master_descriptor descriptor;
   content_digest digest;
+  // Motivo di esclusione che vale per l'origine del candidato e non si ricava dal descrittore (per esempio un master
+  // esterno prodotto da un RAW: il suo descrittore non porta `frame_decoder_states`). Applicato dopo lo stato, il dominio,
+  // l'IMAGETYP e l'ingresso condiviso.
+  std::optional<std::string> origin_reason;
+  // Caricamento differito dei campioni: se `img` porta solo le intestazioni, il controllo termico di `flat.bias` chiama
+  // questa funzione (dopo la sonda `calib.analysis.samples`) per ottenere l'immagine completa. Assente: `img` ha già i
+  // campioni. Si chiama solo per il flat e il bias di una catena `flat.bias` effettivamente valutata.
+  std::function<image()> load_samples = nullptr;
 };
 
 // Dichiarazioni del progetto lette dall'analisi. Nessun default: un valore richiesto assente o fuori dominio ferma
@@ -123,6 +133,41 @@ struct candidate_analysis {
   candidate_status status = candidate_status::excluded;
   std::vector<chain_verdict> chains;
 };
+
+// Dichiarazioni che una combinazione di ruoli presenti richiede all'analisi (ADR-16.a §2, §b.7): è la regola con cui
+// `analyze_calibration` fa i suoi stop `calib.param.<nome>`, esposta a chi deve sapere quali mancano prima di chiamarla.
+// `flat_pairs`: coppie con un flat presente (F–DF, F–B).
+struct declaration_needs {
+  bool exposure = false;     // exposure_rel_tol
+  bool temperature = false;  // temperature_policy (e temperature_abs_tol_c con `compare`)
+  bool decoder = false;      // decoder_black_abs_tol_adu
+};
+declaration_needs declaration_needs_of(bool dark, bool bias, bool dark_flat, bool flat, bool any_raw) noexcept;
+
+// Coppie di §b.3 (stesse regole di `analyze_calibration`, un solo proprietario): riferimento e candidato.
+enum class pair_kind { light_bias, light_dark, light_flat, flat_dark_flat, flat_bias };
+
+// Un lato di una coppia: immagine e, se ha stato del decoder, gli stati dei suoi frame (un light: il proprio; un master
+// RAW: quelli di `frame_decoder_states`).
+struct pair_side {
+  const image* img = nullptr;
+  std::optional<std::vector<decoder_state>> states;
+};
+
+// Primo motivo di incompatibilità della coppia (campi di ADR-16.a §2 nell'ordine di `.a`, poi §b.7), nullopt se
+// compatibile. Non valuta lo stato né il dominio del candidato (`candidate_own_reason`). Dichiarazioni richieste dalla
+// coppia assenti o fuori dominio: invalid_input calib.param.<nome>. `warnings` riceve gli avvisi di ADR-16.a §2.
+std::optional<std::string> pair_compatibility(pair_kind kind, const pair_side& reference, const pair_side& candidate,
+                                              const calibration_declarations& declarations,
+                                              std::vector<std::string>& warnings);
+
+// Motivo di esclusione di un candidato per sé, nell'ordine di ADR-16.b §b.2, §b.3 e §b.7: stato, dominio, IMAGETYP,
+// ingresso condiviso (`shared`), `origin_reason`, elenco dei frame vuoto, stato del decoder misto col light.
+std::optional<std::string> candidate_own_reason(const analysis_candidate& candidate, bool shared, bool light_raw,
+                                                std::vector<std::string>& warnings);
+
+// Dominio del light (C-01.b §2, §7): lo stop che fermerebbe `analyze_calibration`, nullopt se il light è nel dominio.
+std::optional<stop_error> light_domain_stop(const image& light, std::vector<std::string>& warnings);
 
 // P-DF di §b.4: dark-flat assente, `usable` con `bias_included`, `usable` con `bias_subtracted`, presente ed `excluded`.
 enum class dark_flat_predicate { absent, inc, sub, bad };
@@ -179,8 +224,8 @@ struct calibration_analysis {
 };
 
 // Funzione pura degli ingressi. Un master fuori regola è `excluded` con motivo, mai uno stop. Stop, tutti prima di ogni
-// calcolo (`fault` è chiamato con "calib.analysis.pair" prima di ogni coppia; un valore diverso da zero dà io
-// calib.analysis.fault):
+// calcolo (`fault` è chiamato con "calib.analysis.pair" prima di ogni coppia e con "calib.analysis.samples" prima
+// di leggere i campioni del controllo termico; un valore diverso da zero dà io calib.analysis.fault):
 // - light: metadata_missing calib.metadata.phase / calib.metadata.unit; incompatible op.phase_blocked /
 //   op.linearity_blocked (riga `calibrate_light`, `role` nel contesto); unsupported calib.unit, calib.plane_layout,
 //   calib.coverage_input, calib.pedestal; incompatible calib.imagetyp_conflict; invalid_input calib.decoder_state;
@@ -195,6 +240,14 @@ struct calibration_analysis {
 //   calib.param.q_min (assenti), calib.normalization_requires_cfa; invalid_input image.* (campioni incoerenti).
 calibration_analysis analyze_calibration(const calibration_analysis_input& input, const fault_injector& fault = {});
 
+// Ricetta per una coppia ammissibile, con i parametri delle sue catene copiati dalle dichiarazioni dell'analisi e, per il
+// percorso parziale, `flat_division_offset = known_not_removed`. Assente se una dichiarazione che la coppia usa manca (il
+// default non inventa dichiarazioni, §b.9).
+std::optional<chain_recipe> recipe_of_pair(const calibration_analysis& analysis, const admissible_pair& pair);
+
+// Vero se la ricetta usa il master del ruolo in una delle sue catene (§b.5).
+bool recipe_uses_role(const chain_recipe& recipe, master_role role) noexcept;
+
 // Selezione (§b.1 punto 2, §b.9): ritorna se la ricetta appartiene all'insieme ammissibile dell'analisi e porta tutti e
 // soli i parametri delle sue catene, uguali alle dichiarazioni dell'analisi quando questa le ha. Stop, nessun nodo:
 // - master `unknown` selezionato: metadata_missing calib.master_state_unknown; dark o dark-flat `scaled`: unsupported
@@ -206,5 +259,40 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& input
 //   senza percorso parziale), calib.param.<nome> (assente, fuori dominio o diverso dalla dichiarazione dell'analisi;
 //   `flat_division_offset` diverso da `known_not_removed`).
 void require_admissible(const calibration_analysis& analysis, const chain_recipe& recipe);
+
+// ---------------------------------------------------------------- selezione congelata (F-IO-03 CL-11)
+
+// Stato e identità del decoder di un ingresso RAW osservati nell'analisi; `name` identifica l'ingresso nella selezione.
+struct selected_decoder_input {
+  std::string name;
+  decoder_state state;
+  decoder_identity identity;
+};
+
+// Candidato di un ruolo scelto per l'analisi: `input` (digest e dimensione) per un input registrato, `node_key` per il
+// master di uno slot; esattamente uno dei due.
+struct selected_candidate {
+  master_role role = master_role::dark;
+  std::optional<content_digest> input;
+  std::optional<std::string> node_key;
+};
+
+// Selezione congelata (CL-11), tutti i campi: ricetta e parametri; light del gruppo (digest e dimensione, per digest) e
+// candidato dei ruoli che la ricetta usa; dichiarazioni dell'analisi; stato e identità del decoder di ogni ingresso RAW
+// osservato nell'analisi.
+struct calibration_selection {
+  chain_recipe recipe;
+  std::vector<selected_decoder_input> raw_inputs;
+  std::vector<content_digest> lights;
+  std::vector<selected_candidate> candidates;  // nell'ordine dei ruoli bias, dark, dark_flat, flat
+  calibration_declarations declarations;
+};
+
+// Funzione pura: per ogni ingresso RAW della selezione, nell'ordine, confronta lo stato (membri di contenuto nell'ordine di
+// dichiarazione, `source` esclusa) e poi l'identità del decoder con l'osservazione dello stesso `name`. Prima differenza:
+// integrity calib.decoder_state_changed con `field` (membro dello stato, `decoder_identity.<membro>`, oppure
+// `observation` se l'ingresso non ha osservazione), `predicate` = P-LOST e `prerequisite` = `<name>.decoder_state`. Nessuna
+// altra uscita: né ricetta, né candidato, né selezione modificata.
+void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed);
 
 }  // namespace astro

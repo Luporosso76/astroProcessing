@@ -105,15 +105,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `CMakeLists.txt` | `7b1a76ed5d18e95b267d724998b1b2d0715382de9618a9e3b71af246afc9ac63` |
-| `docs/contracts/ADR-08-decoder-pack.md` | `6e020ced8da401f8d26c69e610275020f00762ed5b358d0a98c94ffa20392fd8` |
-| `docs/licenses.md` | `f98457e8bbf7ea03c53ff18bfb54f9052e19428a0d03723ab5e217d72d6738c4` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
+| `docs/licenses.md` | `8f26eaa032e5d7c2352f3102542b08caf41880d32d602988c7007111cd8576b1` |
 | `src/core/CMakeLists.txt` | `2e09fcd7ebc1d942c33a9b10020c80b44c3ba078e03e0bcc4418820e292c79da` |
-| `src/core/include/astro/raw_decode.hpp` | `7ab60332832da275e2f625f635ac86a6218b2aa1847d41ac45b7d28ea6b917f4` |
-| `src/core/raw_decode.cpp` | `0e8ce66a76ebf3704db608ff5e1facf827b3aa132ca56c33d952ff7c96c80f90` |
-| `tests/fixtures/syn_dng.hpp` | `2253a1bda17f45101d32b6744d56821aa4b0a8b524c74d78e0a0b372016e04c4` |
-| `tests/unit/CMakeLists.txt` | `6c958dd237e5b18b5b0828950505d10e575bdbe88f4ec6b45727b7860e806646` |
+| `src/core/include/astro/raw_decode.hpp` | `0a2b8aa117998b429ac983439f67a3360ba08a481dd2106dddb606f858e99be6` |
+| `src/core/raw_decode.cpp` | `e114fbf53cad623be8ab4a4c4fd952fc33227f29e171e8788259f5e0b493029e` |
+| `tests/fixtures/syn_dng.hpp` | `24b5ca3df3bda786bfd5019875ce0403df73d89a399802e119f159c77e2d64bf` |
+| `tests/unit/CMakeLists.txt` | `b33a1186cba06cba729843ab630e9dd1bb848ca27648c89247c730500fe1418f` |
 | `tests/unit/test_raw_decode.cpp` | `3c92a36eea64a2c24bd8258207f1b0465aac45f341a736d73a3668c32e115817` |
 
-- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
 <!-- evidence:end -->

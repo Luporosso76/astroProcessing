@@ -809,7 +809,7 @@ std::string declarations_with(const char* section, json value, json fields = jso
 }
 
 // Descrittore di un master esterno (ADR-16.a): `role` più i campi opzionali; i valori sono quelli di `descriptor_json`.
-json master_descriptor(const std::string& role, const std::map<std::string, json>& extra = {}) {
+json descriptor_json(const std::string& role, const std::map<std::string, json>& extra = {}) {
   json d = json::object();
   d.set("role", json::string(role));
   for (const auto& [k, v] : extra) d.set(k, v);
@@ -817,7 +817,7 @@ json master_descriptor(const std::string& role, const std::map<std::string, json
 }
 
 json full_master_descriptor(const std::string& role) {
-  return master_descriptor(role, {{"additive", json::string("bias_included")},
+  return descriptor_json(role, {{"additive", json::string("bias_included")},
                                   {"scaling", json::string("unscaled")},
                                   {"flat", json::null()},
                                   {"combine_count", json::uinteger(20)},
@@ -847,16 +847,16 @@ TEST(BatchClassification, T_M3A_05b_valid_declarations_are_accepted_and_stored) 
   };
   const std::vector<accepted> cases = {
       {"descrittore completo su dark", "dark", declarations_with("master_descriptor", full_master_descriptor("dark"), fields)},
-      {"descrittore minimo su dark", "dark", declarations_with("master_descriptor", master_descriptor("dark"))},
+      {"descrittore minimo su dark", "dark", declarations_with("master_descriptor", descriptor_json("dark"))},
       {"descrittore flat con valore di flat", "flat",
-       declarations_with("master_descriptor", master_descriptor("flat", {{"flat", json::string("raw")}}))},
-      {"descrittore bias", "bias", declarations_with("master_descriptor", master_descriptor("bias"))},
-      {"descrittore dark_flat", "dark_flat", declarations_with("master_descriptor", master_descriptor("dark_flat"))},
+       declarations_with("master_descriptor", descriptor_json("flat", {{"flat", json::string("raw")}}))},
+      {"descrittore bias", "bias", declarations_with("master_descriptor", descriptor_json("bias"))},
+      {"descrittore dark_flat", "dark_flat", declarations_with("master_descriptor", descriptor_json("dark_flat"))},
       {"combine_method median e rejection sigma_clip", "dark",
-       declarations_with("master_descriptor", master_descriptor("dark", {{"combine_method", json::string("median")},
+       declarations_with("master_descriptor", descriptor_json("dark", {{"combine_method", json::string("median")},
                                                                          {"rejection", json::string("sigma_clip")}}))},
       {"combine_count al massimo uint32", "dark",
-       declarations_with("master_descriptor", master_descriptor("dark", {{"combine_count", json::uinteger(4294967295ULL)}}))},
+       declarations_with("master_descriptor", descriptor_json("dark", {{"combine_count", json::uinteger(4294967295ULL)}}))},
       {"frame_metadata completo su light", "light", declarations_with("frame_metadata", meta, fields)},
   };
   std::uint64_t expected = 1;
@@ -881,13 +881,13 @@ TEST(BatchClassification, T_M3A_05b_master_descriptor_and_frame_metadata_shape_i
     EXPECT_EQ(r.store->classifications(r.ids[0]).size(), before);
   };
   rejected("ruolo del descrittore diverso da quello della revisione", "dark",
-           declarations_with("master_descriptor", master_descriptor("flat")));
+           declarations_with("master_descriptor", descriptor_json("flat")));
   rejected("ruolo del descrittore non testuale", "dark",
            declarations_with("master_descriptor", [] { json d = json::object(); d.set("role", json::integer(1)); return d; }()));
-  rejected("descrittore su light", "light", declarations_with("master_descriptor", master_descriptor("light")));
-  rejected("descrittore su unclassified", "unclassified", declarations_with("master_descriptor", master_descriptor("unclassified")));
+  rejected("descrittore su light", "light", declarations_with("master_descriptor", descriptor_json("light")));
+  rejected("descrittore su unclassified", "unclassified", declarations_with("master_descriptor", descriptor_json("unclassified")));
   rejected("chiave sconosciuta nel descrittore", "dark",
-           declarations_with("master_descriptor", master_descriptor("dark", {{"bogus", json::string("x")}})));
+           declarations_with("master_descriptor", descriptor_json("dark", {{"bogus", json::string("x")}})));
   rejected("sezione di primo livello sconosciuta", "light", declarations_with("frame_meta", json::object()));
   rejected("roi_x frazionario", "light", declarations_with("frame_metadata", [] { json m = json::object(); m.set("roi_x", json::number(1.5)); return m; }()));
   rejected("roi_y frazionario", "light", declarations_with("frame_metadata", [] { json m = json::object(); m.set("roi_y", json::number(0.5)); return m; }()));
@@ -907,7 +907,7 @@ TEST(BatchClassification, T_M3A_05b_closed_list_fields_reject_out_of_list_values
     SCOPED_TRACE(std::string("master_descriptor.") + key);
     const std::size_t before = r.store->classifications(r.ids[0]).size();
     EXPECT_STOP(r.store->append_classifications(
-                    {user_record(r.ids[0], "dark", declarations_with("master_descriptor", master_descriptor("dark", {{key, std::move(value)}})))}),
+                    {user_record(r.ids[0], "dark", declarations_with("master_descriptor", descriptor_json("dark", {{key, std::move(value)}})))}),
                 error_category::invalid_input, "classify.declaration");
     EXPECT_EQ(r.store->classifications(r.ids[0]).size(), before);
   };

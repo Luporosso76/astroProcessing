@@ -368,6 +368,30 @@ reason compare_all_decoder(const decoder_states& a, const decoder_states& b, boo
   return std::nullopt;
 }
 
+// Esito di una coppia (§b.3, §b.7) per ingressi già validati: metadati, poi stato del decoder.
+reason pair_outcome(const pair_rule& rule, const image& ref, bool ref_raw, const decoder_states& ref_decoder,
+                    const image& owner_img, bool owner_raw, const decoder_states& owner_decoder,
+                    const calibration_declarations& decl, std::vector<std::string>& warnings) {
+  // `offset_adu` si confronta solo in una coppia senza ingressi RAW (§b.3, §b.7).
+  if (reason r = compare_metadata(ref, owner_img, rule, !ref_raw && !owner_raw, decl, warnings)) return r;
+  if (ref_raw != owner_raw) return "decoder_state_mixed";
+  if (!owner_raw) return std::nullopt;
+  if (ref_decoder.states.empty()) return "metadata_missing.frame_decoder_states";
+  // `owner_raw`: la tolleranza è obbligatoria ed è già stata verificata presente.
+  return compare_all_decoder(ref_decoder, owner_decoder, rule.additive, *decl.decoder_black_abs_tol_adu);
+}
+
+pair_rule rule_of(pair_kind kind) {
+  switch (kind) {
+    case pair_kind::light_bias: return {"L-B", true, false};
+    case pair_kind::light_dark: return {"L-D", true, true};
+    case pair_kind::light_flat: return {"L-F", false, false};
+    case pair_kind::flat_dark_flat: return {"F-DF", true, true};
+    case pair_kind::flat_bias: return {"F-B", true, false};
+  }
+  std::abort();
+}
+
 struct candidate_work {
   const analysis_candidate* c = nullptr;
   std::vector<std::string> chains;
@@ -384,6 +408,14 @@ void check_nonnegative_param(const std::optional<double>& v, const char* name) {
   if (why)
     stop(error_category::invalid_input, std::string("calib.param.") + name, "dichiarazione richiesta da una coppia presente",
          {{"parametro", name}, {"motivo", why}});
+}
+
+// Politica termica richiesta da una coppia additiva e, con `compare`, la sua tolleranza.
+void require_temperature_declarations(const calibration_declarations& decl) {
+  if (!decl.temp_policy)
+    stop(error_category::invalid_input, "calib.param.temperature_policy", "dichiarazione richiesta da una coppia presente",
+         {{"parametro", "temperature_policy"}, {"motivo", "assente"}});
+  if (*decl.temp_policy == temperature_policy::compare) check_nonnegative_param(decl.temperature_abs_tol_c, "temperature_abs_tol_c");
 }
 
 // Dominio di un parametro della ricetta o di una dichiarazione (ADR-16.a §2, §b.5).
@@ -764,6 +796,69 @@ void require_light_domain(const image& l, std::vector<std::string>& warnings) {
 
 }  // namespace
 
+declaration_needs declaration_needs_of(bool dark, bool bias, bool dark_flat, bool flat, bool any_raw) noexcept {
+  declaration_needs n;
+  n.exposure = dark || (dark_flat && flat);
+  n.temperature = dark || bias || (dark_flat && flat);
+  n.decoder = any_raw;
+  return n;
+}
+
+std::optional<std::string> pair_compatibility(pair_kind kind, const pair_side& reference, const pair_side& candidate,
+                                              const calibration_declarations& decl, std::vector<std::string>& warnings) {
+  ASTRO_ASSERT(reference.img != nullptr && candidate.img != nullptr);
+  const pair_rule rule = rule_of(kind);
+  if (rule.exposure) check_nonnegative_param(decl.exposure_rel_tol, "exposure_rel_tol");
+  if (rule.additive) require_temperature_declarations(decl);
+  const bool ref_raw = reference.states.has_value(), cand_raw = candidate.states.has_value();
+  if (ref_raw && cand_raw && !decl.decoder_black_abs_tol_adu)
+    stop(error_category::invalid_input, "calib.param.decoder_black_abs_tol_adu",
+         "tolleranza del nero obbligatoria con un ingresso con stato del decoder", {{"parametro", "decoder_black_abs_tol_adu"}});
+  const auto sides = [](const pair_side& side) {
+    std::vector<const decoder_state*> ptrs;
+    if (side.states) {
+      for (const decoder_state& s : *side.states) ptrs.push_back(&s);
+    }
+    return states_of(ptrs);
+  };
+  return pair_outcome(rule, *reference.img, ref_raw, sides(reference), *candidate.img, cand_raw, sides(candidate), decl,
+                      warnings);
+}
+
+std::optional<std::string> candidate_own_reason(const analysis_candidate& c, bool shared, bool light_raw,
+                                                std::vector<std::string>& warnings) {
+  const master_descriptor& d = c.descriptor;
+  if (reason r = state_reason(d)) return r;
+  if (reason r = domain_reason(c)) return r;
+  if (imagetyp_conflicts(c.img, role_text(d.role), warnings, role_text(d.role))) return "imagetyp_conflict";
+  if (shared) return "shared_input";
+  if (c.origin_reason) return c.origin_reason;
+  // Elenco vuoto prima del confronto col light: lo stato di un master RAW non si presume (ADR-16.b §b.7).
+  if (d.frame_decoder_states && d.frame_decoder_states->empty()) return "metadata_missing.frame_decoder_states";
+  if (d.frame_decoder_states.has_value() != light_raw) return "decoder_state_mixed";
+  return std::nullopt;
+}
+
+std::optional<stop_error> light_domain_stop(const image& light, std::vector<std::string>& warnings) {
+  try {
+    require_light_domain(light, warnings);
+  } catch (const stop_error& e) {
+    return e;
+  }
+  return std::nullopt;
+}
+
+std::optional<chain_recipe> recipe_of_pair(const calibration_analysis& a, const admissible_pair& p) {
+  std::optional<chain_recipe> r = recipe_from(a.declarations, p.light, p.flat, a.light_has_decoder_state);
+  if (r && p.partial) r->flat_division_offset = offset_state::known_not_removed;
+  return r;
+}
+
+bool recipe_uses_role(const chain_recipe& r, master_role role) noexcept {
+  const auto in = [role](const std::vector<master_role>& v) { return std::find(v.begin(), v.end(), role) != v.end(); };
+  return in(members_of(r.light)) || in(members_of(r.flat));
+}
+
 calibration_analysis analyze_calibration(const calibration_analysis_input& in, const fault_injector& fault) {
   std::vector<std::string> warnings;
   require_light_domain(in.light, warnings);
@@ -812,32 +907,18 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
     stop(error_category::invalid_input, "calib.param_not_applicable.decoder_black_abs_tol_adu",
          "tolleranza del nero senza alcun ingresso con stato del decoder", {{"parametro", "decoder_black_abs_tol_adu"}});
   const bool flat_pairs = flat.c != nullptr;
-  if (dark.c || (dark_flat.c && flat_pairs)) check_nonnegative_param(decl.exposure_rel_tol, "exposure_rel_tol");
-  if (dark.c || bias.c || (dark_flat.c && flat_pairs)) {
-    if (!decl.temp_policy)
-      stop(error_category::invalid_input, "calib.param.temperature_policy", "dichiarazione richiesta da una coppia presente",
-           {{"parametro", "temperature_policy"}, {"motivo", "assente"}});
-    if (*decl.temp_policy == temperature_policy::compare)
-      check_nonnegative_param(decl.temperature_abs_tol_c, "temperature_abs_tol_c");
-  }
+  const declaration_needs needs = declaration_needs_of(dark.c, bias.c, dark_flat.c, flat.c, any_raw);
+  if (needs.exposure) check_nonnegative_param(decl.exposure_rel_tol, "exposure_rel_tol");
+  if (needs.temperature) require_temperature_declarations(decl);
   check_optional_declarations(decl);
   // Esiti per candidato (§b.2, C-01.b §2, §7, §b.7), nell'ordine: stato, dominio, IMAGETYP, ingresso condiviso, stato
   // del decoder.
   for (int k = 0; k < 4; ++k) {
     candidate_work& w = work[k];
     if (!w.c) continue;
-    const master_descriptor& d = w.c->descriptor;
-    w.own = state_reason(d);
-    if (!w.own) w.own = domain_reason(*w.c);
-    if (!w.own && imagetyp_conflicts(w.c->img, role_text(d.role), warnings, role_text(d.role))) w.own = "imagetyp_conflict";
-    if (!w.own) {
-      bool shared = w.c->digest == in.light_digest;
-      for (int j = 0; j < 4; ++j) shared = shared || (j != k && work[j].c && work[j].c->digest == w.c->digest);
-      if (shared) w.own = "shared_input";
-    }
-    // Elenco vuoto prima del confronto col light: lo stato di un master RAW non si presume (ADR-16.b §b.7).
-    if (!w.own && w.raw && w.decoder.states.empty()) w.own = "metadata_missing.frame_decoder_states";
-    if (!w.own && w.raw != light_raw) w.own = "decoder_state_mixed";
+    bool shared = w.c->digest == in.light_digest;
+    for (int j = 0; j < 4; ++j) shared = shared || (j != k && work[j].c && work[j].c->digest == w.c->digest);
+    w.own = candidate_own_reason(*w.c, shared, light_raw, warnings);
   }
 
   // Coppie di §b.3. Una coppia con un candidato escluso per sé non si valuta: il suo motivo vale già in ogni catena.
@@ -853,13 +934,7 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
                         const pair_rule& rule) -> reason {
     probe("calib.analysis.pair");
     if (owner.own) return std::nullopt;
-    // `offset_adu` si confronta solo in una coppia senza ingressi RAW (§b.3, §b.7).
-    if (reason r = compare_metadata(ref, owner.c->img, rule, !ref_raw && !owner.raw, decl, warnings)) return r;
-    if (ref_raw != owner.raw) return "decoder_state_mixed";
-    if (!owner.raw) return std::nullopt;
-    if (ref_decoder.states.empty()) return "metadata_missing.frame_decoder_states";
-    // `owner.raw`: la tolleranza è obbligatoria ed è già stata verificata presente.
-    return compare_all_decoder(ref_decoder, owner.decoder, rule.additive, *decl.decoder_black_abs_tol_adu);
+    return pair_outcome(rule, ref, ref_raw, ref_decoder, owner.c->img, owner.raw, owner.decoder, decl, warnings);
   };
   if (bias.c) bias.light_pair = pair(bias, in.light, light_raw, light_decoder, {"L-B", true, false});
   if (dark.c) dark.light_pair = pair(dark, in.light, light_raw, light_decoder, {"L-D", true, true});
@@ -874,7 +949,11 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
   bool thermal_within = false;
   if (decl.flat_thermal_bound_adu && flat.c && !flat.own && !flat.light_pair && flat.c->descriptor.flat == flat_state::raw &&
       bias.c && !bias.own && !bias.flat_pair) {
-    thermal_within = flat_bias_within_budget(flat.c->img, bias.c->img, decl);
+    probe("calib.analysis.samples");
+    const image flat_samples = flat.c->load_samples ? flat.c->load_samples() : image();
+    const image bias_samples = bias.c->load_samples ? bias.c->load_samples() : image();
+    thermal_within = flat_bias_within_budget(flat.c->load_samples ? flat_samples : flat.c->img,
+                                             bias.c->load_samples ? bias_samples : bias.c->img, decl);
     if (!thermal_within) flat.thermal = "flat_thermal_budget";
   }
 
@@ -1029,6 +1108,63 @@ void require_admissible(const calibration_analysis& a, const chain_recipe& r) {
   require_param("flat_thermal_rel_budget", u.thermal, r.flat_thermal_rel_budget, d.flat_thermal_rel_budget,
                 param_domain::open_unit);
   require_param("decoder_black_abs_tol_adu", u.decoder, r.decoder_black_abs_tol_adu, d.decoder_black_abs_tol_adu);
+}
+
+// ---------------------------------------------------------------- selezione congelata (F-IO-03 CL-11)
+
+namespace {
+
+[[noreturn]] void decoder_changed(const std::string& field, const std::string& name) {
+  stop(error_category::integrity, "calib.decoder_state_changed", "stato o identità del decoder diversi da quelli della selezione",
+       {{"field", field}, {"predicate", "P-LOST"}, {"prerequisite", name + ".decoder_state"}});
+}
+
+// Primo membro di contenuto diverso nell'ordine di dichiarazione di `decoder_state`; vuoto se uguali (`source` esclusa).
+std::string first_state_difference(const decoder_state& a, const decoder_state& b) {
+  const auto same = [&a, &b](const auto decoder_state::*member) { return a.*member == b.*member; };
+  if (!same(&decoder_state::raw_width)) return "raw_width";
+  if (!same(&decoder_state::raw_height)) return "raw_height";
+  if (!same(&decoder_state::window)) return "window";
+  if (!same(&decoder_state::black)) return "black";
+  if (!same(&decoder_state::cfa_color_index)) return "cfa_color_index";
+  if (!same(&decoder_state::black_per_color)) return "black_per_color";
+  if (!same(&decoder_state::black_pattern_rows)) return "black_pattern_rows";
+  if (!same(&decoder_state::black_pattern_cols)) return "black_pattern_cols";
+  if (!same(&decoder_state::black_pattern)) return "black_pattern";
+  if (!same(&decoder_state::white)) return "white";
+  if (!same(&decoder_state::data_maximum)) return "data_maximum";
+  if (!same(&decoder_state::linear_max)) return "linear_max";
+  if (!same(&decoder_state::linearization)) return "linearization";
+  if (!same(&decoder_state::curve_sha256)) return "curve_sha256";
+  if (!same(&decoder_state::process_warnings)) return "process_warnings";
+  if (!same(&decoder_state::raw_inset_crops)) return "raw_inset_crops";
+  if (!same(&decoder_state::flip)) return "flip";
+  if (!same(&decoder_state::route)) return "route";
+  if (!same(&decoder_state::dng)) return "dng";
+  ASTRO_ASSERT(a == b);
+  return {};
+}
+
+std::string first_identity_difference(const decoder_identity& a, const decoder_identity& b) {
+  if (a.libraw_version != b.libraw_version) return "decoder_identity.libraw_version";
+  if (a.libraw_version_number != b.libraw_version_number) return "decoder_identity.libraw_version_number";
+  if (a.libraw_capabilities != b.libraw_capabilities) return "decoder_identity.libraw_capabilities";
+  if (a.libraw_tarball_sha256 != b.libraw_tarball_sha256) return "decoder_identity.libraw_tarball_sha256";
+  return {};
+}
+
+}  // namespace
+
+void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed) {
+  for (const selected_decoder_input& frozen : selection.raw_inputs) {
+    const auto now = std::find_if(observed.begin(), observed.end(),
+                                  [&frozen](const selected_decoder_input& o) { return o.name == frozen.name; });
+    if (now == observed.end()) decoder_changed("observation", frozen.name);
+    if (std::string field = first_state_difference(frozen.state, now->state); !field.empty()) decoder_changed(field, frozen.name);
+    if (std::string field = first_identity_difference(frozen.identity, now->identity); !field.empty()) {
+      decoder_changed(field, frozen.name);
+    }
+  }
 }
 
 }  // namespace astro

@@ -162,6 +162,29 @@ TEST(RawImportRecord, T_M3A_RAW_12_decoder_injections_change_record_and_key) {
     s.active_area = fx::dng_active_area{2, 2, 34, 42};
     EXPECT_NE(key_of(decode(s)), base.key);
   }
+  {  // larghezza e altezza del buffer grezzo diverse (§2.9, emendamento U8b): il record porta il valore, la chiave cambia
+    for (const bool wide : {true, false}) {
+      fx::dng_spec s = base_spec();
+      const std::uint32_t w = wide ? raw_w + 2 : raw_w, h = wide ? raw_h : raw_h + 2;
+      s.width = w;
+      s.height = h;
+      std::vector<std::uint16_t> v(w * h);
+      for (std::uint32_t r = 0; r < h; ++r)
+        for (std::uint32_t c = 0; c < w; ++c) v[r * w + c] = static_cast<std::uint16_t>(100 + (r * 37 + c * 11) % 3500);
+      s.pixels = fx::pixels_u16(v);
+      const decoded d = decode(s);
+      EXPECT_EQ(member(d.record, rk::raw_width)->as_integer(), static_cast<std::int64_t>(w));
+      EXPECT_EQ(member(d.record, rk::raw_height)->as_integer(), static_cast<std::int64_t>(h));
+      EXPECT_NE(key_of(d), base.key);
+    }
+  }
+  {  // indice colore diverso (pattern bggr): cfa_color_index cambia nel record e nella chiave
+    fx::dng_spec s = base_spec();
+    s.cfa = {2, 1, 1, 0};
+    const decoded d = decode(s);
+    EXPECT_NE(canonical_json(*member(d.record, rk::cfa_color_index)), canonical_json(*member(base.record, rk::cfa_color_index)));
+    EXPECT_NE(key_of(d), base.key);
+  }
   {  // pattern diverso
     fx::dng_spec s = base_spec();
     s.cfa = {2, 1, 1, 0};

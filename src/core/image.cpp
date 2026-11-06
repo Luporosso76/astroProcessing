@@ -58,6 +58,7 @@ void validate_decoder_state(const image& img) {
   if (img.layout != plane_layout::cfa) bad_decoder_state("layout");
   if (!img.phase || img.phase->value != process_phase::raw) bad_decoder_state("phase");
   if (s.source.origin != metadata_origin::decoder) bad_decoder_state("source");
+  if (s.dng.has_value() != (s.route.decoder == raw_decoder_kind::astro_dng)) bad_decoder_state("dng");
   const decoder_window& w = s.window;
   if (w.width != img.geometry.width || w.height != img.geometry.height) bad_decoder_state("window");
   if (std::uint64_t{w.x0} + w.width > s.raw_width || std::uint64_t{w.y0} + w.height > s.raw_height) {

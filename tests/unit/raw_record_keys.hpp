@@ -29,6 +29,10 @@ constexpr std::string_view margin_parity = "margin_parity";                    /
 constexpr std::string_view cfa_pattern = "cfa_pattern";                        // rggb | bggr | grbg | gbrg
 constexpr std::string_view raw_inset_crops = "raw_inset_crops";
 constexpr std::string_view flip = "flip";
+// Emendamento U8b (§2.9): campi strutturali di `decoder_state` (ADR-16.b §b.7) letti dall'analisi del batch dal report.
+constexpr std::string_view raw_width = "raw_width";                            // intero: sizes.raw_width
+constexpr std::string_view raw_height = "raw_height";                          // intero: sizes.raw_height
+constexpr std::string_view cfa_color_index = "cfa_color_index";                // array di 4 interi 0..3: FC dei siti (0,0),(0,1),(1,0),(1,1)
 // Righe «Metadati conservati o eliminati», «Stato del dato», «Avvisi».
 constexpr std::string_view metadata_present = "metadata_present";              // nomi dei campi interpretati e presenti
 constexpr std::string_view metadata_not_kept = "metadata_not_kept";            // categorie non conservate (§2.6)
@@ -46,10 +50,10 @@ constexpr std::string_view capture_time_libraw = "capture_time_libraw";        /
 constexpr std::string_view capture_time_clock = "capture_time_clock";          // "camera_no_zone"
 constexpr std::string_view process_tz = "process_tz";                          // "UTC0"
 
-constexpr std::array<std::string_view, 30> all_keys = {
+constexpr std::array<std::string_view, 33> all_keys = {
     libraw_version, libraw_version_number, libraw_capabilities, libraw_tarball_sha256, black_applied, scale_applied,
     black, white, data_maximum, linear_max, linearization, curve_sha256, crop, margin_parity, cfa_pattern,
-    raw_inset_crops, flip, metadata_present, metadata_not_kept, data_state, camera_processing, process_warnings, sensor,
+    raw_inset_crops, flip, raw_width, raw_height, cfa_color_index, metadata_present, metadata_not_kept, data_state, camera_processing, process_warnings, sensor,
     pixel_size_um, pixel_scale_arcsec, wcs, absent_reason, capture_time_libraw, capture_time_clock, process_tz};
 
 // U13 §8 (docs/contracts/U13-dng-decoder.md): decoder scelto dall'instradamento e campi dell'IFD raw scelto. Stessi nomi
@@ -60,8 +64,64 @@ constexpr std::string_view route_reason = "route_reason";        // per libraw: 
 constexpr std::string_view compression = "compression";          // Compression (259) dell'IFD raw scelto
 constexpr std::string_view sample_format = "sample_format";      // SampleFormat (339), predefinito 1
 constexpr std::string_view bits_per_sample = "bits_per_sample";  // BitsPerSample (258)
+// Chiavi d'instradamento del record di LibRaw, oltre a `all_keys`.
+constexpr std::array<std::string_view, 5> libraw_route_keys = {decoder, route_reason, compression, sample_format,
+                                                               bits_per_sample};
 constexpr std::string_view decoder_libraw = "libraw";
 constexpr std::string_view decoder_astro_dng = "astro_dng";
+
+// U13 §8, decodifica riuscita del decoder del progetto (nomi scelti dall'autore dei test di U13b, da riportare nel codice).
+constexpr std::string_view dng_spec = "dng_spec";                          // contratto: "DNG 1.7.1.0"
+constexpr std::string_view dng_version = "dng_version";                    // DNGVersion, "a.b.c.d"
+constexpr std::string_view dng_backward_version = "dng_backward_version";  // DNGBackwardVersion o il predefinito di §4
+// Strisce: {kind: "strips", rows_per_strip: valore scritto, count}; tasselli: {kind: "tiles", tile_width, tile_length,
+// count}.
+constexpr std::string_view segments = "segments";
+constexpr std::string_view predictor = "predictor";                        // Predictor (317), predefinito 1
+constexpr std::string_view byte_order = "byte_order";                      // "II" | "MM"
+constexpr std::string_view zlib_version_field = "zlib_version";            // zlibVersion()
+constexpr std::string_view orientation = "orientation";                    // Orientation (274) scritto, o null
+// DefaultCropOrigin e DefaultCropSize come scritti: un valore intero (SHORT, LONG o RATIONAL che si divide) come intero,
+// un RATIONAL non intero come testo "num/den" dei due interi scritti (scelta dell'autore dei test).
+constexpr std::string_view default_crop_origin = "default_crop_origin";    // [x, y] di DefaultCropOrigin (50719), o null
+constexpr std::string_view default_crop_size = "default_crop_size";        // [w, h] di DefaultCropSize (50720), o null
+constexpr std::string_view metadata_rejected = "metadata_rejected";        // nomi TIFF dei tag di metadato malformati
+constexpr std::string_view opcode_lists = "opcode_lists";                  // nomi TIFF di OpcodeList1-3 presenti, non applicati
+constexpr std::string_view spec_dng_1_7_1_0 = "DNG 1.7.1.0";
+
+// Chiavi del record di una decodifica riuscita del decoder del progetto (§8): campi propri, instradamento, identità del
+// pacchetto di decoder (ADR-08.b §2.9, riga «Libreria»: per entrambi i decoder), geometria (con `raw_width`,
+// `raw_height`, `cfa_color_index`, campi comuni dell'emendamento U8b) e livelli di ADR-08.b §2.9 (righe «Offset o nero
+// applicato», «Scala applicata», «Metadati conservati o eliminati», «Stato del dato»), metadati, `process_tz` (§3: fuso
+// verificato anche sul percorso del progetto).
+constexpr std::array<std::string_view, 46> astro_dng_keys = {
+    decoder, libraw_version, libraw_version_number, libraw_capabilities, libraw_tarball_sha256, compression, sample_format, bits_per_sample, dng_spec, dng_version, dng_backward_version, segments,
+    predictor, byte_order, zlib_version_field, black_applied, scale_applied, black, white, data_maximum, linear_max,
+    linearization, curve_sha256, crop, margin_parity, cfa_pattern, raw_width, raw_height, cfa_color_index, orientation,
+    default_crop_origin, default_crop_size, metadata_present, metadata_not_kept, metadata_rejected, data_state,
+    camera_processing, sensor, pixel_size_um, pixel_scale_arcsec, wcs, absent_reason, capture_time_libraw,
+    capture_time_clock, process_tz, opcode_lists};
+
+// Chiavi di primo livello da cui `decoder_state_of_record` ricostruisce i membri di contenuto di `decoder_state` (ADR-08.b
+// §2.9, U13 §8): comuni ai due decoder, poi quelle del solo decoder scelto. Una sola assente: integrity
+// raw.record_malformed con la chiave nel contesto (`chiave`, scelta dell'autore del codice).
+constexpr std::array<std::string_view, 14> state_common_keys = {
+    raw_width, raw_height, crop, black, cfa_color_index, white, data_maximum, linear_max, linearization, curve_sha256,
+    decoder, compression, sample_format, bits_per_sample};
+constexpr std::array<std::string_view, 4> state_libraw_keys = {route_reason, process_warnings, raw_inset_crops, flip};
+constexpr std::array<std::string_view, 12> state_astro_dng_keys = {
+    dng_spec, dng_version, dng_backward_version, segments, predictor, byte_order, zlib_version_field, orientation,
+    default_crop_origin, default_crop_size, metadata_rejected, opcode_lists};
+
+// Valori di ADR-08.b §2.9 uguali per i due decoder: nero e scala non applicati (`none`), dato `raw`, elaborazioni della
+// camera `unknown`, fuso `UTC0`; categorie non conservate di §2.6 (makernote, miniature, profili, bilanciamento del
+// bianco della camera) con i nomi scelti dall'autore dei test, nell'ordine di §2.6.
+constexpr std::string_view expected_applied_none = "none";
+constexpr std::string_view expected_data_state = "raw";
+constexpr std::string_view expected_camera_processing = "unknown";
+constexpr std::string_view expected_process_tz = "UTC0";
+constexpr std::array<std::string_view, 4> expected_metadata_not_kept = {"makernote", "thumbnail", "profiles",
+                                                                         "camera_white_balance"};
 
 // Valori fissati dal contratto o da U12-third-party.md §1 (LibRaw 0.22.3, build del progetto).
 constexpr std::string_view expected_libraw_version = "0.22.3-Release";

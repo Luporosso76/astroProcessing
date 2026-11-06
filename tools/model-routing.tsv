@@ -1,0 +1,13 @@
+# Modello per unità e ruolo (fonte: plans/M3a.md, tabella «Modelli per unità»; AGENTS.md, «Delega e review»).
+# Colonne: unità, modello dei test, modello del codice. I ruoli arb-tests e arb-code seguono tests e code.
+# Ruoli senza unità: mech (passi meccanici: lanciare script, mutazioni, rinomine, record) = haiku;
+# infra (lavoro ordinario fuori dalle verità: strumenti, librerie, indagini) = sonnet; review = opus.
+U4	sonnet	sonnet
+U5	sonnet	sonnet
+U6	opus	opus
+U7	opus	opus
+U8a	sonnet	sonnet
+U8b	sonnet	sonnet
+U9	sonnet	sonnet
+U13a	opus	opus
+U13b	opus	opus

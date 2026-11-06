@@ -92,7 +92,7 @@ Regola. Tre fasi, come in ADR-16.b §b.1:
 
 - Motivi di esclusione dall'analisi (lista chiusa, nella proposta con i valori):
   - `unclassified.<motivo>`, con il motivo di CL-01 o `user`;
-  - `import_stopped`, con categoria e codice;
+  - `import_stopped`, con categoria e codice; prevale su ogni revisione `user` successiva, anche `unclassified`, e il confronto dei duplicati dello stesso digest usa le dichiarazioni della revisione dell'import, non quelle dell'utente (decisione del coordinatore, 6 novembre 2026, review di arbitraggio di U8b);
   - `classification_missing`: input senza revisione, per esempio con la registrazione interrotta;
   - `declared_conflict`: un valore dichiarato diverso da quello dell'header o del decoder, come `metadata.declared_conflict` di ADR-03 e ADR-03.b §b.1;
   - `duplicate_digest_conflict`: input con lo stesso SHA-256 registrato e classificazione effettiva (ruolo e dichiarazioni) diversa; tutte le copie sono escluse. Con classificazione uguale le copie sono un solo input analizzato, identificato dal digest, che riporta l'elenco dei loro `input_id`. È un raggruppamento su digest già registrati, non una verifica di byte (OB-11).
@@ -139,6 +139,7 @@ Regola. Tre fasi, come in ADR-16.b §b.1:
 
   Le coppie F–DF e F–B e il controllo termico non dipendono dal light. Quindi i light di un gruppo hanno la stessa analisi: stati per catena, predicati, insieme ammissibile e default. La proposta si calcola sul light di digest minimo e vale per ogni membro.
 - Nessuna tolleranza nuova: esposizione e temperatura separano i light solo attraverso gli esiti delle coppie, con le tolleranze dichiarate di ADR-16.a §2.
+- Parametri mancanti (`params_missing`): si valutano per gruppo. Un parametro manca per un gruppo se l'analisi di quel gruppo (il suo light e i candidati scelti per esso) lo richiede: per esempio `decoder_black_abs_tol_adu` serve solo se almeno un ingresso dell'analisi del gruppo ha lo stato del decoder (decisione del coordinatore, 6 novembre 2026, review del codice di U8b).
 - Esito di un gruppo:
   - `ready`: con proposta (CL-09);
   - `candidate_choice_required` (CL-08);
@@ -218,11 +219,12 @@ Ogni controllo dell'accettazione corrisponde a una clausola esistente, con un so
 
 **CL-11 — Nessuna sostituzione; ripartizione fra M3.a, M3.b e M3.c.**
 
-- La selezione è congelata. Contiene:
+- La selezione è congelata (`calibration_selection`, tutti i campi qui sotto: nessuno è facoltativo; decisione del coordinatore, 6 novembre 2026, review del codice di U8b: digest e dimensione servono al confine OB-11 per verificare i byte). Contiene:
   - ricetta e parametri;
   - light e candidato per ruolo (input con digest e dimensione, oppure chiave del nodo del master);
   - dichiarazioni;
   - stato e identità del decoder di ogni ingresso RAW osservati nell'analisi.
+  - Precisazioni (decisione del coordinatore, 6 novembre 2026): gli «ingressi RAW» sono i light RAW del gruppo; i frame RAW dei master restano al job del master (M3.b). Le dichiarazioni congelate sono i parametri applicabili alla ricetta: in un gruppo senza stato del decoder `decoder_black_abs_tol_adu` non c'è. Un `black.pattern` incoerente nel report persistito ferma con `batch.report_malformed`.
 - Una revisione di classificazione o di dichiarazioni successiva alla selezione non la modifica e non la ferma. Produce una nuova analisi, che propone nuove selezioni (decisione: la ricetta è esplicita, ADR-16.b §b.1).
 - **Regola di M3.a**: `verify_selection(selezione, osservazioni nuove)` è una funzione pura. Per ogni ingresso RAW della selezione confronta stato e identità del decoder congelati con quelli della nuova decodifica. Alla prima differenza ferma con `integrity`, `calib.decoder_state_changed`, con il campo, `predicate = P-LOST` e `prerequisite = <ingresso>.decoder_state` nel contesto (codici di ADR-16.b §b.7 e §b.8). Uguali: nessun effetto.
 - `verify_selection` non restituisce mai un'altra ricetta, un altro candidato o una selezione modificata: l'unica uscita è «nessun effetto» oppure lo stop.
@@ -248,7 +250,7 @@ Ogni controllo dell'accettazione corrisponde a una clausola esistente, con un so
 - `analyze_batch` è una funzione pura di: input registrati, revisioni correnti, report di import, slot dei master, parametri d'analisi, scelte dei candidati.
 - Con le stesse scelte dei candidati fornite, permutare l'ordine di registrazione degli input, o riaprire il progetto, dà la stessa proposta, byte per byte in JSON canonico. Nella forma canonica gli input sono identificati dal digest; gli `input_id`, identità locale che dipende dall'ordine di registrazione, stanno in un elenco a parte escluso dal confronto.
 - Nessuna scrittura nello store.
-- Nessuna lettura di campioni, tranne quella del controllo termico di `flat.bias` (ADR-16.b §b.1, punto 1).
+- Nessuna lettura di campioni, tranne quella del controllo termico di `flat.bias` (ADR-16.b §b.1, punto 1). Si leggono solo i campioni del flat e del bias candidati di una catena `flat.bias` effettivamente valutata, al momento del controllo; nessun altro input o slot `flat` o `bias` si carica (decisione del coordinatore, 6 novembre 2026, review del codice di U8b).
 - Proprietario: `analyze_batch`.
 - Prova: T-M3A-04c, 04f.
 

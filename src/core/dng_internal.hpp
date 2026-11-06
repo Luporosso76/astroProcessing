@@ -2,7 +2,9 @@
 
 // Decoder DNG del progetto (docs/contracts/U13-dng-decoder.md): interfaccia interna fra `decode_raw_buffer` e il parser.
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 
 #include "astro/image.hpp"
@@ -25,5 +27,9 @@ route_detail route(std::span<const std::uint8_t> bytes);
 // dell'instradamento (§8).
 image decode(std::span<const std::uint8_t> bytes, const route_detail& route, const raw_decode_hooks& hooks,
              const raw_decode_context& ctx);
+
+// Curva di linearizzazione di 65 536 voci (ADR-08.b §2.4): assente se è l'identità, altrimenti SHA-256 delle voci come
+// uint16 little-endian in ordine di indice. Stessa regola per i due decoder.
+std::optional<std::array<std::uint8_t, 32>> curve_digest(std::span<const std::uint16_t, 0x10000> curve);
 
 }  // namespace astro::dng_detail

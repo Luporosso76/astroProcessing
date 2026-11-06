@@ -130,17 +130,17 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-U12-12 | U12 obbligo 12 | U12-third-party | M3.a (U12) | verde (U12) |
 | T-U13-01 | U13 §3 | U13-dng-decoder | M3.a (U13a) | verde (U13a) |
 | T-U13-02 | U13 §3 | U13-dng-decoder | M3.a (U13a) | verde (U13a) |
-| T-U13-03 | U13 §4, §5 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-04 | U13 §5 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-05 | U13 §4 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
+| T-U13-03 | U13 §4, §5 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-04 | U13 §5 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-05 | U13 §4 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
 | T-U13-06 | U13 §4, §6 | U13-dng-decoder | M3.a (U13a) | verde (U13a) |
-| T-U13-07 | U13 §4 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-08 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-09 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-10 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-11 | U13 §3-§6 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-12 | U13 §8 | U13-dng-decoder | M3.a (U13b; con T-M3A-RAW-11 e 12) | PIANIFICATO |
-| T-U13-24 | U13 §10 | U13-dng-decoder | M3.a (U13b; documentazione in M5) | PIANIFICATO |
+| T-U13-07 | U13 §4 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-08 | U13 §7 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-09 | U13 §7 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-10 | U13 §7 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-11 | U13 §3-§6 | U13-dng-decoder | M3.a (U13b) | verde (U13b) |
+| T-U13-12 | U13 §8 | U13-dng-decoder | M3.a (U13b; con T-M3A-RAW-11 e 12) | verde (U13b) |
+| T-U13-24 | U13 §10 | U13-dng-decoder | M3.a (U13b; documentazione in M5) | verde (U13b) |
 | T-M3A-LIC-01 | NFR-LIC-01.d; ADR-08.b §4 | ADR-08.b | M3.a | verde (U10) |
 
 ## M3.entry: ID di lavoro di ADR-03.b
@@ -182,7 +182,7 @@ Definiti in `docs/contracts/ADR-16-stati-master.md` §b.13, con tolleranze e cri
 | T-M3A-CAL-06 | G-STOP, P-FLAT-UNKNOWN, G-OFFSET, P-OFFSET; ADR-16.b §b.9 | ADR-16.b | M3.c | verde (U7) |
 | T-M3A-CAL-07 | G-CAL, F-IO-04; ADR-16.b §b.7 (master da RAW) | ADR-16.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | verde (U6) |
-| T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | PIANIFICATO — non eseguito |
+| T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | verde, parte M3.a (U8b); resto pianificato |
 | T-M3A-CAL-10 | G-STOP, resume; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 
 ## M3.entry: ID di lavoro di C-01.b
@@ -389,9 +389,9 @@ Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
 | T-M3A-RAW-13 | F-IO-04 | ADR-08.b §2.6 (emendamento L4) | U4 | verde (U4) |
-| T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
-| T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | parziale: 05a, 05b, 05c parte U8a verdi (U8a); resto U8b pianificato |
-| T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | parziale: 06b verde (U8a); resto U8b pianificato |
+| T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8b) |
+| T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8a, U8b) |
+| T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8a, U8b) |
 | T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |

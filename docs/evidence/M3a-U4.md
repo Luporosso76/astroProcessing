@@ -51,22 +51,22 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `6e020ced8da401f8d26c69e610275020f00762ed5b358d0a98c94ffa20392fd8` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
 | `src/core/CMakeLists.txt` | `2e09fcd7ebc1d942c33a9b10020c80b44c3ba078e03e0bcc4418820e292c79da` |
-| `src/core/include/astro/image.hpp` | `3568c28d62b45e10d77736eea891eb59093970c9f3c51739292a526b4d71aba6` |
-| `src/core/include/astro/raw_decode.hpp` | `7ab60332832da275e2f625f635ac86a6218b2aa1847d41ac45b7d28ea6b917f4` |
+| `src/core/include/astro/image.hpp` | `216e96b4fc5088e01775261255f8ecbeda63c35e5925d2523e0a743bb984da03` |
+| `src/core/include/astro/raw_decode.hpp` | `0a2b8aa117998b429ac983439f67a3360ba08a481dd2106dddb606f858e99be6` |
 | `src/core/include/astro/raw_import_job.hpp` | `5cc66cbf960a723ecd160f2001e4e9eef7aa7825cbf69b55b57ed337f6204803` |
 | `src/core/job_types.cpp` | `5041b210e2aeb2f3c76f1f81e5fbb02932505886e55df9f4d2754953a047ecdc` |
-| `src/core/raw_decode.cpp` | `0e8ce66a76ebf3704db608ff5e1facf827b3aa132ca56c33d952ff7c96c80f90` |
+| `src/core/raw_decode.cpp` | `e114fbf53cad623be8ab4a4c4fd952fc33227f29e171e8788259f5e0b493029e` |
 | `src/core/raw_import_job.cpp` | `2840fcdc7c19f47dca9f566c402aaf045b336effb393059e05ce9e4b2099efd0` |
 | `tests/u4/test_raw07_offline.py` | `9c9a95ea09f39204064ff7de3f1cc43b3082826d4df2e88fa04e740736157836` |
-| `tests/unit/CMakeLists.txt` | `6c958dd237e5b18b5b0828950505d10e575bdbe88f4ec6b45727b7860e806646` |
+| `tests/unit/CMakeLists.txt` | `b33a1186cba06cba729843ab630e9dd1bb848ca27648c89247c730500fe1418f` |
 | `tests/unit/raw_import_run.cpp` | `7dfa3731a61351d3b4e079d8906f7e3f9e404d57e894656353f5bce41ef71c65` |
-| `tests/unit/raw_record_keys.hpp` | `5a44d26cb5e8a6211cd498cbd50af34c6b92cf42f7d2b9e91d6facb72a3ce57c` |
-| `tests/unit/test_raw_import.cpp` | `5284ec3d606223fa2261ddc928af0b859e1f45c45b5a34472b6ba25571aa0933` |
-| `tests/unit/test_raw_import_record.cpp` | `476049bd106a85d443abbc49f9af05d27e3150300aeef6d9964206db6cd918e6` |
+| `tests/unit/raw_record_keys.hpp` | `ff32b3c8f5e0942397921048068e0cd13b0859bf11f5e81dae13c8f7e9169baf` |
+| `tests/unit/test_raw_import.cpp` | `4603a1b29f10b10d46ea409d8760eb793923e4475e633bbf8367fa9bf9ff1e6d` |
+| `tests/unit/test_raw_import_record.cpp` | `b8e2b539dabe826a949434ba225b6750941a649731b5b12ccecaaf7a9ec98b7c` |
 | `tools/check_offline.sh` | `9f9ada7e6c9f201ba5a921d7bc76e932e07c2f67ae4aa8ac9f83b69ad8762b71` |
 
-- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
 <!-- evidence:end -->

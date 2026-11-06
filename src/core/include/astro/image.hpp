@@ -199,6 +199,52 @@ struct decoder_window {
 
 enum class decoder_linearization { identity, decoder_curve };
 
+// Decoder scelto dall'instradamento (docs/contracts/U13-dng-decoder.md §3).
+enum class raw_decoder_kind { libraw, astro_dng };
+
+// Esito dell'instradamento (U13 §3, §8). `reason` per libraw: "not_tiff", "tiff_not_dng" o "dng_libraw_compression";
+// vuoto per astro_dng. I tre campi dell'IFD raw (predefiniti del TIFF se il tag manca) sono presenti solo per un DNG con
+// esattamente un IFD raw.
+struct dng_route_result {
+  raw_decoder_kind decoder = raw_decoder_kind::libraw;
+  std::string reason;
+  std::optional<std::uint32_t> compression;
+  std::optional<std::uint32_t> sample_format;
+  std::optional<std::uint32_t> bits_per_sample;
+  friend bool operator==(const dng_route_result&, const dng_route_result&) = default;
+};
+
+// Valore di un tag DNG registrato e non applicato (DefaultCropOrigin, DefaultCropSize): SHORT, LONG e RATIONAL di valore
+// intero con denominatore 1, RATIONAL non intero come scritto.
+struct dng_rational {
+  std::uint32_t num = 0;
+  std::uint32_t den = 1;
+  friend bool operator==(const dng_rational&, const dng_rational&) = default;
+};
+
+// Campi propri del decoder DNG del progetto (U13 §8), presenti solo con `route.decoder` = astro_dng.
+struct dng_decoder_fields {
+  std::array<std::uint8_t, 4> dng_version{};
+  std::array<std::uint8_t, 4> dng_backward_version{};  // scritto, o DNGVersion con gli ultimi due byte a 0
+  bool tiles = false;
+  std::uint32_t rows_per_strip = 0;  // strisce: valore scritto
+  std::uint32_t tile_width = 0;      // tasselli
+  std::uint32_t tile_length = 0;     // tasselli
+  std::uint64_t segment_count = 0;
+  std::uint32_t predictor = 1;
+  bool little_endian = true;  // ordine dei byte del file: II
+  std::string zlib_runtime_version;  // zlibVersion() della decodifica (`zlib_version` è una macro di zlib.h)
+  // Registrati, mai applicati (§4); assenti se il tag manca o è malformato.
+  std::optional<std::uint32_t> orientation;
+  std::optional<std::array<dng_rational, 2>> default_crop_origin;
+  std::optional<std::array<dng_rational, 2>> default_crop_size;
+  // Nomi TIFF dei tag di metadato malformati, nell'ordine di lettura: il campo corrispondente resta assente.
+  std::vector<std::string> metadata_rejected;
+  // Nomi TIFF di OpcodeList1, OpcodeList2, OpcodeList3 presenti nell'IFD raw: mai applicati.
+  std::vector<std::string> opcode_lists;
+  friend bool operator==(const dng_decoder_fields&, const dng_decoder_fields&) = default;
+};
+
 // Stato lasciato dal decoder RAW nella rappresentazione di LibRaw (ADR-03.b §b.2): il nero del singolo campione non si
 // valuta qui. Invarianti in validate_image (`image.decoder_state`).
 struct decoder_state {
@@ -224,13 +270,17 @@ struct decoder_state {
   // `sizes.raw_inset_crops[2]` ({cleft, ctop, cwidth, cheight}) e `sizes.flip` di LibRaw: registrati, mai applicati (§2.3, §2.9).
   std::array<std::array<std::uint32_t, 4>, 2> raw_inset_crops{};
   std::int32_t flip = 0;
+  // Decoder che ha prodotto l'immagine e campi dell'instradamento (U13 §8); `dng` presente solo con astro_dng.
+  dng_route_result route;
+  std::optional<dng_decoder_fields> dng;
   metadata_source source;
   // `source` e' provenienza (origine e keyword): l'uguaglianza non la confronta.
   friend bool operator==(const decoder_state& a, const decoder_state& b) {
     const auto content = [](const decoder_state& s) {
       return std::tie(s.raw_width, s.raw_height, s.window, s.black, s.cfa_color_index, s.black_per_color,
                       s.black_pattern_rows, s.black_pattern_cols, s.black_pattern, s.white, s.data_maximum,
-                      s.linear_max, s.linearization, s.curve_sha256, s.process_warnings, s.raw_inset_crops, s.flip);
+                      s.linear_max, s.linearization, s.curve_sha256, s.process_warnings, s.raw_inset_crops, s.flip,
+                      s.route, s.dng);
     };
     return content(a) == content(b);
   }

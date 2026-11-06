@@ -9,6 +9,7 @@
 #include <string_view>
 #include <span>
 
+#include "astro/calibration.hpp"
 #include "astro/cancel.hpp"
 #include "astro/image.hpp"
 #include "astro/input_format.hpp"
@@ -79,20 +80,6 @@ struct raw_decode_context {
   std::optional<std::uint64_t> held_bytes;
 };
 
-// Decoder scelto dall'instradamento (docs/contracts/U13-dng-decoder.md §3).
-enum class raw_decoder_kind { libraw, astro_dng };
-
-// Esito dell'instradamento (U13 §3, §8). `reason` per libraw: "not_tiff", "tiff_not_dng" o "dng_libraw_compression";
-// vuoto per astro_dng. I tre campi dell'IFD raw (predefiniti del TIFF se il tag manca) sono presenti solo per un DNG con
-// esattamente un IFD raw.
-struct dng_route_result {
-  raw_decoder_kind decoder = raw_decoder_kind::libraw;
-  std::string reason;
-  std::optional<std::uint32_t> compression;
-  std::optional<std::uint32_t> sample_format;
-  std::optional<std::uint32_t> bits_per_sample;
-};
-
 // Instradamento puro (U13 §3): legge solo intestazione, IFD0, catena di primo livello e `SubIFDs` di IFD0, nelle voci
 // necessarie. Più IFD raw di cui almeno uno del decoder del progetto: unsupported raw.multi_image. Struttura letta non
 // valida: integrity raw.data_error con `funzione` = dng_route.
@@ -112,6 +99,15 @@ struct raw_decode_hooks {
   std::function<void(const dng_route_result&)> after_route;
   // Decoder del progetto: codice di `inflate` del segmento `segment`; restituisce quello su cui il prodotto decide.
   std::function<int(std::size_t segment, int rc)> inflate_return;
+  // Decoder del progetto, prima di ogni flusso zlib: riceve il tetto dei byte allocati da zlib per flusso (65 536, U13 §5)
+  // e restituisce quello su cui il prodotto decide.
+  std::function<std::uint64_t(std::uint64_t limit)> zlib_memory_limit;
+  // Decoder del progetto, a ogni allocazione di zlib accettata dal tetto e prima di chiederla al sistema: riceve i byte
+  // richiesti; true = il sistema la nega, come `malloc` che restituisce nullptr (U13 §5, memoria negata dal sistema).
+  std::function<bool(std::size_t bytes)> zlib_system_refuses;
+  // Decoder del progetto, dopo ogni segmento decodificato (inflate, predittore, copia nell'area importata): indice del
+  // segmento e massimo dei byte tenuti allocati da zlib per quel flusso.
+  std::function<void(std::size_t segment, std::uint64_t zlib_peak_bytes)> after_segment;
 };
 
 // Decodifica un RAW gia' letto in memoria (ADR-08.b §2.2-§2.4, §2.6): area visibile di LibRaw in f32 = uint16, layout
@@ -125,5 +121,12 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
 // del contratto, valori `null` espliciti per i dati che il decoder non fornisce. Immagine senza `decoder_state` o `cfa`:
 // invalid_input raw.record_source.
 json raw_decoder_record(const image& decoded);
+
+// Identità del decoder di questo processo: le quattro chiavi «Libreria» del record (ADR-08.b §2.9).
+decoder_identity current_decoder_identity();
+
+// Inverso di `raw_decoder_record` per il `decoder_state` (tutti i membri di contenuto; `source` è provenienza). Chiave
+// assente o fuori dominio: integrity raw.record_malformed.
+decoder_state decoder_state_of_record(const json& record);
 
 }  // namespace astro

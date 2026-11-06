@@ -295,6 +295,8 @@ class sqlite_dag_store : public dag_store {
   std::vector<std::string> descendants(const std::string& node_key) const override;
   void create_slot(const std::string& slot_name, const std::string& target_node_key) override;
   std::optional<slot_record> get_slot(const std::string& slot_name) const override;
+  // Tutti gli slot, in ordine di nome, compresi quelli esclusi dalla ricetta (`detached`). Funziona in sola lettura.
+  std::vector<slot_record> slots() const;
   std::uint64_t retarget_slot(const std::string& slot_name, const std::string& target_node_key) override;
   job_record start_job(const std::string& slot_name) override;
   void finish_job(std::uint64_t job_id, job_state state, std::optional<error_category> stop_category,
