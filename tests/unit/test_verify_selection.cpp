@@ -52,6 +52,7 @@
 #include "astro/raw_decode.hpp"
 #include "astro/scheduler.hpp"
 #include "astro/sqlite_dag_store.hpp"
+#include "dng_state_changes.hpp"
 #include "expect_stop.hpp"
 #include "import_support.hpp"
 #include "store_test_support.hpp"
@@ -192,41 +193,16 @@ std::vector<state_change> state_changes() {
 // Stato del decoder del progetto: instradamento astro_dng, `dng` presente (U13 §8).
 decoder_state base_dng_state() {
   decoder_state s = base_state();
-  s.route = dng_route_result{raw_decoder_kind::astro_dng, "", 8, 1, 16};
-  dng_decoder_fields d;
-  d.dng_version = {1, 7, 1, 0};
-  d.dng_backward_version = {1, 4, 0, 0};
-  d.rows_per_strip = kH;
-  d.segment_count = 1;
-  d.predictor = 1;
-  d.zlib_runtime_version = "1.3.1";
-  s.dng = d;
+  s.route = dng_state_fixture::project_route();
+  s.dng = dng_state_fixture::project_fields(kH);
   return s;
 }
 
 // Un cambio per membro di `dng_decoder_fields`, con `route` uguale: il campo dello stop è `dng`.
 std::vector<state_change> dng_state_changes() {
-  return {
-      {"dng.dng_version", [](decoder_state& s) { s.dng->dng_version[1] = 6; }},
-      {"dng.dng_backward_version", [](decoder_state& s) { s.dng->dng_backward_version[1] = 3; }},
-      {"dng.tiles", [](decoder_state& s) { s.dng->tiles = true; }},
-      {"dng.rows_per_strip", [](decoder_state& s) { s.dng->rows_per_strip = 2; }},
-      {"dng.tile_width", [](decoder_state& s) { s.dng->tile_width = 16; }},
-      {"dng.tile_length", [](decoder_state& s) { s.dng->tile_length = 16; }},
-      {"dng.segment_count", [](decoder_state& s) { s.dng->segment_count = 2; }},
-      {"dng.predictor", [](decoder_state& s) { s.dng->predictor = 2; }},
-      {"dng.little_endian", [](decoder_state& s) { s.dng->little_endian = false; }},
-      {"dng.zlib_runtime_version", [](decoder_state& s) { s.dng->zlib_runtime_version = "1.3.2"; }},
-      {"dng.orientation", [](decoder_state& s) { s.dng->orientation = 1; }},
-      {"dng.default_crop_origin", [](decoder_state& s) {
-         s.dng->default_crop_origin = std::array<dng_rational, 2>{dng_rational{0, 1}, dng_rational{0, 1}};
-       }},
-      {"dng.default_crop_size", [](decoder_state& s) {
-         s.dng->default_crop_size = std::array<dng_rational, 2>{dng_rational{kW, 1}, dng_rational{kH, 1}};
-       }},
-      {"dng.metadata_rejected", [](decoder_state& s) { s.dng->metadata_rejected = {"Orientation"}; }},
-      {"dng.opcode_lists", [](decoder_state& s) { s.dng->opcode_lists = {"OpcodeList1"}; }},
-  };
+  std::vector<state_change> out;
+  for (const dng_state_fixture::field_change& c : dng_state_fixture::dng_field_changes(kW, kH)) out.push_back({c.field, c.apply});
+  return out;
 }
 
 TEST(VerifySelection, T_M3A_06a_each_decoder_state_field_changed_one_at_a_time_stops_with_that_field) {

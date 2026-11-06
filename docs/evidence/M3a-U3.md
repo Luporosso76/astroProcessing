@@ -1,6 +1,6 @@
 # M3.a, unità U2b e U3: ora di acquisizione, avviso Fujifilm, decoder RAW robusto
 
-Stato: **REVIEW FAIL al giro 2, tetto raggiunto: arbitraggio del coordinatore**. I rilievi aperti riguardano solo casi e asserzioni dei test (sotto, «Review»); nessun rilievo aperto sul codice di prodotto. Unità: U2b e U3 di `plans/M3a.md`, ID F-IO-02, F-IO-04. Proprietario: `decode_raw_buffer` in `src/core/raw_decode.cpp`. Contratto: `docs/contracts/ADR-08-decoder-pack.md` §2.1, §2.5, §2.6, §2.7, §2.8; fatti misurati in `docs/evidence/M3a-ADR08-U3.md` e `docs/evidence/M3a-ADR08-U4.md`. Test: T-M3A-RAW-01 (ora e fuso), T-M3A-RAW-05, 06, 08, 10.
+Stato: **chiusa** (6 novembre 2026: review indipendente di chiusura per il gate M3.a PASS, `tmp/api/gate-U3-review.json`: i rilievi BLOCCANTE e MED del giro 2 risultano chiusi nel codice, nei test o nel contratto, oppure dichiarati come limite). Storia: **REVIEW FAIL al giro 2, tetto raggiunto: arbitraggio del coordinatore**. I rilievi aperti riguardano solo casi e asserzioni dei test (sotto, «Review»); nessun rilievo aperto sul codice di prodotto. Unità: U2b e U3 di `plans/M3a.md`, ID F-IO-02, F-IO-04. Proprietario: `decode_raw_buffer` in `src/core/raw_decode.cpp`. Contratto: `docs/contracts/ADR-08-decoder-pack.md` §2.1, §2.5, §2.6, §2.7, §2.8; fatti misurati in `docs/evidence/M3a-ADR08-U3.md` e `docs/evidence/M3a-ADR08-U4.md`. Test: T-M3A-RAW-01 (ora e fuso), T-M3A-RAW-05, 06, 08, 10.
 
 | Campo | Valore |
 |---|---|
@@ -108,6 +108,10 @@ Revisore: Codex `gpt-6-astra`, reasoning high, sola lettura, con `tools/review.s
 | 1 | `.omc/artifacts/ask/codex-u3-round1-20261030-2038.md` | `tmp/u3-round1.diff` | FAIL | 5 MED: budget senza i byte dell'input (corretto nel prodotto); gestore di errori di dati provato solo via gancio; limite `max_file_bytes` esatto non provato; RSS non registrati; fuzz ASan incompleto (completato). 2 LOW: `CHECK-RESULT` assente; commento obsoleto in `test_raw_decode_u2b.cpp` (corretto) |
 | 2 | `.omc/artifacts/ask/codex-u3-round2-20261030-2139.md` | `tmp/review-delta-u3-round2.diff` | FAIL | 4 MED, tutti sui test: caso con input prenotato (`m24`), registrazione del gestore (`m22`), `max_file_bytes` esatto (`m02`), RSS; 2 LOW: `CHECK-RESULT`, conteggio dei riepiloghi del fuzz nei fatti (19 semi e 8 totali, non 27 semi: corretto qui). Tetto di 2 giri raggiunto: arbitraggio del coordinatore |
 
+## Chiusura per il gate M3.a
+
+Review indipendente di chiusura (Claude Opus 5.5, sola lettura, 6 novembre 2026; prompt `tmp/api/gate-U3-review.md`, esito `tmp/api/gate-U3-review.json`): PASS. Ogni rilievo BLOCCANTE o MED rimasto aperto al giro 2 è chiuso o dichiarato.
+
 <!-- evidence:begin -->
 Blocco generato da `tools/evidence.py`; non modificare a mano.
 
@@ -120,7 +124,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/include/astro/input_format.hpp` | `40e4924aaf3a808ed54e394cc187cf2be1efb075c699dc73a1ba5af2ff6421d7` |
 | `src/core/include/astro/raw_decode.hpp` | `0a2b8aa117998b429ac983439f67a3360ba08a481dd2106dddb606f858e99be6` |
 | `src/core/raw_decode.cpp` | `e114fbf53cad623be8ab4a4c4fd952fc33227f29e171e8788259f5e0b493029e` |
-| `tests/unit/CMakeLists.txt` | `b33a1186cba06cba729843ab630e9dd1bb848ca27648c89247c730500fe1418f` |
+| `tests/unit/CMakeLists.txt` | `e3c343d6d071dd685e381d590046e523e1444612ec45d0935158634425c1f98f` |
 | `tests/unit/fuzz_raw_decode.cpp` | `77b64344305fea6c59e90d9e3da126c45487fc8b75bd6a0c612981f4620846bc` |
 | `tests/unit/main_utc0.cpp` | `c09d5a99f17d099218f9de3a664622749534fe3c3379c81143d669c1ac334081` |
 | `tests/unit/pub_raw_01.hpp` | `cd18843a0885f569d49f4c2c34852b3afbf93df329e9967b04a331204de12c24` |
@@ -129,8 +133,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_raw_decode_u2b.cpp` | `2abd37934df5eeb669eb141ee86b79e21a1f358bde3e693ccd288117723d43ce` |
 | `tests/unit/test_raw_robust.cpp` | `991822d5345be814a60b91cf106ba3d2b5e221300de0bb0a3e66e497b5a7859b` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 - Test release-giro2 (`tmp/release-junit-r2.xml`): totali 812, fast 812, slow 0, falliti 0
 - Test fuzz-asan (`tmp/u3-fuzz-asan-junit.xml`): totali 9, fast 0, slow 9, falliti 0
 <!-- evidence:end -->

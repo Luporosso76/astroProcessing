@@ -53,15 +53,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
 | `docs/contracts/F-IO-03-classificazione.md` | `8bfc0f8df2143dbc69babfc8bda69d0b273a663f229b20a12f1252afc74eee1b` |
-| `src/core/batch_classification.cpp` | `7a3585a22ac265d9573ef3f1da051a1a75521f23d7f1872957d189f55157e7fb` |
-| `src/core/calibration_analysis.cpp` | `d729b3f7d34473de95a4e3c93402757349271d46f8de95ed9b53395d7fce5f63` |
+| `src/core/batch_classification.cpp` | `c80e92738b657bdaf53bd3041ef2af89e533ca029b54f96283e6d290cfa5a446` |
+| `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
 | `src/core/include/astro/batch_classification.hpp` | `3ff40fc084e923fc70ad5c62dfcd60e72b9bada5eb3c928930233d1e8747c98d` |
-| `src/core/include/astro/calibration_analysis.hpp` | `2b2e84333df93bff3141db497c7d38fead2d28fe6fd4e4d2fbdcc96572a753d7` |
+| `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
 | `src/core/raw_decode.cpp` | `e114fbf53cad623be8ab4a4c4fd952fc33227f29e171e8788259f5e0b493029e` |
 | `tests/unit/raw_record_keys.hpp` | `ff32b3c8f5e0942397921048068e0cd13b0859bf11f5e81dae13c8f7e9169baf` |
-| `tests/unit/test_batch_analysis.cpp` | `4bc859977b6ad5032a83ee538861667f5804374fa055e3c763e98b791dc50fc0` |
-| `tests/unit/test_verify_selection.cpp` | `fbd61c7e3d4ec8c5f060f5f69e463b2f09d71dd2e663cb4600674a0f3413aeb2` |
+| `tests/unit/test_batch_analysis.cpp` | `46dab6c51f440cb4e09a28ac74712c40b442e4c47c7898e45d1f87913223959e` |
+| `tests/unit/test_verify_selection.cpp` | `6f5aaaf67fbc983c4f909bec5178b56ba7191c6c27ccae5e2bff5ab2f859c642` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

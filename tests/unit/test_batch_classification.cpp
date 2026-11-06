@@ -2,7 +2,7 @@
 // Prove: T-M3A-05 a, b, c (parte di persistenza), T-M3A-06 b (solo la riapertura del progetto dopo `import_batch`).
 // Il resto di T-M3A-04, 05c, 05d e 06 (analisi, gruppi, candidati, `verify_selection`) è di U8b.
 //
-// Il file usa simboli che U8a deve ancora introdurre: compila solo con -DASTRO_U8A_TESTS=ON. Interfaccia attesa (nomi di
+// Il file usa i simboli di U8a. Interfaccia (nomi di
 // funzione e di tabella dal contratto; i campi delle strutture sono la forma fissata da questi test):
 //   astro/batch_classification.hpp
 //     struct classification_proposal { role, rule_id, reason, json evidence };   // reason vuoto se role != unclassified

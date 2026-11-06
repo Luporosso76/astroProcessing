@@ -1,6 +1,6 @@
 # ExecPlan M3.a: import RAW, classificazione, offset, ricollegamento, G-PACK
 
-Stato: **PLANNED**. Base: commit `311fb7a` (base comune I1–I4 chiusa, suite di conformità `725bdac`). Convenzione: `PLANS.md`. Piano madre: `plans/M3.md` (riga della slice M3.a, «Base comune», «Questioni aperte», «Dati pubblici»).
+Stato: **CHIUSA**, gate M3.a PASS il 6 novembre 2026 (`docs/evidence/M3-a.md`). Base: commit `311fb7a` (base comune I1–I4 chiusa, suite di conformità `725bdac`). Convenzione: `PLANS.md`. Piano madre: `plans/M3.md` (riga della slice M3.a, «Base comune», «Questioni aperte», «Dati pubblici»).
 
 ## Ambito
 

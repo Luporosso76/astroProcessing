@@ -410,12 +410,13 @@ void check_nonnegative_param(const std::optional<double>& v, const char* name) {
          {{"parametro", name}, {"motivo", why}});
 }
 
-// Politica termica richiesta da una coppia additiva e, con `compare`, la sua tolleranza.
+// Politica termica e tolleranza richieste da una coppia additiva. La tolleranza è obbligatoria e nel dominio con
+// entrambe le politiche (ADR-16.a, «Parametri obbligatori»): con `not_applicable_declared` non entra nel confronto.
 void require_temperature_declarations(const calibration_declarations& decl) {
   if (!decl.temp_policy)
     stop(error_category::invalid_input, "calib.param.temperature_policy", "dichiarazione richiesta da una coppia presente",
          {{"parametro", "temperature_policy"}, {"motivo", "assente"}});
-  if (*decl.temp_policy == temperature_policy::compare) check_nonnegative_param(decl.temperature_abs_tol_c, "temperature_abs_tol_c");
+  check_nonnegative_param(decl.temperature_abs_tol_c, "temperature_abs_tol_c");
 }
 
 // Dominio di un parametro della ricetta o di una dichiarazione (ADR-16.a §2, §b.5).
@@ -701,7 +702,7 @@ std::optional<chain_recipe> recipe_from(const calibration_declarations& d, light
   };
   take(u.exposure, r.exposure_rel_tol, d.exposure_rel_tol);
   take(u.temperature, r.temp_policy, d.temp_policy);
-  take(u.temperature && d.temp_policy == temperature_policy::compare, r.temperature_abs_tol_c, d.temperature_abs_tol_c);
+  take(u.temperature, r.temperature_abs_tol_c, d.temperature_abs_tol_c);
   take(u.normalization, r.normalization, d.normalization);
   take(u.division, r.q_min, d.q_min);
   take(u.division, r.q_rel_sigma_max, d.q_rel_sigma_max);
@@ -1098,8 +1099,8 @@ void require_admissible(const calibration_analysis& a, const chain_recipe& r) {
   const calibration_declarations& d = a.declarations;
   require_param("exposure_rel_tol", u.exposure, r.exposure_rel_tol, d.exposure_rel_tol, param_domain::nonnegative);
   require_param("temperature_policy", u.temperature, r.temp_policy, d.temp_policy);
-  require_param("temperature_abs_tol_c", u.temperature && r.temp_policy == temperature_policy::compare,
-                r.temperature_abs_tol_c, d.temperature_abs_tol_c, param_domain::nonnegative);
+  require_param("temperature_abs_tol_c", u.temperature, r.temperature_abs_tol_c, d.temperature_abs_tol_c,
+                param_domain::nonnegative);
   require_param("normalization", u.normalization, r.normalization, d.normalization);
   require_param("q_min", u.division, r.q_min, d.q_min, param_domain::positive);
   require_param("q_rel_sigma_max", u.division, r.q_rel_sigma_max, d.q_rel_sigma_max, param_domain::positive);

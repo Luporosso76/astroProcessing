@@ -1,9 +1,10 @@
 # Stato del progetto astroProcessor
 
-Ultimo aggiornamento: 30 ottobre 2026. Unica fonte dello stato corrente; risultati e limiti nei record di evidenza.
+Ultimo aggiornamento: 6 novembre 2026. Unica fonte dello stato corrente; risultati e limiti nei record di evidenza.
 
 ## Ora
 
+- **M3.a DONE: Gate M3.a PASS il 6 novembre 2026** (`docs/evidence/M3-a.md`, `plans/M3a.md`): import RAW (LibRaw e decoder DNG del progetto), stati di offset e di calibrazione G-OFFSET e G-CAL, classificazione e import del batch, selezione congelata, ricollegamento degli originali, G-PACK; dev (ASan/UBSan, slow compresi) e release verdi, trace di M3.a pulito, review indipendente PASS per ogni unità.
 - **M0 PASS. M1 DONE. M2 DONE: Gate M2 PASS per arbitraggio il 30 ottobre 2026** (`docs/evidence/M2-gate.md`, giro 10; commit del gate `9d3996c`). Storico: Gate M2 riaperto e rifatto dal registro dell'appendice D (`plans/M2-residui.md`): R0–R5 chiuse (`docs/evidence/M2-R0.md` … `M2-R5.md`); R6 in corso. Esecuzione finale provata prima del commit (giro 8 di `docs/evidence/M2-gate.md`): build pulita, dev 501/501 (slow compresi, preset `dev-full`) e release 500/500, `tools/check_m2_trace.py` uscita 0 sui 63 ID, matrice con stati finali. Il gate passa dopo la riesecuzione sul commit del gate e la review Codex del record (clausola 4).
 - Stack adottato in `docs/decisions/ADR-M1-stack.md`, review indipendente PASS in `docs/evidence/M1-closure-001-review.md`: C++20, Qt 6 Widgets (provvisoria fino al gate M4.a), SQLite, SHA-256 via OpenSSL, FFTW, CPU di riferimento e nessuna GPU fino a M7.
 - Licenza (D-02): il proprietario ammette la GPL per il prodotto (28 ottobre 2026); `LICENSE` da emettere con ADR-12.
@@ -23,12 +24,13 @@ Ultimo aggiornamento: 30 ottobre 2026. Unica fonte dello stato corrente; risulta
 | M1.d | `docs/evidence/M1-closure-001.md`, `M2-d.md` | Spill a budget fisso esatto, guasti con exit 2; protocollo completo chiuso in M2.d (T-M2D-13) |
 | M1.e | `docs/evidence/M1-e-*.md` | Vulkan corretto; prestazioni sul microcaso non rappresentative |
 | M1.f | `docs/evidence/M1-closure-001.md` | SHA-256 circa 2,1 GB/s in memoria, 1,27 GB/s da file |
+| M3.a | `docs/evidence/M3-a.md`, `M3a-*.md` | Gate PASS: 8 ID dello stadio coperti, dev e release verdi, review PASS per ogni unità |
 
 I record M1 precedenti (pocketfft, supervisori, ritiro Rust, contratti 16M) restano come storico; i loro rami sono chiusi dall'ADR e non richiedono altre azioni.
 
 ## Prossima unità
 
-M3 (`plans/M3.md`): contratti d'ingresso scritti (ADR-08.b, ADR-03.b, ADR-16.b e D-16, C-01.b, D-08, ADR-17.b e D-17, C-02.b, ADR-09.b e D-09); prima del codice di M3.a la base comune con la suite di conformità (`plans/M3.md`, «Base comune prima del codice delle slice»). Prima di M4 (GUI) ci si ferma col proprietario.
+M3.b (`plans/M3.md`, riga della slice), dopo il lavoro rinviato dal gate M3.a (`docs/evidence/M3-a.md`, «Limiti»). Fermo su richiesta del proprietario (6 novembre 2026) dopo la chiusura di M3.a. Prima di M4 (GUI) ci si ferma col proprietario.
 
 Ritmo misurato di M2 (solo informazione): avviata il 28 ottobre 2026; M2.g, M2.f, M2.a e M2.b chiuse il 28 ottobre; M2.c, M2.d e M2.e il 29 ottobre (date dei commit e dei record).
 

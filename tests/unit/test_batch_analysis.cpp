@@ -94,6 +94,7 @@
 #include "astro/raw_decode.hpp"
 #include "astro/scheduler.hpp"
 #include "astro/sqlite_dag_store.hpp"
+#include "dng_state_changes.hpp"
 #include "expect_stop.hpp"
 #include "import_support.hpp"
 #include "pub_raw_01.hpp"
@@ -551,47 +552,43 @@ batch_proposal analyze_raw(const raw_batch& b, const batch_analysis_request& req
   return analyze_batch(inputs, slots, req);
 }
 
-// L'uguaglianza di due osservazioni confronta anche l'instradamento e i campi del decoder del progetto (U13 §8).
+// L'uguaglianza di due osservazioni confronta anche l'instradamento (ogni membro di `dng_route_result`) e ciascun membro
+// dei campi del decoder del progetto (U13 §8).
 TEST(BatchAnalysis, T_M3A_06a_observations_differing_only_in_route_or_in_one_dng_field_are_not_equal) {
   decoder_state libraw_state = base_state();
   libraw_state.route = dng_route_result{raw_decoder_kind::libraw, "not_tiff", std::nullopt, std::nullopt, std::nullopt};
   decoder_state project_state = base_state();
-  project_state.route = dng_route_result{raw_decoder_kind::astro_dng, "", 8, 1, 16};
-  dng_decoder_fields d;
-  d.dng_version = {1, 7, 1, 0};
-  d.dng_backward_version = {1, 4, 0, 0};
-  d.rows_per_strip = kH;
-  d.segment_count = 1;
-  d.predictor = 1;
-  d.zlib_runtime_version = "1.3.1";
-  project_state.dng = d;
+  project_state.route = dng_state_fixture::project_route();
+  project_state.dng = dng_state_fixture::project_fields(kH);
 
   const auto observe = [](const decoder_state& s) { return make_observation(raw_image(kLightExp, s), raw_decl(), identity_a()); };
   EXPECT_TRUE(observe(libraw_state) == observe(libraw_state)) << "controllo positivo: stati uguali";
   EXPECT_TRUE(observe(project_state) == observe(project_state)) << "controllo positivo: stati uguali";
 
   struct row {
-    const char* name;
+    std::string name;
     const decoder_state* base;
     std::function<void(decoder_state&)> change;
   };
-  const std::vector<row> rows = {
+  std::vector<row> rows = {
+      {"route.decoder", &libraw_state, [](decoder_state& s) { s.route.decoder = raw_decoder_kind::astro_dng; }},
       {"route.reason", &libraw_state, [](decoder_state& s) { s.route.reason = "tiff_not_dng"; }},
       {"route.compression", &libraw_state, [](decoder_state& s) { s.route.compression = 7; }},
       {"route.sample_format", &project_state, [](decoder_state& s) { s.route.sample_format = 3; }},
       {"route.bits_per_sample", &project_state, [](decoder_state& s) { s.route.bits_per_sample = 32; }},
-      {"dng.predictor", &project_state, [](decoder_state& s) { s.dng->predictor = 2; }},
-      {"dng.zlib_runtime_version", &project_state, [](decoder_state& s) { s.dng->zlib_runtime_version = "1.3.2"; }},
-      {"dng.opcode_lists", &project_state, [](decoder_state& s) { s.dng->opcode_lists = {"OpcodeList2"}; }},
-      {"dng.default_crop_size", &project_state, [](decoder_state& s) {
-         s.dng->default_crop_size = std::array<dng_rational, 2>{dng_rational{5, 2}, dng_rational{kH, 1}};
-       }},
   };
+  const std::vector<dng_state_fixture::field_change> dng_changes = dng_state_fixture::dng_field_changes(kW, kH);
+  ASSERT_EQ(dng_changes.size(), 15U) << "un cambio per ciascun membro di `dng_decoder_fields`";
+  for (const dng_state_fixture::field_change& c : dng_changes) rows.push_back({c.field, &project_state, c.apply});
+
   for (const row& r : rows) {
     SCOPED_TRACE(r.name);
     decoder_state changed = *r.base;
     r.change(changed);
     ASSERT_FALSE(changed == *r.base) << "il cambio deve toccare il contenuto";
+    if (r.name.rfind("dng.", 0) == 0) {
+      ASSERT_TRUE(changed.route == r.base->route) << "solo `dng` cambia";
+    }
     EXPECT_FALSE(observe(changed) == observe(*r.base)) << "osservazioni diverse solo in " << r.name << " risultano uguali";
   }
 }
@@ -1370,6 +1367,27 @@ TEST(BatchAnalysis, T_M3A_04f_missing_analysis_parameters_one_at_a_time) {
     EXPECT_EQ(g.outcome, group_outcome::params_missing);
     EXPECT_EQ(g.missing_params, std::vector<std::string>{"decoder_black_abs_tol_adu"});
     EXPECT_FALSE(g.analysis.has_value());
+  }
+}
+
+// ADR-16 §b.9: `temperature_abs_tol_c` e' obbligatorio con entrambe le `temperature_policy`.
+TEST(BatchAnalysis, T_M3A_04f_temperature_tolerance_is_required_with_not_applicable_declared) {
+  const baseline b;
+  {
+    batch_analysis_request req = request();
+    req.params.temp_policy = temperature_policy::not_applicable_declared;
+    req.params.temperature_abs_tol_c.reset();
+    const group_proposal g = only_group(analyze(inputs_of(b), req));
+    EXPECT_EQ(g.outcome, group_outcome::params_missing);
+    EXPECT_EQ(g.missing_params, std::vector<std::string>{"temperature_abs_tol_c"});
+    EXPECT_FALSE(g.analysis.has_value());
+  }
+  {
+    batch_analysis_request req = request();
+    req.params.temp_policy = temperature_policy::not_applicable_declared;
+    const group_proposal g = only_group(analyze(inputs_of(b), req));
+    EXPECT_NE(g.outcome, group_outcome::params_missing);
+    EXPECT_TRUE(g.missing_params.empty());
   }
 }
 

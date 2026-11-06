@@ -52,7 +52,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/F-IO-08-ricollegamento.md` | `9e5498a4661fd7f5685bf37edeb52093b3fd0112a54f05d4219de90b54f7515f` |
+| `docs/contracts/F-IO-08-ricollegamento.md` | `668c1e42622e805a9068334b26d8e0b817891d5ebdf6d6cf50e33bdf23ca730d` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/include/astro/hash.hpp` | `2043851aa8b5e01288e40841a44bd77476bfe12f9a6ff2100984117409256481` |
 | `src/core/include/astro/sqlite_dag_store.hpp` | `783fa87a3f6778e1976a1f4846635a500683887a0dabfcd99ff7753eb083fe16` |
@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_relink_nostat.cpp` | `f384b46e5748ddb13a32cd34170546d5f05231a750bcb0c8887f43d56fa77b07` |
 | `tests/unit/test_relink_status.cpp` | `457386c57cbedbb6f31a96ad70d531bf1e7762fbf064fb7d5cb39ac53f61fa9d` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

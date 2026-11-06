@@ -56,7 +56,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/C-02-master.md` | `c34b078781862e905ddd53734909d34113f893367a92ad8bf9f37a514336876d` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
-| `docs/test-matrix.md` | `4a587859ba1e405584903987598ddd4c6fb64befb518e147182d0a6e2faa53ed` |
+| `docs/test-matrix.md` | `4c0cdc989add3ce566996917155b30f0dbe2559312c7dfdebf7ef482d5ea02bc` |
 | `plans/M3.md` | `ce79c62f5bbec62930a675fc28415ed6ff0b37162bf4444ae203b2aee2bd2f01` |
 
 <!-- evidence:end -->

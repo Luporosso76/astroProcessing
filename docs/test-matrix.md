@@ -395,4 +395,5 @@ Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime 
 | T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
+| T-M3A-11 | F-IO-03 CL-11, CL-12; U13 §8 | F-IO-03, U13-dng-decoder | U8b; integrazione U8b+U13b | verde (integrazione U8b+U13b: light DNG del decoder del progetto analizzato dallo store, stato del decoder dal report, `verify_selection`) |
 | T-M3A-02 | F-IO-04 | nessun contratto: plans/M3a.md U4 | U4 | verde (U4) |

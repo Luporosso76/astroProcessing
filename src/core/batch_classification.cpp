@@ -671,7 +671,7 @@ std::vector<std::string> missing_params(const image& light, const batch_context&
   std::vector<std::string> missing;
   if (needs.exposure && !p.exposure_rel_tol) missing.push_back("exposure_rel_tol");
   if (needs.temperature && !p.temp_policy) missing.push_back("temperature_policy");
-  if (needs.temperature && p.temp_policy == temperature_policy::compare && !p.temperature_abs_tol_c) {
+  if (needs.temperature && !p.temperature_abs_tol_c) {
     missing.push_back("temperature_abs_tol_c");
   }
   if (needs.decoder && !p.decoder_black_abs_tol_adu) missing.push_back("decoder_black_abs_tol_adu");

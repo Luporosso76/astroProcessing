@@ -318,7 +318,7 @@ Ogni stop di questa tabella porta nel contesto `predicate = P-LOST` e `prerequis
 
 ### b.9 Selezione non ammissibile (G-STOP)
 
-Parametri della ricetta (decisione del coordinatore, 6 novembre 2026, review del codice di U7): un parametro applicabile che l'analisi ha dichiarato deve essere uguale alla dichiarazione, altrimenti `invalid_input`, `calib.param.<nome>`, contesto `parametro`; un parametro che l'analisi non ha dichiarato si controlla solo sul dominio di ADR-16.a §2, con lo stesso codice. La ricetta di default non usa mai un parametro che l'analisi non ha dichiarato (D-16: non inventa una dichiarazione): una catena senza tutte le sue dichiarazioni resta nell'insieme ammissibile ma non è il default.
+Parametri della ricetta (decisione del coordinatore, 6 novembre 2026, review del codice di U7): un parametro applicabile che l'analisi ha dichiarato deve essere uguale alla dichiarazione, altrimenti `invalid_input`, `calib.param.<nome>`, contesto `parametro`; un parametro che l'analisi non ha dichiarato si controlla solo sul dominio di ADR-16.a §2, con lo stesso codice. `temperature_abs_tol_c` resta obbligatorio e controllato nel dominio (≥ 0, finito) con entrambe le `temperature_policy` (ADR-16.a, «Parametri obbligatori»): con `not_applicable_declared` non si usa nel confronto ma non è un parametro non applicabile, né nell'analisi né nella ricetta (decisione del coordinatore, 6 novembre 2026, test di U7 prima del gate). La ricetta di default non usa mai un parametro che l'analisi non ha dichiarato (D-16: non inventa una dichiarazione): una catena senza tutte le sue dichiarazioni resta nell'insieme ammissibile ma non è il default.
 Una ricetta fuori dall'insieme di §b.5 si ferma prima del calcolo, senza nodo:
 
 | Caso | Categoria | Codice |

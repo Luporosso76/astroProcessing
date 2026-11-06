@@ -139,7 +139,7 @@ struct candidate_analysis {
 // `flat_pairs`: coppie con un flat presente (F–DF, F–B).
 struct declaration_needs {
   bool exposure = false;     // exposure_rel_tol
-  bool temperature = false;  // temperature_policy (e temperature_abs_tol_c con `compare`)
+  bool temperature = false;  // temperature_policy e temperature_abs_tol_c
   bool decoder = false;      // decoder_black_abs_tol_adu
 };
 declaration_needs declaration_needs_of(bool dark, bool bias, bool dark_flat, bool flat, bool any_raw) noexcept;
@@ -184,7 +184,7 @@ struct chain_recipe {
   light_chain light = light_chain::none;
   flat_chain flat = flat_chain::none;
   std::optional<double> exposure_rel_tol;              // catene con dark o dark-flat
-  std::optional<double> temperature_abs_tol_c;         // con `temp_policy = compare`
+  std::optional<double> temperature_abs_tol_c;         // catene con dark, bias o dark-flat
   std::optional<temperature_policy> temp_policy;       // catene con dark, bias o dark-flat
   std::optional<normalization_mode> normalization;     // catene del flat che calcolano N
   std::optional<double> q_min;                         // catene del flat che dividono

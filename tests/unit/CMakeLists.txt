@@ -208,21 +208,11 @@ target_include_directories(test_measure PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixt
 target_compile_definitions(test_measure PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_measure PROPERTIES LABELS fast)
 
-# U6 (M3.a, G-CAL parte 1): T-M3A-CAL-08, T-M3A-TYP-18, T-M3A-C01-06, T-M3A-C01-07 (parte di analisi). L'opzione è ON di
-# default; spenta, il target dei test non è nella suite e la spia è rossa, così il gate non chiude senza quei casi.
-option(ASTRO_U6_TESTS "Compila test_calibration_analysis_u6 (richiede i simboli di U6)" ON)
-add_executable(test_calibration_analysis_u6_spy test_calibration_analysis_u6_spy.cpp)
-target_link_libraries(test_calibration_analysis_u6_spy PRIVATE astrocore GTest::gtest_main)
-target_include_directories(test_calibration_analysis_u6_spy PRIVATE ${PROJECT_SOURCE_DIR}/src/core)
-target_compile_definitions(test_calibration_analysis_u6_spy PRIVATE
-  ASTRO_U6_TESTS_ENABLED=$<BOOL:${ASTRO_U6_TESTS}>)
-gtest_discover_tests(test_calibration_analysis_u6_spy PROPERTIES LABELS fast)
-if(ASTRO_U6_TESTS)
-  add_executable(test_calibration_analysis_u6 test_calibration_analysis_u6.cpp)
-  target_link_libraries(test_calibration_analysis_u6 PRIVATE astrocore GTest::gtest_main)
-  target_include_directories(test_calibration_analysis_u6 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
-  gtest_discover_tests(test_calibration_analysis_u6 PROPERTIES LABELS fast)
-endif()
+# U6 (M3.a, G-CAL parte 1): T-M3A-CAL-08, T-M3A-TYP-18, T-M3A-C01-06, T-M3A-C01-07 (parte di analisi).
+add_executable(test_calibration_analysis_u6 test_calibration_analysis_u6.cpp)
+target_link_libraries(test_calibration_analysis_u6 PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_calibration_analysis_u6 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_calibration_analysis_u6 PROPERTIES LABELS fast)
 
 # U11 (G-PACK parte 2): T-M3A-PACK-06, 08, 09 (indice e righe) e casi aperti di ADR-08.b §3.6.
 add_executable(test_pack_index test_pack_index.cpp)
@@ -459,30 +449,20 @@ target_include_directories(test_dng_u13a_alloc PRIVATE ${PROJECT_SOURCE_DIR}/tes
 target_compile_definitions(test_dng_u13a_alloc PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_dng_u13a_alloc NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600)
 
-# U8a (M3.a): F-IO-03 CL-01…CL-04. `add_input` solo con percorsi assoluti (compila subito, rosso finché il codice manca) e caso
-# spia. I test di classificazione (T-M3A-05a, 05b, 05c, 06b: test_batch_classification) usano i simboli che U8a deve ancora
-# introdurre (astro/batch_classification.hpp, sqlite_dag_store::append_classifications): il target sta dietro un'opzione
-# spenta di default; il codice di U8a la accende (-DASTRO_U8A_TESTS=ON) e poi la rimuove con la definizione
-# ASTRO_U8A_TESTS_ENABLED e il caso spia (test_batch_classification_spy.cpp). PUB-RAW-01 in sola lettura da data/public.
-option(ASTRO_U8A_TESTS "Compila test_batch_classification (richiede i simboli di U8a)" ON)
+# U8a (M3.a): F-IO-03 CL-01…CL-04. `add_input` solo con percorsi assoluti. I test di classificazione (T-M3A-05a, 05b, 05c,
+# 06b: test_batch_classification) usano astro/batch_classification.hpp e sqlite_dag_store::append_classifications.
+# PUB-RAW-01 in sola lettura da data/public.
 add_executable(test_input_paths test_input_paths.cpp)
 target_link_libraries(test_input_paths PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
 target_include_directories(test_input_paths PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 target_compile_definitions(test_input_paths PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_input_paths PROPERTIES LABELS fast)
 
-add_executable(test_batch_classification_spy test_batch_classification_spy.cpp)
-target_link_libraries(test_batch_classification_spy PRIVATE GTest::gtest_main)
-target_compile_definitions(test_batch_classification_spy PRIVATE ASTRO_U8A_TESTS_ENABLED=$<BOOL:${ASTRO_U8A_TESTS}>)
-gtest_discover_tests(test_batch_classification_spy PROPERTIES LABELS fast)
-
-if(ASTRO_U8A_TESTS)
-  add_executable(test_batch_classification test_batch_classification.cpp main_utc0.cpp)
-  target_link_libraries(test_batch_classification PRIVATE astrocore GTest::gtest SQLite::SQLite3)
-  target_include_directories(test_batch_classification PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
-  target_compile_definitions(test_batch_classification PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
-  gtest_discover_tests(test_batch_classification NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
-endif()
+add_executable(test_batch_classification test_batch_classification.cpp main_utc0.cpp)
+target_link_libraries(test_batch_classification PRIVATE astrocore GTest::gtest SQLite::SQLite3)
+target_include_directories(test_batch_classification PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_batch_classification PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_batch_classification NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600 ENVIRONMENT "${ASTRO_RAW_PIXLS_ENV}")
 
 # U8b (M3.a): F-IO-03 CL-05…CL-12 (T-M3A-04, 05c, 05d, 06, T-M3A-CAL-09 parte M3.a).
 foreach(t test_batch_analysis test_verify_selection)

@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_dng_u13b_hooks.cpp` | `c0e3fd9f534c8ceff4ec33ac6863af23661f40f2f7b89c8d4524b832f5dbfa1d` |
 | `third_party/libtiff/SHA256SUMS` | `bc546ce0298da64f8a43a2a8662ccb0df3e0e9ef53312623cfb8474086655ab6` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

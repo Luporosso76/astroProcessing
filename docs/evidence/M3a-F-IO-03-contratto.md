@@ -1,6 +1,6 @@
 # M3.a, F-IO-03: contratto della classificazione batch
 
-Stato: **IN ARBITRAGGIO**: review FAIL al giro 2 con 1 MED, già corretto per l'arbitraggio e non rivisto; tetto di 2 giri raggiunto (vedi «Review» e «Punti per l'arbitraggio»). Unità: lacune L2 e L5 di `plans/M3a.md`, prerequisito di U8. Solo testo: nessun codice di prodotto, nessun test scritto o eseguito, nessuna build.
+Stato: **chiusa per arbitraggio del coordinatore** dopo il giro 2 (sezione «Arbitraggio del coordinatore»); 6 novembre 2026: review indipendente di chiusura per il gate M3.a PASS (`tmp/api/gate-F-IO-03-contratto-review.json`): MED del giro 2 e rilievo fuori delta chiusi nel contratto (CL-08, T-M3A-04c, T-M3A-04d) e nei test di U8b, verdi nel junit release. Unità: lacune L2 e L5 di `plans/M3a.md`, prerequisito di U8. Solo testo: nessun codice di prodotto, nessun test scritto o eseguito, nessuna build.
 
 | Campo | Valore |
 |---|---|
@@ -13,7 +13,7 @@ Stato: **IN ARBITRAGGIO**: review FAIL al giro 2 con 1 MED, già corretto per l'
 | Risultato | Nuovo `docs/contracts/F-IO-03-classificazione.md`: obblighi CL-01…CL-12 con proprietario unico, test pianificati T-M3A-04 (a-f), 05 (a-d), 06 (a-b); voce in `docs/contracts/README.md` |
 | Output | File elencati nel blocco generato sotto; artefatti di review in `.omc/artifacts/ask/`; delta in `tmp/fio03-contract-round2.diff` e `tmp/fio03-contract-arbitrato.diff` |
 | Ambito | Classificazione e proposta prima della scelta, verifica della selezione dopo la scelta. Fuori: gruppi di frame e master proposti (C-02.b, M3.b), Advisor (ADR-15), esecuzione `.b` e P-LOST nel preflight (M3.c), F-IO-08, GUI |
-| Esito | FAIL al giro 2 (1 MED, corretto senza nuovo giro); in attesa dell'arbitraggio del coordinatore |
+| Esito | FAIL al giro 2 (1 MED, corretto senza nuovo giro); chiusa per arbitraggio del coordinatore; review di chiusura per il gate M3.a PASS |
 | Limiti | Vedi sotto |
 | Autore e data | Agente Claude (modello dichiarato dal runtime: Opus 5.5), 30 ottobre 2026 |
 

@@ -1757,7 +1757,6 @@ TEST(CalibrationAnalysisU6, T_M3A_CAL_08_temperature_policy_compare_or_skipped) 
   {
     SCOPED_TRACE("temperatura non applicabile dichiarata: la coppia non confronta e il report lo dice");
     in.declarations.temp_policy = temperature_policy::not_applicable_declared;
-    in.declarations.temperature_abs_tol_c.reset();
     const calibration_analysis a = analyze_ok(in);
     expect_usable_except(a, in, {});
     for (const char* pair : {"L-B", "L-D", "F-DF", "F-B"}) {

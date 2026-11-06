@@ -1,6 +1,6 @@
 # M3.a: emendamento di ADR-08.b dopo i test di U3
 
-Stato: **CHIUSO per arbitraggio del coordinatore dopo il giro 2**. Unità: emendamento del contratto `docs/contracts/ADR-08-decoder-pack.md` (§2.1 `max_raw_memory_mb`, §2.7, §2.8, §6 righe T-M3A-RAW-06 e T-M3A-RAW-08, §7) sui fatti emersi dai test di U3. Solo testo del contratto e una sonda usa-e-getta in `tmp/`: nessun codice di prodotto, nessun test del repository scritto o eseguito.
+Stato: **CHIUSO per arbitraggio del coordinatore dopo il giro 2**; 6 novembre 2026: review indipendente di chiusura per il gate M3.a PASS (`tmp/api/gate-ADR08-U3-review.json`: i due MED chiusi nel contratto, §2.7 e §6 riga T-M3A-RAW-08, e nei test `T-M3A-RAW-08.*`, verdi nel junit release). Unità: emendamento del contratto `docs/contracts/ADR-08-decoder-pack.md` (§2.1 `max_raw_memory_mb`, §2.7, §2.8, §6 righe T-M3A-RAW-06 e T-M3A-RAW-08, §7) sui fatti emersi dai test di U3. Solo testo del contratto e una sonda usa-e-getta in `tmp/`: nessun codice di prodotto, nessun test del repository scritto o eseguito.
 
 | Campo | Valore |
 |---|---|

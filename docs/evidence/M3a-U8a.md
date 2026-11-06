@@ -51,7 +51,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/F-IO-03-classificazione.md` | `8bfc0f8df2143dbc69babfc8bda69d0b273a663f229b20a12f1252afc74eee1b` |
-| `src/core/batch_classification.cpp` | `7a3585a22ac265d9573ef3f1da051a1a75521f23d7f1872957d189f55157e7fb` |
+| `src/core/batch_classification.cpp` | `c80e92738b657bdaf53bd3041ef2af89e533ca029b54f96283e6d290cfa5a446` |
 | `src/core/import_job.cpp` | `304aeffb88c57fd4698a861ba22058a9b4867080e83c72feebe63005bd2d6fb6` |
 | `src/core/include/astro/batch_classification.hpp` | `3ff40fc084e923fc70ad5c62dfcd60e72b9bada5eb3c928930233d1e8747c98d` |
 | `src/core/include/astro/scheduler.hpp` | `498d77dddcfabf7d5c8546ce6cc9bc5d08b731102711b64c5ff816b0bf3d82bc` |
@@ -59,9 +59,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/scheduler.cpp` | `89c432bf224f5e191b198968542576ff2ef6a88c0a68661a914820b341f7d072` |
 | `src/core/sqlite_classification.cpp` | `8cdca8a6d5a01e0b03244436038944d683b75d4ae66251d1a33f64ef40bcf6d4` |
 | `src/core/sqlite_dag_store.cpp` | `141422518f46f6367902eab709e6a9203d74fef453096db8f4f9fc04e16a06d3` |
-| `tests/unit/test_batch_classification.cpp` | `146048c379395cf049c5832e9b646ea0691b0d4654570f67f6a852643b95f5d0` |
+| `tests/unit/test_batch_classification.cpp` | `66545610b30f5ba3cd5397b0cd94e46e3ba16cf10c076048abf66fe8bd15ef64` |
 | `tests/unit/test_input_paths.cpp` | `b7264ab06b2e3f3493bb4fa8b96e323bce0ee0ff47861b021c5987a3bfbc6e09` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

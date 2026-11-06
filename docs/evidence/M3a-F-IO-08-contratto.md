@@ -1,6 +1,6 @@
 # M3.a, F-IO-08: contratto del ricollegamento degli originali
 
-Stato: **IN ARBITRAGGIO**: review FAIL al giro 2 con 1 MED e 1 LOW, non corretti; tetto di 2 giri raggiunto (vedi «Review» e «Punti per l'arbitraggio»). Unità: lacuna L3 di `plans/M3a.md`, prerequisito di U9. Solo testo: nessun codice di prodotto, nessun test scritto o eseguito, nessuna build.
+Stato: **chiusa per arbitraggio del coordinatore** dopo il giro 2 (sezione «Arbitraggio del coordinatore»); 6 novembre 2026: review indipendente di chiusura per il gate M3.a PASS (`tmp/api/gate-F-IO-08-contratto-review.json`): MED e LOW del giro 2 chiusi nel contratto e nei test di U9 (T-M3A-08b, T-M3A-08c), percorsi assoluti applicati da U8a (`InputPaths`), verdi nel junit release. Unità: lacuna L3 di `plans/M3a.md`, prerequisito di U9. Solo testo: nessun codice di prodotto, nessun test scritto o eseguito, nessuna build.
 
 | Campo | Valore |
 |---|---|
@@ -13,7 +13,7 @@ Stato: **IN ARBITRAGGIO**: review FAIL al giro 2 con 1 MED e 1 LOW, non corretti
 | Risultato | Nuovo `docs/contracts/F-IO-08-ricollegamento.md`: obblighi RL-01…RL-08 con proprietario unico, test pianificati T-M3A-07 (a-c), 08 (a-d), 09 (a-f); rinvio in ADR-04 («Estensione F-IO-08»); voce in `docs/contracts/README.md`; riga L3 di `plans/M3a.md` |
 | Output | File elencati nel blocco generato sotto; artefatti di review in `.omc/artifacts/ask/`; delta del giro 2 in `tmp/fio08-contract-round2.diff` |
 | Ambito | Rilevamento, ricollegamento, blocco e sblocco, storia. Fuori: ricerca automatica (vietata), esecuzione dai percorsi dello store (F-IO-03 CL-04, M3.c), GUI (F-UX-01, M4) |
-| Esito | FAIL al giro 2 (1 MED, 1 LOW, non corretti); in attesa dell'arbitraggio del coordinatore |
+| Esito | FAIL al giro 2 (1 MED, 1 LOW); chiusa per arbitraggio del coordinatore; review di chiusura per il gate M3.a PASS |
 | Limiti | Vedi sotto |
 | Autore e data | Agente Claude (modello dichiarato dal runtime: Opus 5.5), 30 ottobre 2026 |
 
@@ -66,7 +66,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-04-persistenza.md` | `83861d7d5db28b2f45b7748a0af91044e2cd56565c3fa9295733c0561163401c` |
-| `docs/contracts/F-IO-08-ricollegamento.md` | `9e5498a4661fd7f5685bf37edeb52093b3fd0112a54f05d4219de90b54f7515f` |
+| `docs/contracts/F-IO-08-ricollegamento.md` | `668c1e42622e805a9068334b26d8e0b817891d5ebdf6d6cf50e33bdf23ca730d` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 
 <!-- evidence:end -->

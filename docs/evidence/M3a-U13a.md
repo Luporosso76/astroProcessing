@@ -56,6 +56,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_dng_u13a.cpp` | `b1e8690671cae687c2d7036ef80d67c42de6053b504a7753b883dfdaa9bdf6db` |
 | `tests/unit/test_dng_u13a_alloc.cpp` | `d1008157600e5a1b0080364ddc67e0978cd8fe0706096fa2d8e6ce3d56929541` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

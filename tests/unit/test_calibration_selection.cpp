@@ -112,6 +112,7 @@ struct tuning {
   double bound_in = 64.0;
   double bound_out = 256.0;
   double budget = 0.25;
+  bool mono = false;  // light, bias e flat `raw` senza BAYERPAT (layout mono)
 };
 
 constexpr double light_value = 500.0;
@@ -128,13 +129,13 @@ struct built_frame {
 };
 
 built_frame frame(const char* imagetyp, double exposure, double temperature, const char* filter,
-                  const std::vector<double>& values) {
+                  const std::vector<double>& values, bool mono = false) {
   fx::calib_header h;
   h.imagetyp = imagetyp;
   h.exposure = exposure;
   h.temperature = temperature;
   h.filter = filter;
-  h.bayer = "RGGB";
+  h.bayer = mono ? "" : "RGGB";
   const fx::bytes bytes = fx::float_frame(frame_w, frame_h, -64, values, fx::calib_cards(h));
   return {decode_fits(bytes, decode_budget), digest_of(bytes)};
 }
@@ -223,13 +224,13 @@ std::optional<analysis_candidate> bias_of(bias_kind k, bool raw, const tuning& t
     case bias_kind::only_light: temperature = -11; break;
     case bias_kind::only_flat: temperature = -5; break;
   }
-  return candidate(frame("Bias Frame", 0.001, temperature, "L", t.bias), descriptor_of(master_role::bias), raw);
+  return candidate(frame("Bias Frame", 0.001, temperature, "L", t.bias, t.mono), descriptor_of(master_role::bias), raw);
 }
 
 std::optional<analysis_candidate> flat_of(flat_kind k, bool raw, const tuning& t) {
   switch (k) {
     case flat_kind::absent: return std::nullopt;
-    case flat_kind::raw: return candidate(frame("Flat Field", 5, -6, "L", t.flat_raw), flat_descriptor(flat_state::raw), raw);
+    case flat_kind::raw: return candidate(frame("Flat Field", 5, -6, "L", t.flat_raw, t.mono), flat_descriptor(flat_state::raw), raw);
     case flat_kind::corrected_unnormalized:
       return candidate(frame("Flat Field", 5, -6, "L", constant(1024)), flat_descriptor(flat_state::corrected_unnormalized), raw);
     case flat_kind::calibrated: {
@@ -270,7 +271,7 @@ std::optional<analysis_candidate> dark_flat_of(dark_flat_kind k, bool raw) {
 
 calibration_analysis_input input_of(const config& c, const tuning& t = {}) {
   calibration_analysis_input in;
-  built_frame light = frame("Light Frame", 60, -10, "L", constant(light_value));
+  built_frame light = frame("Light Frame", 60, -10, "L", constant(light_value), t.mono);
   in.light = std::move(light.img);
   in.light_digest = std::move(light.digest);
   if (c.raw_light) in.light.decoder_state = raw_state();
@@ -1685,7 +1686,6 @@ TEST(CalibSelection, T_M3A_CAL_06_parameter_differs_from_the_analysis_declaratio
   EXPECT_TRUE(stops_on_param(a, r, "temperature_abs_tol_c"));
   r = recipe_for(light_chain::bias, flat_chain::none, false);
   r.temp_policy = temperature_policy::not_applicable_declared;
-  r.temperature_abs_tol_c.reset();
   EXPECT_TRUE(stops_on_param(a, r, "temperature_policy"));
   r = recipe_for(light_chain::dark, flat_chain::dark_flat, false);
   ASSERT_TRUE(passes(a, r));
@@ -1834,6 +1834,220 @@ TEST(CalibSelection, T_M3A_C01_02_p_offset_admissibility_and_default) {
       }
       EXPECT_EQ(diff(a, oracle(c)), "");
     }
+  }
+}
+
+// ---------------------------------------------------------------- dichiarazioni lette dall'analisi
+
+// Stop dell'analisi atteso con categoria e codice; con `param` non vuoto, il nome alla chiave `parametro` del contesto.
+::testing::AssertionResult analysis_stops(const calibration_analysis_input& in, error_category cat, const std::string& code,
+                                          const std::string& param = "") {
+  try {
+    (void)analyze_calibration(in);
+  } catch (const stop_error& e) {
+    if (e.category() != cat || e.code() != code) {
+      return ::testing::AssertionFailure() << "stop diverso: " << e.what() << " invece di " << code;
+    }
+    if (param.empty()) return ::testing::AssertionSuccess();
+    for (const auto& [k, v] : e.context()) {
+      if (k == "parametro" && v == param) return ::testing::AssertionSuccess();
+    }
+    return ::testing::AssertionFailure() << "parametro " << param << " assente dal contesto: " << e.what();
+  }
+  return ::testing::AssertionFailure() << "nessuno stop, atteso " << code;
+}
+
+::testing::AssertionResult analysis_completes(const calibration_analysis_input& in) {
+  try {
+    (void)analyze_calibration(in);
+  } catch (const stop_error& e) {
+    return ::testing::AssertionFailure() << "stop inatteso: " << e.what();
+  }
+  return ::testing::AssertionSuccess();
+}
+
+// Light FITS, bias valido, flat `raw`, nessun dark né dark-flat, dichiarazioni termiche presenti: l'analisi esegue il
+// controllo termico di `flat.bias` (§b.5), che calcola `N_c` secondo `normalization` e confronta con `q_min`.
+const config thermal_config{false, dark_kind::absent, bias_kind::valid, flat_kind::raw, dark_flat_kind::absent,
+                            thermal_kind::in_budget};
+
+// Controllo termico con le dichiarazioni termiche presenti (§b.5; ADR-16.a §2: `normalization` e `q_min` obbligatori, senza
+// default; assenti: `invalid_input`, `calib.param.<nome>`). `cfa_channel_median` su un flat mono: `invalid_input`,
+// `calib.normalization_requires_cfa` (ADR-16.a §6, T-M2E-07). Light, bias e flat mono (L–F e F–B confrontano il CFA per
+// uguaglianza esatta, quindi tutti e tre senza BAYERPAT). Controlli: tutte le dichiarazioni presenti; flat mono con
+// `global_median` (N = 1024, soglia 0,25 · 0,5 · 1024 = 128 ≥ bound 64: `flat.bias` ammesso).
+TEST(CalibSelection, T_M3A_CAL_02_thermal_check_requires_its_declarations) {
+  {
+    SCOPED_TRACE("normalization assente");
+    calibration_analysis_input in = input_of(thermal_config);
+    in.declarations.normalization.reset();
+    EXPECT_TRUE(analysis_stops(in, error_category::invalid_input, "calib.param.normalization", "normalization"));
+  }
+  {
+    SCOPED_TRACE("q_min assente");
+    calibration_analysis_input in = input_of(thermal_config);
+    in.declarations.q_min.reset();
+    EXPECT_TRUE(analysis_stops(in, error_category::invalid_input, "calib.param.q_min", "q_min"));
+  }
+  {
+    SCOPED_TRACE("controllo: tutte le dichiarazioni presenti");
+    EXPECT_TRUE(analysis_completes(input_of(thermal_config)));
+  }
+  tuning t;
+  t.mono = true;
+  t.normalization = normalization_mode::cfa_channel_median;
+  {
+    SCOPED_TRACE("cfa_channel_median su flat mono");
+    const calibration_analysis_input in = input_of(thermal_config, t);
+    ASSERT_EQ(in.flat->img.layout, plane_layout::mono);
+    ASSERT_FALSE(in.flat->img.cfa.has_value());
+    EXPECT_TRUE(analysis_stops(in, error_category::invalid_input, "calib.normalization_requires_cfa"));
+  }
+  t.normalization = normalization_mode::global_median;
+  {
+    SCOPED_TRACE("controllo: flat mono con global_median");
+    const calibration_analysis_input in = input_of(thermal_config, t);
+    ASSERT_TRUE(analysis_completes(in));
+    const calibration_analysis a = analyze_calibration(in);
+    const auto adm = admissible_of(a);
+    EXPECT_TRUE(std::binary_search(adm.begin(), adm.end(), pair_key{light_chain::bias, flat_chain::bias, false}))
+        << pairs_text(adm);
+    EXPECT_EQ(a.default_recipe.flat, flat_chain::bias);
+  }
+}
+
+// Dominio delle dichiarazioni lette dall'analisi (ADR-16.a §2: `q_min` > 0, `q_rel_sigma_max` > 0, valore non finito
+// escluso; §b.5: `flat_thermal_bound_adu` ≥ 0, `flat_thermal_rel_budget` in (0, 1), e la ricetta le dichiara entrambe):
+// fuori dominio `invalid_input`, `calib.param.<nome>`. `exposure_rel_tol`, `temperature_policy` e `temperature_abs_tol_c`
+// sono coperti da T-M3A-C01-06 (test di U6). Controlli sui bordi del dominio: l'analisi si completa.
+TEST(CalibSelection, T_M3A_CAL_06_analysis_declarations_out_of_domain) {
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double inf = std::numeric_limits<double>::infinity();
+  const double tiny = std::numeric_limits<double>::denorm_min();
+  enum class field { q_min, q_rel_sigma_max, bound, budget };
+  const auto set = [](calibration_analysis_input& in, field f, std::optional<double> v) {
+    calibration_declarations& d = in.declarations;
+    switch (f) {
+      case field::q_min: d.q_min = v; break;
+      case field::q_rel_sigma_max: d.q_rel_sigma_max = v; break;
+      case field::bound: d.flat_thermal_bound_adu = v; break;
+      case field::budget: d.flat_thermal_rel_budget = v; break;
+    }
+  };
+  const struct {
+    field f;
+    const char* name;
+    std::vector<double> bad;
+    std::vector<double> good;
+  } rows[] = {
+      {field::q_min, "q_min", {0.0, -0.0, -0.5, nan, inf, -inf}, {tiny, 0.5}},
+      {field::q_rel_sigma_max, "q_rel_sigma_max", {0.0, -0.0, -10.0, nan, inf, -inf}, {tiny, 10.0}},
+      {field::bound, "flat_thermal_bound_adu", {-1.0, -tiny, nan, inf, -inf}, {0.0, 64.0}},
+      {field::budget, "flat_thermal_rel_budget", {0.0, 1.0, -0.25, 1.5, nan, inf, -inf}, {tiny, std::nextafter(1.0, 0.0)}},
+  };
+  for (const auto& row : rows) {
+    for (double v : row.bad) {
+      SCOPED_TRACE(std::string(row.name) + " = " + std::to_string(v));
+      calibration_analysis_input in = input_of(thermal_config);
+      set(in, row.f, v);
+      EXPECT_TRUE(analysis_stops(in, error_category::invalid_input, std::string("calib.param.") + row.name, row.name));
+    }
+    for (double v : row.good) {
+      SCOPED_TRACE(std::string("controllo: ") + row.name + " = " + std::to_string(v));
+      calibration_analysis_input in = input_of(thermal_config);
+      set(in, row.f, v);
+      EXPECT_TRUE(analysis_completes(in));
+    }
+  }
+  // Una sola delle due dichiarazioni termiche: l'altra è assente (`calib.param.<nome mancante>`).
+  {
+    SCOPED_TRACE("solo flat_thermal_bound_adu");
+    calibration_analysis_input in = input_of(thermal_config);
+    in.declarations.flat_thermal_rel_budget.reset();
+    EXPECT_TRUE(analysis_stops(in, error_category::invalid_input, "calib.param.flat_thermal_rel_budget",
+                               "flat_thermal_rel_budget"));
+  }
+  {
+    SCOPED_TRACE("solo flat_thermal_rel_budget");
+    calibration_analysis_input in = input_of(thermal_config);
+    in.declarations.flat_thermal_bound_adu.reset();
+    EXPECT_TRUE(analysis_stops(in, error_category::invalid_input, "calib.param.flat_thermal_bound_adu",
+                               "flat_thermal_bound_adu"));
+  }
+}
+
+// `temperature_policy = not_applicable_declared` con `temperature_abs_tol_c` presente (ADR-16.a §2: il secondo valore
+// della politica salta solo il confronto di temperatura; T-M2E-09). Bias valido a −8 °C e light a −10 °C: con `compare` e
+// tolleranza 0,5 °C le coppie L–B e F–B (flat −6 °C) sono `incompatible.temperature_c`; con `not_applicable_declared` e la
+// stessa tolleranza il confronto non avviene, il bias è `usable` e il report ha l'avviso di ogni coppia additiva.
+TEST(CalibSelection, T_M3A_CAL_06_temperature_tolerance_with_not_applicable_declared_skips_the_comparison) {
+  const config c{false, dark_kind::absent, bias_kind::valid, flat_kind::raw, dark_flat_kind::absent, thermal_kind::absent};
+  calibration_analysis_input in = input_of(c);
+  in.declarations.temperature_abs_tol_c = 0.5;
+  {
+    SCOPED_TRACE("controllo: compare, 2 °C oltre 0,5 °C");
+    const calibration_analysis a = analyze_calibration(in);
+    const candidate_analysis* b = find_candidate(a, master_role::bias);
+    ASSERT_NE(b, nullptr);
+    EXPECT_EQ(b->status, candidate_status::excluded);
+    for (const chain_verdict& v : b->chains) EXPECT_EQ(v.reason.value_or(""), "incompatible.temperature_c") << v.chain;
+  }
+  in.declarations.temp_policy = temperature_policy::not_applicable_declared;
+  const calibration_analysis a = analyze_calibration(in);
+  const candidate_analysis* b = find_candidate(a, master_role::bias);
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(b->status, candidate_status::usable);
+  ASSERT_FALSE(b->chains.empty());
+  for (const chain_verdict& v : b->chains) {
+    EXPECT_EQ(v.status, candidate_status::usable) << v.chain;
+    EXPECT_FALSE(v.reason.has_value()) << v.chain;
+  }
+  for (const char* pair : {"temperature_comparison_skipped:L-B", "temperature_comparison_skipped:F-B"}) {
+    EXPECT_NE(std::find(a.warnings.begin(), a.warnings.end(), pair), a.warnings.end()) << pair;
+  }
+  EXPECT_EQ(a.predicates.dfb, "P-DFB011");
+  EXPECT_EQ(a.default_recipe.light, light_chain::bias);
+}
+
+// `temperature_abs_tol_c` obbligatorio e nel dominio (≥ 0, finito) con entrambe le `temperature_policy` (ADR-16 §b.9,
+// ADR-16.a «Parametri obbligatori»): con `not_applicable_declared` non entra nel confronto ma non è un parametro non
+// applicabile. Analisi: assente, NaN, ±∞ o negativo → `invalid_input`, `calib.param.temperature_abs_tol_c`; 0 e 0,5
+// completano. Ricetta: la tolleranza dichiarata passa, una diversa o assente → `calib.param.temperature_abs_tol_c`, mai
+// `calib.param_not_applicable.temperature_abs_tol_c`; la ricetta di default porta la dichiarazione.
+TEST(CalibSelection, T_M3A_CAL_06_temperature_tolerance_is_required_with_not_applicable_declared) {
+  const config c{false, dark_kind::absent, bias_kind::valid, flat_kind::raw, dark_flat_kind::absent, thermal_kind::absent};
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double inf = std::numeric_limits<double>::infinity();
+  const auto with = [&](std::optional<double> tol) {
+    calibration_analysis_input in = input_of(c);
+    in.declarations.temp_policy = temperature_policy::not_applicable_declared;
+    in.declarations.temperature_abs_tol_c = tol;
+    return in;
+  };
+  const std::optional<double> bad[] = {std::nullopt, nan, inf, -inf, -0.5, -std::numeric_limits<double>::denorm_min()};
+  for (const std::optional<double>& v : bad) {
+    SCOPED_TRACE("analisi: temperature_abs_tol_c = " + (v ? std::to_string(*v) : std::string("assente")));
+    EXPECT_TRUE(analysis_stops(with(v), error_category::invalid_input, "calib.param.temperature_abs_tol_c",
+                               "temperature_abs_tol_c"));
+  }
+  for (double v : {0.0, 0.5}) {
+    SCOPED_TRACE("controllo: analisi con temperature_abs_tol_c = " + std::to_string(v));
+    EXPECT_TRUE(analysis_completes(with(v)));
+  }
+
+  const calibration_analysis a = analyze_calibration(with(0.5));
+  ASSERT_EQ(a.default_recipe.light, light_chain::bias);
+  EXPECT_EQ(a.default_recipe.temp_policy, temperature_policy::not_applicable_declared);
+  EXPECT_EQ(a.default_recipe.temperature_abs_tol_c, std::optional<double>(0.5));
+  EXPECT_TRUE(passes(a, a.default_recipe));
+  chain_recipe r = recipe_for(light_chain::bias, flat_chain::none, false);
+  r.temp_policy = temperature_policy::not_applicable_declared;
+  r.temperature_abs_tol_c = 0.5;
+  EXPECT_TRUE(passes(a, r));
+  for (const std::optional<double>& v : {std::optional<double>(2.0), std::optional<double>(0.0), std::optional<double>()}) {
+    SCOPED_TRACE("ricetta: temperature_abs_tol_c = " + (v ? std::to_string(*v) : std::string("assente")));
+    r.temperature_abs_tol_c = v;
+    EXPECT_TRUE(stops_on_param(a, r, "temperature_abs_tol_c"));
   }
 }
 

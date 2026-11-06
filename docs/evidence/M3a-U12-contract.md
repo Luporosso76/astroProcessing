@@ -1,6 +1,6 @@
 # M3.a U12: contratto delle librerie compilate nel progetto e sonde di ADR-08 su LibRaw 0.22.3
 
-Stato: **FAIL al giro 2 (tetto di 2 giri), correzioni applicate e in attesa dell'arbitraggio del coordinatore**. Unità: contratto `docs/contracts/U12-third-party.md` (nuovo) ed emendamenti di `docs/contracts/ADR-08-decoder-pack.md`, `docs/contracts/ADR-13-offline.md`, `docs/licenses.md`. Solo testo e sonde usa-e-getta in `tmp/u12/`: nessun codice di prodotto, nessun test del repository scritto o eseguito, nessun file in `third_party/`.
+Stato: **chiusa** (6 novembre 2026: review indipendente di chiusura per il gate M3.a PASS, `tmp/api/gate-U12-contract-review.json`: i rilievi BLOCCANTE e MED del giro 2 risultano chiusi nel codice, nei test o nel contratto, oppure dichiarati come limite). Storia: **FAIL al giro 2 (tetto di 2 giri), correzioni applicate e in attesa dell'arbitraggio del coordinatore**. Unità: contratto `docs/contracts/U12-third-party.md` (nuovo) ed emendamenti di `docs/contracts/ADR-08-decoder-pack.md`, `docs/contracts/ADR-13-offline.md`, `docs/licenses.md`. Solo testo e sonde usa-e-getta in `tmp/u12/`: nessun codice di prodotto, nessun test del repository scritto o eseguito, nessun file in `third_party/`.
 
 | Campo | Valore |
 |---|---|
@@ -45,6 +45,10 @@ Stato: **FAIL al giro 2 (tetto di 2 giri), correzioni applicate e in attesa dell
 |---|---|---|
 | 1 | `.omc/artifacts/ask/codex-u12contract-contract1-20261030-2136.md` | FAIL: 3 MED, 1 LOW. (1) regola delle licenze limitata alle librerie compilate, contro `plans/M3a.md` («ogni dipendenza diretta»): regola estesa, obbligo 12 di U12 per le dipendenze dirette di sistema; (2) VC-5 attribuito al DNG SDK invece che al GPR SDK: corretto in ADR-08.b §1, §7 e U12 §3, §5; (3) `%ld` su `linear_max` `unsigned` nella sonda di U2: formati corretti, sonde rieseguite (`run5.log`), log della 0.22.3 invariato, cambio di tipo scritto in ADR-08.b §2.4; LOW: citazione di LGPL-2.1 §3 resa fedele, con il cambio degli avvisi |
 | 2 | `.omc/artifacts/ask/codex-u12contract-contract2-20261030-2144.md` | FAIL: 3 MED, 1 LOW, 1 fuori delta. (1) T-U12-08 non discriminante su un collegamento a `OpenMP::OpenMP_CXX` senza chiamate: aggiunti i controlli su comandi di compilazione e collegamento e su `NEEDED`; (2) «nessuna velocità persa» non misurata: riscritta, equivalenza dei tempi dichiarata ipotesi; (3) delta oltre i rilievi: il paragrafo OpenMP è una richiesta del coordinatore, all'arbitraggio; LOW e fuori delta: hash di `out/old/u2.log` e riferimenti a `run5.log` e alla sonda corretta allineati. Correzioni dopo il tetto di 2 giri, non riviste: arbitraggio del coordinatore (`tmp/u12-arbitrato.diff`) |
+
+## Chiusura per il gate M3.a
+
+Review indipendente di chiusura (Claude Opus 5.5, sola lettura, 6 novembre 2026; prompt `tmp/api/gate-U12-contract-review.md`, esito `tmp/api/gate-U12-contract-review.json`): PASS. Ogni rilievo BLOCCANTE o MED rimasto aperto al giro 2 è chiuso o dichiarato.
 
 <!-- evidence:begin -->
 Blocco generato da `tools/evidence.py`; non modificare a mano.

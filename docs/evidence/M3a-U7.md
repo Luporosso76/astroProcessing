@@ -43,12 +43,12 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-16-stati-master.md` | `703ce7ac2ed085f4aca2b6fa716bb528c21ba58d15316e20333fbf37c4994ff4` |
+| `docs/contracts/ADR-16-stati-master.md` | `0f42ff8697090990163c54147559f4f7435121acf91b42ff46a142f5f5ebbf58` |
 | `docs/decisions/D-16-calibrazione-incompleta.md` | `17d99880649e716815e5a57741c71362fee41710535c0e2b99662a392649abb7` |
-| `src/core/calibration_analysis.cpp` | `d729b3f7d34473de95a4e3c93402757349271d46f8de95ed9b53395d7fce5f63` |
-| `src/core/include/astro/calibration_analysis.hpp` | `2b2e84333df93bff3141db497c7d38fead2d28fe6fd4e4d2fbdcc96572a753d7` |
-| `tests/unit/test_calibration_selection.cpp` | `afb004a873fabada2c42e16332f6ba5208f8d53ec046fceb0a3a23a345f47cd4` |
+| `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
+| `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
+| `tests/unit/test_calibration_selection.cpp` | `a485f56ddf7ba710df0d2dfe06369114cc2ba1fb2ced09010270551e0adfb3a5` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

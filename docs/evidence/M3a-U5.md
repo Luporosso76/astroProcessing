@@ -47,14 +47,14 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `src/core/CMakeLists.txt` | `2e09fcd7ebc1d942c33a9b10020c80b44c3ba078e03e0bcc4418820e292c79da` |
-| `src/core/calibration_analysis.cpp` | `d729b3f7d34473de95a4e3c93402757349271d46f8de95ed9b53395d7fce5f63` |
+| `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
 | `src/core/image.cpp` | `1328d714b18320f0190c394ac08a08dce7d93f4d8328502f5b275cd402616761` |
-| `src/core/include/astro/calibration_analysis.hpp` | `2b2e84333df93bff3141db497c7d38fead2d28fe6fd4e4d2fbdcc96572a753d7` |
+| `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
 | `src/core/include/astro/image.hpp` | `216e96b4fc5088e01775261255f8ecbeda63c35e5925d2523e0a743bb984da03` |
-| `tests/unit/CMakeLists.txt` | `b33a1186cba06cba729843ab630e9dd1bb848ca27648c89247c730500fe1418f` |
+| `tests/unit/CMakeLists.txt` | `e3c343d6d071dd685e381d590046e523e1444612ec45d0935158634425c1f98f` |
 | `tests/unit/test_calibration_offset.cpp` | `28335edf3b052a30889adcba1612c8c41dc3f477bc0021a5653df4b64f801a68` |
 | `tests/unit/test_u5_spy.cpp` | `cad6b9f7c1035859f6984088f273128c2e8e42bbc34042aab6a08ad3f890b960` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_master.cpp` | `0ebd2a6c43e09f5965de4304e3a4f1e995b270fb88989328c93470777b3b7761` |
 | `tests/unit/test_measure.cpp` | `358d003a21b6bd1b560f036bb390657de7c904416cdace9813a789bdb54d0419` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->

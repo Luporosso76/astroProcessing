@@ -95,9 +95,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/fits_internal.hpp` | `15a8f763955ad2e0fc6358e240ee19cb9e23730b28f2b8856b8e19f52b24b07b` |
 | `src/core/image.cpp` | `1328d714b18320f0190c394ac08a08dce7d93f4d8328502f5b275cd402616761` |
 | `src/core/include/astro/image.hpp` | `216e96b4fc5088e01775261255f8ecbeda63c35e5925d2523e0a743bb984da03` |
-| `tests/unit/CMakeLists.txt` | `b33a1186cba06cba729843ab630e9dd1bb848ca27648c89247c730500fe1418f` |
+| `tests/unit/CMakeLists.txt` | `e3c343d6d071dd685e381d590046e523e1444612ec45d0935158634425c1f98f` |
 | `tests/unit/test_measure.cpp` | `358d003a21b6bd1b560f036bb390657de7c904416cdace9813a789bdb54d0419` |
 
-- Test release (`tmp/release-junit.xml`): totali 1209, fast 1187, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1187, fast 1187, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
 <!-- evidence:end -->
