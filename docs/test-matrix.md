@@ -128,12 +128,12 @@ Definiti in `docs/contracts/ADR-08-decoder-pack.md` §6, con tolleranze e criter
 | T-U12-10 | U12 obbligo 10 | U12-third-party | M3.a (U12) | verde (U12) |
 | T-U12-11 | U12 obbligo 11 | U12-third-party | M3.a (U12) | verde (U12) |
 | T-U12-12 | U12 obbligo 12 | U12-third-party | M3.a (U12) | verde (U12) |
-| T-U13-01 | U13 §3 | U13-dng-decoder | M3.a (U13a) | PIANIFICATO |
-| T-U13-02 | U13 §3 | U13-dng-decoder | M3.a (U13a) | PIANIFICATO |
+| T-U13-01 | U13 §3 | U13-dng-decoder | M3.a (U13a) | verde (U13a) |
+| T-U13-02 | U13 §3 | U13-dng-decoder | M3.a (U13a) | verde (U13a) |
 | T-U13-03 | U13 §4, §5 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
 | T-U13-04 | U13 §5 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
 | T-U13-05 | U13 §4 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
-| T-U13-06 | U13 §4, §6 | U13-dng-decoder | M3.a (U13a) | PIANIFICATO |
+| T-U13-06 | U13 §4, §6 | U13-dng-decoder | M3.a (U13a) | verde (U13a) |
 | T-U13-07 | U13 §4 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
 | T-U13-08 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
 | T-U13-09 | U13 §7 | U13-dng-decoder | M3.a (U13b) | PIANIFICATO |
@@ -166,7 +166,7 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 | T-M3A-TYP-15 | §9.8; ADR-03.b §b.13 (`measure`, keyword `ASTRMCAP`/`ASTRMLnn`) | ADR-03.b | M3.a | verde (U1b; parte M3.d di TYP-16 aperta) |
 | T-M3A-TYP-16 | §7.3, §9.8; ADR-03.b §b.13 (limitazioni, unione, idoneità per misura) | ADR-03.b | M3.a | verde (U1b; parte M3.d di TYP-16 aperta) |
 | T-M3A-TYP-17 | §9.8, F-CAL-02.b, F-CAL-03.b; ADR-03.b §b.13 (codici della calibrazione `.b`) | ADR-03.b, ADR-16.b | M3.c | PIANIFICATO — non eseguito |
-| T-M3A-TYP-18 | G-CAL; ADR-03.b §b.14 (tabella delle operazioni, ADR-16.b §b.2) | ADR-03.b, ADR-16.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-TYP-18 | G-CAL; ADR-03.b §b.14 (tabella delle operazioni, ADR-16.b §b.2) | ADR-03.b, ADR-16.b | M3.a | verde (U6) |
 
 ## M3.entry: ID di lavoro di ADR-16.b e D-16
 
@@ -181,7 +181,7 @@ Definiti in `docs/contracts/ADR-16-stati-master.md` §b.13, con tolleranze e cri
 | T-M3A-CAL-05 | G-STOP, P-LOST, NC-21; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-CAL-06 | G-STOP, P-FLAT-UNKNOWN, G-OFFSET, P-OFFSET; ADR-16.b §b.9 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-CAL-07 | G-CAL, F-IO-04; ADR-16.b §b.7 (master da RAW) | ADR-16.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | verde (U6) |
 | T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | PIANIFICATO — non eseguito |
 | T-M3A-CAL-10 | G-STOP, resume; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 
@@ -196,8 +196,8 @@ Definiti in `docs/contracts/C-01-calibrazione-light.md` §9, con soglie e criter
 | T-M3A-C01-03 | G-OFFSET, F-IO-04; C-01.b §10 (voce `light_offset`) | C-01.b | M3.a | verde (U5) |
 | T-M3A-C01-04 | G-OFFSET, F-CAL-02.b, T-CAL-08; C-01.b §1, §9 (bias residuo, nero non sottratto) | C-01.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-C01-05 | G-OFFSET, P-OFFSET; C-01.b §6 (residuo del percorso parziale) | C-01.b | M3.c | PIANIFICATO — non eseguito |
-| T-M3A-C01-06 | G-CAL; C-01.b §2 (dominio del light), ADR-16.b §b.2 | C-01.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-C01-07 | F-CAL-06.b, §9.8; C-01.b §7 (coverage) | C-01.b | M3.a (analisi), M3.c (esecuzione) | PIANIFICATO — non eseguito |
+| T-M3A-C01-06 | G-CAL; C-01.b §2 (dominio del light), ADR-16.b §b.2 | C-01.b | M3.a | verde (U6) |
+| T-M3A-C01-07 | F-CAL-06.b, §9.8; C-01.b §7 (coverage) | C-01.b | M3.a (analisi), M3.c (esecuzione) | verde, parte di analisi (U6); esecuzione M3.c pianificata |
 | T-M3A-C01-08 | F-CAL-06.b; C-01.b §6 (varianza delle catene) | C-01.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-C01-09 | F-CAL-02.b, F-CAL-03.b; C-01.b §7, §9 (perdita di segnale) | C-01.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-C01-10 | F-CAL-02.b, T-CAL-08; C-01.b §9 (otto combinazioni, flat residuo) | C-01.b | M3.c | PIANIFICATO — non eseguito |
@@ -390,8 +390,8 @@ Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime 
 |---|---|---|---|---|
 | T-M3A-RAW-13 | F-IO-04 | ADR-08.b §2.6 (emendamento L4) | U4 | verde (U4) |
 | T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
-| T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
-| T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
+| T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | parziale: 05a, 05b, 05c parte U8a verdi (U8a); resto U8b pianificato |
+| T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | parziale: 06b verde (U8a); resto U8b pianificato |
 | T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |

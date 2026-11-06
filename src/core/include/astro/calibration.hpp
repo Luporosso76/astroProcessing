@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "astro/cpu_dispatch.hpp"
@@ -39,6 +40,30 @@ constexpr const char* calibration_operator_id = "calib.dark_matched_flat_dark_fl
 constexpr std::uint32_t calibration_algorithm_version = 1;
 constexpr std::uint32_t calibration_serialization_version = 1;
 
+// Identità del decoder (ADR-16.b §b.7, ADR-08.b §2.9): le quattro chiavi «Libreria» del record di `raw_decoder_record`.
+struct decoder_identity {
+  std::string libraw_version;
+  std::uint32_t libraw_version_number = 0;
+  std::uint32_t libraw_capabilities = 0;
+  std::string libraw_tarball_sha256;
+
+  decoder_identity() = default;
+  decoder_identity(std::string version, std::uint32_t version_number, std::uint32_t capabilities, std::string sha256)
+      : libraw_version(std::move(version)),
+        libraw_version_number(version_number),
+        libraw_capabilities(capabilities),
+        libraw_tarball_sha256(std::move(sha256)) {}
+  friend bool operator==(const decoder_identity&, const decoder_identity&) = default;
+};
+
+// Stato del decoder di un frame RAW di un master (ADR-16.b §b.7): `decoder_state` senza `source` (che l'uguaglianza
+// di `decoder_state` non confronta) e identità del decoder.
+struct frame_decoder_state {
+  decoder_state state;
+  decoder_identity identity;
+  friend bool operator==(const frame_decoder_state&, const frame_decoder_state&) = default;
+};
+
 // Stato dichiarato di un master. I campi non pertinenti al ruolo restano nullopt.
 struct master_descriptor {
   master_role role = master_role::dark;
@@ -50,6 +75,10 @@ struct master_descriptor {
   // Master del prodotto (ADR-16, aggiunte di R2): presenti nel descrittore derivato dal nodo del master.
   std::optional<master_rejection> rejection;
   std::optional<variance_estimator> estimator;
+  // Solo flat `calibrated` (ADR-16.b §b.2): normalizzazione con cui il flat è stato prodotto.
+  std::optional<normalization_mode> flat_normalization_declared;
+  // Solo master da frame RAW (ADR-16.b §b.7): un elemento per frame, nell'ordine canonico degli ingressi.
+  std::optional<std::vector<frame_decoder_state>> frame_decoder_states;
   friend bool operator==(const master_descriptor&, const master_descriptor&) = default;
 };
 

@@ -555,7 +555,7 @@ std::vector<branch_result> run_branches(sqlite_dag_store& store, std::vector<bra
   std::vector<std::string> names;
   for (const branch_files_job& j : jobs) names.push_back(j.slot_name);
   return run_branches_with(store, names, [&](std::size_t i) {
-    return run_job_files(store, jobs[i].slot_name, jobs[i].work, budget, cancel);
+    return run_job_files(store, jobs[i].slot_name, jobs[i].work, budget, cancel, jobs[i].request);
   });
 }
 

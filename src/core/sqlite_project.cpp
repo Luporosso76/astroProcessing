@@ -29,6 +29,12 @@ constexpr const char* schema_v1[] = {
     "old_path TEXT NOT NULL, old_dev INTEGER NOT NULL, old_ino INTEGER NOT NULL, new_path TEXT NOT NULL, "
     "new_dev INTEGER NOT NULL, new_ino INTEGER NOT NULL, previous_status TEXT NOT NULL, "
     "record_version INTEGER NOT NULL CHECK(record_version=1), PRIMARY KEY(input_id, revision)) STRICT",
+    "CREATE TABLE input_classifications(input_id INTEGER NOT NULL REFERENCES inputs(id), "
+    "revision INTEGER NOT NULL CHECK(revision>=1), "
+    "role TEXT NOT NULL CHECK(role IN ('light','bias','dark','dark_flat','flat','unclassified')), "
+    "source TEXT NOT NULL CHECK(source IN ('rule','user')), rule_id TEXT, evidence_canonical TEXT NOT NULL, "
+    "declarations_canonical TEXT NOT NULL, record_version INTEGER NOT NULL CHECK(record_version=1), "
+    "CHECK((source='rule') = (rule_id IS NOT NULL)), PRIMARY KEY(input_id, revision)) STRICT",
     "CREATE TABLE nodes(node_key TEXT PRIMARY KEY, operator_id TEXT NOT NULL, algorithm_version INTEGER NOT NULL, "
     "serialization_version INTEGER NOT NULL, params_canonical TEXT NOT NULL, precision TEXT NOT NULL, "
     "backend TEXT NOT NULL, seed TEXT) STRICT",
@@ -76,6 +82,8 @@ constexpr const char* schema_v1[] = {
     "CREATE TRIGGER inputs_no_delete BEFORE DELETE ON inputs BEGIN SELECT RAISE(ABORT,'inputs: nessuna cancellazione'); END",
     "CREATE TRIGGER input_relinks_immutable_update BEFORE UPDATE ON input_relinks BEGIN SELECT RAISE(ABORT,'input_relinks e append-only'); END",
     "CREATE TRIGGER input_relinks_immutable_delete BEFORE DELETE ON input_relinks BEGIN SELECT RAISE(ABORT,'input_relinks e append-only'); END",
+    "CREATE TRIGGER input_classifications_immutable_update BEFORE UPDATE ON input_classifications BEGIN SELECT RAISE(ABORT,'input_classifications e append-only'); END",
+    "CREATE TRIGGER input_classifications_immutable_delete BEFORE DELETE ON input_classifications BEGIN SELECT RAISE(ABORT,'input_classifications e append-only'); END",
 };
 
 struct header_fields {

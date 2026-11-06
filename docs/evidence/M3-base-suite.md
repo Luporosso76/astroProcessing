@@ -169,10 +169,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `src/core/CMakeLists.txt` | `0dffca21be9c9367d55971c144601d5b6872f22c2f0beeb6b33deeab6fb529de` |
-| `src/core/fits.cpp` | `1b6a71e5ac9a3e16963c3764bca55ea21471d05882c0bd0bc05753757d7ba842` |
-| `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
-| `src/core/include/astro/job.hpp` | `8c60900de1782ff03eb74fb41f0aa6583223a8601008d1f0305dfa4447ff15e3` |
+| `src/core/CMakeLists.txt` | `2e09fcd7ebc1d942c33a9b10020c80b44c3ba078e03e0bcc4418820e292c79da` |
+| `src/core/fits.cpp` | `ef596caae35a0bf99f0384d53bf2d901fed8609794db13ff32a50f1865789b5b` |
+| `src/core/fits_blocks.cpp` | `af6c39463726457e4951d39e9672dcb9072cc86a5d97caa90ae4d375cc4b1c7a` |
+| `src/core/include/astro/job.hpp` | `452dd5673b6050bb19e6c78ed94c572e704055865c7b49463c042930458bd020` |
 | `src/core/include/astro/job_probe.hpp` | `558d5107416a7c7c1199734dc69f2dbb3ab400d9802f59bca4672ca0fdda9296` |
 | `src/core/include/astro/job_types.hpp` | `98d1f80ede5ecb0da92cdb55f2aa8cec050b0cb163b6df1c7968b7367ace70e6` |
 | `src/core/inventory.cpp` | `6b2fee4bf475ca554a8647c2418da24741465ac2f63d0cdd7fbae81b30e17ef1` |
@@ -180,9 +180,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/job_probe.cpp` | `a3f08b593a97b04672f0ae4b089e7cebf7594531979cffd6252aa668e70451bc` |
 | `src/core/job_types.cpp` | `5041b210e2aeb2f3c76f1f81e5fbb02932505886e55df9f4d2754953a047ecdc` |
 | `src/core/node.cpp` | `b697838dd840f877c2b41a63ab83679d03a2ec6700e784438d052532b8bf7e3c` |
-| `src/core/scheduler.cpp` | `9588b0adfc402c790329ee0f837972128a3548ef82b5012055f228c429d38069` |
+| `src/core/scheduler.cpp` | `89c432bf224f5e191b198968542576ff2ef6a88c0a68661a914820b341f7d072` |
 | `tests/fixtures/conformance_inputs.hpp` | `8187edabdcfded54750fa1805a8319216a24240f5485a17a5722680bde07c463` |
-| `tests/unit/CMakeLists.txt` | `d757bc22a9c63246d14d3e63180545d0fc3874340cddb088ca85763e9861cf26` |
+| `tests/unit/CMakeLists.txt` | `553321640af3e26f9778919b587368f3a05398672d0088976358989e6a6f76f7` |
 | `tests/unit/conformance_network.cpp` | `686191572a2575c8881e44d21b4a6b99f1ee06d319a868f11aecd413e58206dc` |
 | `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
 | `tools/check_job_types.py` | `5744c2ceeda8f738b7147003014398fea8f9d5163227f8739ca314e8e2126c7b` |

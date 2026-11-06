@@ -155,8 +155,11 @@ struct branch_job {
 
 // Lavoro a file per uno store durevole (come run_job_files).
 struct branch_files_job {
+  branch_files_job(std::string slot, std::function<job_files_result(const job_record&)> w, job_request r = {})
+      : slot_name(std::move(slot)), work(std::move(w)), request(std::move(r)) {}
   std::string slot_name;
   std::function<job_files_result(const job_record&)> work;
+  job_request request;  // confronto del nodo e risorse, come run_job_files
 };
 
 struct branch_result {

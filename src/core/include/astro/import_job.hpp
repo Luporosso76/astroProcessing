@@ -12,6 +12,7 @@
 #include "astro/job.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/node.hpp"
+#include "astro/scheduler.hpp"
 #include "astro/thumbnail_cache.hpp"
 
 namespace astro {
@@ -48,6 +49,12 @@ std::string import_report_text(const json& report);
 // I tre job di I/O passano da job_scheduler::run con un job_plan di un task: il picco (blocco del digest piu' memoria
 // del task) e' prenotato dal pool, in coda FIFO, prima del primo task; il digest si verifica nel `prepare`.
 // `resources`, se presente, va nella provenance (budget.resources) e da' allo scheduler cpu_set e coda dei job.
+
+// Ramo di `run_branches` per un import: stesso lavoro, stessa richiesta (nodo, risorse) di run_import_job. `store`, `request`,
+// `pool`, `cancel` e `resources` devono vivere fino al ritorno di run_branches.
+branch_files_job make_import_branch_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
+                                        memory_pool& pool, const cancel_token& cancel,
+                                        const resource_config* resources = nullptr);
 
 // Job di import su uno store durevole: verifica il digest in streaming, inventaria i soli header, pubblica
 // report JSON e testuale. Fase assente: metadata_missing import.phase_missing.

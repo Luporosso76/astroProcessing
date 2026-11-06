@@ -109,16 +109,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
 | `src/core/calibration_internal.hpp` | `9e536cf219d574cfae3959259d9396228b21e48bee8bc481034dca6106a83a4c` |
-| `src/core/fits.cpp` | `1b6a71e5ac9a3e16963c3764bca55ea21471d05882c0bd0bc05753757d7ba842` |
-| `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
+| `src/core/fits.cpp` | `ef596caae35a0bf99f0384d53bf2d901fed8609794db13ff32a50f1865789b5b` |
+| `src/core/fits_blocks.cpp` | `af6c39463726457e4951d39e9672dcb9072cc86a5d97caa90ae4d375cc4b1c7a` |
 | `src/core/fits_header.cpp` | `0ac963b56356149b128339563f688294664ca9c8770a523bbcf925fc690e1b45` |
-| `src/core/fits_internal.hpp` | `e8b62f0bd808166ecaf603449199bfc7df1e3beb69f109a27e0466bfe8d4b09f` |
-| `src/core/image.cpp` | `2dd625e140c522b0a1d12f543bced12dcc5ff08e3cb3d0f0b820946110bb8416` |
-| `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
-| `src/core/include/astro/image.hpp` | `4f6007bbe26d4ab7946fd413451017bc73e6227ef0cb3255d16998106151b116` |
-| `tests/unit/CMakeLists.txt` | `d757bc22a9c63246d14d3e63180545d0fc3874340cddb088ca85763e9861cf26` |
+| `src/core/fits_internal.hpp` | `15a8f763955ad2e0fc6358e240ee19cb9e23730b28f2b8856b8e19f52b24b07b` |
+| `src/core/image.cpp` | `ef3806c397d6f46026e8997f20089f01419606adc57f4276a2a089b89de03825` |
+| `src/core/import_job.cpp` | `304aeffb88c57fd4698a861ba22058a9b4867080e83c72feebe63005bd2d6fb6` |
+| `src/core/include/astro/image.hpp` | `3568c28d62b45e10d77736eea891eb59093970c9f3c51739292a526b4d71aba6` |
+| `tests/unit/CMakeLists.txt` | `553321640af3e26f9778919b587368f3a05398672d0088976358989e6a6f76f7` |
 | `tests/unit/test_decoder_types.cpp` | `63adee44ced66be345321731e77d2b4a352d9055410f057890ae82a1c457dc46` |
 
-- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
 <!-- evidence:end -->

@@ -498,12 +498,23 @@ std::optional<std::string> sqlite_dag_store::get_setting(const std::string& key)
   return st.text(0);
 }
 
+void require_absolute_input_path(const std::string& path) {
+  if (path.find('\0') != std::string::npos) {
+    throw stop_error(error_category::invalid_input, "store.bad_input", "il percorso dell'input contiene NUL",
+                     {{"lunghezza", std::to_string(path.size())}});
+  }
+  if (path.empty() || path.front() != '/') {
+    throw stop_error(error_category::invalid_input, "store.bad_input",
+                     path.empty() ? "il percorso dell'input è vuoto" : "il percorso dell'input non è assoluto", {{"path", path}});
+  }
+}
+
 input_record sqlite_dag_store::add_input(input_record input) {
   require_writable();
+  require_absolute_input_path(input.path);
   const auto& formats = input_formats();
   const bool known_format = std::any_of(formats.begin(), formats.end(), [&](const input_format* f) { return input.format == f->prefix; });
-  if (!is_sha256_hex(input.sha256) || input.path.empty() || input.path.find('\0') != std::string::npos || input.role.empty() ||
-      !known_format) {
+  if (!is_sha256_hex(input.sha256) || input.role.empty() || !known_format) {
     throw stop_error(error_category::invalid_input, "store.bad_input", "record di input non valido",
                      {{"path", input.path}});
   }

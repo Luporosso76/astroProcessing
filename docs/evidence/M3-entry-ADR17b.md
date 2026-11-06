@@ -86,11 +86,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
-| `docs/contracts/ADR-16-stati-master.md` | `748fe437f87082f2bab80aa7469ad97a3aac90712dd7220c38d2ab2b43799d11` |
+| `docs/contracts/ADR-16-stati-master.md` | `1c8f3a6b772367fe19a762d1ada1e408a35dd2b1fd018fb265086a20dfd7f456` |
 | `docs/contracts/ADR-17-varianza.md` | `44c307f32b9bb529c052f17f4e7154e45f809e6c46e81a7e23f41dd44cd688b8` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/D-17-covarianza.md` | `8b00d0073612808ecb91d7731d60ab2ae30513536fdd8a04cc4ae9d81c41368d` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
-| `docs/test-matrix.md` | `93cfc31d05f4e782b83b36763088106403d8eea6845afe8bcf867c161d6f12dd` |
+| `docs/test-matrix.md` | `8f7b77d1e0255874a5f99579d5c2c429db03a0c2906642cc1c72ece1110e044b` |
 
 <!-- evidence:end -->

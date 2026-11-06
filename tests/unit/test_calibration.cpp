@@ -12,7 +12,9 @@
 //    (Lc*Lc)*vq: 3+11+1 = 15; /q4: 15+19+1 = 35. Somma dei due termini: 35+1 = 36.
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <limits>
+#include <map>
 
 #include "calib_support.hpp"
 
@@ -715,6 +717,81 @@ TEST(CalibM2E, T_M2E_10_master_states_roles_and_imagetyp) {
     c.light.hdr.imagetyp = "Mystery";
     const calibration_result r = calibrate(recipe_of(c), images_of(c));
     EXPECT_NE(std::find(r.warnings.begin(), r.warnings.end(), "imagetyp_unrecognized:light:Mystery"), r.warnings.end());
+  }
+}
+
+// Coverage in un ingresso della ricetta `.a` (C-01.b §7, regola C7.3): fuori dominio, anche se tutta a 1.
+void add_coverage(image& im, double value) {
+  coverage_plane cov;
+  cov.samples = aligned_buffer(static_cast<std::size_t>(im.geometry.sample_count() * sizeof(double)));
+  for (std::uint64_t i = 0; i < im.geometry.sample_count(); ++i) cov.samples.as<double>()[i] = value;
+  im.coverage = std::move(cov);
+}
+
+TEST(CalibM2E, T_M3A_C01_07_recipe_input_with_coverage_stops_with_coverage_input) {
+  const set_def s = synth_set(8, 4, -64);
+  for (const double value : {0.5, 1.0}) {
+    for (const char* which : {"light", "dark", "flat", "dark_flat"}) {
+      SCOPED_TRACE(std::string(which) + " coverage " + std::to_string(value));
+      calibration_images im = images_of(s);
+      image& target = std::string(which) == "light" ? im.light : std::string(which) == "dark" ? im.dark
+                      : std::string(which) == "flat" ? im.flat : im.dark_flat;
+      add_coverage(target, value);
+      try {
+        (void)calibrate(recipe_of(s), std::move(im));
+        ADD_FAILURE() << "stop_error atteso, nessuna eccezione";
+      } catch (const stop_error& e) {
+        EXPECT_EQ(e.category(), error_category::unsupported) << e.what();
+        EXPECT_EQ(e.code(), std::string("calib.coverage_input")) << e.what();
+        std::string input;
+        for (const auto& [k, v] : e.context()) {
+          if (k == "input") input = v;
+        }
+        EXPECT_EQ(input, which);
+      }
+    }
+  }
+  // controllo positivo: nessun ingresso con coverage
+  EXPECT_NO_THROW((void)calibrate(recipe_of(s), images_of(s)));
+}
+
+// Il descrittore della ricetta `.a` non rappresenta i campi di ADR-16.b §b.2 e §b.7 nei parametri del nodo.
+TEST(CalibM2E, T_M3A_C01_06_recipe_a_refuses_the_new_descriptor_fields) {
+  const set_def s = synth_set(8, 4, -64);
+  const auto expect_refused = [&](const char* slot_name, const char* field, const char* value,
+                                  const std::function<void(calibration_recipe&)>& edit) {
+    SCOPED_TRACE(std::string(slot_name) + " " + field);
+    calibration_recipe rec = recipe_of(s);
+    edit(rec);
+    try {
+      (void)calibrate(rec, images_of(s));
+      ADD_FAILURE() << "stop_error atteso, nessuna eccezione";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::unsupported) << e.what();
+      EXPECT_EQ(e.code(), std::string("calib.master_state_m2")) << e.what();
+      std::map<std::string, std::string> ctx;
+      for (const auto& [k, v] : e.context()) ctx[k] = v;
+      EXPECT_EQ(ctx["slot"], slot_name);
+      EXPECT_EQ(ctx["campo"], field);
+      EXPECT_EQ(ctx["valore"], value);
+    }
+  };
+  expect_refused("dark", "flat_normalization_declared", "presente",
+                 [](calibration_recipe& r) { r.dark.descriptor->flat_normalization_declared = normalization_mode::global_median; });
+  expect_refused("dark_flat", "flat_normalization_declared", "presente", [](calibration_recipe& r) {
+    r.dark_flat.descriptor->flat_normalization_declared = normalization_mode::cfa_channel_median;
+  });
+  expect_refused("flat", "flat_normalization_declared", "presente",
+                 [](calibration_recipe& r) { r.flat.descriptor->flat_normalization_declared = normalization_mode::global_median; });
+  for (const char* slot_name : {"dark", "dark_flat", "flat"}) {
+    for (const bool with_frames : {false, true}) {
+      expect_refused(slot_name, "frame_decoder_states", "presente", [&](calibration_recipe& r) {
+        master_descriptor& d = std::string(slot_name) == "dark" ? *r.dark.descriptor
+                               : std::string(slot_name) == "flat" ? *r.flat.descriptor : *r.dark_flat.descriptor;
+        d.frame_decoder_states = std::vector<frame_decoder_state>{};
+        if (with_frames) d.frame_decoder_states->push_back(frame_decoder_state{});
+      });
+    }
   }
 }
 

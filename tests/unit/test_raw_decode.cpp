@@ -20,6 +20,7 @@
 #include <ctime>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "astro/image.hpp"
@@ -614,8 +615,8 @@ TEST(RawDecode, T_M3A_RAW_03_injected_floating_point_stops_before_unpack) {
   EXPECT_EQ(unpack_calls, 0);
 }
 
-// T-M3A-RAW-03 (§2.3): DNG con Compression JPEG XL (52546) o VC-5 (9): open_buffer riesce, get_decoder_info dichiara il formato
-// non supportato. Lo stop e' unsupported/raw.file_unsupported con funzione, nome e flag del decoder, prima della prenotazione
+// T-M3A-RAW-03 (§2.3): DNG con Compression VC-5 (9): open_buffer riesce, get_decoder_info dichiara il formato non
+// supportato. Lo stop e' unsupported/raw.file_unsupported con funzione, nome e flag del decoder, prima della prenotazione
 // delle risorse (before_unpack_plan) e di unpack.
 void expect_unsupported_compression(std::uint16_t compression, memory_pool* pool = nullptr) {
   fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
@@ -651,15 +652,76 @@ void expect_unsupported_compression(std::uint16_t compression, memory_pool* pool
   }
 }
 
-TEST(RawDecode, T_M3A_RAW_03_dng_jpeg_xl_unsupported_before_reservation) { expect_unsupported_compression(52546); }
+// T-M3A-RAW-03 emendato da U13 (docs/contracts/U13-dng-decoder.md §6, §11): un DNG TIFF classico CFA con Compression 52546
+// va al decoder del progetto e si ferma sui tag con unsupported/raw.dng_nonconformant (32803 non è fra le interpretazioni
+// fotometriche ammesse per JPEG XL, DNG 1.7.1.0 p. 21), senza alcuna chiamata a LibRaw, prima della prenotazione.
+void expect_jpeg_xl_cfa_nonconformant(memory_pool* pool = nullptr) {
+  fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
+  s.compression = 52546;
+  raw_decode_context ctx;
+  ctx.pool = pool;
+  int libraw_calls = 0;
+  int plan_calls = 0;
+  raw_decode_hooks hooks;
+  hooks.libraw_return = [&](std::string_view, int rc) {
+    ++libraw_calls;
+    return rc;
+  };
+  hooks.before_unpack_plan = [&](const raw_unpack_plan&) { ++plan_calls; };
+  EXPECT_STOP(decode_raw_buffer(fx::make_dng(s), hooks, ctx), error_category::unsupported, "raw.dng_nonconformant");
+  EXPECT_EQ(libraw_calls, 0) << "nessuna chiamata a LibRaw";
+  EXPECT_EQ(plan_calls, 0) << "nessuna prenotazione prima dello stop";
+  if (pool != nullptr) {
+    EXPECT_EQ(pool->reserved_bytes(), 0u) << "nessuna prenotazione dopo lo stop";
+    EXPECT_EQ(pool->peak_reserved_bytes(), 0u) << "nessuna prenotazione durante lo stop";
+  }
+}
+
+TEST(RawDecode, T_M3A_RAW_03_dng_jpeg_xl_cfa_nonconformant_without_libraw) { expect_jpeg_xl_cfa_nonconformant(); }
 TEST(RawDecode, T_M3A_RAW_03_dng_vc5_unsupported_before_reservation) { expect_unsupported_compression(9); }
 
-// Con pool reale e budget sotto la prenotazione del decoder lo stop resta unsupported/raw.file_unsupported: il formato si
-// controlla prima del budget e della prenotazione, non dopo.
-TEST(RawDecode, T_M3A_RAW_03_dng_jpeg_xl_unsupported_before_reservation_with_pool) {
+// Con pool reale e budget sotto la prenotazione del decoder lo stop resta quello del formato: il formato si controlla prima
+// del budget e della prenotazione, non dopo.
+TEST(RawDecode, T_M3A_RAW_03_dng_jpeg_xl_cfa_nonconformant_before_reservation_with_pool) {
   memory_pool pool(1);
-  expect_unsupported_compression(52546, &pool);
+  expect_jpeg_xl_cfa_nonconformant(&pool);
 }
+
+// T-M3A-RAW-03, caso aggiunto da U13 §11: un BigTIFF DNG con Compression 52546 va a LibRaw (U13 §3 punto 1). Esito
+// misurato sulla LibRaw 0.22.3 del progetto (sonda dei test di U13a, tmp/u13a-probe/): `open_buffer` restituisce
+// LIBRAW_FILE_UNSUPPORTED (-2), quindi unsupported/raw.file_unsupported con funzione open_buffer, prima di unpack.
+TEST(RawDecode, T_M3A_RAW_03_bigtiff_jpeg_xl_goes_to_libraw) {
+  fx::dng32_spec s;
+  s.bits = 16;
+  s.compression = 52546;
+  s.white = 65535;
+  s.backward_version = std::array<std::uint8_t, 4>{1, 7, 0, 0};
+  fx::tiff_file f;
+  f.bigtiff = true;
+  f.chain.push_back(fx::make_dng32_ifd(s, fx::tiff_order::ii, [](const std::vector<std::uint8_t>& seg) { return seg; }));
+  int open_buffer_calls = 0;
+  int unpack_calls = 0;
+  raw_decode_hooks hooks;
+  hooks.libraw_return = [&](std::string_view function, int rc) {
+    if (function == "open_buffer") ++open_buffer_calls;
+    return rc;
+  };
+  hooks.before_unpack = [&] { ++unpack_calls; };
+  try {
+    (void)decode_raw_buffer(fx::write_tiff(f).bytes, hooks);
+    ADD_FAILURE() << "stop_error atteso, nessuna eccezione";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::unsupported) << e.what();
+    EXPECT_EQ(e.code(), "raw.file_unsupported") << e.what();
+    std::string function;
+    for (const auto& [k, v] : e.context())
+      if (k == "funzione") function = v;
+    EXPECT_EQ(function, "open_buffer") << e.what();
+  }
+  EXPECT_EQ(open_buffer_calls, 1);
+  EXPECT_EQ(unpack_calls, 0);
+}
+
 TEST(RawDecode, T_M3A_RAW_03_dng_vc5_unsupported_before_reservation_with_pool) {
   memory_pool pool(1);
   expect_unsupported_compression(9, &pool);

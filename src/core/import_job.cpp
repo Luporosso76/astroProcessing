@@ -374,15 +374,15 @@ std::string import_report_text(const json& report) {
   return out.str();
 }
 
-job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
-                           memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
-                           const resource_config* resources) {
-  std::optional<node_spec> node;
-  const auto work = [&](const job_record&) -> job_files_result {
+branch_files_job make_import_branch_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
+                                        memory_pool& pool, const cancel_token& cancel,
+                                        const resource_config* resources) {
+  const auto node = std::make_shared<std::optional<node_spec>>();
+  const auto work = [&store, &request, &pool, &cancel, resources, node](const job_record&) -> job_files_result {
     const fits_input input = open_fits_input(request.path);
     std::optional<fits_inventory> scanned;
     std::shared_ptr<const resource_plan> plan = run_single_task(
-        *node, input, request.path, request.digest, request.hook, inventory_reserve_bytes(input.size_bytes()), 1, pool,
+        **node, input, request.path, request.digest, request.hook, inventory_reserve_bytes(input.size_bytes()), 1, pool,
         resources, cancel, [&](task_context& tc) {  // l'inventario verifica anche che il file non sia cambiato
           scanned.emplace(inventory_fits(input, request.read_options, tc.memory, &tc.job.cancel));
         });
@@ -402,8 +402,15 @@ job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name
     result.plan = std::move(plan);
     return result;
   };
-  return run_job_files(store, slot_name, work, budget, &cancel,
-                       import_node_request(node, [&] { return make_import_node(request); }, resources));
+  return branch_files_job{slot_name, work,
+                          import_node_request(*node, [&request] { return make_import_node(request); }, resources)};
+}
+
+job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name, const import_request& request,
+                           memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
+                           const resource_config* resources) {
+  const branch_files_job job = make_import_branch_job(store, slot_name, request, pool, cancel, resources);
+  return run_job_files(store, slot_name, job.work, budget, &cancel, job.request);
 }
 
 job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,

@@ -711,8 +711,15 @@ void fits_detail::reject_decoder_state(const image& img) {
   }
 }
 
+void fits_detail::reject_coverage(const image& img) {
+  if (img.coverage) {
+    fail(error_category::unsupported, "fits.coverage", "lo scrittore FITS non scrive ancora l'HDU COVERAGE");
+  }
+}
+
 std::vector<std::uint8_t> encode_fits(const image& img) {
   fits_detail::reject_decoder_state(img);
+  fits_detail::reject_coverage(img);
   validate_image(img);
   const source_encoding enc = resolve_encoding(img);
   const std::vector<std::string> cards = compose_cards(img);

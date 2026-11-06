@@ -46,15 +46,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `src/core/CMakeLists.txt` | `0dffca21be9c9367d55971c144601d5b6872f22c2f0beeb6b33deeab6fb529de` |
-| `src/core/calibration_analysis.cpp` | `a8c4b95e06010bb66be4a91aa5a153e882cb6cd7299dfcb9a356f7f41cdf692f` |
-| `src/core/image.cpp` | `2dd625e140c522b0a1d12f543bced12dcc5ff08e3cb3d0f0b820946110bb8416` |
-| `src/core/include/astro/calibration_analysis.hpp` | `74660760c13a7dcd586d3ae005912e126ffd1f71abacd494dbdbdcf25d479182` |
-| `src/core/include/astro/image.hpp` | `4f6007bbe26d4ab7946fd413451017bc73e6227ef0cb3255d16998106151b116` |
-| `tests/unit/CMakeLists.txt` | `d757bc22a9c63246d14d3e63180545d0fc3874340cddb088ca85763e9861cf26` |
+| `src/core/CMakeLists.txt` | `2e09fcd7ebc1d942c33a9b10020c80b44c3ba078e03e0bcc4418820e292c79da` |
+| `src/core/calibration_analysis.cpp` | `3da9e8d975ddb59acb79e4b10b217fe6b6ba905c05d4241c25d96ccb40d5f172` |
+| `src/core/image.cpp` | `ef3806c397d6f46026e8997f20089f01419606adc57f4276a2a089b89de03825` |
+| `src/core/include/astro/calibration_analysis.hpp` | `d0b0f83a5b0645252a91f46a86267802003cb9a0772625d59bb1ebc94d9e62bf` |
+| `src/core/include/astro/image.hpp` | `3568c28d62b45e10d77736eea891eb59093970c9f3c51739292a526b4d71aba6` |
+| `tests/unit/CMakeLists.txt` | `553321640af3e26f9778919b587368f3a05398672d0088976358989e6a6f76f7` |
 | `tests/unit/test_calibration_offset.cpp` | `28335edf3b052a30889adcba1612c8c41dc3f477bc0021a5653df4b64f801a68` |
 | `tests/unit/test_u5_spy.cpp` | `cad6b9f7c1035859f6984088f273128c2e8e42bbc34042aab6a08ad3f890b960` |
 
-- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
 <!-- evidence:end -->

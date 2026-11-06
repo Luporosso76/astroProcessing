@@ -51,9 +51,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `e9f7a6f719f7f406de8a5fab80db9d6b43f6b07fb126d9ac53c4437052f38168` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `6e020ced8da401f8d26c69e610275020f00762ed5b358d0a98c94ffa20392fd8` |
 | `docs/contracts/ADR-13-offline.md` | `4312bd3ad66eecd9a56d9402f6639dabcdd30c2792455fa321e2b7a5ae42b135` |
 | `docs/contracts/U12-third-party.md` | `846641dec75e4f9a6e03a97c8bae5affa1ff1bfdb79dd76cd159c082e1ad6484` |
-| `docs/licenses.md` | `7a50e18608d22fb2041d030963630844ce886ac76df937a5ca6085c223ab8d46` |
+| `docs/licenses.md` | `f98457e8bbf7ea03c53ff18bfb54f9052e19428a0d03723ab5e217d72d6738c4` |
 
 <!-- evidence:end -->

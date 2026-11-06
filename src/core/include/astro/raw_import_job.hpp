@@ -13,6 +13,7 @@
 #include "astro/node.hpp"
 #include "astro/raw_decode.hpp"
 #include "astro/resources.hpp"
+#include "astro/scheduler.hpp"
 #include "astro/sqlite_dag_store.hpp"
 
 namespace astro {
@@ -39,6 +40,12 @@ struct raw_import_request {
 // (il costruttore del job minimo non ferma). Limite dichiarato: la lettura e la decodifica della costruzione non passano
 // dal pool, dallo scheduler ne' dal token di cancel; sono limitate solo da raw_limits (§2.1).
 raw_import_request make_raw_import_request(std::string path, content_digest digest);
+
+// Ramo di `run_branches` per un import RAW: stesso lavoro e stessa richiesta di run_raw_import_job. `store`, `request`,
+// `pool`, `cancel` e `resources` devono vivere fino al ritorno di run_branches.
+branch_files_job make_raw_import_branch_job(sqlite_dag_store& store, const std::string& slot_name,
+                                            const raw_import_request& request, memory_pool& pool,
+                                            const cancel_token& cancel, const resource_config* resources = nullptr);
 
 // Job di import RAW sullo scheduler (OB-08): `prepare` verifica il digest in streaming, il task legge e verifica i byte,
 // decodifica (`decode_raw_buffer`, un solo thread, ADR-08.b §2.7); dopo lo scheduler il job costruisce il nodo con

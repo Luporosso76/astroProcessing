@@ -101,6 +101,9 @@ void validate_masters(const calibration_recipe& r) {
       if (!d.additive || *d.additive == additive_state::unknown) unknown("additive");
       if (!d.scaling || *d.scaling == scaling_state::unknown) unknown("scaling");
     }
+    // Campi di ADR-16.b §b.2 e §b.7: la ricetta `.a` non li rappresenta nei parametri del nodo.
+    if (d.flat_normalization_declared) unsupported("flat_normalization_declared", "presente");
+    if (d.frame_decoder_states) unsupported("frame_decoder_states", "presente");
     if (*s.expected == master_role::flat) {
       if (*d.flat != flat_state::raw) unsupported("flat", flat_name(*d.flat));
     } else {
@@ -189,6 +192,11 @@ bool all_finite_or_flagged(const image& im) {
 }
 
 void check_image(const frame& f) {
+  // C-01.b §7, regola C7.3: un ingresso con coverage è fuori dominio anche per la ricetta `.a`.
+  if (f.img->coverage) {
+    stop(error_category::unsupported, "calib.coverage_input", "ingresso con coverage fuori dal dominio della calibrazione",
+         {{"input", f.name}});
+  }
   if (f.img->variance && f.img->variance->samples.size() != f.img->samples.size()) {
     stop(error_category::invalid_input, "var.plane_geometry", "il piano di varianza non ha la geometria dell'immagine",
          {{"input", f.name}});
@@ -652,7 +660,7 @@ std::unique_ptr<prepared_calibration::impl> prepare_impl(const calibration_recip
   for (const frame& f : frames) {
     const image& x = *f.img;
     if (!x.unit) {
-      stop(error_category::metadata_missing, "calib.metadata.unit", "unita' non dichiarata", {{"input", f.name}});
+      stop(error_category::metadata_missing, "calib.metadata.unit", "unità non dichiarata", {{"input", f.name}});
     }
     if (*x.unit != pixel_unit::adu) {
       stop(error_category::unsupported, "calib.unit", "la ricetta M2 richiede ADU", {{"input", f.name}});

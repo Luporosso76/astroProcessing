@@ -1,0 +1,14 @@
+# Sorgente del blocco generato di M3a-U8a.md (tools/evidence.py)
+file src/core/batch_classification.cpp
+file src/core/include/astro/batch_classification.hpp
+file src/core/sqlite_classification.cpp
+file src/core/scheduler.cpp
+file src/core/include/astro/scheduler.hpp
+file src/core/import_job.cpp
+file src/core/raw_import_job.cpp
+file src/core/sqlite_dag_store.cpp
+file docs/contracts/F-IO-03-classificazione.md
+file tests/unit/test_batch_classification.cpp
+file tests/unit/test_input_paths.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

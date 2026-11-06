@@ -114,23 +114,23 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `CMakeLists.txt` | `7b1a76ed5d18e95b267d724998b1b2d0715382de9618a9e3b71af246afc9ac63` |
-| `docs/contracts/ADR-08-decoder-pack.md` | `e9f7a6f719f7f406de8a5fab80db9d6b43f6b07fb126d9ac53c4437052f38168` |
-| `src/core/CMakeLists.txt` | `0dffca21be9c9367d55971c144601d5b6872f22c2f0beeb6b33deeab6fb529de` |
-| `src/core/include/astro/image.hpp` | `4f6007bbe26d4ab7946fd413451017bc73e6227ef0cb3255d16998106151b116` |
-| `src/core/include/astro/input_format.hpp` | `e30c81080600aec605fd3730bad533e1b77774d531a26441e4269990b986831f` |
-| `src/core/include/astro/raw_decode.hpp` | `ef65ebd958672813ff0bc931b2e2faf84fe58191cd8543623a5f8d10ef496a14` |
-| `src/core/raw_decode.cpp` | `7f3aa00829bf1911fe9400f87626ff2df01fd95a5cb1cbc6eea7b1bd75f42042` |
-| `tests/unit/CMakeLists.txt` | `d757bc22a9c63246d14d3e63180545d0fc3874340cddb088ca85763e9861cf26` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `6e020ced8da401f8d26c69e610275020f00762ed5b358d0a98c94ffa20392fd8` |
+| `src/core/CMakeLists.txt` | `2e09fcd7ebc1d942c33a9b10020c80b44c3ba078e03e0bcc4418820e292c79da` |
+| `src/core/include/astro/image.hpp` | `3568c28d62b45e10d77736eea891eb59093970c9f3c51739292a526b4d71aba6` |
+| `src/core/include/astro/input_format.hpp` | `40e4924aaf3a808ed54e394cc187cf2be1efb075c699dc73a1ba5af2ff6421d7` |
+| `src/core/include/astro/raw_decode.hpp` | `7ab60332832da275e2f625f635ac86a6218b2aa1847d41ac45b7d28ea6b917f4` |
+| `src/core/raw_decode.cpp` | `0e8ce66a76ebf3704db608ff5e1facf827b3aa132ca56c33d952ff7c96c80f90` |
+| `tests/unit/CMakeLists.txt` | `553321640af3e26f9778919b587368f3a05398672d0088976358989e6a6f76f7` |
 | `tests/unit/fuzz_raw_decode.cpp` | `77b64344305fea6c59e90d9e3da126c45487fc8b75bd6a0c612981f4620846bc` |
 | `tests/unit/main_utc0.cpp` | `c09d5a99f17d099218f9de3a664622749534fe3c3379c81143d669c1ac334081` |
 | `tests/unit/pub_raw_01.hpp` | `cd18843a0885f569d49f4c2c34852b3afbf93df329e9967b04a331204de12c24` |
 | `tests/unit/raw_threads.cpp` | `0088793e2daaa44e85776fbe17551061775e86690928a5ad623123e2d910de31` |
-| `tests/unit/test_raw_decode.cpp` | `8e3347b6ef24a9f61c153428898623c5e70c9daee03128190c9e501a149dc3cd` |
+| `tests/unit/test_raw_decode.cpp` | `3c92a36eea64a2c24bd8258207f1b0465aac45f341a736d73a3668c32e115817` |
 | `tests/unit/test_raw_decode_u2b.cpp` | `2abd37934df5eeb669eb141ee86b79e21a1f358bde3e693ccd288117723d43ce` |
-| `tests/unit/test_raw_robust.cpp` | `7afc89f0f2b4ebb0ca2e71d83c020a85a3b30002725b134d2370cdc47aa90513` |
+| `tests/unit/test_raw_robust.cpp` | `991822d5345be814a60b91cf106ba3d2b5e221300de0bb0a3e66e497b5a7859b` |
 
-- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
 - Test release-giro2 (`tmp/release-junit-r2.xml`): totali 812, fast 812, slow 0, falliti 0
 - Test fuzz-asan (`tmp/u3-fuzz-asan-junit.xml`): totali 9, fast 0, slow 9, falliti 0
 <!-- evidence:end -->

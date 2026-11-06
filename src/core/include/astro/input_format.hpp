@@ -19,6 +19,9 @@ namespace raw_limits {
 // ADR-08.b §2.1: stima non misurata.
 constexpr std::uint64_t max_file_bytes = 1073741824;
 constexpr std::uint64_t max_pixels = 268435456;
+// U13 §3 punto 2: IFD letti dall'instradamento DNG (IFD0, `SubIFDs`, catena), ciascun offset una volta; stima non
+// misurata, tiene memoria e tempo dell'instradamento indipendenti dalla dimensione del file.
+constexpr std::uint32_t max_route_ifds = 256;
 }  // namespace raw_limits
 
 const input_format& fits_input_format();

@@ -1,0 +1,13 @@
+# Sorgente del blocco generato di M3a-U6.md (tools/evidence.py)
+file src/core/calibration_analysis.cpp
+file src/core/include/astro/calibration_analysis.hpp
+file src/core/calibration.cpp
+file src/core/operations.cpp
+file src/core/include/astro/operations.hpp
+file src/core/fits.cpp
+file docs/contracts/ADR-16-stati-master.md
+file docs/contracts/C-01-calibrazione-light.md
+file tests/unit/test_calibration_analysis_u6.cpp
+file tests/unit/test_calibration.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

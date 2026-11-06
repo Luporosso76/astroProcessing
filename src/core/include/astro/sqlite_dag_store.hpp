@@ -119,6 +119,23 @@ struct input_record {
   std::string format;  // obbligatorio: nessun default
 };
 
+// Revisione di classificazione di un input (F-IO-03 CL-02). `revision` la assegna append_classifications (massimo
+// corrente + 1) e si ignora in ingresso. `role`: light, bias, dark, dark_flat, flat o unclassified; `source`: rule o user;
+// `rule_id` presente se e solo se `source = rule`. `evidence_canonical` e `declarations_canonical` sono JSON canonico
+// (`astro.input_declarations.v1` per le dichiarazioni).
+struct classification_record {
+  std::uint64_t input_id = 0;
+  std::uint64_t revision = 0;
+  std::string role;
+  std::string source;
+  std::optional<std::string> rule_id;
+  std::string evidence_canonical;
+  std::string declarations_canonical;
+};
+
+// `path` assoluto, valutato com'è dato: vuoto, con NUL o non assoluto è invalid_input store.bad_input.
+void require_absolute_input_path(const std::string& path);
+
 // Stato della posizione registrata di un originale (F-IO-08, RL-02): osservazione del filesystem con un solo stat,
 // mai persistita. `status`: present, missing, inaccessible, changed; `reason`: codice del motivo, vuoto se present.
 struct input_state {
@@ -306,10 +323,19 @@ class sqlite_dag_store : public dag_store {
   void insert_setting(const std::string& key, const std::string& value_canonical);
   std::optional<std::string> get_setting(const std::string& key) const;
 
-  // Registra l'originale con la sua identità (dev, ino) letta con stat. Assente: io input.missing; non regolare o
-  // formato non ammesso: invalid_input store.bad_input.
+  // Registra l'originale con la sua identità (dev, ino) letta con stat. Assente: io input.missing; percorso non
+  // assoluto, non regolare o formato non ammesso: invalid_input store.bad_input.
   input_record add_input(input_record input);
   std::vector<input_record> inputs() const;
+
+  // F-IO-03 CL-02. Un elenco di revisioni entra in una sola transazione: l'intero elenco è validato prima della prima
+  // scrittura e un errore non lascia nulla. Ogni revisione prende il massimo corrente dell'input + 1 e restituisce il
+  // record scritto. Una revisione `rule` è ammessa solo per un input senza revisioni. Errori: schema store.read_only;
+  // invalid_input classify.unknown_input, classify.role, classify.declaration. Punto di guasto `classify.insert`, uno
+  // per riga, prima dell'INSERT.
+  std::vector<classification_record> append_classifications(const std::vector<classification_record>& records);
+  // Storia di un input in ordine di revisione; vuota se non ha revisioni. L'effettiva è l'ultima.
+  std::vector<classification_record> classifications(std::uint64_t input_id) const;
 
   // F-IO-08. Stato di ogni originale registrato (per id) con un solo stat sul percorso registrato: nessuna scrittura,
   // nessuna ricerca, nessuna lettura del contenuto (RL-02). Funziona anche in sola lettura.

@@ -53,10 +53,10 @@ raw_import_request make_raw_import_request(std::string path, content_digest dige
   }
 }
 
-job_outcome run_raw_import_job(sqlite_dag_store& store, const std::string& slot_name, const raw_import_request& request,
-                               memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
-                               const resource_config* resources) {
-  const auto work = [&](const job_record&) -> job_files_result {
+branch_files_job make_raw_import_branch_job(sqlite_dag_store& store, const std::string& slot_name,
+                                            const raw_import_request& request, memory_pool& pool,
+                                            const cancel_token& cancel, const resource_config* resources) {
+  const auto work = [&store, &request, &pool, &cancel, resources](const job_record&) -> job_files_result {
     if (request.identification_stop) throw *request.identification_stop;
     const fits_input input = open_input(request.path, raw_input_format());
     const std::uint64_t shared_bytes = digest_reserve_bytes(input.size_bytes());
@@ -126,7 +126,14 @@ job_outcome run_raw_import_job(sqlite_dag_store& store, const std::string& slot_
   jr.node = [&request] { return request.node; };
   jr.mismatch_code = "raw_import.node_mismatch";
   jr.resources = resources;
-  return run_job_files(store, slot_name, work, budget, &cancel, jr);
+  return branch_files_job{slot_name, work, jr};
+}
+
+job_outcome run_raw_import_job(sqlite_dag_store& store, const std::string& slot_name, const raw_import_request& request,
+                               memory_pool& pool, const cancel_token& cancel, const std::optional<budget_snapshot>& budget,
+                               const resource_config* resources) {
+  const branch_files_job job = make_raw_import_branch_job(store, slot_name, request, pool, cancel, resources);
+  return run_job_files(store, slot_name, job.work, budget, &cancel, job.request);
 }
 
 }  // namespace astro

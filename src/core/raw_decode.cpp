@@ -14,6 +14,7 @@
 #include "astro/json.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/third_party.hpp"
+#include "dng_internal.hpp"
 
 #ifndef ASTRO_LIBRAW_TARBALL_SHA256
 #error "ASTRO_LIBRAW_TARBALL_SHA256 deve venire da cmake/third_party_libs.cmake"
@@ -281,6 +282,11 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   // U12 obbligo 5: versione e capacita' di LibRaw verificate prima della prima chiamata alla libreria.
   third_party::verify_once();
   check_process_tz();
+  // U13 §3: un solo punto di scelta, prima di ogni chiamata a LibRaw o a zlib; un errore di un decoder non porta mai
+  // all'altro.
+  const dng_detail::route_detail route = dng_detail::route(bytes);
+  if (hooks.after_route) hooks.after_route(route.result);
+  if (route.result.decoder == raw_decoder_kind::astro_dng) return dng_detail::decode(bytes, route, hooks, ctx);
   const auto returned = [&hooks](const char* function, int rc) {
     return hooks.libraw_return ? hooks.libraw_return(function, rc) : rc;
   };

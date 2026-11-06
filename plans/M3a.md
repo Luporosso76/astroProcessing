@@ -104,13 +104,14 @@ ID: G-OFFSET. Proprietario: nuovo `src/core/calibration_analysis.cpp`.
 2. Voce `light_offset`: nero per posizione del periodo `lcm(2, rows) × lcm(2, cols)` con H3, `black_applied_by_decoder`, identità del decoder; mai sottratto (C-01.b §1, §10).
 Test: T-M3A-C01-01, 03. Uscita: G-OFFSET chiuso con U6 (T-M3A-CAL-08, C01-06, 07 parte di analisi) e U7 (C01-02), più T-M3A-RAW-02.
 
-### U6. G-CAL, parte 1: stati accettati e compatibilità (ADR-16.b §b.2, §b.3, §b.7) — ~380 righe
+### U6. G-CAL, parte 1: stati accettati e compatibilità (ADR-16.b §b.2, §b.3, §b.7) — ~380 righe — CHIUSA il 6 novembre 2026 (`docs/evidence/M3a-U6.md`)
 
 ID: G-CAL. Proprietario: `calibration_analysis.cpp`, funzione di compatibilità per coppia.
 1. Stati `usable`/`excluded` per ruolo, unità, fase, linearità, layout, piedistallo, coverage (§b.2; C-01.b §2, §7).
 2. Compatibilità per coppia e per catena, lista chiusa dei motivi (§b.3).
 3. Compatibilità del decoder: campi strutturali, nero effettivo in interi a 64 bit contro `decoder_black_abs_tol_adu` obbligatorio senza default, `decoder_state_mixed` (§b.7).
 Test: T-M3A-CAL-08; T-M3A-TYP-18 (tabella delle operazioni di ADR-03.b §b.14); T-M3A-C01-06; T-M3A-C01-07 (parte di analisi). Uscita: zero calcoli negli stop (contatore del `fault_injector`).
+Limite dichiarato: un'immagine con coverage non si scrive in FITS (stop `unsupported`, `fits.coverage` da `fits.cpp`); la scrittura dell'HDU di coverage prevista da ADR-03 arriva con T-M3A-TYP-07 (M3.g).
 
 ### U7. G-CAL, parte 2: predicati, ammissibili, default, selezione (ADR-16.b §b.1 punti 1-2, §b.4–b.6, §b.9) — ~400 righe
 
@@ -122,7 +123,7 @@ ID: G-CAL, G-OFFSET (P-OFFSET). Proprietario: `analyze_calibration` (`calibratio
 5. Ricetta fuori dall'insieme → G-STOP senza nodo; parametri non applicabili (§b.9, §b.5).
 Test: T-M3A-CAL-01, 02, 06; T-M3A-C01-02. Oracle: tabelle di §b.5 e §b.6 ricodificate a mano dall'autore dei test.
 
-### U8. F-IO-03: classificazione batch — stima ~550 righe, divisa in U8a (proposta, persistenza, import batch, `add_input` solo con percorsi assoluti) e U8b (analisi, gruppi, candidati, ricette) secondo `docs/contracts/F-IO-03-classificazione.md`
+### U8. F-IO-03: classificazione batch — stima ~550 righe, divisa in U8a (proposta, persistenza, import batch, `add_input` solo con percorsi assoluti) e U8b (analisi, gruppi, candidati, ricette) secondo `docs/contracts/F-IO-03-classificazione.md` — U8a CHIUSA il 6 novembre 2026 (`docs/evidence/M3a-U8a.md`)
 
 ID: F-IO-03. Bloccata finché il contratto non copre L2 e L5.
 1. Classificazione modificabile di light, dark, flat, dark-flat, bias; ruolo mai dedotto da esposizione, `IMAGETYP` o nome (ADR-16.a, «Stati tipizzati»); `IMAGETYP` in conflitto → `imagetyp_conflict`.
@@ -236,7 +237,7 @@ Conseguenza: i test esistenti che si aspettano true per immagini senza `measure`
 - Fatto di U12: LibRaw 0.22.3 decodifica il deflate solo in virgola mobile («Only float deflated supported»); il DNG intero deflate e il JPEG XL richiedono l'Adobe DNG SDK, la cui licenza (indennizzo §5, legge della California §8) non è compatibile con GPL-3.0-or-later ed è esclusa.
 - Scelta: decoder indipendente scritto dal progetto dalla specifica DNG 1.7.1.0 pubblica, con zlib di sistema per il deflate intero a 32 bit; i DNG JPEG XL si fermano sui tag e libjxl (BSD-3-Clause) è valutata e non adottata (contratto §6, §9). Contratto e test prima del codice; avviso di brevetto DNG di Adobe nei sorgenti del decoder e nella documentazione (M5).
 - Contratto: `docs/contracts/U13-dng-decoder.md` (specifica DNG 1.7.1.0). Fatti della specifica (p. 21): il deflate è ammesso per l'IFD raw solo con interi a 32 bit, quindi i DNG deflate interi a 16 bit di U12 non sono conformi e si fermano con `raw.dng_nonconformant`; il JPEG XL non è ammesso per un IFD raw CFA (solo LinearRaw e altre interpretazioni non CFA), quindi ogni DNG JPEG XL si ferma sui tag (`raw.dng_nonconformant` o `raw.not_cfa`) e libjxl non entra nel prodotto (versioni, licenze e sonde in §9 e §14 per un'unità successiva). Il LinearRaw JPEG XL è fuori dal prodotto come ogni LinearRaw: portarlo dentro è una scelta di perimetro del proprietario. Test T-U13-01…12 e 24 (§12), emendamenti ad ADR-08.b in §11, da applicare prima del codice.
-- Sotto-unità, in ordine, una review ciascuna: U13a instradamento, parser DNG e stop sui tag (T-U13-01, 02, 06); U13b deflate, immagine, livelli, metadati, limiti (T-U13-03…05, 07…12, 24). T-U13-12 si esegue con T-M3A-RAW-11 e 12; T-U13-24 parte in U13b (sorgente) e si chiude in M5. Modelli nella tabella «Modelli per unità».
+- Sotto-unità, in ordine, una review ciascuna: U13a instradamento, parser DNG e stop sui tag (T-U13-01, 02, 06; CHIUSA il 6 novembre 2026, `docs/evidence/M3a-U13a.md`); U13b deflate, immagine, livelli, metadati, limiti (T-U13-03…05, 07…12, 24). T-U13-12 si esegue con T-M3A-RAW-11 e 12; T-U13-24 parte in U13b (sorgente) e si chiude in M5. Confine fra le due: dopo U13a il decoder del progetto, superati i controlli dei tag, decomprime i segmenti e si ferma con `unsupported`, `raw.dng_decoder_incomplete`, senza immagine; U13b sostituisce questo stop con la costruzione dell'immagine. Modelli nella tabella «Modelli per unità».
 
 ### Emendamenti alle slice successive (prima del loro codice)
 - M3.d: debayer edge-aware (RCD) come default più CFA/Bayer drizzle per lo stacking; il bilineare a pesi fissi resta per la varianza esatta (ADR-09).

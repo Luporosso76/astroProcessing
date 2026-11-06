@@ -100,6 +100,10 @@ void check_header_matches(const image& img, const header_info& info);
 // Lo scrittore FITS non rappresenta `decoder_state` (ADR-03.b §b.2): stop `fits.decoder_state` prima di ogni buffer.
 void reject_decoder_state(const image& img);
 
+// Lo scrittore FITS non scrive ancora l'HDU `COVERAGE` (ADR-03.b §b.5, T-M3A-TYP-07): stop `fits.coverage` prima di ogni
+// buffer, perché la coverage non si perda in silenzio.
+void reject_coverage(const image& img);
+
 // Confronta ogni HDU letto da CFITSIO (offset, BITPIX, assi) con la scansione: differenza = fits.structure_mismatch.
 void verify_structure(fitsfile* f, const std::vector<hdu_scan>& hdus);
 

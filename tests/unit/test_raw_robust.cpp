@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include <libraw/libraw.h>
 #include <sys/mman.h>
+#include <unistd.h>
 #include <sys/resource.h>
 
 #include <atomic>
@@ -186,13 +187,27 @@ TEST(RawRobust, T_M3A_RAW_05_empty_and_truncated_files_stop_with_table_codes) {
     SCOPED_TRACE("lunghezza " + std::to_string(length));
     const std::vector<std::uint8_t> cut(full.begin(), full.begin() + static_cast<std::ptrdiff_t>(length));
     bool unpack_called = false;
+    int open_buffer_calls = 0;
     raw_decode_hooks hooks;
     hooks.before_unpack = [&] { unpack_called = true; };
+    hooks.libraw_return = [&](std::string_view function, int rc) {
+      if (function == "open_buffer") ++open_buffer_calls;
+      return rc;
+    };
     const stop_error e = capture(cut, hooks);
     EXPECT_FALSE(unpack_called);
     EXPECT_TRUE(e.code() == "raw.data_error" || e.code() == "raw.file_unsupported") << e.what();
-    expect_table_consistent(e);
-    EXPECT_EQ(ctx_value(e, "funzione"), std::string("open_buffer"));
+    // Emendamento di U13 §11: un troncamento dentro le parti lette dall'instradamento si ferma in dng_route, prima di
+    // LibRaw (§3 punto 6: nessuna chiamata a LibRaw), con integrity raw.data_error; gli altri restano stop di open_buffer
+    // della tabella.
+    if (ctx_value(e, "funzione") == std::optional<std::string>("dng_route")) {
+      EXPECT_EQ(e.category(), error_category::integrity) << e.what();
+      EXPECT_EQ(e.code(), "raw.data_error") << e.what();
+      EXPECT_EQ(open_buffer_calls, 0) << e.what();
+    } else {
+      expect_table_consistent(e);
+      EXPECT_EQ(ctx_value(e, "funzione"), std::string("open_buffer"));
+    }
   }
 }
 
@@ -228,12 +243,16 @@ TEST(RawRobust, T_M3A_RAW_05_file_over_max_file_bytes_stops_without_reading) {
 }
 
 // Confine inclusivo (m02): esattamente max_file_bytes è ammesso e arriva al gancio before_open, che ferma con una
-// sentinella prima di ogni lettura del buffer (mappa PROT_NONE); max_file_bytes + 1 si ferma prima del gancio.
+// sentinella. L'instradamento di U13 (§3) legge l'intestazione prima di LibRaw: la prima pagina è leggibile e vale zero
+// (non TIFF, quindi LibRaw), il resto è PROT_NONE e resta non letto; max_file_bytes + 1 si ferma prima del gancio.
 TEST(RawRobust, T_M3A_RAW_05_file_exactly_at_max_file_bytes_is_accepted_without_reading) {
   struct sentinel {};
   const std::size_t exact = static_cast<std::size_t>(raw_limits::max_file_bytes);
   void* base = ::mmap(nullptr, exact, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
   ASSERT_NE(base, MAP_FAILED);
+  const long page = ::sysconf(_SC_PAGESIZE);
+  ASSERT_GT(page, 0);
+  ASSERT_EQ(::mprotect(base, static_cast<std::size_t>(page), PROT_READ), 0);
   const std::span<const std::uint8_t> bytes(static_cast<const std::uint8_t*>(base), exact);
   bool open_reached = false;
   raw_decode_hooks hooks;

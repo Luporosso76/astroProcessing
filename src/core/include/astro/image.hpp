@@ -129,6 +129,13 @@ struct variance_plane {
   friend bool operator==(const variance_plane&, const variance_plane&) = default;
 };
 
+// Frazione geometrica coperta di ogni pixel (ADR-03.b §b.5): un campione per pixel e per piano, tipo dei campioni.
+// Gli invarianti di valore e l'HDU FITS sono di T-M3A-TYP-07 (M3.g): finché mancano, lo scrittore FITS la rifiuta.
+struct coverage_plane {
+  aligned_buffer samples;
+  friend bool operator==(const coverage_plane&, const coverage_plane&) = default;
+};
+
 // `decoder`: valore del decoder RAW; `metadata_source.keyword` e' il nome del campo di LibRaw (ADR-03.b §b.1).
 enum class metadata_origin { header, declared, decoder };
 
@@ -283,6 +290,7 @@ struct image {
   aligned_buffer samples;
   invalid_mask invalid;
   std::optional<variance_plane> variance;
+  std::optional<coverage_plane> coverage;
   frame_metadata metadata;
   std::vector<std::string> header_cards;
   std::vector<std::string> uninterpreted_keywords;
@@ -321,7 +329,7 @@ struct image {
 };
 
 // Contenuto scientifico: geometria, layout, tipo, unita', linearita', fase (valore, senza origine), cfa, decoder_state (senza
-// `source`), measure, campioni, maschera, varianza e valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine
+// `source`), measure, campioni, maschera, varianza, coverage e valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine
 // dei metadati.
 bool equivalent_content(const image& a, const image& b);
 

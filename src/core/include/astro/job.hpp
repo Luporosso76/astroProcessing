@@ -97,7 +97,7 @@ struct job_files_result {
 struct job_request {
   // Nodo ricostruito dalla richiesta. run_job_files lo costruisce dopo il controllo dell'ambiente FP e dopo aver letto
   // il nodo dello slot, prima di `work`: chiave diversa da quella dello slot = arresto invalid_input `mismatch_code`
-  // con le due chiavi (`nodo_slot`, `nodo_richiesta`). Vuoto: nessun confronto (composizioni come run_branches).
+  // con le due chiavi (`nodo_slot`, `nodo_richiesta`). Vuoto: nessun confronto.
   std::function<node_spec()> node;
   std::string mismatch_code = "job.node_mismatch";
   // Configurazione delle risorse ricevuta dal job: con `budget`, run_job_files la serializza in budget.resources dopo

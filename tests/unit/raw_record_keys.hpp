@@ -52,6 +52,17 @@ constexpr std::array<std::string_view, 30> all_keys = {
     raw_inset_crops, flip, metadata_present, metadata_not_kept, data_state, camera_processing, process_warnings, sensor,
     pixel_size_um, pixel_scale_arcsec, wcs, absent_reason, capture_time_libraw, capture_time_clock, process_tz};
 
+// U13 §8 (docs/contracts/U13-dng-decoder.md): decoder scelto dall'instradamento e campi dell'IFD raw scelto. Stessi nomi
+// nel record di una decodifica riuscita e nel contesto dello stop del decoder del progetto (provenance dell'arresto);
+// i valori numerici nel contesto sono interi decimali.
+constexpr std::string_view decoder = "decoder";                  // contratto: libraw | astro_dng
+constexpr std::string_view route_reason = "route_reason";        // per libraw: not_tiff | tiff_not_dng | dng_libraw_compression
+constexpr std::string_view compression = "compression";          // Compression (259) dell'IFD raw scelto
+constexpr std::string_view sample_format = "sample_format";      // SampleFormat (339), predefinito 1
+constexpr std::string_view bits_per_sample = "bits_per_sample";  // BitsPerSample (258)
+constexpr std::string_view decoder_libraw = "libraw";
+constexpr std::string_view decoder_astro_dng = "astro_dng";
+
 // Valori fissati dal contratto o da U12-third-party.md §1 (LibRaw 0.22.3, build del progetto).
 constexpr std::string_view expected_libraw_version = "0.22.3-Release";
 constexpr long expected_libraw_version_number = 0x001603;

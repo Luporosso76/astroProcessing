@@ -1,9 +1,11 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <span>
 
@@ -77,6 +79,25 @@ struct raw_decode_context {
   std::optional<std::uint64_t> held_bytes;
 };
 
+// Decoder scelto dall'instradamento (docs/contracts/U13-dng-decoder.md §3).
+enum class raw_decoder_kind { libraw, astro_dng };
+
+// Esito dell'instradamento (U13 §3, §8). `reason` per libraw: "not_tiff", "tiff_not_dng" o "dng_libraw_compression";
+// vuoto per astro_dng. I tre campi dell'IFD raw (predefiniti del TIFF se il tag manca) sono presenti solo per un DNG con
+// esattamente un IFD raw.
+struct dng_route_result {
+  raw_decoder_kind decoder = raw_decoder_kind::libraw;
+  std::string reason;
+  std::optional<std::uint32_t> compression;
+  std::optional<std::uint32_t> sample_format;
+  std::optional<std::uint32_t> bits_per_sample;
+};
+
+// Instradamento puro (U13 §3): legge solo intestazione, IFD0, catena di primo livello e `SubIFDs` di IFD0, nelle voci
+// necessarie. Più IFD raw di cui almeno uno del decoder del progetto: unsupported raw.multi_image. Struttura letta non
+// valida: integrity raw.data_error con `funzione` = dng_route.
+dng_route_result dng_route(std::span<const std::uint8_t> bytes);
+
 // Ganci di iniezione dei test: ricevono i campi letti dalla libreria e possono sostituirli prima delle decisioni.
 struct raw_decode_hooks {
   std::function<void(raw_user_params&)> before_open;
@@ -87,6 +108,10 @@ struct raw_decode_hooks {
   std::function<int(std::string_view function, int rc)> libraw_return;
   std::function<void(const raw_unpack_callbacks&)> with_handlers;
   std::function<void(const raw_unpack_plan&)> before_unpack_plan;
+  // Decoder scelto, una volta per decodifica, dopo l'instradamento e prima di ogni chiamata a LibRaw o a zlib.
+  std::function<void(const dng_route_result&)> after_route;
+  // Decoder del progetto: codice di `inflate` del segmento `segment`; restituisce quello su cui il prodotto decide.
+  std::function<int(std::size_t segment, int rc)> inflate_return;
 };
 
 // Decodifica un RAW gia' letto in memoria (ADR-08.b §2.2-§2.4, §2.6): area visibile di LibRaw in f32 = uint16, layout
