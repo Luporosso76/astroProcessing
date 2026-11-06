@@ -1,0 +1,16 @@
+# Sorgente del blocco generato di M3a-U9.md (tools/evidence.py)
+file src/core/sqlite_relink.cpp
+file src/core/sqlite_dag_store.cpp
+file src/core/include/astro/sqlite_dag_store.hpp
+file src/core/sqlite_project.cpp
+file src/core/hash.cpp
+file src/core/include/astro/hash.hpp
+file docs/contracts/F-IO-08-ricollegamento.md
+file tests/unit/relink_support.hpp
+file tests/unit/test_relink.cpp
+file tests/unit/test_relink_status.cpp
+file tests/unit/test_relink_blocked.cpp
+file tests/unit/test_relink_nostat.cpp
+file tests/fixtures/fs_probe.hpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

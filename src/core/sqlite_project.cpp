@@ -23,7 +23,12 @@ namespace {
 
 constexpr const char* schema_v1[] = {
     "CREATE TABLE inputs(id INTEGER PRIMARY KEY, path TEXT NOT NULL, size_bytes INTEGER NOT NULL, "
-    "sha256 TEXT NOT NULL CHECK(length(sha256)=64), role TEXT NOT NULL, dev INTEGER NOT NULL, ino INTEGER NOT NULL) STRICT",
+    "sha256 TEXT NOT NULL CHECK(length(sha256)=64), role TEXT NOT NULL, dev INTEGER NOT NULL, ino INTEGER NOT NULL, "
+    "format TEXT NOT NULL CHECK(length(format)>0)) STRICT",
+    "CREATE TABLE input_relinks(input_id INTEGER NOT NULL REFERENCES inputs(id), revision INTEGER NOT NULL CHECK(revision>=1), "
+    "old_path TEXT NOT NULL, old_dev INTEGER NOT NULL, old_ino INTEGER NOT NULL, new_path TEXT NOT NULL, "
+    "new_dev INTEGER NOT NULL, new_ino INTEGER NOT NULL, previous_status TEXT NOT NULL, "
+    "record_version INTEGER NOT NULL CHECK(record_version=1), PRIMARY KEY(input_id, revision)) STRICT",
     "CREATE TABLE nodes(node_key TEXT PRIMARY KEY, operator_id TEXT NOT NULL, algorithm_version INTEGER NOT NULL, "
     "serialization_version INTEGER NOT NULL, params_canonical TEXT NOT NULL, precision TEXT NOT NULL, "
     "backend TEXT NOT NULL, seed TEXT) STRICT",
@@ -61,6 +66,16 @@ constexpr const char* schema_v1[] = {
     "CREATE TRIGGER entries_immutable_delete BEFORE DELETE ON snapshot_entries BEGIN SELECT RAISE(ABORT,'snapshot_entries e immutabile'); END",
     "CREATE TRIGGER recovery_reports_immutable_update BEFORE UPDATE ON recovery_reports BEGIN SELECT RAISE(ABORT,'recovery_reports e immutabile'); END",
     "CREATE TRIGGER recovery_reports_immutable_delete BEFORE DELETE ON recovery_reports BEGIN SELECT RAISE(ABORT,'recovery_reports e immutabile'); END",
+    "CREATE TRIGGER inputs_identity_immutable BEFORE UPDATE ON inputs "
+    "WHEN NEW.id IS NOT OLD.id OR NEW.sha256 IS NOT OLD.sha256 OR NEW.size_bytes IS NOT OLD.size_bytes "
+    "OR NEW.role IS NOT OLD.role OR NEW.format IS NOT OLD.format BEGIN SELECT RAISE(ABORT,'inputs: identita immutabile'); END",
+    "CREATE TRIGGER inputs_position_needs_history BEFORE UPDATE ON inputs WHEN NOT EXISTS("
+    "SELECT 1 FROM input_relinks r WHERE r.input_id = OLD.id AND r.new_path = NEW.path AND r.new_dev = NEW.dev "
+    "AND r.new_ino = NEW.ino AND r.revision = (SELECT max(revision) FROM input_relinks WHERE input_id = OLD.id)) "
+    "BEGIN SELECT RAISE(ABORT,'inputs: posizione senza riga di storia'); END",
+    "CREATE TRIGGER inputs_no_delete BEFORE DELETE ON inputs BEGIN SELECT RAISE(ABORT,'inputs: nessuna cancellazione'); END",
+    "CREATE TRIGGER input_relinks_immutable_update BEFORE UPDATE ON input_relinks BEGIN SELECT RAISE(ABORT,'input_relinks e append-only'); END",
+    "CREATE TRIGGER input_relinks_immutable_delete BEFORE DELETE ON input_relinks BEGIN SELECT RAISE(ABORT,'input_relinks e append-only'); END",
 };
 
 struct header_fields {

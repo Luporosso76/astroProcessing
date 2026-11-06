@@ -97,7 +97,7 @@ ID: F-IO-02, F-IO-04.
 4. Simboli vietati assenti (§5) — `tools/check_offline.sh`.
 Decisi il 30 ottobre (ADR-08.b §2.5, §2.6, §2.9): `PARSEFUJI_PROCESSED` ammesso e registrato (X-A1 si decodifica); ora di acquisizione col processo a `TZ=UTC0`, nel record e nella chiave. Test: T-M3BASE-11 e T-M3BASE-12 sulla variante RAW (da U0); T-M3A-RAW-07, 09, 11, 12, 13 (chiavi `null` di ADR-08.b §2.6, emendamento L4); T-M3A-02 (export F-IO-04: hash della sorgente, `black_applied_by_decoder = none`, campi assenti restano assenti); T-M2F-02 e T-M2R0-01 rieseguiti con i binari che collegano LibRaw e libtiff. Dati: `PUB-RAW-01` (7 Bayer, X-E1 → `raw.xtrans`). Uscita: suite di conformità verde sul nuovo tipo.
 
-### U5. G-OFFSET: stato dell'offset e voce `light_offset` (C-01.b §1, §10; ADR-16.b §b.5 colonna offset, §b.10) — ~200 righe
+### U5. G-OFFSET: stato dell'offset e voce `light_offset` (C-01.b §1, §10; ADR-16.b §b.5 colonna offset, §b.10) — ~200 righe — CHIUSA il 6 novembre 2026 (`docs/evidence/M3a-U5.md`)
 
 ID: G-OFFSET. Proprietario: nuovo `src/core/calibration_analysis.cpp`.
 1. Stato `removed` / `known_not_removed` / `unknown` per catena del light; `OFFSET` FITS resta `unknown`; piedistallo → `calib.pedestal` (C-01.b §1, §2).
@@ -131,7 +131,7 @@ ID: F-IO-03. Bloccata finché il contratto non copre L2 e L5.
 4. Dopo la scelta, mismatch → stop del ramo senza sostituzione, progetto riapribile (L5).
 Test: T-M3A-CAL-09 parte M3.a (luce: `verify_selection` e stop del ramo, U8b; F-IO-03 tabella di L5); T-M3A-04 (batch con un campo incompatibile alla volta: motivo e proposta uguali all'oracle), T-M3A-05 (prestacked e RGB nel batch; ruolo cambiato dall'utente → nuova analisi), T-M3A-06 (file cambiato e stato del decoder cambiato dopo la scelta: stop del solo ramo con `run_branches`, altri rami completati, riapertura del progetto con stato logico identico).
 
-### U9. F-IO-08: ricollegamento — stima ~300 righe, dopo la Lacuna L3
+### U9. F-IO-08: ricollegamento — stima ~300 righe, dopo la Lacuna L3 — CHIUSA il 6 novembre 2026 (`docs/evidence/M3a-U9.md`)
 
 ID: F-IO-08. Proprietario: store del progetto (`sqlite_project.cpp`), unica funzione di ricollegamento.
 1. File mancante o spostato rilevato (`io` `input.missing`, identità `dev`/`ino` di ADR-04 R4) senza corrompere il progetto.

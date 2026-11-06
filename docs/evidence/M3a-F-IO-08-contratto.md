@@ -66,7 +66,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-04-persistenza.md` | `83861d7d5db28b2f45b7748a0af91044e2cd56565c3fa9295733c0561163401c` |
-| `docs/contracts/F-IO-08-ricollegamento.md` | `fa680da12c9d7e1d332bc67a06631d5c843464e238d69f1ce5181e283241111d` |
+| `docs/contracts/F-IO-08-ricollegamento.md` | `9e5498a4661fd7f5685bf37edeb52093b3fd0112a54f05d4219de90b54f7515f` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 
 <!-- evidence:end -->

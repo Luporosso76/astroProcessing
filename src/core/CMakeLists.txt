@@ -56,6 +56,7 @@ add_library(astrocore STATIC
   sqlite_files.cpp
   sqlite_history.cpp
   sqlite_recovery.cpp
+  sqlite_relink.cpp
   project_export.cpp
   project_verify.cpp
   cpu_dispatch.cpp
@@ -66,6 +67,7 @@ add_library(astrocore STATIC
   calibration.cpp
   calibration_report.cpp
   calibration_job.cpp
+  calibration_analysis.cpp
   master.cpp
   operations.cpp
   inventory.cpp

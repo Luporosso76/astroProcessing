@@ -6,6 +6,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "astro/memory_pool.hpp"
@@ -90,9 +91,11 @@ content_digest digest_input(const fits_input& input, std::span<std::byte> work, 
 // Riverifica prima della pubblicazione: `path` riaperto con `format`, il formato dichiarato del ruolo (io
 // input.missing, limite e codici di quel formato), ha la dimensione attesa (integrity input.size_changed) e il digest
 // atteso, letto a pezzi di `work`, ed e' invariato durante la lettura; poi `opened`, se presente (aperto con lo stesso
-// `format`), e' invariato dall'apertura (integrity input.modified, input.size_changed).
-void reverify_input(const std::string& path, const input_format& format, const fits_input* opened,
-                    const content_digest& expected, std::span<std::byte> work,
-                    const std::function<void()>& check_cancel);
+// `format`), e' invariato dall'apertura (integrity input.modified, input.size_changed). Restituisce (st_dev, st_ino) del
+// descrittore verificato, letti con fstat sullo stesso descrittore.
+std::pair<std::uint64_t, std::uint64_t> reverify_input(const std::string& path, const input_format& format,
+                                                       const fits_input* opened, const content_digest& expected,
+                                                       std::span<std::byte> work,
+                                                       const std::function<void()>& check_cancel);
 
 }  // namespace astro

@@ -22,7 +22,7 @@ TEST(Store, T_M2C_01_create_save_reopen_keeps_the_same_logical_state) {
     // add_input legge l'identita' dell'originale (ADR-04, estensione R4): il file deve esistere.
     const fs::path light = dir.parent_path() / "t01_light.fits";
     write_text(light, std::string(2880, 'L'));
-    store->add_input(input_record{0, light.string(), 2880, std::string(64, 'a'), "light"});
+    store->add_input(input_record{0, light.string(), 2880, std::string(64, 'a'), "light", 0, 0, "fits"});
     const auto v1 = diamond(2).resolve();
     store->apply_recipe(v1, diamond_slots());
     for (const auto& n : v1) canonical[n.spec.key()] = n.spec.canonical();
@@ -305,7 +305,7 @@ TEST(Store, T_M2C_11_registered_originals_are_never_touched_by_the_store_workflo
   ASSERT_EQ(::stat(original.c_str(), &before), 0);
   {
     auto store = sqlite_dag_store::create(dir / "project");
-    store->add_input(input_record{0, original.string(), digest.size_bytes, digest.sha256, "light"});
+    store->add_input(input_record{0, original.string(), digest.size_bytes, digest.sha256, "light", 0, 0, "fits"});
     recipe_graph g;
     g.add("dec", entry("fits.decode", 1, {recipe_input{"file", digest}}));
     store->apply_recipe(g.resolve(), {{"s", "dec"}});

@@ -179,6 +179,22 @@ target_link_libraries(test_raw_decode_u2b PRIVATE astrocore GTest::gtest)
 target_include_directories(test_raw_decode_u2b PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_raw_decode_u2b PROPERTIES LABELS fast)
 
+# U5 (M3.a): G-OFFSET, stato dell'offset del light e voce `light_offset` (T-M3A-C01-01, T-M3A-C01-03). Usano i simboli di
+# astro/calibration_analysis.hpp (src/core/calibration_analysis.cpp, in astrocore). Con ASTRO_U5_TESTS ON (default) si
+# compila test_calibration_offset; con OFF il target non esiste e resta il caso spia test_u5_spy, sempre rosso, così che
+# i test di G-OFFSET non spariscano dal gate senza che il gate lo dica.
+option(ASTRO_U5_TESTS "Compila test_calibration_offset (richiede i simboli di U5)" ON)
+if(ASTRO_U5_TESTS)
+  add_executable(test_calibration_offset test_calibration_offset.cpp main_utc0.cpp)
+  target_link_libraries(test_calibration_offset PRIVATE astrocore GTest::gtest)
+  target_include_directories(test_calibration_offset PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+  gtest_discover_tests(test_calibration_offset PROPERTIES LABELS fast)
+else()
+  add_executable(test_u5_spy test_u5_spy.cpp)
+  target_link_libraries(test_u5_spy PRIVATE GTest::gtest_main)
+  gtest_discover_tests(test_u5_spy PROPERTIES LABELS fast)
+endif()
+
 # U1b (M3.a): capacità di misura `measure` (ADR-03.b §b.13).
 add_executable(test_measure test_measure.cpp)
 target_link_libraries(test_measure PRIVATE astrocore GTest::gtest_main)
@@ -373,4 +389,28 @@ if(ASTRO_U4_RECORD_TESTS)
   target_include_directories(test_raw_import_record PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
   target_compile_definitions(test_raw_import_record PRIVATE ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
   gtest_discover_tests(test_raw_import_record NO_PRETTY_VALUES PROPERTIES LABELS fast)
+endif()
+
+# U9 (M3.a, F-IO-08): ricollegamento. T-M3A-07, 08, 09 usano funzioni che il contratto dichiara e il prodotto non ha ancora
+# (relink_input, input_status, blocked_slots, input_record::format): stanno dietro un'opzione spenta di default, con un caso
+# spia rosso nella build di default. Chi implementa U9 porta l'opzione a ON.
+option(ASTRO_U9_RELINK_TESTS "Test di F-IO-08 (richiedono l'API di U9)" ON)
+add_executable(test_relink_spy test_relink_spy.cpp)
+target_link_libraries(test_relink_spy PRIVATE GTest::gtest_main)
+target_compile_definitions(test_relink_spy PRIVATE ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+if(ASTRO_U9_RELINK_TESTS)
+  target_compile_definitions(test_relink_spy PRIVATE ASTRO_U9_RELINK_TESTS_ENABLED=1)
+endif()
+gtest_discover_tests(test_relink_spy PROPERTIES LABELS fast)
+if(ASTRO_U9_RELINK_TESTS)
+  foreach(t test_relink test_relink_status test_relink_blocked test_relink_nostat)
+    add_executable(${t} ${t}.cpp)
+    target_link_libraries(${t} PRIVATE astrocore GTest::gtest_main SQLite::SQLite3 OpenSSL::Crypto)
+    target_include_directories(${t} PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+    target_compile_definitions(${t} PRIVATE
+      ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+      ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+    gtest_discover_tests(${t} NO_PRETTY_VALUES PROPERTIES LABELS fast)
+  endforeach()
+  target_link_libraries(test_relink_nostat PRIVATE ${CMAKE_DL_LIBS})
 endif()

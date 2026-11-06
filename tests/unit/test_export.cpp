@@ -266,7 +266,7 @@ TEST(Export, T_M2C_22_non_current_slots_existing_or_forbidden_destinations_stop)
   const fs::path base = f.project.parent_path();
   const fs::path original = base / "t22_original.fits";
   write_text(original, "original");
-  f.store->add_input(input_record{0, original.string(), 8, digest_of(bytes_of("original")).sha256, "light"});
+  f.store->add_input(input_record{0, original.string(), 8, digest_of(bytes_of("original")).sha256, "light", 0, 0, "fits"});
 
   EXPECT_STOP(f.store->export_slots(base / "t22_a", {"sa"}), error_category::stale_generation, "export.not_current");
   f.store->apply_recipe(diamond(9).resolve(), diamond_slots());

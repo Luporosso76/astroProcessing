@@ -123,19 +123,19 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `docs/evidence/M3-base-I2.md` | `f756def76de10eeba637f0bebf5976653f58c6a745b6aa51b9a5ac27fddf5fc3` |
+| `docs/evidence/M3-base-I2.md` | `897a97088f004f671eb9161d1e07ef25ae5dd814e58f0bacced8724c18d5947d` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
 | `src/core/cpu_dispatch.cpp` | `73c737a9f1ce03e297be90126d47d85c1fe5f451fbdacde579478bb5bff367ae` |
 | `src/core/fits.cpp` | `1b6a71e5ac9a3e16963c3764bca55ea21471d05882c0bd0bc05753757d7ba842` |
 | `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
 | `src/core/fits_scan.cpp` | `0caccd3aac283689838f4fa060c5c1fd28fbc1d04351a60d5e5088b3f1d84b0e` |
-| `src/core/hash.cpp` | `f8507547472b5b58b882ae069256530cb1a091b879a373a749afbfde563d0823` |
+| `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/import_job.cpp` | `945d3ee4045c7ff15e2292551a5cc34384ef4431b09181cfffe6816c9e0df487` |
 | `src/core/include/astro/cpu_dispatch.hpp` | `21c32fbd9c9416789ec7d31bf3c561d631b460a9ae9ce4162a1e7aab4fb7adb2` |
 | `src/core/include/astro/fits.hpp` | `37d4c4a21797c3a54c1d1bdc80c2e12b383d00d729571a3e41ef8fe07976abd7` |
 | `src/core/include/astro/fits_blocks.hpp` | `49c32447622cdf9f0f2fb5122679e474a36ca492f296cf44e1e7a87d96e4860c` |
-| `src/core/include/astro/hash.hpp` | `35127c7ac5255cc715ad016da94c4958136dd39a2342ee716324f3db2d3d4a24` |
+| `src/core/include/astro/hash.hpp` | `2043851aa8b5e01288e40841a44bd77476bfe12f9a6ff2100984117409256481` |
 | `src/core/inventory.cpp` | `6b2fee4bf475ca554a8647c2418da24741465ac2f63d0cdd7fbae81b30e17ef1` |
 | `src/core/job_types.cpp` | `5041b210e2aeb2f3c76f1f81e5fbb02932505886e55df9f4d2754953a047ecdc` |
 | `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
@@ -143,6 +143,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
 | `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
 
-- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
 <!-- evidence:end -->

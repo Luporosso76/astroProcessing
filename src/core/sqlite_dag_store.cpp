@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <set>
 
+#include "astro/input_format.hpp"
 #include "astro/sqlite_dag_store.hpp"
 #include "sqlite_internal.hpp"
 
@@ -499,7 +500,10 @@ std::optional<std::string> sqlite_dag_store::get_setting(const std::string& key)
 
 input_record sqlite_dag_store::add_input(input_record input) {
   require_writable();
-  if (!is_sha256_hex(input.sha256) || input.path.empty() || input.role.empty()) {
+  const auto& formats = input_formats();
+  const bool known_format = std::any_of(formats.begin(), formats.end(), [&](const input_format* f) { return input.format == f->prefix; });
+  if (!is_sha256_hex(input.sha256) || input.path.empty() || input.path.find('\0') != std::string::npos || input.role.empty() ||
+      !known_format) {
     throw stop_error(error_category::invalid_input, "store.bad_input", "record di input non valido",
                      {{"path", input.path}});
   }
@@ -517,9 +521,9 @@ input_record sqlite_dag_store::add_input(input_record input) {
   input.ino = static_cast<std::uint64_t>(st.st_ino);
   std::lock_guard lock(mutex_);
   transaction tx(db_);
-  statement ins(db_, "INSERT INTO inputs(path, size_bytes, sha256, role, dev, ino) VALUES(?1,?2,?3,?4,?5,?6)");
+  statement ins(db_, "INSERT INTO inputs(path, size_bytes, sha256, role, dev, ino, format) VALUES(?1,?2,?3,?4,?5,?6,?7)");
   ins.bind(1, input.path).bind_u64(2, input.size_bytes).bind(3, input.sha256).bind(4, input.role);
-  ins.bind_u64(5, input.dev).bind_u64(6, input.ino).run();
+  ins.bind_u64(5, input.dev).bind_u64(6, input.ino).bind(7, input.format).run();
   input.id = static_cast<std::uint64_t>(sqlite3_last_insert_rowid(db_));
   tx.commit();
   return input;
@@ -527,9 +531,11 @@ input_record sqlite_dag_store::add_input(input_record input) {
 
 std::vector<input_record> sqlite_dag_store::inputs() const {
   std::lock_guard lock(mutex_);
-  statement st(db_, "SELECT id, path, size_bytes, sha256, role, dev, ino FROM inputs ORDER BY id");
+  statement st(db_, "SELECT id, path, size_bytes, sha256, role, dev, ino, format FROM inputs ORDER BY id");
   std::vector<input_record> out;
-  while (st.step()) out.push_back(input_record{st.u64(0), st.text(1), st.u64(2), st.text(3), st.text(4), st.u64(5), st.u64(6)});
+  while (st.step()) {
+    out.push_back(input_record{st.u64(0), st.text(1), st.u64(2), st.text(3), st.text(4), st.u64(5), st.u64(6), st.text(7)});
+  }
   return out;
 }
 

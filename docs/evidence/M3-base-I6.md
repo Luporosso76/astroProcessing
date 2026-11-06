@@ -56,8 +56,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/calibration.cpp` | `1c0374933be597aea1eb326b72e5b69ad0cd5fa187be4329d08d935a7c994a51` |
 | `src/core/fits_header.cpp` | `0ac963b56356149b128339563f688294664ca9c8770a523bbcf925fc690e1b45` |
 | `src/core/fits_internal.hpp` | `e8b62f0bd808166ecaf603449199bfc7df1e3beb69f109a27e0466bfe8d4b09f` |
-| `src/core/image.cpp` | `053fe85fa341c93294522f72de472ef37a6156dbbe500a53044da8d62e0bf0dd` |
-| `src/core/include/astro/image.hpp` | `8e2a0b29675358ed71959620f5cfe4c9f364bf2a7219ccabc9fa276586ef22e4` |
+| `src/core/image.cpp` | `2dd625e140c522b0a1d12f543bced12dcc5ff08e3cb3d0f0b820946110bb8416` |
+| `src/core/include/astro/image.hpp` | `4f6007bbe26d4ab7946fd413451017bc73e6227ef0cb3255d16998106151b116` |
 | `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
 | `tests/unit/calib_support.hpp` | `433850f3376ede604c8ae6d311d9ec84133dc59af4cb345620431646b57ee060` |
 | `tests/unit/test_calibration.cpp` | `cc0c13ef54f7e317025996276dcf0048ae2fbf5dfcf894eec3d5a50710ea90af` |
@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_master.cpp` | `0ebd2a6c43e09f5965de4304e3a4f1e995b270fb88989328c93470777b3b7761` |
 | `tests/unit/test_measure.cpp` | `358d003a21b6bd1b560f036bb390657de7c904416cdace9813a789bdb54d0419` |
 
-- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
 <!-- evidence:end -->

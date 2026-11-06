@@ -191,9 +191,9 @@ Definiti in `docs/contracts/C-01-calibrazione-light.md` §9, con soglie e criter
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3A-C01-01 | G-OFFSET, F-IO-04; C-01.b §1 (stato dell'offset del light) | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-01 | G-OFFSET, F-IO-04; C-01.b §1 (stato dell'offset del light) | C-01.b | M3.a | verde (U5) |
 | T-M3A-C01-02 | G-OFFSET, P-OFFSET; C-01.b §1, ADR-16.b §b.5 | C-01.b | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-C01-03 | G-OFFSET, F-IO-04; C-01.b §10 (voce `light_offset`) | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-03 | G-OFFSET, F-IO-04; C-01.b §10 (voce `light_offset`) | C-01.b | M3.a | verde (U5) |
 | T-M3A-C01-04 | G-OFFSET, F-CAL-02.b, T-CAL-08; C-01.b §1, §9 (bias residuo, nero non sottratto) | C-01.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-C01-05 | G-OFFSET, P-OFFSET; C-01.b §6 (residuo del percorso parziale) | C-01.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-C01-06 | G-CAL; C-01.b §2 (dominio del light), ADR-16.b §b.2 | C-01.b | M3.a | PIANIFICATO — non eseguito |
@@ -392,7 +392,7 @@ Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime 
 | T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
 | T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
 | T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | PIANIFICATO |
-| T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
-| T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
-| T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | PIANIFICATO |
+| T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
+| T-M3A-08 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
+| T-M3A-09 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |
 | T-M3A-02 | F-IO-04 | nessun contratto: plans/M3a.md U4 | U4 | verde (U4) |

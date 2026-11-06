@@ -93,11 +93,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/fits_blocks.cpp` | `f6adaddd1dcf88337e9e2874a2f7a336d19645398eb2ca05dde85d90ff066ab7` |
 | `src/core/fits_header.cpp` | `0ac963b56356149b128339563f688294664ca9c8770a523bbcf925fc690e1b45` |
 | `src/core/fits_internal.hpp` | `e8b62f0bd808166ecaf603449199bfc7df1e3beb69f109a27e0466bfe8d4b09f` |
-| `src/core/image.cpp` | `053fe85fa341c93294522f72de472ef37a6156dbbe500a53044da8d62e0bf0dd` |
-| `src/core/include/astro/image.hpp` | `8e2a0b29675358ed71959620f5cfe4c9f364bf2a7219ccabc9fa276586ef22e4` |
-| `tests/unit/CMakeLists.txt` | `f5863caa240e9d59938e1493dcfc585e4d667f2d0cbf023d8d71b7eb5d6b5272` |
+| `src/core/image.cpp` | `2dd625e140c522b0a1d12f543bced12dcc5ff08e3cb3d0f0b820946110bb8416` |
+| `src/core/include/astro/image.hpp` | `4f6007bbe26d4ab7946fd413451017bc73e6227ef0cb3255d16998106151b116` |
+| `tests/unit/CMakeLists.txt` | `d757bc22a9c63246d14d3e63180545d0fc3874340cddb088ca85763e9861cf26` |
 | `tests/unit/test_measure.cpp` | `358d003a21b6bd1b560f036bb390657de7c904416cdace9813a789bdb54d0419` |
 
-- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
 <!-- evidence:end -->

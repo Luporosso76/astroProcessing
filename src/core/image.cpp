@@ -28,8 +28,7 @@ std::size_t checked_bytes(std::uint64_t count, std::size_t element) {
   return static_cast<std::size_t>(bytes);
 }
 
-// Limite del motivo del nero: LIBRAW_CBLACK_SIZE = 4104 meno i sei elementi iniziali (ADR-03.b §b.2).
-constexpr std::uint64_t max_black_pattern = 4098;
+constexpr std::uint64_t max_black_pattern = decoder_state::max_black_pattern;
 
 // Canali della cella 2x2 del pattern, ordine (0, 0) (0, 1) (1, 0) (1, 1): 0 rosso, 1 verde, 2 blu.
 std::array<int, 4> pattern_cell(cfa_pattern p) {

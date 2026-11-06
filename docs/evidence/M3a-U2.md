@@ -107,13 +107,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `CMakeLists.txt` | `7b1a76ed5d18e95b267d724998b1b2d0715382de9618a9e3b71af246afc9ac63` |
 | `docs/contracts/ADR-08-decoder-pack.md` | `e9f7a6f719f7f406de8a5fab80db9d6b43f6b07fb126d9ac53c4437052f38168` |
 | `docs/licenses.md` | `7a50e18608d22fb2041d030963630844ce886ac76df937a5ca6085c223ab8d46` |
-| `src/core/CMakeLists.txt` | `cd2a4dbfe6be91dfac1815ce83752d086c16de15b91c5dc1541ff906cfce6678` |
+| `src/core/CMakeLists.txt` | `0dffca21be9c9367d55971c144601d5b6872f22c2f0beeb6b33deeab6fb529de` |
 | `src/core/include/astro/raw_decode.hpp` | `ef65ebd958672813ff0bc931b2e2faf84fe58191cd8543623a5f8d10ef496a14` |
 | `src/core/raw_decode.cpp` | `7f3aa00829bf1911fe9400f87626ff2df01fd95a5cb1cbc6eea7b1bd75f42042` |
 | `tests/fixtures/syn_dng.hpp` | `7f87df440051ceb37f142e03f1e8e15f6cbafdfe3e99f26e1bd9d20bf87defb6` |
-| `tests/unit/CMakeLists.txt` | `f5863caa240e9d59938e1493dcfc585e4d667f2d0cbf023d8d71b7eb5d6b5272` |
+| `tests/unit/CMakeLists.txt` | `d757bc22a9c63246d14d3e63180545d0fc3874340cddb088ca85763e9861cf26` |
 | `tests/unit/test_raw_decode.cpp` | `8e3347b6ef24a9f61c153428898623c5e70c9daee03128190c9e501a149dc3cd` |
 
-- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
 <!-- evidence:end -->

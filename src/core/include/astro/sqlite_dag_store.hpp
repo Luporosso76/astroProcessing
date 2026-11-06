@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -113,7 +114,53 @@ struct input_record {
   // Identita' dell'originale letta da add_input con stat (regola hardlink, D18); ignorate in ingresso.
   std::uint64_t dev = 0;
   std::uint64_t ino = 0;
+  // Dichiarazione di formato del confine (BASE §2.5): `fits` o `raw`, con cui si riapre l'originale. Fuori elenco o
+  // vuota: invalid_input store.bad_input. Immutabile dopo la registrazione.
+  std::string format;  // obbligatorio: nessun default
 };
+
+// Stato della posizione registrata di un originale (F-IO-08, RL-02): osservazione del filesystem con un solo stat,
+// mai persistita. `status`: present, missing, inaccessible, changed; `reason`: codice del motivo, vuoto se present.
+struct input_state {
+  std::uint64_t input_id = 0;
+  std::string path;
+  std::string sha256;
+  std::uint64_t size_bytes = 0;
+  std::uint64_t dev = 0;
+  std::uint64_t ino = 0;
+  std::string status;
+  std::string reason;
+  std::optional<int> os_errno;         // se stat è fallita
+  std::string os_message;              // testo dell'errno, vuoto altrimenti
+  std::optional<std::uint64_t> found_dev;  // se stat è riuscita
+  std::optional<std::uint64_t> found_ino;
+};
+
+// Input registrato che non rende disponibile un arco (RL-03); `input_id` 0 e `path` vuoto per `input.unregistered`.
+struct blocked_input {
+  std::uint64_t input_id = 0;
+  std::string path;
+  std::string reason;
+};
+
+// Arco verso un file (digest e dimensione) dell'antenato transitivo del nodo di uno slot.
+struct blocked_edge {
+  std::string sha256;
+  std::uint64_t size_bytes = 0;
+  bool available = false;
+  std::vector<std::uint64_t> available_ids;  // input presenti con quel digest e quella dimensione, per id
+  std::vector<blocked_input> blockers;       // vuoto se available
+};
+
+struct slot_block {
+  std::string slot;
+  std::string node_key;
+  bool blocked = false;
+  std::vector<blocked_edge> edges;
+};
+
+// JSON canonico `astro.input_status.v1` degli stati e dei blocchi (il «motivo visibile» di F-IO-08).
+std::string input_status_canonical(const std::vector<input_state>& states, const std::vector<slot_block>& blocks);
 
 // Contenuto di un file derivato da scrivere con il protocollo atomico.
 struct artifact_content {
@@ -259,10 +306,23 @@ class sqlite_dag_store : public dag_store {
   void insert_setting(const std::string& key, const std::string& value_canonical);
   std::optional<std::string> get_setting(const std::string& key) const;
 
-  // Registra l'originale con la sua identita' (dev, ino) letta con stat. Assente: io input.missing; non regolare:
-  // invalid_input store.bad_input.
+  // Registra l'originale con la sua identità (dev, ino) letta con stat. Assente: io input.missing; non regolare o
+  // formato non ammesso: invalid_input store.bad_input.
   input_record add_input(input_record input);
   std::vector<input_record> inputs() const;
+
+  // F-IO-08. Stato di ogni originale registrato (per id) con un solo stat sul percorso registrato: nessuna scrittura,
+  // nessuna ricerca, nessuna lettura del contenuto (RL-02). Funziona anche in sola lettura.
+  std::vector<input_state> input_status() const;
+  // Slot attaccati con gli archi verso file dei loro antenati e l'esito di ciascuno sugli `states` dati (RL-03).
+  // Funzione degli stati passati: nessuno stat. Input registrato raggiunto da un arco e senza stato: invalid_input relink.state_missing.
+  std::vector<slot_block> blocked_slots(const std::vector<input_state>& states) const;
+  // Unica funzione che cambia la posizione di un originale (RL-05): il candidato `path` (assoluto, fuori dal progetto)
+  // è verificato per dimensione e SHA-256 registrati nel confine, poi `inputs` e `input_relinks` cambiano in una sola
+  // transazione. Errori: schema store.read_only; invalid_input relink.unknown_input, relink.path_not_absolute;
+  // security relink.target_forbidden, fs.original_inode; integrity relink.identity_changed e quelli del confine.
+  input_record relink_input(std::uint64_t input_id, const std::string& path, std::span<std::byte> work,
+                            const std::function<void()>& check_cancel);
 
   // Passi 1-5 della scrittura atomica per ogni file; nessuna riga viene scritta.
   std::vector<stored_file> write_files(const std::vector<artifact_content>& files);

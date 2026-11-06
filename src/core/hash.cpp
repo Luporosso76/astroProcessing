@@ -135,9 +135,10 @@ content_digest digest_input(const fits_input& input, std::span<std::byte> work, 
   return hasher.finish();
 }
 
-void reverify_input(const std::string& path, const input_format& format, const fits_input* opened,
-                    const content_digest& expected, std::span<std::byte> work,
-                    const std::function<void()>& check_cancel) {
+std::pair<std::uint64_t, std::uint64_t> reverify_input(const std::string& path, const input_format& format,
+                                                       const fits_input* opened, const content_digest& expected,
+                                                       std::span<std::byte> work,
+                                                       const std::function<void()>& check_cancel) {
   ASTRO_ASSERT(opened == nullptr || &opened->format() == &format);
   const fits_input input = open_input(path, format);
   if (input.size_bytes() != expected.size_bytes) {
@@ -148,6 +149,7 @@ void reverify_input(const std::string& path, const input_format& format, const f
   require_input_digest(digest_input(input, work, check_cancel), expected, path);
   fits_detail::check_unchanged(input);
   if (opened != nullptr) fits_detail::check_unchanged(*opened);
+  return fits_detail::identity_of(input);
 }
 
 std::vector<std::uint8_t> read_verified_fits(const std::string& path, const content_digest& expected,

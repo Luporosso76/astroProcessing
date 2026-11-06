@@ -78,7 +78,7 @@ void setup_project(const fs::path& dir, const frames& f, std::size_t imports = 0
   auto store = sqlite_dag_store::create(dir);
   for (const fs::path& p : f.files) {
     const content_digest d = file_digest(p);
-    store->add_input(input_record{0, p.string(), d.size_bytes, d.sha256, "frame"});
+    store->add_input(input_record{0, p.string(), d.size_bytes, d.sha256, "frame", 0, 0, "fits"});
   }
   for (std::size_t k = 0; k < imports; ++k) {
     const node_spec node = make_import_node(import_request_of(f, k, {}));
@@ -899,7 +899,7 @@ hardlink_fixture hardlink_project(const std::string& name) {
   st::write_text(h.original, "original pixels");
   auto store = sqlite_dag_store::create(h.project);
   const content_digest d = file_digest(h.original);
-  const input_record in = store->add_input(input_record{0, h.original.string(), d.size_bytes, d.sha256, "light"});
+  const input_record in = store->add_input(input_record{0, h.original.string(), d.size_bytes, d.sha256, "light", 0, 0, "fits"});
   struct stat s {};
   EXPECT_EQ(::stat(h.original.c_str(), &s), 0);
   EXPECT_EQ(in.dev, static_cast<std::uint64_t>(s.st_dev));
@@ -1036,9 +1036,9 @@ TEST(Recovery, T_M2R4_05_hardlinks_of_originals_or_project_files_stop_as_securit
     SCOPED_TRACE("originale assente all'import");
     const fs::path dir = st::fresh_dir("r405f");
     auto store = sqlite_dag_store::create(dir);
-    EXPECT_STOP(store->add_input(input_record{0, (dir / "missing.fits").string(), 1, std::string(64, 'a'), "light"}),
+    EXPECT_STOP(store->add_input(input_record{0, (dir / "missing.fits").string(), 1, std::string(64, 'a'), "light", 0, 0, "fits"}),
                 error_category::io, "input.missing");
-    EXPECT_STOP(store->add_input(input_record{0, (dir / "artifacts").string(), 1, std::string(64, 'a'), "light"}),
+    EXPECT_STOP(store->add_input(input_record{0, (dir / "artifacts").string(), 1, std::string(64, 'a'), "light", 0, 0, "fits"}),
                 error_category::invalid_input, "store.bad_input");
   }
 }

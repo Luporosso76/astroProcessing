@@ -22,10 +22,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/thumbnail_cache.cpp` | `732030d91566f407df2125963ec36ce39b0d3476d3d16e1edc69cd8d6905279d` |
 | `src/core/workflow.cpp` | `9eaadacfce9fb87b2d5dc4998411efc27d15c4d6084cd48595ae446a50ffa84a` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
-| `tests/unit/test_recovery.cpp` | `884b87b25700b53ff9263a0b20b26139e798ed92d8368866e5ca3c08fee0ccaf` |
+| `tests/unit/test_recovery.cpp` | `8c610e954f03c6a841e7fa574da3b040ba6aace60f7dcdceda7ccd97d88e9bab` |
 
-- Test release (`tmp/release-junit.xml`): totali 937, fast 919, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 919, fast 919, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 979, fast 961, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 961, fast 961, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

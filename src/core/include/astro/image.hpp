@@ -202,6 +202,8 @@ struct decoder_state {
   // FC(r, c) dei siti (0, 0), (0, 1), (1, 0), (1, 1) della cella all'origine dell'area visibile.
   std::array<std::uint8_t, 4> cfa_color_index{};
   std::array<std::uint32_t, 4> black_per_color{};
+  // Limite del motivo del nero: LIBRAW_CBLACK_SIZE = 4104 meno i sei elementi iniziali (ADR-03.b §b.2).
+  static constexpr std::uint64_t max_black_pattern = 4098;
   std::uint32_t black_pattern_rows = 0;
   std::uint32_t black_pattern_cols = 0;
   std::vector<std::uint32_t> black_pattern;
