@@ -60,13 +60,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/raw_decode.cpp` | `0e8ce66a76ebf3704db608ff5e1facf827b3aa132ca56c33d952ff7c96c80f90` |
 | `src/core/raw_import_job.cpp` | `2840fcdc7c19f47dca9f566c402aaf045b336effb393059e05ce9e4b2099efd0` |
 | `tests/u4/test_raw07_offline.py` | `9c9a95ea09f39204064ff7de3f1cc43b3082826d4df2e88fa04e740736157836` |
-| `tests/unit/CMakeLists.txt` | `553321640af3e26f9778919b587368f3a05398672d0088976358989e6a6f76f7` |
+| `tests/unit/CMakeLists.txt` | `6c958dd237e5b18b5b0828950505d10e575bdbe88f4ec6b45727b7860e806646` |
 | `tests/unit/raw_import_run.cpp` | `7dfa3731a61351d3b4e079d8906f7e3f9e404d57e894656353f5bce41ef71c65` |
 | `tests/unit/raw_record_keys.hpp` | `5a44d26cb5e8a6211cd498cbd50af34c6b92cf42f7d2b9e91d6facb72a3ce57c` |
 | `tests/unit/test_raw_import.cpp` | `5284ec3d606223fa2261ddc928af0b859e1f45c45b5a34472b6ba25571aa0933` |
 | `tests/unit/test_raw_import_record.cpp` | `476049bd106a85d443abbc49f9af05d27e3150300aeef6d9964206db6cd918e6` |
 | `tools/check_offline.sh` | `9f9ada7e6c9f201ba5a921d7bc76e932e07c2f67ae4aa8ac9f83b69ad8762b71` |
 
-- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
 <!-- evidence:end -->

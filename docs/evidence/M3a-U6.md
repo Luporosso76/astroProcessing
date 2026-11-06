@@ -42,17 +42,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-16-stati-master.md` | `1c8f3a6b772367fe19a762d1ada1e408a35dd2b1fd018fb265086a20dfd7f456` |
+| `docs/contracts/ADR-16-stati-master.md` | `703ce7ac2ed085f4aca2b6fa716bb528c21ba58d15316e20333fbf37c4994ff4` |
 | `docs/contracts/C-01-calibrazione-light.md` | `063e14eacdbf25c92b31cf78c4bb6e19934d39fada23a06ba0c24d7fe8212162` |
 | `src/core/calibration.cpp` | `552fcc48742a6a543c408e8c7adb2cd20c68bd71d3deb08fa1a4cdd2076d430d` |
-| `src/core/calibration_analysis.cpp` | `3da9e8d975ddb59acb79e4b10b217fe6b6ba905c05d4241c25d96ccb40d5f172` |
+| `src/core/calibration_analysis.cpp` | `ef641f3be2d55582cc3096b26ee0d44d8726fbf6d7051b1c5c3f73e81e694e6d` |
 | `src/core/fits.cpp` | `ef596caae35a0bf99f0384d53bf2d901fed8609794db13ff32a50f1865789b5b` |
-| `src/core/include/astro/calibration_analysis.hpp` | `d0b0f83a5b0645252a91f46a86267802003cb9a0772625d59bb1ebc94d9e62bf` |
+| `src/core/include/astro/calibration_analysis.hpp` | `c88647b30b362c843d9bc26a70f69b9caf8713516c0a05fbe84f806cbd0126e9` |
 | `src/core/include/astro/operations.hpp` | `0ff6fe02460c785052085650cbeb2214d49051318f10f5d83c80a4c73010f6df` |
 | `src/core/operations.cpp` | `f1f5b17966332891c75e50c0ee8d91e73034f32b19d65c082a66a1b75d1a88ae` |
 | `tests/unit/test_calibration.cpp` | `27eba24afcba2e21b4f50e65b2e49608f06e6abe12e902340976d8efb40bb373` |
 | `tests/unit/test_calibration_analysis_u6.cpp` | `9e49e992d39bee25961a5320831e1146464d5e89479c262b967ad4a475cbaa0e` |
 
-- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
 <!-- evidence:end -->

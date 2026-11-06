@@ -29,8 +29,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_store.cpp` | `06de27ef8db29c9c45d168c3858883a2a6528e6004b36518bc3adfac52bdbdac` |
 | `tests/unit/test_store_review.cpp` | `23e1dc408879523e5fe06725dd029ee0968f07ef21d7ee76aac76381987d034e` |
 
-- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

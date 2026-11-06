@@ -1,10 +1,14 @@
 #include "astro/calibration_analysis.hpp"
 
 #include <algorithm>
+#include <array>
+#include <bit>
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "astro/error.hpp"
 #include "astro/operations.hpp"
@@ -69,6 +73,18 @@ const char* to_string(light_chain chain) noexcept {
     case light_chain::dark: return "light.dark";
     case light_chain::bias_dark_sub: return "light.bias_dark_sub";
     case light_chain::dark_sub_partial: return "light.dark_sub_partial";
+  }
+  std::abort();  // enum fuori dai valori dichiarati: memoria corrotta
+}
+
+const char* to_string(flat_chain chain) noexcept {
+  switch (chain) {
+    case flat_chain::none: return "flat.none";
+    case flat_chain::dark_flat: return "flat.dark_flat";
+    case flat_chain::bias_dark_flat_sub: return "flat.bias_dark_flat_sub";
+    case flat_chain::bias: return "flat.bias";
+    case flat_chain::normalize: return "flat.normalize";
+    case flat_chain::given_q: return "flat.given_q";
   }
   std::abort();  // enum fuori dai valori dichiarati: memoria corrotta
 }
@@ -358,6 +374,7 @@ struct candidate_work {
   reason own;          // motivo che vale in ogni catena
   reason light_pair;   // L–X: catene del light (per il flat, L–F: tutte le sue catene)
   reason flat_pair;    // F–DF, F–B: catene del flat
+  reason thermal;      // controllo termico: solo la catena `flat.bias` del flat
   bool raw = false;    // descrittore con `frame_decoder_states`
   decoder_states decoder;
 };
@@ -367,6 +384,357 @@ void check_nonnegative_param(const std::optional<double>& v, const char* name) {
   if (why)
     stop(error_category::invalid_input, std::string("calib.param.") + name, "dichiarazione richiesta da una coppia presente",
          {{"parametro", name}, {"motivo", why}});
+}
+
+// Dominio di un parametro della ricetta o di una dichiarazione (ADR-16.a §2, §b.5).
+enum class param_domain { nonnegative, positive, open_unit };
+
+const char* domain_violation(double v, param_domain d) {
+  if (!std::isfinite(v)) return "non finito";
+  switch (d) {
+    case param_domain::nonnegative: return v < 0 ? "deve essere >= 0" : nullptr;
+    case param_domain::positive: return v > 0 ? nullptr : "deve essere > 0";
+    case param_domain::open_unit: return v > 0 && v < 1 ? nullptr : "deve essere in (0, 1)";
+  }
+  std::abort();
+}
+
+[[noreturn]] void bad_param(const std::string& name, const char* why) {
+  stop(error_category::invalid_input, "calib.param." + name, "parametro della calibrazione fuori regola",
+       {{"parametro", name}, {"motivo", why}});
+}
+
+// Dichiarazioni non richieste dall'analisi: se presenti, nel dominio; le due termiche insieme.
+void check_optional_declarations(const calibration_declarations& d) {
+  const auto in_domain = [](const std::optional<double>& v, const char* name, param_domain dom) {
+    if (!v) return;
+    if (const char* why = domain_violation(*v, dom)) bad_param(name, why);
+  };
+  in_domain(d.q_min, "q_min", param_domain::positive);
+  in_domain(d.q_rel_sigma_max, "q_rel_sigma_max", param_domain::positive);
+  if (d.flat_thermal_bound_adu.has_value() != d.flat_thermal_rel_budget.has_value())
+    bad_param(d.flat_thermal_bound_adu ? "flat_thermal_rel_budget" : "flat_thermal_bound_adu",
+              "assente: le due dichiarazioni termiche vanno insieme");
+  in_domain(d.flat_thermal_bound_adu, "flat_thermal_bound_adu", param_domain::nonnegative);
+  in_domain(d.flat_thermal_rel_budget, "flat_thermal_rel_budget", param_domain::open_unit);
+}
+
+// ---------------------------------------------------------------- aritmetica esatta del controllo termico
+
+// Intero senza segno a parole di 32 bit, dalla meno significativa. 768 bit bastano: i prodotti del controllo termico
+// hanno al più 160 bit (tre mantisse di 53 bit, o una mantissa per (2^53 + 1)^2) e l'allineamento di due valori della
+// stessa lunghezza in bit sposta al più di quella lunghezza.
+class wide_uint {
+ public:
+  static constexpr std::size_t words = 24;
+
+  wide_uint() = default;
+  explicit wide_uint(std::uint64_t v) {
+    w_[0] = static_cast<std::uint32_t>(v);
+    w_[1] = static_cast<std::uint32_t>(v >> 32);
+  }
+
+  int bit_length() const {
+    for (std::size_t i = words; i-- > 0;) {
+      if (w_[i] != 0) return static_cast<int>(i * 32) + 32 - std::countl_zero(w_[i]);
+    }
+    return 0;
+  }
+
+  wide_uint times(const wide_uint& o) const {
+    ASTRO_ASSERT(bit_length() + o.bit_length() <= static_cast<int>(words * 32));
+    wide_uint r;
+    for (std::size_t i = 0; i < words; ++i) {
+      std::uint64_t carry = 0;
+      for (std::size_t j = 0; i + j < words; ++j) {
+        const std::uint64_t t = std::uint64_t{w_[i]} * o.w_[j] + r.w_[i + j] + carry;
+        r.w_[i + j] = static_cast<std::uint32_t>(t);
+        carry = t >> 32;
+      }
+    }
+    return r;
+  }
+
+  wide_uint shifted_left(int s) const {
+    ASTRO_ASSERT(s >= 0 && bit_length() + s <= static_cast<int>(words * 32));
+    wide_uint r;
+    const std::size_t q = static_cast<std::size_t>(s) / 32;
+    const unsigned b = static_cast<unsigned>(s) % 32;
+    for (std::size_t i = words; i-- > q;) {
+      std::uint64_t v = std::uint64_t{w_[i - q]} << b;
+      if (b != 0 && i - q > 0) v |= std::uint64_t{w_[i - q - 1]} >> (32 - b);
+      r.w_[i] = static_cast<std::uint32_t>(v);
+    }
+    return r;
+  }
+
+  friend int compare(const wide_uint& a, const wide_uint& b) {
+    for (std::size_t i = words; i-- > 0;) {
+      if (a.w_[i] != b.w_[i]) return a.w_[i] < b.w_[i] ? -1 : 1;
+    }
+    return 0;
+  }
+
+ private:
+  std::array<std::uint32_t, words> w_{};
+};
+
+// Valore esatto `m · 2^e`.
+struct exact_value {
+  wide_uint m;
+  int e = 0;
+};
+
+// Un double finito e non negativo è `m · 2^(e − 53)` con `m` intero di al più 53 bit (frexp, anche per i subnormali).
+exact_value exact_of(double x) {
+  ASTRO_ASSERT(std::isfinite(x) && x >= 0);
+  if (x == 0) return {};
+  int e = 0;
+  const double f = std::frexp(x, &e);
+  return {wide_uint(static_cast<std::uint64_t>(std::ldexp(f, 53))), e - 53};
+}
+
+exact_value operator*(const exact_value& a, const exact_value& b) { return {a.m.times(b.m), a.e + b.e}; }
+
+int compare(const exact_value& a, const exact_value& b) {
+  const int la = a.m.bit_length(), lb = b.m.bit_length();
+  if (la == 0 || lb == 0) return la == lb ? 0 : (la == 0 ? -1 : 1);
+  if (la + a.e != lb + b.e) return la + a.e < lb + b.e ? -1 : 1;
+  return a.e >= b.e ? compare(a.m.shifted_left(a.e - b.e), b.m) : compare(a.m, b.m.shifted_left(b.e - a.e));
+}
+
+// Vista di un ingresso per la regola dei pixel validi per N di ADR-16.a §6 (`valid_for_n`).
+calib_detail::input_view view_of(const image& im) {
+  calib_detail::input_view v;
+  v.samples = im.samples.data();
+  v.mask = im.invalid.bits.data();
+  v.f32 = im.type == sample_type::f32;
+  if (im.metadata.saturation_adu) {
+    v.has_saturation = true;
+    v.saturation = im.metadata.saturation_adu->value;
+  }
+  return v;
+}
+
+// Controllo termico di `flat.bias` (§b.5): per ogni canale di normalizzazione `c`, con `N_c` = mediana f64 di
+// `Fc = fl(F − B)` sui pixel validi per N, la catena resta ammessa se e solo se, in aritmetica esatta sui valori f64,
+// `bound ≤ budget · q_min · N_c` e `bound · (1 + u)^2 < q_min · N_c` (cioè `β⁺_c < 1`, `u = 2^-53`). Un canale senza
+// pixel validi, o con `N_c` non positiva o non finita, esclude la catena: `β_c` non è definito o il limite di §b.5 non
+// vale (con `N_c ≤ 0` le due disuguaglianze di esclusione sono vere). L'esclusione è della sola catena (§b.1, §b.3).
+bool flat_bias_within_budget(const image& flat, const image& bias, const calibration_declarations& d) {
+  if (!d.normalization) bad_param("normalization", "assente: richiesta dal controllo termico di flat.bias");
+  if (!d.q_min) bad_param("q_min", "assente: richiesto dal controllo termico di flat.bias");
+  const bool per_channel = *d.normalization == normalization_mode::cfa_channel_median;
+  if (per_channel && (flat.layout != plane_layout::cfa || !flat.cfa))
+    stop(error_category::invalid_input, "calib.normalization_requires_cfa", "cfa_channel_median richiede un flat CFA",
+         {{"role", "flat"}, {"layout", calib_detail::layout_name(flat.layout)}});
+  validate_image(flat);
+  validate_image(bias);
+  // La coppia F–B ammessa ha larghezza e altezza uguali; layout mono o cfa: un piano.
+  ASTRO_ASSERT(flat.geometry.width == bias.geometry.width && flat.geometry.height == bias.geometry.height);
+  const calib_detail::input_view f = view_of(flat), b = view_of(bias);
+  const std::uint32_t w = flat.geometry.width, h = flat.geometry.height;
+  const std::uint32_t cx = per_channel ? flat.cfa->x_offset : 0, cy = per_channel ? flat.cfa->y_offset : 0;
+  std::array<std::vector<double>, 4> fc;
+  for (std::uint32_t y = 0; y < h; ++y) {
+    for (std::uint32_t x = 0; x < w; ++x) {
+      const std::size_t i = std::size_t{y} * w + x;
+      if (!calib_detail::valid_for_n(f, b, i)) continue;
+      const std::size_t c = per_channel ? ((y + cy) & 1u) * 2 + ((x + cx) & 1u) : 0;
+      fc[c].push_back(f.value(i) - b.value(i));
+    }
+  }
+  const exact_value bound = exact_of(*d.flat_thermal_bound_adu);
+  const exact_value budget_q = exact_of(*d.flat_thermal_rel_budget) * exact_of(*d.q_min);
+  const wide_uint two53_plus_one((std::uint64_t{1} << 53) + 1);
+  const exact_value bound_plus{bound.m.times(two53_plus_one).times(two53_plus_one), bound.e - 106};
+  bool within = true;
+  for (std::size_t c = 0; c < (per_channel ? 4u : 1u); ++c) {
+    if (fc[c].empty()) {
+      within = false;
+      continue;
+    }
+    const double n = calib_detail::median_of(fc[c]);
+    if (!std::isfinite(n) || !(n > 0)) {
+      within = false;
+      continue;
+    }
+    const exact_value q_n = exact_of(*d.q_min) * exact_of(n);
+    if (compare(bound, budget_q * exact_of(n)) > 0 || compare(bound_plus, q_n) >= 0) within = false;
+  }
+  return within;
+}
+
+// ---------------------------------------------------------------- catene, insieme ammissibile e default
+
+// Ruoli dei master di una catena, nell'ordine della formula di §b.5 (il flat prima degli altri ingressi del flat).
+std::vector<master_role> members_of(light_chain c) {
+  switch (c) {
+    case light_chain::none: return {};
+    case light_chain::bias: return {master_role::bias};
+    case light_chain::dark: return {master_role::dark};
+    case light_chain::bias_dark_sub: return {master_role::bias, master_role::dark};
+    case light_chain::dark_sub_partial: return {master_role::dark};
+  }
+  std::abort();
+}
+
+std::vector<master_role> members_of(flat_chain c) {
+  switch (c) {
+    case flat_chain::none: return {};
+    case flat_chain::dark_flat: return {master_role::flat, master_role::dark_flat};
+    case flat_chain::bias_dark_flat_sub: return {master_role::flat, master_role::bias, master_role::dark_flat};
+    case flat_chain::bias: return {master_role::flat, master_role::bias};
+    case flat_chain::normalize:
+    case flat_chain::given_q: return {master_role::flat};
+  }
+  std::abort();
+}
+
+constexpr light_chain all_light[] = {light_chain::none, light_chain::bias, light_chain::dark, light_chain::bias_dark_sub,
+                                     light_chain::dark_sub_partial};
+constexpr flat_chain all_flat[] = {flat_chain::none, flat_chain::dark_flat, flat_chain::bias_dark_flat_sub,
+                                   flat_chain::bias, flat_chain::normalize, flat_chain::given_q};
+
+// Priorità di §b.6, dalla più alta. `flat.given_q` e `flat.normalize` si escludono per lo stato del flat.
+constexpr light_chain light_priority[] = {light_chain::dark, light_chain::bias_dark_sub, light_chain::dark_sub_partial,
+                                          light_chain::bias, light_chain::none};
+constexpr flat_chain flat_priority[] = {flat_chain::given_q, flat_chain::normalize, flat_chain::dark_flat,
+                                        flat_chain::bias_dark_flat_sub, flat_chain::bias, flat_chain::none};
+
+offset_state offset_after(light_chain c, bool light_raw) {
+  if (c == light_chain::bias || c == light_chain::dark || c == light_chain::bias_dark_sub) return offset_state::removed;
+  return light_raw ? offset_state::known_not_removed : offset_state::unknown;
+}
+
+const candidate_analysis* find_role(const calibration_analysis& a, master_role r) {
+  for (const candidate_analysis& c : a.candidates) {
+    if (c.role == r) return &c;
+  }
+  return nullptr;
+}
+
+const chain_verdict* verdict_in(const candidate_analysis& c, const std::string& chain) {
+  for (const chain_verdict& v : c.chains) {
+    if (v.chain == chain) return &v;
+  }
+  return nullptr;
+}
+
+bool usable_in(const calibration_analysis& a, master_role r, const std::string& chain) {
+  const candidate_analysis* c = find_role(a, r);
+  if (!c) return false;
+  const chain_verdict* v = verdict_in(*c, chain);
+  return v && v->status == candidate_status::usable;
+}
+
+template <class Chain>
+bool chain_admissible(const calibration_analysis& a, Chain c) {
+  for (master_role r : members_of(c)) {
+    if (!usable_in(a, r, to_string(c))) return false;
+  }
+  if constexpr (std::is_same_v<Chain, flat_chain>) {
+    if (c == flat_chain::bias && !a.flat_thermal_within_budget) return false;
+  }
+  return true;
+}
+
+// Uso dei parametri da parte di una coppia di catene (§b.5, ADR-16.a §2, §b.7).
+struct param_use {
+  bool exposure, temperature, normalization, division, thermal, decoder;
+};
+
+param_use uses_of(light_chain lc, flat_chain fc, bool light_raw) {
+  const bool dark = lc == light_chain::dark || lc == light_chain::bias_dark_sub || lc == light_chain::dark_sub_partial;
+  const bool bias = lc == light_chain::bias || lc == light_chain::bias_dark_sub || fc == flat_chain::bias_dark_flat_sub ||
+                    fc == flat_chain::bias;
+  const bool dark_flat = fc == flat_chain::dark_flat || fc == flat_chain::bias_dark_flat_sub;
+  const bool computes_n = fc == flat_chain::dark_flat || fc == flat_chain::bias_dark_flat_sub || fc == flat_chain::bias ||
+                          fc == flat_chain::normalize;
+  return {dark || dark_flat, dark || bias || dark_flat, computes_n, fc != flat_chain::none, fc == flat_chain::bias, light_raw};
+}
+
+// Ricetta con i parametri delle sue catene copiati dalle dichiarazioni; assente se ne manca uno (il default non inventa
+// una dichiarazione).
+std::optional<chain_recipe> recipe_from(const calibration_declarations& d, light_chain lc, flat_chain fc, bool light_raw) {
+  const param_use u = uses_of(lc, fc, light_raw);
+  chain_recipe r;
+  r.light = lc;
+  r.flat = fc;
+  bool complete = true;
+  const auto take = [&complete](bool used, auto& field, const auto& declared) {
+    if (!used) return;
+    if (!declared) complete = false;
+    field = declared;
+  };
+  take(u.exposure, r.exposure_rel_tol, d.exposure_rel_tol);
+  take(u.temperature, r.temp_policy, d.temp_policy);
+  take(u.temperature && d.temp_policy == temperature_policy::compare, r.temperature_abs_tol_c, d.temperature_abs_tol_c);
+  take(u.normalization, r.normalization, d.normalization);
+  take(u.division, r.q_min, d.q_min);
+  take(u.division, r.q_rel_sigma_max, d.q_rel_sigma_max);
+  take(u.thermal, r.flat_thermal_bound_adu, d.flat_thermal_bound_adu);
+  take(u.thermal, r.flat_thermal_rel_budget, d.flat_thermal_rel_budget);
+  take(u.decoder, r.decoder_black_abs_tol_adu, d.decoder_black_abs_tol_adu);
+  if (!complete) return std::nullopt;
+  return r;
+}
+
+// Predicati, insieme ammissibile e default (§b.4–§b.6) dall'esito per catena dei candidati.
+void complete_analysis(calibration_analysis& a, const candidate_work& dark_flat, const candidate_work& flat) {
+  const auto status_of = [&a](master_role r) {
+    const candidate_analysis* c = find_role(a, r);
+    return c ? std::optional<candidate_status>(c->status) : std::nullopt;
+  };
+  const bool x = status_of(master_role::dark) == candidate_status::usable;
+  const bool y = status_of(master_role::flat) == candidate_status::usable;
+  // z: una catena conta solo se i suoi membri sono tutti ammessi; senza flat ammesso le catene del flat non esistono.
+  const bool z = usable_in(a, master_role::bias, "light.bias") || usable_in(a, master_role::bias, "light.bias_dark_sub") ||
+                 (y && (usable_in(a, master_role::bias, "flat.bias_dark_flat_sub") ||
+                        usable_in(a, master_role::bias, "flat.bias")));
+  a.predicates.dfb = std::string("P-DFB") + (x ? '1' : '0') + (y ? '1' : '0') + (z ? '1' : '0');
+  if (y) a.predicates.flat_available = flat.c->descriptor.flat;
+  if (const std::optional<candidate_status> df = status_of(master_role::dark_flat)) {
+    if (*df == candidate_status::excluded) a.predicates.df = dark_flat_predicate::bad;
+    else
+      a.predicates.df = dark_flat.c->descriptor.additive == additive_state::bias_subtracted ? dark_flat_predicate::sub
+                                                                                             : dark_flat_predicate::inc;
+  }
+
+  for (light_chain lc : all_light) {
+    if (!chain_admissible(a, lc)) continue;
+    const offset_state off = offset_after(lc, a.light_has_decoder_state);
+    for (flat_chain fc : all_flat) {
+      if (!chain_admissible(a, fc)) continue;
+      if (fc == flat_chain::none || off == offset_state::removed) a.admissible.push_back({lc, fc, false});
+      else if (off == offset_state::known_not_removed) a.admissible.push_back({lc, fc, true});
+    }
+  }
+
+  const calibration_declarations& d = a.declarations;
+  const bool raw = a.light_has_decoder_state;
+  light_chain light = light_chain::none;
+  for (light_chain lc : light_priority) {
+    // Le dichiarazioni delle catene del light sono già obbligatorie nell'analisi: qui `recipe_from` non esclude mai una
+    // catena ammissibile, e il controllo resta per simmetria col ciclo del flat.
+    if (chain_admissible(a, lc) && recipe_from(d, lc, flat_chain::none, raw)) {
+      light = lc;
+      break;
+    }
+  }
+  flat_chain chosen = flat_chain::none;
+  if (offset_after(light, raw) == offset_state::removed) {
+    for (flat_chain fc : flat_priority) {
+      if (chain_admissible(a, fc) && recipe_from(d, light, fc, raw)) {
+        chosen = fc;
+        break;
+      }
+    }
+  }
+  const std::optional<chain_recipe> recipe = recipe_from(d, light, chosen, raw);
+  // `light.none` + `flat.none` usa solo la tolleranza del nero, obbligatoria per un light con stato del decoder.
+  ASTRO_ASSERT(recipe.has_value());
+  a.default_recipe = *recipe;
 }
 
 // Dominio del light (C-01.b §2, §7; ADR-03.b §b.14 riga `calibrate_light`): ogni violazione ferma l'analisi.
@@ -452,6 +820,7 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
     if (*decl.temp_policy == temperature_policy::compare)
       check_nonnegative_param(decl.temperature_abs_tol_c, "temperature_abs_tol_c");
   }
+  check_optional_declarations(decl);
   // Esiti per candidato (§b.2, C-01.b §2, §7, §b.7), nell'ordine: stato, dominio, IMAGETYP, ingresso condiviso, stato
   // del decoder.
   for (int k = 0; k < 4; ++k) {
@@ -501,6 +870,14 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
     if (bias.c) bias.flat_pair = pair(bias, f, flat.raw, flat.decoder, {"F-B", true, false});
   }
 
+  // Controllo termico di `flat.bias`, solo con le dichiarazioni e con flat `raw` e bias ammessi nella coppia F–B.
+  bool thermal_within = false;
+  if (decl.flat_thermal_bound_adu && flat.c && !flat.own && !flat.light_pair && flat.c->descriptor.flat == flat_state::raw &&
+      bias.c && !bias.own && !bias.flat_pair) {
+    thermal_within = flat_bias_within_budget(flat.c->img, bias.c->img, decl);
+    if (!thermal_within) flat.thermal = "flat_thermal_budget";
+  }
+
   calibration_analysis out;
   for (const candidate_work& w : work) {
     if (!w.c) continue;
@@ -508,14 +885,150 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
     ca.role = w.c->descriptor.role;
     for (const std::string& chain : w.chains) {
       const bool flat_chain = is_flat_chain(chain) && ca.role != master_role::flat;
-      const reason r = w.own ? w.own : flat_chain ? w.flat_pair : w.light_pair;
+      // Senza flat candidato le catene del flat del bias non esistono (§b.4).
+      if (flat_chain && ca.role == master_role::bias && !flat.c) continue;
+      reason r = w.own ? w.own : flat_chain ? w.flat_pair : w.light_pair;
+      if (!r && ca.role == master_role::flat && chain == "flat.bias") r = w.thermal;
       ca.chains.push_back(chain_verdict{chain, r ? candidate_status::excluded : candidate_status::usable, r});
       if (!r) ca.status = candidate_status::usable;
     }
     out.candidates.push_back(std::move(ca));
   }
   out.warnings = std::move(warnings);
+  out.flat_thermal_within_budget = thermal_within;
+  out.light_has_decoder_state = light_raw;
+  out.declarations = decl;
+  complete_analysis(out, dark_flat, flat);
   return out;
+}
+
+// ---------------------------------------------------------------- selezione (§b.1 punto 2, §b.9)
+
+bool p_flat_raw(const chain_recipe& r) noexcept {
+  return r.flat == flat_chain::dark_flat || r.flat == flat_chain::bias_dark_flat_sub || r.flat == flat_chain::bias;
+}
+
+bool p_flat_q(const chain_recipe& r) noexcept { return r.flat == flat_chain::given_q; }
+
+bool p_offset(const chain_recipe& r) noexcept { return r.flat != flat_chain::none; }
+
+namespace {
+
+[[noreturn]] void not_admissible(const std::string& why, const std::string& chain, const char* role) {
+  stop(error_category::invalid_input, "calib.recipe_not_admissible", "ricetta fuori dall'insieme ammissibile",
+       {{"reason", why}, {"chain", chain}, {"role", role}});
+}
+
+bool has_chain(const candidate_analysis& c, const char* chain) { return verdict_in(c, chain) != nullptr; }
+
+// Motivo di §b.10 per una catena che lo stato del master non accetta: lo stato si legge dalle catene del candidato
+// (§b.5: `D` → `light.dark`, `D'` → le due catene di `D'`; `DF` / `DF'`; flat `raw`, `corrected_unnormalized`,
+// `calibrated`). Le combinazioni senza un motivo proprio nella lista chiusa sono `master_excluded`.
+std::string incoherent_reason(const candidate_analysis& c, const std::string& chain) {
+  switch (c.role) {
+    case master_role::dark:
+      if (chain == "light.dark") return "light_offset_not_removed";   // L − D' lascia l'offset
+      if (chain == "light.bias_dark_sub") return "double_offset";     // L − B − D
+      return "master_excluded";
+    case master_role::dark_flat:
+      if (chain == "flat.dark_flat") return "dark_flat_sub_requires_bias";  // F − DF' lascia B_F
+      return "double_offset";                                               // F − B − DF
+    case master_role::flat: {
+      const bool raw = has_chain(c, "flat.dark_flat");
+      const bool corrected = has_chain(c, "flat.normalize");
+      if (chain == "flat.normalize" || chain == "flat.given_q") {
+        if (raw) return "flat_offset_not_removable";
+        return corrected ? "master_excluded" : "flat_already_corrected";
+      }
+      return "flat_already_corrected";
+    }
+    case master_role::bias: return "master_excluded";
+  }
+  std::abort();
+}
+
+bool has_reason(const candidate_analysis& c, const char* why) {
+  return std::any_of(c.chains.begin(), c.chains.end(), [why](const chain_verdict& v) { return v.reason == why; });
+}
+
+template <class Chain>
+void require_chain(const calibration_analysis& a, Chain chain) {
+  const std::string name = to_string(chain);
+  for (master_role r : members_of(chain)) {
+    const char* role = role_text(r);
+    const candidate_analysis* c = find_role(a, r);
+    if (!c) not_admissible("master_absent", name, role);
+    if (has_reason(*c, "state_unknown"))
+      stop(error_category::metadata_missing, "calib.master_state_unknown", "master di stato unknown nella ricetta",
+           {{"chain", name}, {"role", role}});
+    if (has_reason(*c, "state_scaled"))
+      stop(error_category::unsupported, "calib.master_state_scaled", "master scaled nella ricetta (F-CAL-05)",
+           {{"chain", name}, {"role", role}});
+    const chain_verdict* v = verdict_in(*c, name);
+    if (!v) not_admissible(incoherent_reason(*c, name), name, role);
+    if (v->status == candidate_status::excluded) not_admissible(*v->reason, name, role);
+  }
+  if constexpr (std::is_same_v<Chain, flat_chain>) {
+    if (chain == flat_chain::bias && !a.flat_thermal_within_budget)
+      not_admissible("flat_thermal_not_declared", name, "flat");
+  }
+}
+
+// Parametro di una catena: presente se e solo se la ricetta lo usa, nel dominio, uguale alla dichiarazione
+// dell'analisi se questa l'ha.
+template <class T>
+void require_param(const char* name, bool used, const std::optional<T>& value, const std::optional<T>& declared,
+                   std::optional<param_domain> dom = std::nullopt) {
+  if (!used) {
+    if (value)
+      stop(error_category::invalid_input, std::string("calib.param_not_applicable.") + name,
+           "parametro di una catena non selezionata", {{"parametro", name}});
+    return;
+  }
+  if (!value) bad_param(name, "assente");
+  if constexpr (std::is_same_v<T, double>) {
+    if (dom) {
+      if (const char* why = domain_violation(*value, *dom)) bad_param(name, why);
+    }
+  }
+  if (declared && !(*value == *declared)) bad_param(name, "diverso dalla dichiarazione dell'analisi");
+}
+
+}  // namespace
+
+void require_admissible(const calibration_analysis& a, const chain_recipe& r) {
+  require_chain(a, r.light);
+  require_chain(a, r.flat);
+
+  // G-OFFSET (P-OFFSET, §b.5): una divisione per Q richiede l'offset del light rimosso o il percorso parziale dichiarato.
+  const bool raw = a.light_has_decoder_state;
+  const offset_state off = offset_after(r.light, raw);
+  const std::string flat_name = to_string(r.flat);
+  if (r.flat == flat_chain::none || off == offset_state::removed) {
+    if (r.flat_division_offset)
+      stop(error_category::invalid_input, "calib.param_not_applicable.flat_division_offset",
+           "flat_division_offset senza percorso parziale", {{"parametro", "flat_division_offset"}, {"chain", flat_name}});
+  } else if (off == offset_state::unknown || !r.flat_division_offset) {
+    stop(error_category::invalid_input, "calib.recipe_not_admissible", "divisione per Q con offset del light non rimosso",
+         {{"reason", "light_offset_not_removed"}, {"chain", flat_name}, {"light_offset", to_string(off)}});
+  } else if (*r.flat_division_offset != offset_state::known_not_removed) {
+    bad_param("flat_division_offset", "il percorso parziale si dichiara con known_not_removed");
+  }
+
+  const param_use u = uses_of(r.light, r.flat, raw);
+  const calibration_declarations& d = a.declarations;
+  require_param("exposure_rel_tol", u.exposure, r.exposure_rel_tol, d.exposure_rel_tol, param_domain::nonnegative);
+  require_param("temperature_policy", u.temperature, r.temp_policy, d.temp_policy);
+  require_param("temperature_abs_tol_c", u.temperature && r.temp_policy == temperature_policy::compare,
+                r.temperature_abs_tol_c, d.temperature_abs_tol_c, param_domain::nonnegative);
+  require_param("normalization", u.normalization, r.normalization, d.normalization);
+  require_param("q_min", u.division, r.q_min, d.q_min, param_domain::positive);
+  require_param("q_rel_sigma_max", u.division, r.q_rel_sigma_max, d.q_rel_sigma_max, param_domain::positive);
+  require_param("flat_thermal_bound_adu", u.thermal, r.flat_thermal_bound_adu, d.flat_thermal_bound_adu,
+                param_domain::nonnegative);
+  require_param("flat_thermal_rel_budget", u.thermal, r.flat_thermal_rel_budget, d.flat_thermal_rel_budget,
+                param_domain::open_unit);
+  require_param("decoder_black_abs_tol_adu", u.decoder, r.decoder_black_abs_tol_adu, d.decoder_black_abs_tol_adu);
 }
 
 }  // namespace astro

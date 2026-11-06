@@ -1,0 +1,8 @@
+# Sorgente del blocco generato di M3a-U7.md (tools/evidence.py)
+file src/core/calibration_analysis.cpp
+file src/core/include/astro/calibration_analysis.hpp
+file docs/contracts/ADR-16-stati-master.md
+file docs/decisions/D-16-calibrazione-incompleta.md
+file tests/unit/test_calibration_selection.cpp
+junit release tmp/release-junit.xml
+junit dev tmp/dev-junit.xml

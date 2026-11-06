@@ -38,6 +38,12 @@ foreach(t test_store test_store_history test_store_contract test_store_crash tes
   target_link_libraries(${t} PRIVATE SQLite::SQLite3)
 endforeach()
 
+# U7 (M3.a, G-CAL parte 2): T-M3A-CAL-01, 02, 06 e T-M3A-C01-02 in test_calibration_selection.
+add_executable(test_calibration_selection test_calibration_selection.cpp)
+target_link_libraries(test_calibration_selection PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_calibration_selection PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_calibration_selection PROPERTIES LABELS fast TIMEOUT 1200)
+
 # I tre eseguibili della suite usano main_utc0.cpp: il decoder RAW (tipo io.raw_import) esige TZ=UTC0 dal main (ADR-08.b §2.6).
 # Suite di conformita' della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
 # registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finche' l'unita' di codice non li paga.
@@ -312,7 +318,9 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/fuzz_raw_decode.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_threads.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_import.dir
-    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_import_run.dir)
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_import_run.dir
+
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_selection.dir)
 set_tests_properties(T-M2F-01.offline PROPERTIES LABELS fast)
 
 # T-M2R0-01 (NFR-LIC-01.c): ogni libreria caricata dai binari di test è in docs/licenses.md con file, hash e licenza.

@@ -120,7 +120,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/include/astro/input_format.hpp` | `40e4924aaf3a808ed54e394cc187cf2be1efb075c699dc73a1ba5af2ff6421d7` |
 | `src/core/include/astro/raw_decode.hpp` | `7ab60332832da275e2f625f635ac86a6218b2aa1847d41ac45b7d28ea6b917f4` |
 | `src/core/raw_decode.cpp` | `0e8ce66a76ebf3704db608ff5e1facf827b3aa132ca56c33d952ff7c96c80f90` |
-| `tests/unit/CMakeLists.txt` | `553321640af3e26f9778919b587368f3a05398672d0088976358989e6a6f76f7` |
+| `tests/unit/CMakeLists.txt` | `6c958dd237e5b18b5b0828950505d10e575bdbe88f4ec6b45727b7860e806646` |
 | `tests/unit/fuzz_raw_decode.cpp` | `77b64344305fea6c59e90d9e3da126c45487fc8b75bd6a0c612981f4620846bc` |
 | `tests/unit/main_utc0.cpp` | `c09d5a99f17d099218f9de3a664622749534fe3c3379c81143d669c1ac334081` |
 | `tests/unit/pub_raw_01.hpp` | `cd18843a0885f569d49f4c2c34852b3afbf93df329e9967b04a331204de12c24` |
@@ -129,8 +129,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_raw_decode_u2b.cpp` | `2abd37934df5eeb669eb141ee86b79e21a1f358bde3e693ccd288117723d43ce` |
 | `tests/unit/test_raw_robust.cpp` | `991822d5345be814a60b91cf106ba3d2b5e221300de0bb0a3e66e497b5a7859b` |
 
-- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
 - Test release-giro2 (`tmp/release-junit-r2.xml`): totali 812, fast 812, slow 0, falliti 0
 - Test fuzz-asan (`tmp/u3-fuzz-asan-junit.xml`): totali 9, fast 0, slow 9, falliti 0
 <!-- evidence:end -->

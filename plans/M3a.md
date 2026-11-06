@@ -113,7 +113,7 @@ ID: G-CAL. Proprietario: `calibration_analysis.cpp`, funzione di compatibilità 
 Test: T-M3A-CAL-08; T-M3A-TYP-18 (tabella delle operazioni di ADR-03.b §b.14); T-M3A-C01-06; T-M3A-C01-07 (parte di analisi). Uscita: zero calcoli negli stop (contatore del `fault_injector`).
 Limite dichiarato: un'immagine con coverage non si scrive in FITS (stop `unsupported`, `fits.coverage` da `fits.cpp`); la scrittura dell'HDU di coverage prevista da ADR-03 arriva con T-M3A-TYP-07 (M3.g).
 
-### U7. G-CAL, parte 2: predicati, ammissibili, default, selezione (ADR-16.b §b.1 punti 1-2, §b.4–b.6, §b.9) — ~400 righe
+### U7. G-CAL, parte 2: predicati, ammissibili, default, selezione (ADR-16.b §b.1 punti 1-2, §b.4–b.6, §b.9) — ~400 righe — CHIUSA il 6 novembre 2026 (`docs/evidence/M3a-U7.md`)
 
 ID: G-CAL, G-OFFSET (P-OFFSET). Proprietario: `analyze_calibration` (`calibration_analysis.cpp`), funzione pura degli ingressi.
 1. Predicati P-DFB, P-DF, stato del flat disponibile (§b.4).

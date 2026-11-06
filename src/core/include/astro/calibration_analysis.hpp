@@ -15,6 +15,8 @@ namespace astro {
 
 // Catene del light (ADR-16.b §b.5), nomi testuali dei contratti: compaiono nel ledger e nelle chiavi.
 enum class light_chain { none, bias, dark, bias_dark_sub, dark_sub_partial };
+// Catene del flat (ADR-16.b §b.5), nell'ordine della tabella.
+enum class flat_chain { none, dark_flat, bias_dark_flat_sub, bias, normalize, given_q };
 
 // Stato dell'offset del light dopo la catena (C-01.b §1).
 enum class offset_state { removed, known_not_removed, unknown };
@@ -23,6 +25,7 @@ enum class offset_state { removed, known_not_removed, unknown };
 enum class black_applied_by_decoder { none };
 
 const char* to_string(light_chain chain) noexcept;
+const char* to_string(flat_chain chain) noexcept;
 const char* to_string(offset_state state) noexcept;
 const char* to_string(black_applied_by_decoder applied) noexcept;
 
@@ -77,12 +80,22 @@ struct analysis_candidate {
   content_digest digest;
 };
 
-// Dichiarazioni della ricetta lette dall'analisi. Nessun default: un valore richiesto assente ferma l'analisi.
+// Dichiarazioni del progetto lette dall'analisi. Nessun default: un valore richiesto assente o fuori dominio ferma
+// l'analisi; `q_min`, `q_rel_sigma_max` e le due termiche la fermano fuori dominio anche se non richieste.
+// `normalization`, `q_min`, `q_rel_sigma_max` e le due dichiarazioni termiche non sono richieste dall'analisi: le usa il
+// controllo termico di `flat.bias` (§b.5) e il default le copia nella ricetta.
 struct calibration_declarations {
   std::optional<double> exposure_rel_tol;
   std::optional<double> temperature_abs_tol_c;
   std::optional<temperature_policy> temp_policy;
   std::optional<std::uint32_t> decoder_black_abs_tol_adu;
+  std::optional<normalization_mode> normalization;
+  std::optional<double> q_min;            // > 0
+  std::optional<double> q_rel_sigma_max;  // > 0
+  // Ipotesi dell'utente per `flat.bias`: limite superiore di `t_F d` per pixel (≥ 0) e budget relativo in (0, 1),
+  // presenti insieme o assenti insieme.
+  std::optional<double> flat_thermal_bound_adu;
+  std::optional<double> flat_thermal_rel_budget;
 };
 
 struct calibration_analysis_input {
@@ -103,17 +116,66 @@ struct chain_verdict {
 };
 
 // `usable` se lo è in almeno una catena (§b.1). Le catene sono quelle di §b.5 che accettano il ruolo e lo stato
-// dichiarato, in ordine di tabella; una coppia con un candidato assente non si valuta.
+// dichiarato, in ordine di tabella; una coppia con un candidato assente non si valuta. Senza flat candidato il bias non
+// ha catene del flat (§b.4); il dark-flat conserva la sua, valutata dal solo stato (§b.3).
 struct candidate_analysis {
   master_role role = master_role::bias;
   candidate_status status = candidate_status::excluded;
   std::vector<chain_verdict> chains;
 };
 
+// P-DF di §b.4: dark-flat assente, `usable` con `bias_included`, `usable` con `bias_subtracted`, presente ed `excluded`.
+enum class dark_flat_predicate { absent, inc, sub, bad };
+
+struct calibration_predicates {
+  std::string dfb;  // "P-DFBxyz", esattamente uno degli otto
+  dark_flat_predicate df = dark_flat_predicate::absent;
+  std::optional<flat_state> flat_available;  // stato del flat se `usable`, assente altrimenti
+};
+
+// Ricetta selezionata: coppia di catene e tutti e soli i parametri che le catene usano (§b.5). Un parametro assente è
+// assente, mai un valore implicito.
+struct chain_recipe {
+  light_chain light = light_chain::none;
+  flat_chain flat = flat_chain::none;
+  std::optional<double> exposure_rel_tol;              // catene con dark o dark-flat
+  std::optional<double> temperature_abs_tol_c;         // con `temp_policy = compare`
+  std::optional<temperature_policy> temp_policy;       // catene con dark, bias o dark-flat
+  std::optional<normalization_mode> normalization;     // catene del flat che calcolano N
+  std::optional<double> q_min;                         // catene del flat che dividono
+  std::optional<double> q_rel_sigma_max;               // catene del flat che dividono
+  std::optional<double> flat_thermal_bound_adu;        // `flat.bias`
+  std::optional<double> flat_thermal_rel_budget;       // `flat.bias`
+  std::optional<std::uint32_t> decoder_black_abs_tol_adu;  // light con `decoder_state` (§b.7)
+  // Percorso parziale (G-OFFSET): obbligatorio, e uguale a `known_not_removed`, con offset del light
+  // `known_not_removed` e catena del flat che divide; vietato negli altri casi.
+  std::optional<offset_state> flat_division_offset;
+};
+
+// P-FLAT-RAW, P-FLAT-Q e P-OFFSET di §b.4: predicati della ricetta, non dell'analisi.
+bool p_flat_raw(const chain_recipe& recipe) noexcept;
+bool p_flat_q(const chain_recipe& recipe) noexcept;
+bool p_offset(const chain_recipe& recipe) noexcept;
+
+// Coppia dell'insieme ammissibile; `partial` = divisione con `flat_division_offset = known_not_removed`.
+struct admissible_pair {
+  light_chain light = light_chain::none;
+  flat_chain flat = flat_chain::none;
+  bool partial = false;
+};
+
 struct calibration_analysis {
   std::vector<candidate_analysis> candidates;  // bias, dark, dark_flat, flat, solo i presenti
   // Avvisi di ADR-16.a §2: `imagetyp_unrecognized:<ingresso>:<valore>`, `temperature_comparison_skipped:<coppia>`.
   std::vector<std::string> warnings;
+  calibration_predicates predicates;
+  // Controllo termico di `flat.bias` calcolato e superato (§b.5); falso se non calcolato (dichiarazioni assenti, flat
+  // non `raw`, flat escluso per sé o nella coppia L–F, bias escluso per sé o nella coppia F–B) o se esclude la catena.
+  bool flat_thermal_within_budget = false;
+  bool light_has_decoder_state = false;
+  calibration_declarations declarations;     // dichiarazioni lette dall'analisi
+  std::vector<admissible_pair> admissible;   // ordine di tabella: catena del light, poi del flat, poi `partial`
+  chain_recipe default_recipe;               // D-16, §b.6: mai il percorso parziale
 };
 
 // Funzione pura degli ingressi. Un master fuori regola è `excluded` con motivo, mai uno stop. Stop, tutti prima di ogni
@@ -125,8 +187,24 @@ struct calibration_analysis {
 // - descrittori: invalid_input calib.role_slot, calib.param_not_applicable.flat_normalization_declared,
 //   calib.decoder_state (stato di un frame incoerente);
 // - dichiarazioni: invalid_input calib.param.<nome> (tolleranza richiesta da una coppia presente, assente o fuori
-//   dominio), calib.param.decoder_black_abs_tol_adu (assente con un ingresso con stato del decoder),
-//   calib.param_not_applicable.decoder_black_abs_tol_adu (presente senza).
+//   dominio; una dichiarazione presente fuori dominio; una sola delle due termiche), calib.param.decoder_black_abs_tol_adu
+//   (assente con un ingresso con stato del decoder), calib.param_not_applicable.decoder_black_abs_tol_adu (presente
+//   senza);
+// - controllo termico di `flat.bias` (calcolato solo con le due dichiarazioni, flat `raw` senza motivo proprio né della
+//   coppia L–F, bias senza motivo proprio né della coppia F–B): invalid_input calib.param.normalization /
+//   calib.param.q_min (assenti), calib.normalization_requires_cfa; invalid_input image.* (campioni incoerenti).
 calibration_analysis analyze_calibration(const calibration_analysis_input& input, const fault_injector& fault = {});
+
+// Selezione (§b.1 punto 2, §b.9): ritorna se la ricetta appartiene all'insieme ammissibile dell'analisi e porta tutti e
+// soli i parametri delle sue catene, uguali alle dichiarazioni dell'analisi quando questa le ha. Stop, nessun nodo:
+// - master `unknown` selezionato: metadata_missing calib.master_state_unknown; dark o dark-flat `scaled`: unsupported
+//   calib.master_state_scaled;
+// - invalid_input calib.recipe_not_admissible, con `reason` nel contesto (motivo di §b.3 del master escluso, o di §b.10:
+//   master_absent, double_offset, light_offset_not_removed, dark_flat_sub_requires_bias, flat_offset_not_removable,
+//   flat_already_corrected, flat_thermal_not_declared, master_excluded per una catena incoerente con lo stato);
+// - invalid_input calib.param_not_applicable.<nome> (parametro di una catena non selezionata, `flat_division_offset`
+//   senza percorso parziale), calib.param.<nome> (assente, fuori dominio o diverso dalla dichiarazione dell'analisi;
+//   `flat_division_offset` diverso da `known_not_removed`).
+void require_admissible(const calibration_analysis& analysis, const chain_recipe& recipe);
 
 }  // namespace astro

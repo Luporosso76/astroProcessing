@@ -174,12 +174,12 @@ Definiti in `docs/contracts/ADR-16-stati-master.md` §b.13, con tolleranze e cri
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3A-CAL-01 | G-CAL, P-DFB000…111, P-DF-*, P-FLAT-*; ADR-16.b §b.1–b.6 | ADR-16.b, D-16 | M3.a | PIANIFICATO — non eseguito |
-| T-M3A-CAL-02 | D-16; ADR-16.b §b.5 (controllo termico), §b.6 | ADR-16.b, D-16 | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-CAL-01 | G-CAL, P-DFB000…111, P-DF-*, P-FLAT-*; ADR-16.b §b.1–b.6 | ADR-16.b, D-16 | M3.a | verde (U7) |
+| T-M3A-CAL-02 | D-16; ADR-16.b §b.5 (controllo termico), §b.6 | ADR-16.b, D-16 | M3.a | verde (U7) |
 | T-M3A-CAL-03 | F-CAL-02.b, F-CAL-03.b; ADR-16.b §b.5 (doppia sottrazione), §b.12 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-CAL-04 | F-CAL-02.b, D-16; ADR-16.b §b.10 | ADR-16.b, D-16 | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-CAL-05 | G-STOP, P-LOST, NC-21; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
-| T-M3A-CAL-06 | G-STOP, P-FLAT-UNKNOWN, G-OFFSET, P-OFFSET; ADR-16.b §b.9 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
+| T-M3A-CAL-06 | G-STOP, P-FLAT-UNKNOWN, G-OFFSET, P-OFFSET; ADR-16.b §b.9 | ADR-16.b | M3.c | verde (U7) |
 | T-M3A-CAL-07 | G-CAL, F-IO-04; ADR-16.b §b.7 (master da RAW) | ADR-16.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | verde (U6) |
 | T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | PIANIFICATO — non eseguito |
@@ -192,7 +192,7 @@ Definiti in `docs/contracts/C-01-calibrazione-light.md` §9, con soglie e criter
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
 | T-M3A-C01-01 | G-OFFSET, F-IO-04; C-01.b §1 (stato dell'offset del light) | C-01.b | M3.a | verde (U5) |
-| T-M3A-C01-02 | G-OFFSET, P-OFFSET; C-01.b §1, ADR-16.b §b.5 | C-01.b | M3.a | PIANIFICATO — non eseguito |
+| T-M3A-C01-02 | G-OFFSET, P-OFFSET; C-01.b §1, ADR-16.b §b.5 | C-01.b | M3.a | verde (U7) |
 | T-M3A-C01-03 | G-OFFSET, F-IO-04; C-01.b §10 (voce `light_offset`) | C-01.b | M3.a | verde (U5) |
 | T-M3A-C01-04 | G-OFFSET, F-CAL-02.b, T-CAL-08; C-01.b §1, §9 (bias residuo, nero non sottratto) | C-01.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-C01-05 | G-OFFSET, P-OFFSET; C-01.b §6 (residuo del percorso parziale) | C-01.b | M3.c | PIANIFICATO — non eseguito |

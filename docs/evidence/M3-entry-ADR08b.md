@@ -75,6 +75,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
 | `docs/licenses.md` | `f98457e8bbf7ea03c53ff18bfb54f9052e19428a0d03723ab5e217d72d6738c4` |
-| `docs/test-matrix.md` | `8f7b77d1e0255874a5f99579d5c2c429db03a0c2906642cc1c72ece1110e044b` |
+| `docs/test-matrix.md` | `e5a59554679cccb79b35652442715ac606c530e81fd997b8a01f87ebd6840cac` |
 
 <!-- evidence:end -->

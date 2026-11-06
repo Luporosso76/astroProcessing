@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_relink_nostat.cpp` | `f384b46e5748ddb13a32cd34170546d5f05231a750bcb0c8887f43d56fa77b07` |
 | `tests/unit/test_relink_status.cpp` | `457386c57cbedbb6f31a96ad70d531bf1e7762fbf064fb7d5cb39ac53f61fa9d` |
 
-- Test release (`tmp/release-junit.xml`): totali 1081, fast 1063, slow 18, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1063, fast 1063, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1107, fast 1089, slow 18, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1089, fast 1089, slow 0, falliti 0
 <!-- evidence:end -->
