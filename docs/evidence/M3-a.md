@@ -105,3 +105,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 - Tracciabilità (`tests/trace/M3a.tsv`, build `build/dev`, junit `tmp/dev-full-junit.xml`): trace: 8 ID nello stadio M3.a, 0 non coperti
 - Tracciabilità (`tests/trace/M3a.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 8 ID nello stadio M3.a, 0 non coperti
 <!-- evidence:end -->
+
+## Arbitraggio 8/11/2026
+
+Gate M3.a PASS per arbitraggio dell'utente (8/11/2026). Run `dev-full` 1211/1212: `T-M2R2-09` in timeout a 1800 s, passato da solo in 1659,84 s. Debito: esecuzione seriale degli slow pesanti (prima voce dei debiti in `STATO.md`). Da qui vale la regola «PASS = un run completo in cui ogni test è passato».

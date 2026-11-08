@@ -9,3 +9,5 @@ __pycache__/
 /graphify-out/
 /.claude/worktrees/
 /.secrets/
+doc_old/
+.playwright-mcp/

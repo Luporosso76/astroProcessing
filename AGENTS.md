@@ -5,10 +5,9 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 ## Fonti
 
 - Mandato: `RICHIESTA_REVISIONE_PLAN_2_2.md` (122 righe). Definisce autonomia M0–M9, D-19/D-20 P0, D-21 come preferenza.
-- Istruzioni: `ISTRUZIONI_OPERATIVE.md` (164 righe), valide salvo l'override Git sotto.
 - Piano attivo: `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md`, SHA-256 `95abbb1a1622c1933ad603af1715524d202a70873f1e049a7514fecfa3ad4094`. La review indipendente è registrata in `docs/evidence/M0-plan-review.md`: supera il PENDING dello snapshot di consegna senza alterarlo. Gli storici sono in `doc_old/`; non serve un voto del proprietario per avanzare M0–M9.
 - Revisione in scrittura: se un autore sta scrivendo attivamente, nessun altro la legge o la modifica. Alla consegna stabile, un revisore indipendente la legge e registra la review; solo dopo diventa fonte.
-- Stato: `docs/progress.md`. Convenzione ExecPlan: `PLANS.md`. Piani: `plans/`. Matrice test: `docs/test-matrix.md`. Decisioni: `docs/decisions/`. Prove: `docs/evidence/`.
+- Stato: `STATO.md`. Convenzione ExecPlan: `PLANS.md`. Piani: `plans/`. Matrice test: `docs/test-matrix.md`. Decisioni: `docs/decisions/`. Prove: `docs/evidence/`.
 
 ## Autonomia
 
@@ -30,7 +29,7 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 ### Ciclo di un'unità (proprietario, 29 ottobre 2026: niente tempo perso)
 
 1. Perimetro dal registro dell'appendice D (`tools/trace.py ids --stage <Mx.y>`), mai dai riepiloghi del §21. Piano corto: il dettaglio sta in contratti e test. Unità piccole: uno o pochi ID coerenti per unità e per review, mai pacchetti di contratti, codice e strumenti insieme. Un contratto afferma solo ciò che è dimostrato o misurato; il resto lo scrive come ipotesi, stima o limite dichiarato.
-2. Contratto e test prima del codice: i test nuovi falliscono finché manca l'implementazione. Statistica e numerica: autore Opus fin dall'inizio.
+2. Contratto e test prima del codice: i test nuovi falliscono finché manca l'implementazione. Statistica e numerica: autore Opus fin dall'inizio; Fable solo dopo che Opus non ce la fa.
 3. L'autore implementa ed esegue `tools/check.sh` (build, test, lint delle classi di difetto) e `tools/mutate.sh` per le prove di mutazione. Non consegna con controlli rossi. Prima della review rilegge il proprio diff con la checklist di `tools/review-template.md` e corregge da sé: la review è un controllo finale, non il modo di trovare i difetti.
 4. L'autore chiede la review con `tools/review.sh` (prompt e checklist fissi, elenco completo al primo giro, nessun tetto di righe), corregge e ripete sul solo delta fino al PASS. Non scrive il prompt del revisore: passa solo fatti (ID, file, log). Al massimo 2 giri in tutto per unità (proprietario, 30 ottobre 2026; slug `-roundN`): il giro 1 rivede contratto, test e codice, il giro 2 le correzioni sul delta; dal secondo giro il revisore valuta solo correzioni e delta, e un difetto nuovo in codice non cambiato conta solo se BLOCCANTE (gli altri vanno in "Fuori delta", lavoro per un'unità successiva). Al terzo giro `review.sh` esce con 3: l'autore si ferma e il coordinatore arbitra (ridurre il perimetro, dichiarare un limite o correggere). Fra un giro e l'altro si corregge soltanto: modifiche minime, limitate ai rilievi, niente riscritture né cambi di impostazione. Se un rilievo richiede di riprogettare, il ciclo si chiude e la nuova impostazione riparte dal punto 2 come unità nuova, dichiarata al proprietario; un rilievo ordinario non apre un'unità nuova. Il tetto vale anche per il gate. A ogni giro `review.sh` salva un'istantanea dei file modificati e nuovi (`tmp/review-snap/`) e al giro 2 calcola da sé il delta (`tmp/review-delta-<unità>-round2.diff`) e lo passa al revisore; il giro 1 deve quindi passare dallo strumento.
 5. Il coordinatore verifica (build pulita dev+release, `tools/trace.py check`), poi privacy, commit e push. Stato, conteggi e tabella ID → test si generano con `tools/trace.py` e `tools/status.py`, non si scrivono a mano.
@@ -42,7 +41,6 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 - Repository ufficiale: `https://github.com/Luporosso76/astroProcessing.git`. Nessun repository alternativo. Branch di lavoro: `work/m0-m1`.
 - Commit locali e push sono consentiti solo verso `origin` ufficiale, con credenziali già disponibili.
 - Prima della pubblicazione: review, test, controllo di sicurezza e privacy. Nessun force push, nessuna riscrittura della storia, nessun push su branch protetto, nessun segreto, nessun token o servizio a pagamento nuovo.
-- L'ultima istruzione del proprietario in chat prevale sui divieti di push delle righe 42 e 121 di `ISTRUZIONI_OPERATIVE.md` (sezioni 3 e 9), che resta invariato come documento storico.
 - Niente installazioni globali, niente modifiche a servizi o configurazioni di sistema, niente lettura di dati personali o segreti.
 
 ## Fallback: prodotto contro sviluppo
@@ -63,16 +61,16 @@ Regole operative per agenti che lavorano in `/opt/workspace/astroProcessor`. Il 
 
 - Proposta primaria allo specialista competente. Review indipendente sul diff o sul testo effettivo, mai sull'auto-riassunto dell'autore. Nessuna auto-approvazione.
 - Non si sceglie il modello più costoso per default. Costi e token si riportano solo se esposti dal runtime.
-- Modelli per competenza (proprietario, 28 ottobre 2026): Haiku 5.5 per ricognizione e compiti meccanici, Sonnet 5.5 per codice, test e documentazione ordinari, Opus per coordinamento, architettura e decisioni, Fable 5 solo per casi estremamente complessi. Il modello si passa esplicitamente alla delega.
-- Codex non si usa più, in nessuna operazione (proprietario, 3 e 5 novembre 2026). Review indipendenti di codice e contratti, con `tools/review.sh`: prima Gemini 4 Argon (High) via `agy`, in modalità plan e sandbox (default); se Argon non risponde (assente da `agy models`, rifiuto, crediti finiti: uscita 4) la stessa review si rilancia con `--reviewer claude`, un agente Claude Opus headless sui crediti API (a credito finito sull'abbonamento), separato dall'autore e senza strumenti di scrittura. Argon ha pochi crediti: solo per le review previste dal ciclo dell'unità, mai per pareri al volo. Gli altri Gemini via `agy` (`gemini-3.8-flash-high`) solo per testi, lingue e ricerca, mai sul codice. Ricerche complesse al miglior modello Claude (Opus; Fable 5 per i casi estremi).
+- Modelli per competenza (proprietario, 28 ottobre 2026; allineati a `CLAUDE.md` l'8 novembre 2026): Haiku 5.5 per ricognizione e compiti meccanici, Sonnet 5.5 per il lavoro ordinario (codice, test, documentazione), Opus per la scrittura di codice complesso (statistica, numerica, unità difficili) e come revisore separato con `--reviewer claude` quando Argon non è disponibile, Fable 5 solo per casi estremamente complessi, dopo che Opus non ce la fa. Il modello si passa esplicitamente alla delega.
+- Review indipendenti di codice e contratti, con `tools/review.sh`: prima Gemini 4 Argon (High) via `agy`, in modalità plan e sandbox (default); se Argon non risponde (assente da `agy models`, rifiuto, crediti finiti: uscita 4) la stessa review si rilancia con `--reviewer claude`, un agente Claude Opus headless sui crediti API (a credito finito sull'abbonamento), separato dall'autore e senza strumenti di scrittura. Argon ha pochi crediti: solo per le review previste dal ciclo dell'unità, mai per pareri al volo. Gli altri Gemini via `agy` (`gemini-3.8-flash-high`) solo per testi, lingue e ricerca, mai sul codice. Ricerche complesse a Opus; Fable 5 per i casi estremi.
 - Crediti API (proprietario, 30 ottobre 2026): finché c'è credito, le deleghe Haiku e Sonnet girano come processi headless con la chiave del progetto, via `tools/agent-api.sh` in un worktree; la chiave sta in `.secrets/` (fuori da Git, permessi 600) e non si stampa mai. Anche Opus può girare sulle API (review Claude). Il coordinamento resta sull'abbonamento. Uscita 4 (credito esaurito): il compito si rilancia come agente sull'abbonamento.
-- Di norma tenere al massimo due deleghe contemporanee. Passare soltanto percorsi, delta e gate necessari; riusare le sessioni pertinenti senza rileggere piani già verificati, così da contenere contesto e consumo.
+- Tenere al massimo quattro deleghe contemporanee, nei limiti di `tools/cpu_cap.sh`. Passare soltanto percorsi, delta e gate necessari; riusare le sessioni pertinenti senza rileggere piani già verificati, così da contenere contesto e consumo.
 - Dopo un errore terminale di quota, verificare gli artefatti e registrare se il lavoro è partito prima di riprenderlo. Non ripetere alla cieca la chiamata né dichiarare attiva una delega già terminata. Non correggere manualmente la configurazione dei modelli per aggirare l'errore.
 - Metadati agente: modello dichiarato dal runtime, percorsi e conteggi di righe letti. Nessuna attestazione inventata.
 
 ## Documenti
 
-- `docs/progress.md` è l'unica fonte dello stato. Non duplica il piano né le 54 unità.
+- `STATO.md` è l'unica fonte dello stato. Non duplica il piano né le 54 unità.
 - `PLANS.md` definisce la convenzione degli ExecPlan. Ogni unità attiva ha un piano in `plans/` con prerequisiti, gate e prossimo comando verificabile.
 - `docs/test-matrix.md` separa esplicitamente test pianificati e test eseguiti. `docs/evidence/` contiene solo prove reali con comando, hash, versioni, ambiente, esito e limiti. Un test pianificato non è un test eseguito.
 - Gli ADR canonici stanno in `docs/decisions/`. Una regola ha una sola casa: qui i vincoli operativi, non la scienza.

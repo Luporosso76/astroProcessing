@@ -1,6 +1,6 @@
 # PLANS.md — convenzione degli ExecPlan
 
-Regole per scrivere e chiudere i piani di lavoro. Lo stato vive in `docs/progress.md`, le prove in `docs/evidence/`, le decisioni in `docs/decisions/`. Qui sta solo il metodo.
+Regole per scrivere e chiudere i piani di lavoro. Lo stato vive in `STATO.md`, le prove in `docs/evidence/`, le decisioni in `docs/decisions/`. Qui sta solo il metodo.
 
 ## Unità e file
 
@@ -36,8 +36,8 @@ Regole per scrivere e chiudere i piani di lavoro. Lo stato vive in `docs/progres
 
 ## Avvio, chiusura, ripresa
 
-- All'avvio di una sessione: leggere `AGENTS.md`, `docs/progress.md`, questo file e il piano attivo; verificare lo stato reale prima di agire.
-- Alla chiusura: aggiornare piano, `docs/progress.md` e matrice test; registrare evidenza, blocchi e primo passo successivo.
+- All'avvio di una sessione: leggere `AGENTS.md`, `STATO.md`, questo file e il piano attivo; verificare lo stato reale prima di agire.
+- Alla chiusura: aggiornare piano, `STATO.md` e matrice test; registrare evidenza, blocchi e primo passo successivo.
 - Una milestone chiusa fa partire la successiva senza attendere autorizzazioni di routine.
 - Un blocco circoscritto si isola; il lavoro indipendente continua.
 

@@ -1,3 +1,5 @@
+Fonte del mandato. Scritto in origine per un revisore Codex, oggi non più usato (3/11/2026).
+
 # AstroProcessing — Revisione finale del Plan 2.2 e mandato operativo autonomo
 
 **Documento di istruzioni impartite da me a Codex**  
