@@ -18,7 +18,7 @@
 
 ## Prossimo passo
 1. Lotto chiuso: review `debt-M3a-round2` PASS; `dev-full` 1221/1221, `release` 1221/1221, `dev` 1199/1199, trace M2 63/0 e M3.a 8/0 scoperti; 48 blocchi evidence rigenerati.
-2. `check.sh` a passi (`delegate.sh - infra`), poi M3.b (`plans/M3.md`; perimetro da `tools/trace.py ids --stage M3.b`).
+2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 19 unità B0…B17, lacune L1…L11 (L7 chiusa) da decidere in B0. In corso: `check.sh` a passi (worktree `infra-check-steps`, review `check-steps-round1`). Poi B0 (decisioni in `docs/decisions/`, emendamento ADR-06 R2.r), B1, B2/B3.
 
 ## Non verificato
 - `tmp/` 15 GB (u12-build-offline 3,8 GB, ccache 5 GB), `build/` 12 GB: non rimossi.
