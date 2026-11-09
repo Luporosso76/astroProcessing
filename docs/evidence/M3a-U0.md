@@ -102,7 +102,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
 | `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/include/astro/fits.hpp` | `4e82d0846dcd1423f402f9e127b9ab4dd10740cfab8b0277fc8abedf6f86ab3c` |

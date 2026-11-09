@@ -90,7 +90,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/ADR-17-varianza.md` | `44c307f32b9bb529c052f17f4e7154e45f809e6c46e81a7e23f41dd44cd688b8` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/D-17-covarianza.md` | `8b00d0073612808ecb91d7731d60ab2ae30513536fdd8a04cc4ae9d81c41368d` |
-| `docs/decisions/README.md` | `65a2018261ab00625f63ee0fac4881e76542755f6e22c6533fa6dd1af31e068f` |
+| `docs/decisions/README.md` | `997662dc2b54f612eeebedfd7aa285f0707eb5f506c582aa6735ae3e297c8686` |
 | `docs/test-matrix.md` | `10e2a269e066f817d16594cad55fe64a7175a0ddea104dbea72155f4402aa543` |
 
 <!-- evidence:end -->

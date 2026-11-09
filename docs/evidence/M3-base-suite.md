@@ -168,7 +168,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
 | `src/core/CMakeLists.txt` | `5b41d8df67ae8a6f3fa5a5d585f3d1369e8711ce535c1b7b6c1ac22090b7cd5f` |
 | `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
 | `src/core/fits_blocks.cpp` | `1866760822bf9c9a8759e00af3bd74b105c5cb05be80b18be7574df9b72eaac5` |

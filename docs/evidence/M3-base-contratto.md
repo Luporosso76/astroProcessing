@@ -77,7 +77,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 
 <!-- evidence:end -->

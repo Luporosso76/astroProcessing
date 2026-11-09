@@ -89,9 +89,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `docs/evidence/M3-base-I2.md` | `849974111048a24e62222419efdd0e7ebf47bc1f29e191be0eaab0cc9d097594` |
-| `docs/evidence/M3-base-I3.md` | `fd3f5cba69b7b95b0a85eeb3cc0f598a1818e275cc94084e9f833493458ad312` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
+| `docs/evidence/M3-base-I2.md` | `ce21587eeefc46d8a444c5de441b593352e4d8de96c24796b9cc1fdef9d6ab79` |
+| `docs/evidence/M3-base-I3.md` | `4af213f135448ba033e13749a09ec7b20335d87d462728651a5c7660880546ab` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |

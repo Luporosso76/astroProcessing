@@ -52,8 +52,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
-| `docs/contracts/F-IO-03-classificazione.md` | `8bfc0f8df2143dbc69babfc8bda69d0b273a663f229b20a12f1252afc74eee1b` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `2356f8f7f730000b6e29b63b1e816c9be0000eaeb696569f3ecd09971ac5018b` |
+| `docs/contracts/F-IO-03-classificazione.md` | `202fd1d1765a882599f1dd96eb93bd7530dc70ebdc532cf674119a5c9344a472` |
 | `src/core/batch_classification.cpp` | `c80e92738b657bdaf53bd3041ef2af89e533ca029b54f96283e6d290cfa5a446` |
 | `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
 | `src/core/include/astro/batch_classification.hpp` | `3ff40fc084e923fc70ad5c62dfcd60e72b9bada5eb3c928930233d1e8747c98d` |

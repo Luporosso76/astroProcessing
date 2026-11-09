@@ -106,7 +106,7 @@ Regola. Tre fasi, come in ADR-16.b §b.1:
 - Un candidato di un ruolo di calibrazione è uno fra:
   - (a) un input classificato in quel ruolo con `master_descriptor` dichiarato (master esterno);
   - (b) uno slot `current` il cui nodo è `master.combine` di quel ruolo, con il descrittore da `master_descriptor_from_node` (R2);
-  - (c) da M3.b, un nodo `master.combine` proposto dall'analisi di C-02.b, con lo stesso descrittore derivato.
+  - (c) da M3.b, un nodo `master.combine` proposto dall'analisi di C-02.b, con lo stesso descrittore derivato. Il candidato (c) è passato a `analyze_batch` con la stessa struttura del candidato (b); la sua chiave è la chiave del nodo proposto. L'osservazione (`slot_candidate::observation`) del candidato (c) si costruisce dal frame di riferimento del gruppo (primo in ordine canonico) con le regole dei metadati comuni di C-02.a §2; il candidato (c) non ha `load_samples`. La verifica termica `flat.bias` (ADR-16.b §b.5) con F o B candidato (c) non si esegue alla proposta: l'esito è dichiarato, `thermal_check_pending_master`, mai omesso in silenzio; dopo l'esecuzione del master la selezione si verifica di nuovo con `verify_selection`.
 - Le tre fonti consegnano la stessa forma: descrittore, metadati di compatibilità con origine, stato del decoder o `frame_decoder_states`, e digest o chiave del nodo. Per questo (c) entra senza cambiare il contratto.
 - In M3.a esistono solo (a) e (b). Fatto, da ADR-16.b §b.7 e §b.14: un light RAW con un master esterno o da FITS dà `decoder_state_mixed`. Quindi in M3.a un light RAW non ha candidati `usable`, e la sua proposta è `light.none` + `flat.none` con le esclusioni motivate.
 - Proprietario: `analyze_batch`.
@@ -145,7 +145,7 @@ Regola. Tre fasi, come in ADR-16.b §b.1:
   - `candidate_choice_required` (CL-08);
   - `light_blocked`: con categoria e codice dello stop del dominio o del light (`op.phase_blocked`, `op.linearity_blocked`, `calib.unit`, `calib.plane_layout`, `calib.pedestal`, `calib.coverage_input`, `calib.imagetyp_conflict`), senza ricette;
   - `params_missing`: con i nomi dei parametri d'analisi assenti, senza ricette e senza default (ADR-16.a §2: parametri obbligatori senza default).
-- I parametri d'analisi stanno in `settings`, chiave `batch.analysis_params`, JSON canonico `astro.batch_analysis_params.v1`. Sono quelli di ADR-16.a §2, ADR-16.b §b.5 e §b.7 (per esempio `exposure_rel_tol`, `temperature_abs_tol_c`, `temperature_policy`, `decoder_black_abs_tol_adu`, le dichiarazioni termiche), e la loro validità è di U6/U7.
+- I parametri d'analisi stanno in `settings`, chiave `batch.analysis_params`, JSON canonico `astro.batch_analysis_params.v1`. Sono quelli di ADR-16.a §2, ADR-16.b §b.5 e §b.7 (per esempio `exposure_rel_tol`, `temperature_abs_tol_c`, `temperature_policy`, `decoder_black_abs_tol_adu`, le dichiarazioni termiche), e la loro validità è di U6/U7. Il documento può contenere un membro `master` con i parametri dell'analisi dei master di C-02.b §b.2 che non sono dei light (`saturation_adu`, `saturated_fraction_max`, `flat_min_signal_adu`, `flat_level_rel_tol`, `offset_adu`); le tolleranze comuni stanno al livello superiore e valgono per light e master.
 - Input prestacked e RGB (F-IO-10, ADR-03.b §b.14) classificati `light`:
   - un prestacked dà `light_blocked` con `op.phase_blocked`;
   - un RGB in fase `raw` dà `light_blocked` con `calib.plane_layout`;

@@ -122,8 +122,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `docs/evidence/M3-base-I2.md` | `849974111048a24e62222419efdd0e7ebf47bc1f29e191be0eaab0cc9d097594` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
+| `docs/evidence/M3-base-I2.md` | `ce21587eeefc46d8a444c5de441b593352e4d8de96c24796b9cc1fdef9d6ab79` |
 | `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
 | `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
 | `src/core/cpu_dispatch.cpp` | `bb5a54608c9379b13089c875157e8f9fb90b783336b68c713ad11babc95ae685` |

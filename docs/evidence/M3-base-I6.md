@@ -52,7 +52,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
 | `src/core/calibration.cpp` | `afb96d94684d9752c001363a90557d2eed55a5ea6caa7faf87863985d9ad2e6b` |
 | `src/core/fits_header.cpp` | `ff80ce493bf7c58bef5952e60fbac5bfe1dfe2c65eaa0a785482a0f249dec22d` |
 | `src/core/fits_internal.hpp` | `12e42b7ff88eb36cb32625ff8703d860f31c93256f21f2e50e99853c2563d7b2` |

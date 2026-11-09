@@ -69,7 +69,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/F-IO-03-classificazione.md` | `8bfc0f8df2143dbc69babfc8bda69d0b273a663f229b20a12f1252afc74eee1b` |
+| `docs/contracts/F-IO-03-classificazione.md` | `202fd1d1765a882599f1dd96eb93bd7530dc70ebdc532cf674119a5c9344a472` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 
 <!-- evidence:end -->

@@ -88,7 +88,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
+| `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
 | `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
 | `src/core/include/astro/job.hpp` | `0fee416857ca8512700e91b0550d9db9df20089369de792360a46b08a881f696` |
 | `src/core/include/astro/sqlite_dag_store.hpp` | `da0919b01c2c79fcd4778ba7bcd8ca57f60f60e7cce098fdb50f91d51732711b` |

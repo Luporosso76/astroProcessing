@@ -346,6 +346,72 @@ Tabella di riferimento (calcolata a mano; ingressi del pianificatore dati come n
 | y | 104 857 600 | 4 | tile 400 | stop, `minimum_feasible_bytes` 109 397 312 |
 | z | 2^64 − 1 | 4 | tile 2^32 − 1, `n` 13 106, W 65 536 | stop, `per_task_bytes` e `minimum_feasible_bytes` `non rappresentabile` |
 
+### Estensione M3.b del piano del master
+
+Decisione `docs/decisions/M3b-lacune.md` (C-02.b §b.11, §b.13 punto 5; C-02.b-flat §f.13 punto 11). I termini di questo paragrafo si aggiungono al modello di R2.r e lo sostituiscono dove lo dicono; la tabella di riferimento p-z sopra vale per `n` frame con `F(n) = 16·n`, `R = CS = Cn = 0`, e si ricalcola in B3b con i termini nuovi. Il modello di R2.r non usava lo spill: per i frame RAW lo usa, come dice «Frame RAW tramite spill».
+
+#### Ingresso (M3.b)
+
+Nuovi campi di `planner_input`, validi con `frame_count` > 0 (nomi indicativi): `master_row_channels` ∈ {1, 2} (canali presenti in una riga del frame: 1 per un master mono, 2 per un master CFA, perché una riga CFA contiene due delle quattro posizioni del motivo) e `master_raw_frames` (booleano: i frame del gruppo sono RAW). Un valore fuori da {1, 2}: `invalid_input`, `resources.planner_input`. Il metodo di combinazione non è un ingresso: i buffer dei metodi si contano tutti, per la quota massima di ogni metodo (limite dichiarato sotto). Con `master_raw_frames` il pianificatore legge `scratch` e la sua quota dalla `resource_config`.
+
+#### Modello (M3.b)
+
+Simboli nuovi: `Cr` = `master_row_channels`; `q(n) = 8·⌈n/8⌉`.
+
+```
+buffer per task (indipendenti dal tile, uno per task, un pixel alla volta):
+  puntatori           16·n                        (già in R2.r)
+  ordinamento         16·n    coppie (valore f64, indice canonico) di median e winsorized (C-02.b §b.8)
+  indicatori          q(n)    uno per frame, per sigma_clip (C-02.b §b.1, §b.11)
+  contatori           24·n + 544    parziali del task, sommati in finalize nei totali persistenti Cn
+                              rifiutati, saturi e invalidi per frame (3 · 8 · n) più, per canale
+                              (bound a 4): conteggi per bit (16 · 8 · 4 = 512) e pixel con rejection (4 · 8 = 32)
+  F(n) = 16·n + 16·n + q(n) + 24·n + 544 = 56·n + q(n) + 544
+
+task(t)   = F(n) + t·W·(10·n + 8)                 (sostituisce 16·n + t·W·(10·n + 8))
+
+termini condivisi nuovi:
+  righe     R = 16·Cr·H·n
+              accumulatori in virgola mobile del report per riga: Σr e Σr² (2 · 8 byte) per frame, per canale di
+              riga e per riga (C-02.b §b.7, §b.11); il flat non ha somme di riga (mediana e massimo si calcolano
+              sui piani contati in K·S)
+  costanti  CS = 120·n + 168
+              pesi w, a, c (24·n); W e T (16); per frame e canale m, 1/m, r (3 · 8 · 4 · n = 96·n); κ (8);
+              per canale Σ(1/m), m_H e ρ (3 · 8 · 4 = 96); A (8) e budget (8); norm_level_bias_bound per canale
+              (4 · 8 = 32) (C-02.b §b.6, C-02.b-flat §f.2, §f.6, §f.13 punto 11)
+  contatori persistenti  Cn = 24·n + 544
+              totali interi (rifiutati, saturi, invalidi per frame; conteggi per bit e pixel con rejection per
+              canale), somma dei parziali dei task in finalize
+
+shared'   = shared + R + CS + Cn
+spill     Z = n·S·6 se master_raw_frames, altrimenti 0: quota di spill richiesta, non memoria del pool
+            (vedi «Frame RAW tramite spill»)
+task(t)   = F(n) + t·W·(10·n + 8)
+minimum_feasible_bytes = shared' + task(t_min)
+tile      = tile esplicito, oppure min(t0, floor((floor((B − shared') / k) − F(n)) / (W·(10·n + 8))))
+peak      = shared' + workers·task(tile)
+working_set = shared' + min(C, ceil(H / t0))·task(t0)
+```
+
+Byte per task in funzione di `n`, `w` (cioè `W`) e `tile_rows` (`t`): `task(t) = 56·n + 8·⌈n/8⌉ + 544 + t·W·(10·n + 8)`. Il confronto con R2.r attuale: `master_task_bytes(n, t, W)` in `master.cpp` calcola `16·n + t·W·(10·n + 8)` (puntatori `n·(8 + 8)`, `t·W` per frame `n·(8 + 2)`, appoggio `8·t·W`); la proposta aggiunge solo `40·n + q(n) + 544` per task, indipendente da `t`. I termini `P`, `8·S`, `out`, `K·S`, `(out + HB)`, `D`, `M` di `shared` non cambiano. `K` = 32 resta valido finché i dati per pixel del report sono quelli attuali: `lbe` (8 byte), `ratio` (8), `nonpositive` (1), copia del piano della varianza per la mediana (8) = 25 byte (`master_plan` e `channel_report` in `master.cpp`). Con `median_ratio` `norm_level_bias_bound` è una costante per canale (C-02.b-flat §f.6, §f.7), contata in `CS`; l'unico dato per pixel è il suo rapporto col piano, già contato in `ratio` (8 byte); `level_bias_estimate` è `null` (C-02.b-flat §f.13 punto 3). Se B11 aggiunge un array per pixel oltre questi quattro, `K` cresce di 8 e il test lo mostra.
+
+Limite dichiarato: il modello riserva i buffer di ogni metodo anche se il metodo scelto non li usa. L'eccesso massimo per task è `40·n + q(n) + 544` byte (ordinamento, indicatori, contatori già allocati comunque) e `CS` non dipende dal metodo; per `n` = 1024 sono circa 42 KB per task. Un kernel che ordina più pixel insieme (corsie SIMD) moltiplicherebbe il termine di ordinamento per il numero di corsie: oggi l'ordinamento è per pixel (C-02.b §b.11) e il modello non lo prevede.
+
+#### Stop (M3.b)
+
+Invariato nella forma. Con `shared'` e `task` nuovi: `B < minimum_feasible_bytes` (anche in automatico); worker esplicito e tile automatico senza alcun `t ≥ 1` che entri, con `picco = shared' + k·task(1)`; worker esplicito con `peak > B`. Ogni grandezza di memoria nuova (`R`, `CS`, `Cn`, `F`, e `P` per i RAW) si calcola con prodotti e somme controllati, come `shared` e `task`; oltre 2^64 − 1 dà lo stesso stop con `non rappresentabile`. `Z` non è memoria del pool: i suoi stop sono quelli di «Frame RAW tramite spill». `Cr` fuori da {1, 2}: `invalid_input`, `resources.planner_input`.
+
+#### Frame RAW tramite spill
+
+Per `master_raw_frames` il job decodifica ogni frame per intero in `prepare` (uno alla volta, dopo la lettura verificata), lo scrive nello spill dichiarato del job (`f32` più maschera `uint16`, righe in ordine) e libera la memoria del frame prima del successivo. D8 resta valido anche per i RAW: la pila non è mai residente; i task leggono le fasce dallo spill (`frame_residency = blocks`).
+
+Memoria. `P` (`input_peak_bytes`) è il massimo fra il picco FITS e, per ogni frame RAW, la dimensione del file più `needed` del decoder (`raw_image_bytes + 6·W·H`; per il decoder DNG `6·W·H + seg.buffer_bytes + zlib_cap`), con `S·6` contato una volta sola. Entra in `shared'` e in `minimum_feasible_bytes`. In `prepare` la decodifica usa la memoria già prenotata dal job in `jc.shared`, come `decode_fits` nel job FITS, senza una seconda `pool->reserve` (ADR-08.b §2.8, modo con prenotazione del chiamante). `needed` si calcola prima del piano, dal solo header e senza campioni, con una funzione pura del decoder (nome indicativo `raw_decode_needed_bytes`, B15a). Il piano si chiude prima di ogni prenotazione: OB-08 vale. La prenotazione interna del decoder non è esclusa dal pianificatore: è dentro `P`.
+
+Spill. Quota richiesta `Z = n·S·6`, con prodotto controllato. Con `master_raw_frames` `resource_plan.spill` è valorizzato da `config.scratch`. Stop, nessun percorso residente alternativo:
+
+- `config.scratch` assente: `invalid_input`, `master.raw_requires_spill`, contesto `frame` (il primo frame RAW in ordine canonico) e `n`; è del job, prima del pianificatore e di ogni lettura.
+- `Z` oltre `scratch.quota_bytes` o oltre 2^64 − 1: `budget`, `spill.quota_exceeded`, contesto `richiesti` (o `non rappresentabile`) e `quota`; è del pianificatore, prima di ogni prenotazione.
+
 ### Job del master
 
 `master_job_options.resources` (una `resource_config`, nessuna opzione esplicita di worker, tile o coda fuori da essa) entra nel pianificatore con `frame_count` = `n`, `C` dalla configurazione e `B` = budget del pool; lo scheduler riceve `scheduler_tuning_of(resources)` (capacità della coda dei job e `cpu_set` dei worker). Con lo snapshot del budget la configurazione con le origini entra nella provenance (`budget.resources`), come per la calibrazione; senza snapshot non viene registrato nulla (limite dichiarato in `master.hpp`).
@@ -359,6 +425,7 @@ Tabella di riferimento (calcolata a mano; ingressi del pianificatore dati come n
 | T-M2R2R-03 | Coda: `task_queue_capacity` configurata diversa dal default arriva nel `job_plan` e nella provenance; il margine configurato cresce `shared_bytes` della differenza. |
 | T-M2R2R-04 | Stop per budget nel job: budget = minimo − 1 (automatico), worker esplicito oltre il budget, tile esplicito il cui piano supera il budget: `sched.job_exceeds_budget` con `minimum_feasible_bytes` della formula, nessuna prenotazione (picco del pool 0), nessun master. Piano non rappresentabile: caso z. |
 | T-M2R2R-05 | Provenance: con lo snapshot, `budget.resources` uguale a `resource_config_json` della configurazione (origini comprese) e `details.resource_plan` uguale al piano; senza snapshot nessun `budget`. |
+| T-M3B-MEM-01 | Pianificatore con i termini nuovi: caso di riferimento di R2.r ricalcolato a mano con `Cr` = 1 e `Cr` = 2 e con `n` = 10 (`F(10)` = 560 + 16 + 544 = 1120; `R` = 16·Cr·1000·10 = 160 000·Cr; `CS` = 1368; `Cn` = 784) e con `n` = 3 (dove `q(n)` = 8); caso con `master_raw_frames`: `P` = file + `needed`, `resource_plan.spill` valorizzato, `Z` = n·S·6; stop `master.raw_requires_spill` senza `scratch`, stop `spill.quota_exceeded` con quota minore di `Z` e con `Z` non rappresentabile, entrambi prima di ogni lettura e prenotazione; piano non rappresentabile con `n` o `H` enormi; `minimum_feasible_bytes` − 1, anche per un master RAW, → stop prima di ogni prenotazione (picco del pool 0); tile automatico a confine (`tile` = 1 contro 0); `Cr` fuori da {1, 2} → `resources.planner_input`; T-M2R2R-01…05 rieseguiti con i valori ricalcolati. |
 
 ## Fuori da M2
 

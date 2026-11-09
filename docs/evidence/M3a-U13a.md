@@ -45,7 +45,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `2356f8f7f730000b6e29b63b1e816c9be0000eaeb696569f3ecd09971ac5018b` |
 | `docs/contracts/U13-dng-decoder.md` | `396393dd3d01f44f7ab1042cbf1b17a15b2a2aba99fb8d04eed13ad89895ba61` |
 | `src/core/dng_decode.cpp` | `337735e3da8c1237796b971b7a27520a5c3674970e5b6363cacf2fab2ed008e1` |
 | `src/core/dng_internal.hpp` | `ac95b16fc39ffd6fd7668cbcaeba341f534b7f4af484811839705e1e8cb3685d` |

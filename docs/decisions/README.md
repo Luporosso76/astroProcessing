@@ -1,6 +1,6 @@
 # Registro ADR
 
-Registro compatto delle 17 decisioni architetturali del piano. Il testo normativo, le opzioni e le evidenze richieste stanno in `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md` §20; qui c'è solo lo stato. Stack scelto in [ADR-M1-stack](ADR-M1-stack.md). Lo stato di avanzamento è in `STATO.md`. Decisioni di infrastruttura fuori dal registro: [M3-dev-preset](M3-dev-preset.md).
+Registro compatto delle 17 decisioni architetturali del piano. Il testo normativo, le opzioni e le evidenze richieste stanno in `ASTRO_POSTPROCESSING_PLAN_v2.2.1.md` §20; qui c'è solo lo stato. Stack scelto in [ADR-M1-stack](ADR-M1-stack.md). Lo stato di avanzamento è in `STATO.md`. Decisioni di infrastruttura fuori dal registro: [M3-dev-preset](M3-dev-preset.md); decisioni sulle lacune di M3.b (L1…L11) e estensione di ADR-06 R2.r: [M3b-lacune](M3b-lacune.md) (DECISO, 9 novembre 2026).
 
 ## Stato
 

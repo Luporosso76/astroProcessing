@@ -1,0 +1,359 @@
+# M3.b, unità B0: decisioni sulle lacune L1…L6, L8…L11 e estensione di ADR-06 R2.r
+
+Stato: **DECISO dal coordinatore** il 9 novembre 2026 (decisione tecnica delegata, `AGENTS.md`). Proposte dell'agente approvate per L1…L6, L8, L9, L11 e per l'estensione di R2.r; L10 decisa diversamente (opzione C, spill: vedi L10). Gli emendamenti ai contratti si applicano in B0 insieme a questo documento.
+
+Fonti lette per il documento: `plans/M3b.md` (§5 B0, §8 e le unità citate), `docs/contracts/C-02-master.md` (C-02.b §b.1…§b.15, C-02.b-flat §f.2, §f.10, §f.13), `docs/contracts/F-IO-03-classificazione.md` (CL-05, CL-06, CL-11, CL-12), `docs/contracts/ADR-16-stati-master.md` §b.7, `docs/contracts/ADR-06-budget-scheduler.md` (estensione R2.r), `docs/contracts/BASE-confini.md` §3.1-§3.3. Codice letto nel worktree: `src/core/job_types.cpp`, `src/core/master.cpp`, `src/core/resources.cpp`, `src/core/batch_classification.cpp`, `src/core/raw_import_job.cpp` e le intestazioni `job_types.hpp`, `master.hpp`, `resources.hpp`, `batch_classification.hpp`, `calibration_analysis.hpp`, `raw_decode.hpp`. I risultati di `codegraph explore` vengono dallo snapshot del checkout principale; ogni fatto di codice qui sotto è stato riletto nel worktree.
+
+Criteri di scelta, in quest'ordine: (1) nessun fallback, stop tipizzati con provenance (`AGENTS.md`); (2) base comune riusata, non rifatta (`plans/M3.md`, `CLAUDE.md` §2.1); (3) riproducibilità bit-esatta e chiave del nodo stabile dopo la riapertura (C-02.b §b.8); (4) minima superficie nuova.
+
+Riepilogo:
+
+| Lacuna | Proposta in una frase | Emendamento di contratto |
+|---|---|---|
+| L1 | Una seconda voce del registro per i frame RAW, varianti per ruolo e metodo con tre frame; la cardinalità variabile non entra nel registro | sì (BASE §3.1, una frase) |
+| L2 | Un lettore di statistiche per frame (lettura verificata) separato dall'analisi, che resta una funzione pura | sì (C-02.b §b.2) |
+| L3 | Funzione propria in `master_analysis.cpp`; `batch_proposal.v1` invariato; i nodi proposti entrano in `analyze_batch` come candidati | sì (C-02.b §b.2, F-IO-03 CL-06) |
+| L4 | Stessa chiave `batch.analysis_params`, nuovo membro opzionale `master`; parametro assente = esito `params_missing` per ruolo | sì (F-IO-03, C-02.b §b.2) |
+| L5 | Il peso si lega al digest del frame, scritto nella voce del frame del nodo | no |
+| L6 | «Set parziale» = sottoinsieme scelto dall'utente dopo le esclusioni per frame; nessun conteggio di frame mancanti | sì (una frase di chiarimento in C-02.b §b.2) |
+| L7 | Chiusa: conferma letterale | no |
+| L8 | L'esito dell'analisi sta nei parametri del nodo (parametro `analysis`) | sì (C-02.b §b.2, §b.8, §b.10) |
+| L9 | `offset_adu` dei RAW è dichiarato nella ricetta del nodo; l'analisi lo riceve come parametro; nessun legame col ledger `light_offset` | no |
+| L10 | Decisione C: decodifica in `prepare`, un frame alla volta, nello spill dichiarato del job; quota `n·S·6` nel pianificatore, non memoria del pool; senza spill stop prima di ogni lettura | sì (ADR-06 R2.r, «Frame RAW tramite spill»; C-02.b §b.2 «RAW») |
+| L11 | Si segue il testo attuale: nessun codice nuovo, nessun parametro opzionale, nessun avviso nuovo | no |
+
+---
+
+## L1. Registro dei tipi di job per `master.combine`
+
+**Domanda (dal piano).** Un solo tipo di job con ingressi variabili, o una variante per ruolo o per metodo? Come si dichiara la cardinalità nella suite di conformità?
+
+**Fatti.**
+- Codice: `registered_job_types()` in `src/core/job_types.cpp` registra `master_operator_id` con `input_roles` `{"frame0", "frame1", "frame2"}`, `fits_roles(...)` e una variante `{"unica", false, true}`. `make_master` costruisce una `master_recipe` con ruolo `dark`, `mean`, `none`, tre frame.
+- Codice: `job_type_entry` ha un solo `input_roles` e una sola mappa `role_formats` per voce (`job_types.hpp`). La variante (`job_type_variant`) porta solo nome, `checkpoint`, `scratch`.
+- Codice: `run_master_job` accetta una `master_recipe` con un numero qualunque di frame (`recipe.frames`, `p.n`): il job reale non ha cardinalità fissa. La fissa è solo quella del costruttore minimo.
+- Contratto: BASE §3.1 punto 2: «Ogni voce porta un costruttore del job minimo. Dagli input sintetici della suite [...] costruisce il nodo e una chiamata del job». BASE §3.2: «Ogni caso gira per ogni voce del registro e per ogni variante». T-M3BASE-11 gira «per ogni ruolo di input»; T-M3BASE-22 verifica il formato dichiarato per ogni voce e ruolo.
+- Codice: `tools/check_job_types.py` confronta insiemi di `operator_id` (regex `ENTRY` su `{x_operator_id,`): due voci con lo stesso operatore non lo rompono. Il nome del test è `operator_id` + `_` + nome della variante (`test_conformance.cpp`, riga 246): i nomi delle varianti devono essere distinti fra voci dello stesso operatore.
+- Codice: i frame RAW hanno un formato diverso (`raw_input_format()`), dichiarato per ruolo nella voce. Con una sola voce non si possono avere ruoli FITS e ruoli RAW dello stesso operatore.
+
+**Opzioni.**
+- A. Una voce, ingressi variabili: richiede che `input_roles` dipenda dalla variante. Cambia la struttura del registro e la suite (`write_inputs`, T-M3BASE-11 e 22). Superficie nuova grande.
+- B. Una voce per formato dei frame (FITS, RAW), stesso operatore, con `frame0…frame2` e varianti per ruolo e metodo ammessi con tre frame. La cardinalità resta quella dei ruoli dichiarati (3). La variabilità di `n`, ruolo e metodo è coperta dai test del prodotto (T-M3B-C02-xx, T-M3B-MEM-01), che chiamano lo stesso `run_master_job`.
+- C. Una voce per ruolo o per metodo: moltiplica le voci e i test di conformità senza aggiungere ostacoli nuovi (le obbligazioni OB-01…OB-20 non dipendono dal metodo).
+
+**Proposta: B.** Motivo: il registro dichiara il job *minimo valido*, non lo spazio dei parametri (BASE §3.1). La suite controlla le obbligazioni del confine; `n`, ruolo e metodo non le cambiano. L'unica differenza reale per il confine è il formato dei ruoli (FITS contro RAW), e una seconda voce la esprime senza toccare la struttura. Le varianti proposte, con tre frame: `unica` (oggi: `dark`, `mean`), `dark_mediana`, `flat_media` per la voce FITS; `raw_dark_mediana` per la voce RAW (ruoli `frame0…frame2` con `raw_input_format()`). Non è una scelta di metodo del prodotto: sono istanze di prova.
+
+**Emendamento proposto.** BASE-confini §3.1, punto 1, aggiungere in fondo la frase: «Un operatore può avere più voci quando i formati dei suoi ruoli differiscono; le varianti hanno nomi distinti fra le voci dello stesso operatore, perché il nome di un caso è l'operatore più la variante. La voce dichiara un job minimo valido: la variabilità dei parametri del job è coperta dai test dell'operatore, non dal registro.»
+
+Applicato in `docs/contracts/BASE-confini.md` §3.1, punto 1 (in fondo).
+
+**Conseguenze.**
+- B16: due voci in `job_types.cpp`, costruttore minimo per la voce RAW; nessun cambio di `job_type_entry`.
+- T-M3B-JOB-01: la dicitura del piano «N variabile e ruolo variabile nella suite» diventa «istanze minime con tre frame per ruolo e metodo scelti, FITS e RAW»; la cardinalità variabile è provata da T-M3B-C02-10 e T-M3B-MEM-01.
+- T-M3BASE-11, 22 e la suite: nessun cambio di codice, due voci in più. T-M3A-CAL-09 (parte master) usa la voce RAW.
+
+---
+
+## L2. Chi legge i campioni dell'analisi dei master
+
+**Domanda.** C-02.b §b.2 dice che l'analisi «legge i campioni solo per la frazione satura e per i livelli `m_(f,c)` del flat». `analyze_batch` non legge campioni salvo `flat.bias`. Chi legge, con quale confine di lettura verificata (OB-11), budget e cancel? L'analisi resta pura?
+
+**Fatti.**
+- Contratto: F-IO-03 CL-12: `analyze_batch` è «una funzione pura»; «Nessuna lettura di campioni, tranne quella del controllo termico di `flat.bias`».
+- Codice: `batch_input::load_samples` (`batch_classification.hpp`) è l'unico canale di lettura; per i FITS è `load_full_image(path, digest, pool, cancel)` (`batch_classification.cpp`), che usa `open_fits_input`, `plan_fits`, `read_verified_input` (OB-11) e `decode_fits`, e controlla `cancel`. È impostato solo per ruoli `flat` e `bias`.
+- Codice: per i RAW `load_samples` non è impostato: l'osservazione viene dal record del decoder del nodo d'import (`batch_classification.cpp`, ramo dopo `rec.format == fits_input_format().prefix`). Nessun RAW ha un lettore di campioni nell'analisi.
+- Contratto: C-02.b §b.2: «L'uscita è una funzione pura degli ingressi»; C-02.b §b.8: «Analisi: funzione pura degli ingressi, indipendente dall'ordine in cui i candidati arrivano».
+
+**Opzioni.**
+- A. L'analisi dei master chiama `load_samples` (estende `analyze_batch` e rompe CL-12 per ogni ruolo).
+- B. Un lettore separato produce per frame una piccola struttura di statistiche (campioni saturi e totale; `m_(f,c)` per canale); l'analisi pura le riceve come ingresso, come riceve le osservazioni.
+- C. Le statistiche si calcolano al primo uso e si persistono come artefatto d'analisi (cache). Superficie nuova: nuovo tipo di artefatto e sua invalidazione.
+
+**Proposta: B.** Motivo: lascia `analyze_batch` e CL-12 intatti; l'analisi resta funzione pura (§b.8); il lettore è un confine di lettura con le garanzie esistenti. Il lettore (nome indicativo `read_master_frame_stats`) legge un frame alla volta: FITS con lo stesso percorso di `load_full_image`; RAW con `open_input(path, raw_input_format())`, `read_verified_input` e `decode_raw_buffer` con `raw_decode_context{&pool, &cancel, ...}` (come `raw_import_job.cpp`). Digest o dimensione diversi: stop `integrity` dei codici di OB-11, nessuna statistica parziale. Cancel controllato prima di ogni frame. Il lettore legge solo se serve: `saturation_adu` dichiarato (frazione satura) oppure ruolo `flat` (livelli). Le statistiche sono funzioni deterministiche dei byte verificati: la proposta non cambia se i candidati sono permutati.
+
+**Emendamento proposto.** C-02.b §b.2, paragrafo «Analisi del set candidato», sostituire «L'analisi legge header, metadati e stato del decoder, e legge i campioni solo per la frazione satura e per i livelli `m_(f,c)` del flat.» con: «L'analisi legge header, metadati e stato del decoder. I campioni, solo per la frazione satura e per i livelli `m_(f,c)` del flat, li legge un'operazione separata del confine di lettura verificata (OB-11, con pool e cancel), che restituisce per ogni frame l'esito di decodifica (ok, oppure `decode_failed` con il dettaglio e il codice di ADR-08.b §2.5; gli stop di integrità OB-11 restano stop e non diventano un'esclusione), il numero di campioni saturi, il numero totale di pixel (`width·height`, denominatore di `saturated_fraction` di C-02.a) e i livelli `m_(f,c)` per canale, assenti per un canale senza pixel validi; l'analisi riceve queste statistiche come ingresso. `analyze_batch` (F-IO-03 CL-12) non cambia.»
+
+Applicato in `docs/contracts/C-02-master.md` §b.2, paragrafo «Analisi del set candidato (prima della scelta)».
+
+**Conseguenze.** B12 (esclusione `saturated_fraction`, `flat_low_signal`) e B13 (livelli del flat) ricevono le statistiche in ingresso; i loro test (T-M3B-C02-08) usano statistiche scritte a mano. Un'unità di lettura nuova (non prevista dal piano) sta dentro B12 per FITS e dentro B15a/B15 per RAW; la riverifica OB-11 dei frame è coperta da T-M3BASE-11 solo se il lettore è raggiunto dal registro: non lo è (non è un job), quindi serve una prova propria dentro B12 (stop `input.digest_mismatch` e `input.missing`, cancel). Da dichiarare nel record di B12 come test aggiunto, non come ID nuovo di contratto.
+
+---
+
+## L3. Dove vive l'API dei gruppi e dei master proposti
+
+**Domanda.** Funzione propria o estensione di `analyze_batch`? `astro.batch_proposal.v1` cambia schema o versione? Come si espone un gruppo di master accanto ai gruppi di light?
+
+**Fatti.**
+- Contratto: F-IO-03 CL-05: i frame di un ruolo senza `master_descriptor` sono elencati «con l'indicazione `frame_pending_master`; i gruppi e i master proposti li calcola C-02.b (M3.b)». F-IO-03 CL-06 (c): «da M3.b, un nodo `master.combine` proposto dall'analisi di C-02.b, con lo stesso descrittore derivato». «Le tre fonti consegnano la stessa forma [...] Per questo (c) entra senza cambiare il contratto.»
+- Codice: `batch_proposal` ha `groups` (light), `excluded`, `frame_pending_master` (ruolo → digest); `canonical()` scrive `astro.batch_proposal.v1` con `frame_pending_master` (`batch_classification.cpp`, funzione `batch_proposal::canonical`). `analyze_batch(inputs, slots, request, fault)` accetta `slots` di tipo `slot_candidate` (`node_key`, ruolo, descrittore, osservazione, `load_samples`).
+- Codice: `analyze_batch` oggi mette in `frame_pending_master` ogni frame di ruolo di calibrazione senza descrittore e non lo valuta.
+- Non letto: come `select_recipe` e `verify_selection` trattano una `node_key` che non è uno slot `current`. B14 lo verifica prima di scrivere il codice.
+
+**Opzioni.**
+- A. Estendere `analyze_batch` e `batch_proposal`: serve ricevere le statistiche di L2 (nuovo parametro) e cambiare lo schema (v2) con `master_groups`. Rompe i test di M3.a sullo schema v1.
+- B. Funzione propria in `src/core/master_analysis.cpp` (nome indicativo `propose_masters`), funzione pura di: osservazioni dei frame di `frame_pending_master`, statistiche di L2, parametri d'analisi (L4), scelte dell'utente. Uscita: `master_proposal` con JSON canonico `astro.master_proposal.v1` (un documento nuovo, versione 1). I nodi proposti si passano ad `analyze_batch` come `slot_candidate` nel parametro `slots` già esistente.
+- C. Come B, ma con un nuovo tipo di candidato in `analyze_batch`. Superficie nuova senza vantaggio rispetto al riuso di `slot_candidate`.
+
+**Proposta: B.** Motivo: `frame_pending_master` è già il contratto di consegna (CL-05); `analyze_batch` e `astro.batch_proposal.v1` non cambiano; i gruppi di master stanno in un documento a parte, collegato ai light solo tramite il candidato (CL-06 (c)). Un gruppo di master accanto ai gruppi di light: il chiamante (UI/CLI) legge i due documenti; le ricette dei light vedono i master proposti come candidati dello stesso ruolo.
+
+**Emendamento proposto.**
+- C-02.b §b.2, in coda al paragrafo «Selezione ed esecuzione», aggiungere: «I gruppi e i nodi proposti li calcola una funzione propria, pura, che riceve i frame elencati in `frame_pending_master`, le loro statistiche, i parametri d'analisi e le scelte dell'utente, e restituisce il documento canonico `astro.master_proposal.v1`. I nodi proposti entrano in `analyze_batch` come candidati di tipo (c) di F-IO-03 CL-06, con la stessa forma di un candidato da slot. L'osservazione (`slot_candidate::observation`) del candidato (c) si costruisce dal frame di riferimento del gruppo (primo in ordine canonico) con le regole dei metadati comuni di C-02.a §2; il candidato (c) non ha `load_samples`. La verifica termica `flat.bias` (ADR-16.b §b.5) con F o B candidato (c) non si esegue alla proposta: l'esito è dichiarato, `thermal_check_pending_master`, mai omesso in silenzio; dopo l'esecuzione del master la selezione si verifica di nuovo con `verify_selection`.»
+- F-IO-03 CL-06 (c), aggiungere: «Il candidato (c) è passato a `analyze_batch` con la stessa struttura del candidato (b); la sua chiave è la chiave del nodo proposto. L'osservazione (`slot_candidate::observation`) del candidato (c) si costruisce dal frame di riferimento del gruppo (primo in ordine canonico) con le regole dei metadati comuni di C-02.a §2; il candidato (c) non ha `load_samples`. La verifica termica `flat.bias` (ADR-16.b §b.5) con F o B candidato (c) non si esegue alla proposta: l'esito è dichiarato, `thermal_check_pending_master`, mai omesso in silenzio; dopo l'esecuzione del master la selezione si verifica di nuovo con `verify_selection`.»
+
+Applicato in `docs/contracts/C-02-master.md` §b.2, paragrafo «Selezione ed esecuzione» (in coda), e in `docs/contracts/F-IO-03-classificazione.md` CL-06 (c) (anche per l'osservazione e la verifica termica del candidato (c)).
+
+**Conseguenze.** B14: la funzione e il documento; `test_batch_analysis` e `test_verify_selection` cambiano solo dove usano `frame_pending_master` come uscita finale (F-IO-03 CL-11): lo schema `batch_proposal.v1` non cambia, quindi i loro confronti canonici restano. T-M3B-ANA-01 verifica l'uguaglianza con l'oracolo a mano e l'indipendenza dall'ordine dei candidati. Nuova verifica da aggiungere a B14 (non è un ID di contratto): `verify_selection` e `select_recipe` su un candidato (c).
+
+---
+
+## L4. Parametri d'analisi dei master
+
+**Domanda.** Stanno nella stessa chiave `batch.analysis_params` dei light o in una propria? Cosa fa l'analisi se ne manca uno (stop o gruppo `params_missing`)?
+
+**Fatti.**
+- Codice: `read_analysis_params` (`batch_classification.cpp`) legge `settings` `batch.analysis_params`, formato `astro.batch_analysis_params.v1`; chiavi note: `exposure_rel_tol`, `temperature_abs_tol_c`, `temperature_policy`, `decoder_black_abs_tol_adu`, `normalization`, `q_min`, `q_rel_sigma_max`, `flat_thermal_bound_adu`, `flat_thermal_rel_budget`. Una chiave sconosciuta è `invalid_input` `batch.analysis_params` («chiave sconosciuta»). Assente = nessuna dichiarazione.
+- Codice: `calibration_declarations` (`calibration_analysis.hpp`) contiene già `exposure_rel_tol`, `temperature_abs_tol_c`, `temp_policy`, `decoder_black_abs_tol_adu`: quattro dei parametri dei master sono gli stessi dei light.
+- Contratto: F-IO-03 CL-07/CL-09: `params_missing` è un esito della proposta di un gruppo di light, con i nomi dei parametri assenti, «senza ricette e senza default». «Gli esiti [...] non sono errori: sono esiti della proposta.»
+- Contratto: C-02.b §b.2: i parametri d'analisi sono `exposure_rel_tol`, `temperature_abs_tol_c`, `temperature_policy`, `saturation_adu`, `saturated_fraction_max`, per il flat `flat_min_signal_adu` e `flat_level_rel_tol`, per i RAW `decoder_black_abs_tol_adu`, per il flat RAW e per `single` `offset_adu`. «Una soglia del frame presente con `saturation_adu` assente ferma l'analisi con `invalid_input`, `master.param.saturation_adu`, come in `.a`.»
+- Codice: `master_recipe` (`master.hpp`): `saturation_adu` assente dà l'avviso `saturation_not_evaluated`; `saturated_fraction_max` è obbligatorio con `saturation_adu`.
+
+**Opzioni.**
+- A. Chiave propria `batch.master_analysis_params`. Dichiara due volte le quattro tolleranze comuni: rischio di valori diversi per lo stesso batch.
+- B. Stessa chiave, un membro opzionale `master` (oggetto con i parametri propri dei master); le quattro tolleranze comuni restano al livello superiore, una sola dichiarazione. Il formato resta `astro.batch_analysis_params.v1`: nessuna chiave esistente cambia significato. Il lettore continua a fermarsi su chiavi sconosciute, dentro e fuori da `master`.
+- C. Come B con formato `v2`. Rompe le fixture e le impostazioni di M3.a senza guadagno.
+
+Assenza di un parametro: (i) stop per l'intera analisi; (ii) esito `params_missing` per ruolo con l'elenco dei nomi, senza proposta per quel ruolo; (iii) default. (iii) è vietato.
+
+**Proposta: B con (ii).** Un ruolo con parametri richiesti mancanti dà l'esito `params_missing` con i nomi, nessun gruppo proposto per quel ruolo; gli altri ruoli procedono (uno stop bloccherebbe bias e dark per un flat senza `flat_level_rel_tol`). Eccezione dettata dal contratto: frame con soglia propria e `saturation_adu` assente ferma con `invalid_input`, `master.param.saturation_adu`. Parametri richiesti per ruolo, dal contratto: tutti i ruoli `exposure_rel_tol`, `temperature_abs_tol_c` e `temperature_policy` (come ADR-16.a §2 per i light); RAW `decoder_black_abs_tol_adu`; `saturated_fraction_max` solo se `saturation_adu` presente; flat `flat_min_signal_adu` e `flat_level_rel_tol`; flat RAW e `single` da RAW `offset_adu`.
+
+**Emendamento proposto.**
+- F-IO-03, voce «I parametri d'analisi stanno in `settings`, chiave `batch.analysis_params`», aggiungere: «Il documento può contenere un membro `master` con i parametri dell'analisi dei master di C-02.b §b.2 che non sono dei light (`saturation_adu`, `saturated_fraction_max`, `flat_min_signal_adu`, `flat_level_rel_tol`, `offset_adu`); le tolleranze comuni stanno al livello superiore e valgono per light e master.»
+- C-02.b §b.2, dopo l'elenco dei parametri d'analisi: «Un parametro richiesto per un ruolo e assente dà, per quel ruolo, l'esito `params_missing` con i nomi, senza proposta e senza default; fa eccezione `saturation_adu` (stop `master.param.saturation_adu`, sopra).»
+
+Applicato in `docs/contracts/F-IO-03-classificazione.md` §7, voce «I parametri d'analisi stanno in `settings`», e in `docs/contracts/C-02-master.md` §b.2, paragrafo «Analisi del set candidato (prima della scelta)».
+
+**Conseguenze.** B12 estende `read_analysis_params` e la `calibration_declarations` solo per il lato dei master (struttura propria, non nelle dichiarazioni congelate di CL-11: i campi dei master non sono «applicabili alla ricetta» del light). T-M3B-C02-08/09 aggiungono un caso per parametro assente (uno alla volta) e per chiave sconosciuta in `master`.
+
+---
+
+## L5. Pesi di `weighted_mean`
+
+**Domanda.** A quale frame si legano i pesi (digest, posizione nell'ordine canonico, `input_id`)? Come entrano nella chiave del nodo? Due frame con lo stesso digest?
+
+**Fatti.**
+- Codice: `canonical_order` (`master.cpp`) ordina i frame per digest SHA-256 crescente (esadecimale minuscolo). Il controllo di unicità (`master.cpp`, dopo `validate_params`) ferma due frame con lo stesso digest: `unsupported`, `calib.shared_input`.
+- Codice: `make_master_node` scrive i frame in ordine canonico sotto `params["frames"]`, una voce per frame (`declared_metadata`, `declared_fields`, `fits_read_options`). I numeri f64 del JSON canonico usano `std::to_chars` in forma scientifica (`json.cpp`).
+- Contratto: C-02.b §b.10: «Pesi assenti, in numero diverso dai frame, non finiti o ≤ 0; [...] pesi con un metodo diverso da `weighted_mean`» → `invalid_input`, `master.param.weights`. C-02.b §b.2: «Il nodo contiene esattamente i frame scelti [...] con metodo, parametri, pesi».
+- Contratto: F-IO-03 CL-12: gli `input_id` sono identità locali che dipendono dall'ordine di registrazione, esclusi dal confronto canonico.
+
+**Opzioni.** (A) `input_id`: non stabile, escluso. (B) Posizione nell'ordine canonico: stabile solo se l'insieme non cambia, e il chiamante dovrebbe prevedere l'ordine dei digest. (C) Digest del frame: l'identità che già determina l'ordine e la chiave.
+
+**Proposta: C.** Il peso è un campo `weight` della voce del frame nel nodo (`frames[k].weight`, `null` per i metodi senza pesi); nella ricetta è un campo opzionale di `master_frame_spec`. La posizione deriva dal digest, quindi i due legami coincidono; permutare i candidati non cambia la chiave. «In numero diverso dai frame» si legge come: frame con peso diverso da tutti i frame; il contesto dello stop riporta i due conteggi. Due frame con lo stesso digest: lo stop esistente `calib.shared_input` arriva prima di ogni controllo dei pesi; nell'analisi la copia è esclusa come `duplicate_digest` e nessun peso è proposto (i pesi non si propongono mai, C-02.b §b.4).
+
+**Emendamento di contratto: no.** C-02.b §b.2 e §b.10 sono rispettati alla lettera.
+
+**Conseguenze.** B3: campo `weight` in `master_frame_spec`, serializzazione nella voce del frame, `master_algorithm_version` aumentata (già prevista). T-M3B-C02-03(c): pesi assenti su un solo frame, in tutti, presenti con `mean`; T-M3B-DSC-01: chiave invariata per permutazione dei frame.
+
+---
+
+## L6. «Set parziali»
+
+**Domanda.** Che cosa vuol dire «gestire set parziali»: (a) sottoinsieme scelto dall'utente, (b) gruppo con meno frame del minimo del metodo, (c) altro? Chi dichiara quanti frame mancano?
+
+**Fatti.**
+- Piano, F-CAL-01 riga 1840: «gestisce set parziali e gruppi incompatibili». C-02.a, intestazione: «set parziali e gruppi misti appartengono a F-CAL-01.b (M3.b)». C-02.a «Fuori da `.a`»: «Media pesata, winsorized, set parziali, gruppi misti.»
+- Contratto: C-02.b §b.2: «un gruppo o un suo sottoinsieme, scelto dall'utente»; «Nessun frame è escluso per livello [...] un sottoinsieme lo sceglie l'utente»; il report dell'analisi elenca ogni frame `used` o `excluded` con il motivo (§b.7).
+- Contratto: C-02.b §b.4: la proposta non propone un metodo fuori dominio (`n = 1`: `single` o nessuna proposta; `n = 2`: `mean`); §b.10: `n` fuori dominio → `master.variance_domain`.
+- Nessun testo definisce un numero atteso di frame né un parametro che lo dichiari.
+
+**Opzioni.** (a) e (b) sono già coperti dal contratto, in punti diversi. (c) un conteggio atteso dichiarato dall'utente: parametro nuovo, non richiesto.
+
+**Proposta.** Per questo prodotto «set parziale» è l'insieme dei frame che resta dopo le esclusioni per frame (§b.2 punto 1) e, in più, ogni sottoinsieme di un gruppo scelto dall'utente; il report dichiara candidati, usati ed esclusi con motivo. Un gruppo troppo piccolo per un metodo non si «completa»: la proposta non lo propone (§b.4) e l'esecuzione si ferma (§b.10). Nessuno dichiara «frame mancanti»: il prodotto non conosce un numero atteso e non lo inventa.
+
+**Emendamento proposto.** C-02.b §b.2, in coda al paragrafo «Selezione ed esecuzione»: «Per «set parziali» (F-CAL-01) questo contratto intende: l'insieme dei frame rimasti dopo le esclusioni per frame e ogni sottoinsieme di un gruppo scelto dall'utente. Il prodotto non conosce né dichiara un numero atteso di frame; un gruppo con meno frame del minimo del metodo non ha proposta per quel metodo e, se scelto, si ferma con `master.variance_domain`.»
+
+Applicato in `docs/contracts/C-02-master.md` §b.2, paragrafo «Selezione ed esecuzione» (in coda).
+
+**Conseguenze.** B14: nessun campo nuovo. T-M3B-C02-09 già copre `n ∈ {1, 2, 3, 1024, 1025}` e gli stop di dominio; T-M3B-C02-08 la selezione di un sottoinsieme (preflight che passa, nodo con esattamente quei frame).
+
+---
+
+## L7. Chiusa: conferma letterale
+
+C-02.b §b.1, tabella dei metodi, riga `weighted_mean`: colonna `n`: «≥ 3 e `2 max_f w_f < W`». Riga `mean` + `sigma_clip`: colonna `n`: «≥ 3, non inerte». Nessuna delle due riporta un massimo. C-02.b §b.2 (tabella dei domini): nessun `n` massimo. L'unico tetto è per `median` e `winsorized`: §b.1, colonna `n`: «3 … 1024» e «`2g + 1` … 1024»; §b.2: «Il limite `n ≤ 1024` dei metodi robusti è il dominio entro cui `κ` è verificato». Nota: il piano cita §b.4 per il limite 1024; §b.4 (tabella della proposta) riporta solo «> 1024 | `mean` + `none`». Nessun tetto nuovo per `sigma_clip` e `weighted_mean`.
+
+---
+
+## L8. L'esito dell'analisi: chiave, record separato o provenance
+
+**Domanda.** L'esito dell'analisi sta nei parametri del nodo (chiave), in un record separato collegato, o solo nella provenance al momento dell'esecuzione? Quale garantisce «ricostruito dopo la riapertura, stessa chiave e stesso artefatto» (§b.8)?
+
+**Fatti.**
+- Contratto: C-02.b §b.2: «Il nodo `master.combine` contiene esattamente i frame scelti [...] con metodo, parametri, pesi e, per i RAW, `frame_decoder_states`». §b.8: «il nodo contiene frame, metodo, parametri, pesi e stati del decoder. Ricostruito dopo la riapertura dello store, dà la stessa chiave e lo stesso artefatto». §b.10: «La provenance del nodo contiene l'esito dell'analisi (esclusioni e gruppi) e le costanti del preflight».
+- Contratto: C-02.b §b.7, report: la sezione «Analisi» elenca i frame candidati `used` o `excluded` con motivo e valori, i gruppi, la proposta. L'artefatto `report` è parte dell'output del job (`master.cpp`: `files` con `master_report_role`).
+- Codice: `make_master_node` costruisce la chiave dai parametri canonici e dagli ingressi; il job non esegue l'analisi. `observed_inputs` entra solo nei `details` del job (`master.cpp`, fine di `run_master_job`).
+- T-M3B-C02-10: candidati permutati e riapertura → «stessa chiave del nodo e stesso digest dell'artefatto».
+
+**Ragionamento.** Il report è un artefatto e contiene frame esclusi, che non appartengono al nodo. Se l'esito non fosse nella chiave, due esecuzioni con la stessa chiave e analisi diverse darebbero report diversi: viola §b.8. Un record separato ha lo stesso problema, salvo che il suo digest entri nella chiave: sarebbe l'opzione A con un'indirezione in più. La sola provenance non determina il report.
+
+**Opzioni.**
+- A. Parametro `analysis` del nodo: il JSON canonico dell'esito (candidati con stato e motivi, gruppo del nodo, riferimento, stato del gruppo, proposta, adesione alla proposta). Entra nella chiave.
+- B. Record separato, riferito dal nodo con il suo digest: stessa dipendenza di A, un artefatto in più.
+- C. Solo nei `details` del job: non determina il report; viola §b.8.
+
+**Proposta: A.** Costo accettato: due selezioni degli stessi frame da insiemi di candidati diversi sono nodi diversi (stesso pixel, provenienza diversa): è coerente con il fatto che il report le descrive in modo diverso. Un nodo non nato da una proposta ha `analysis: null` esplicito e il report dice «analisi non eseguita». Le costanti del preflight (`κ`, `a_f`, `c_f`, `m_(f,c)`, `r_(f,c)`, `m_H,c`, `ρ_c`) restano derivate da parametri e campioni: stanno nei `details` del job (e nel report), non nella chiave. Il parametro `analysis` è un sottoinsieme di `astro.master_proposal.v1` (L3): la funzione di proposta lo produce; il job lo legge dalla ricetta senza rieseguire l'analisi.
+
+**Emendamento proposto.**
+- C-02.b §b.2, «Selezione ed esecuzione»: dopo «con metodo, parametri, pesi e, per i RAW, `frame_decoder_states` (ADR-16.b §b.7)» aggiungere «e l'esito canonico dell'analisi da cui il nodo nasce (parametro `analysis`; `null` per un nodo non proposto)».
+- C-02.b §b.8, «Riproducibilità dal progetto»: «il nodo contiene frame, metodo, parametri, pesi, stati del decoder e l'esito dell'analisi».
+- C-02.b §b.10, ultima frase del paragrafo degli avvisi: sostituire «La provenance del nodo contiene l'esito dell'analisi (esclusioni e gruppi) e le costanti del preflight (`κ`, `a_f`, `c_f`).» con «L'esito dell'analisi (esclusioni e gruppi) sta nei parametri del nodo e quindi nella sua provenance; le costanti del preflight (`κ`, `a_f`, `c_f`) stanno nei `details` del job.»
+
+Applicato in `docs/contracts/C-02-master.md` §b.2 «Selezione ed esecuzione», §b.8 «Riproducibilità dal progetto» e §b.10 (paragrafo degli avvisi).
+
+**Conseguenze.** B3: parametro `analysis` nel nodo e nella ricetta (opaco: oggetto JSON canonico, validato solo come oggetto o `null`). B14: produzione del parametro. B16: il job lo legge dal nodo. T-M3B-C02-10: candidati permutati → stesso `analysis`, stessa chiave; T-M3B-DSC-01: la chiave cambia se cambia `analysis`. La dimensione del parametro cresce con il numero dei candidati: nessun limite nuovo.
+
+---
+
+## L9. `offset_adu` dei RAW
+
+**Domanda.** Lo dichiara l'analisi, la selezione o la ricetta del nodo? Come si lega al ledger `light_offset` di G-OFFSET?
+
+**Fatti.**
+- Contratto: C-02.b §b.2, paragrafo «RAW»: «`offset_adu` è il valore dichiarato nella ricetta, unico per il nodo: non si confronta fra frame [...] Serve solo a `m_(f,c)` del flat e al modello di rumore di `single`. Il nero del decoder non si sottrae». §b.7: «Per i RAW, `offset_adu` è il valore dichiarato, con origine `declared`». §b.2 parametri d'analisi: per il flat e per `single` «`offset_adu`, dichiarato una volta per l'insieme».
+- Codice: per i FITS `offset_adu` è metadato per frame (`frame_metadata::offset_adu`, `image.hpp`) e `compare_optional_fields` lo confronta fra frame (`master.cpp`); `p.offset` è quello del frame di riferimento. Per i RAW non esiste.
+- Contratto: C-01.b §10: la voce `light_offset` riporta lo stato dell'offset del *light*, il master che lo rimuove e il nero effettivo del light RAW. ADR-16.b §b.7: il confronto di `offset_adu` non si applica con stato del decoder.
+
+**Opzioni.** (a) analisi: parametro del membro `master` (L4), copiato nella ricetta; (b) selezione: stesso valore ma congelato altrove; (c) ricetta: il valore sta nei parametri del nodo (e quindi nella chiave).
+
+**Proposta: seguire il contratto.** Lo dichiara l'utente come parametro d'analisi `master.offset_adu` (L4), l'analisi lo riporta nel gruppo e nell'esito, il nodo lo porta come parametro della ricetta (origine `declared`) e quindi nella chiave. Nessun legame col ledger `light_offset`: il ledger descrive il light e il nero che lo riguarda; `offset_adu` del master serve ai livelli del flat e al rumore di `single`. Il contratto risponde già: nessun emendamento.
+
+**Conseguenze.** B12: parametro d'analisi; B15a: campo di ricetta e stop `master.metadata.offset_adu` (`metadata_missing`) se assente con RAW nel flat o in `single`; T-M3B-C02-08, T-M3B-CFA-01.
+
+---
+
+## L10. Lettura dei frame RAW nel job del master
+
+**Domanda.** Decodifica intera del frame e poi fasce? Quale confine di lettura verificata e budget del pool? Come entra nel pianificatore di B3b?
+
+**Fatti.**
+- Codice: `run_master_job` legge i FITS a fasce di righe con `read_fits_rows` nei task (`pread`) e in `prepare` decodifica ogni frame per intero, uno alla volta, per il preflight; in `finalize` riverifica con `reverify_input`. La pila non è mai residente (ADR-06 R2.r, D8).
+- Codice: i RAW non hanno lettura per fasce: `decode_raw_buffer(bytes, hooks, ctx)` decodifica un file intero, in un solo thread (ADR-08.b §2.7), con `raw_decode_context{pool, cancel, max_pixels, held_bytes}`; con `pool` il decoder si ferma con `sched.job_exceeds_budget` se `held_bytes` più la prenotazione superano il budget.
+- Contratto: ADR-16.b §b.7: stato del decoder dalla decodifica dell'analisi; stato diverso alla nuova decodifica: `integrity`, `master.decoder_state_changed`; RAW e FITS insieme: `incompatible`, `master.decoder_state_mixed`.
+- Codice: `decode_raw_buffer` produce un'immagine `f32` con maschera `uint16`: 4 + 2 byte per pixel.
+
+**Opzioni.**
+- A. Frame decodificati residenti per tutta l'esecuzione (`n·S·6` byte nel pool).
+- B. Ridecodificare per ogni task: costo inaccettabile.
+- C. Decodificare in `prepare` e scrivere ogni frame nello spill dichiarato del job, riletto a fasce.
+- D. Usare gli artefatti FITS dei nodi `io.raw_import`: contraddice ADR-16.b §b.7.
+
+**Proposta dell'agente: A. Decisione del coordinatore: C.** Motivo: con A la memoria vale `n·S·6` byte (50 dark da 24 MP: circa 7 GB), quindi i master da RAW di dimensione normale si fermerebbero per budget; D8 (pila mai residente) è un vincolo dell'ADR-06, non un'ottimizzazione. C non è superficie nuova: lo spill dichiarato esiste già nella base (`astro/spill.hpp`: `spill_area`, `spill_file` anonimo `O_TMPFILE` nella directory di scratch, quota dei byte logici, `spill.quota_exceeded`, `spill.short_read`, cancellazione alla chiusura).
+Regole: in `prepare` ogni frame RAW si legge verificato (`read_verified_input` con `raw_input_format()`, OB-11) e si decodifica per intero, uno alla volta, nella memoria già prenotata dal job in `jc.shared` (decoder nel modo con prenotazione del chiamante, ADR-08.b §2.8); lo stato del decoder si confronta col parametro del nodo (`master.decoder_state_changed`); l'immagine (`f32` più maschera `uint16`, righe in ordine) si scrive in un `spill_file` e la memoria del frame si libera prima del frame successivo. I task leggono le fasce di righe dallo spill con le stesse regole delle fasce FITS (`frame_residency = blocks` per entrambi). `finalize` riverifica i file RAW (`reverify_input`, OB-11). Un master con frame RAW richiede lo spill dichiarato nelle risorse del job: senza, stop tipizzato prima di ogni lettura (nessun percorso residente alternativo); quota insufficiente: `spill.quota_exceeded` dalla base. Quota necessaria: `n·S·6` byte, calcolata nel pianificatore e controllata prima della prima decodifica. Il picco di decodifica (file più `needed` del decoder) entra in `P` e quindi in `shared'` e in `minimum_feasible_bytes`: il piano si chiude prima di ogni prenotazione.
+
+**Emendamento.** ADR-06, estensione R2.r: sezione finale di questo documento («Frame RAW tramite spill»). C-02.b §b.2, paragrafo «RAW»: aggiungere «Il job decodifica ogni frame RAW per intero nel `prepare`, uno alla volta, dopo la lettura verificata (OB-11), e lo scrive nello spill dichiarato del job; i task leggono le fasce di righe dallo spill; la riverifica dei file RAW avviene in `finalize`. Senza spill dichiarato un master con frame RAW si ferma prima di ogni lettura (`invalid_input`, `master.raw_requires_spill`).»
+
+Applicato in `docs/contracts/ADR-06-budget-scheduler.md`, estensione R2.r, «Estensione M3.b del piano del master» → «Frame RAW tramite spill»; in `docs/contracts/ADR-08-decoder-pack.md` §2.8 (modo con prenotazione del chiamante); in `docs/contracts/C-02-master.md` §b.2, paragrafo «RAW», e §b.10 (tabella degli errori: `master.raw_requires_spill`, `spill.quota_exceeded`); C-02.b §b.11 (parziali per riga solo per le somme in virgola mobile).
+
+**Conseguenze.** B3b: `P` dei RAW con il picco di decodifica, quota di spill `n·S·6` nel pianificatore e stop senza spill dichiarato o con quota insufficiente; B15a/B16: decodifica in `prepare`, confronto dello stato, riverifica; T-M3A-CAL-09 (parte master) e T-M3B-C02-15 (stato del decoder diverso) valgono sul percorso del job; T-M3B-MEM-01 comprende i casi RAW.
+
+---
+
+## L11. Stop per `flat_normalization` non valida; avvisi e parametri con `median_ratio`
+
+**Domanda.** (a) Codice di stop per `flat_normalization` fuori da {`none`, `median_ratio`}. (b) Con `median_ratio`: `flat_level_rel_tol` vietato, nessun avviso per la dispersione dei livelli. Si emenda il contratto o si segue il testo?
+
+**Fatti.**
+- Codice: `flat_normalization` è un `enum class { none, median_ratio }` (`master.hpp`): una ricetta in memoria non può contenere un terzo valore. Assente su un flat: `bad_param("flat_normalization", "assente")` → `invalid_input`, `master.param.flat_normalization` (`master.cpp`, `validate_params`). Presente su un ruolo diverso da `flat`: stesso codice. Oggi `median_ratio` → `master.variance_domain` (`outside_variance_domain`).
+- Codice: `master_descriptor_from_node` ferma un nodo non riconosciuto con `master.not_master_node` (`bad(...)`).
+- Contratto: C-02.b-flat §f.2: «`flat_normalization` ∈ {`none`, `median_ratio`}, solo per il ruolo `flat`»; «Parametri con `median_ratio` (regole; assenti, non finiti o fuori dominio: `invalid_input`, `master.param.<nome>`)»; «`flat_level_rel_tol`: vietato». §f.10: «Parametri di §f.2 assenti, non finiti, fuori dominio o presenti dove vietati → `invalid_input`, `master.param.<nome>`». §f.10, avvisi: `flat_norm_scales_estimated` e quelli di C-02.b. Provenance: `m_(f,c)`, `r_(f,c)`, `m_H,c` e `ρ_c`.
+- Ricerca nel repository (`grep`): `master.flat_normalization_unsupported`, `flat_norm_wide_scale_spread` e `flat_level_spread_not_checked` compaiono solo nel piano `plans/M3b.md`, non nei contratti né nel codice.
+
+**Opzioni.** (1) Seguire il testo. (2) Emendare con un codice nuovo, un parametro opzionale e due avvisi.
+
+**Proposta: (1).** (a) Un testo fuori dall'insieme, letto da un parametro serializzato o da un'interfaccia che lo riceve come stringa, è un parametro «fuori dominio» di §f.2: `invalid_input`, `master.param.flat_normalization` (la famiglia esistente), con il valore nel contesto. Un nodo con il valore sconosciuto letto da `master_descriptor_from_node` si ferma con `master.not_master_node`. Nessun codice nuovo. (b) Nessun parametro opzionale: ogni parametro nuovo è una scelta nascosta (criterio 4), e una soglia per «dispersione larga» non ha una derivazione nei contratti; per i metodi robusti il limite `max m ≤ 4 min m` (§f.2 controllo 3) e il budget (§f.2 controllo 4) sono già stop tipizzati, per `mean` il fattore globale è dimostrato per qualunque rapporto (T-M3B-FLAT-02 (a)). La dispersione dei livelli è visibile nel report e nella provenance (`m_(f,c)`, `r_(f,c)`, `ρ_c`, §f.10) e non richiede un avviso. L'avviso `flat_norm_scales_estimated` resta l'unico di `median_ratio`.
+
+**Emendamento di contratto: no.**
+
+**Conseguenze.** B3: validazione del valore con `master.param.flat_normalization`, nessun codice nuovo. B8: `median_ratio` ammesso; `flat_level_rel_tol` presente con `median_ratio` → `master.param.flat_level_rel_tol` (vietato dove non ammesso); T-M3B-FLAT-06 (parte parametri). 
+
+---
+
+## Estensione proposta di ADR-06, «Estensione R2.r: piano del job del master»
+
+Dove sta: `docs/contracts/ADR-06-budget-scheduler.md`, sezione «Estensione R2.r: piano del job del master» (righe 293-362 nel worktree), sottosezioni «Ingresso», «Modello», «Stop», «Test R2.r». Il testo sotto è la decisione, applicato in `docs/contracts/ADR-06-budget-scheduler.md`, estensione R2.r, sottosezione «Estensione M3.b del piano del master» («Ingresso (M3.b)», «Modello (M3.b)», «Stop (M3.b)», «Frame RAW tramite spill») e riga T-M3B-MEM-01 della tabella «Test R2.r».
+
+### Testo da aggiungere alla sezione «Ingresso»
+
+Nuovi campi di `planner_input`, validi con `frame_count` > 0 (nomi indicativi): `master_row_channels` ∈ {1, 2} (canali presenti in una riga del frame: 1 per un master mono, 2 per un master CFA, perché una riga CFA contiene due delle quattro posizioni del motivo) e `master_raw_frames` (booleano: i frame del gruppo sono RAW). Un valore fuori da {1, 2}: `invalid_input`, `resources.planner_input`. Il metodo di combinazione non è un ingresso: i buffer dei metodi si contano tutti, per la quota massima di ogni metodo (limite dichiarato sotto). Con `master_raw_frames` il pianificatore legge `scratch` e la sua quota dalla `resource_config`.
+
+### Testo da aggiungere alla sezione «Modello»
+
+Simboli nuovi: `Cr` = `master_row_channels`; `q(n) = 8·⌈n/8⌉`.
+
+```
+buffer per task (indipendenti dal tile, uno per task, un pixel alla volta):
+  puntatori           16·n                        (già in R2.r)
+  ordinamento         16·n    coppie (valore f64, indice canonico) di median e winsorized (C-02.b §b.8)
+  indicatori          q(n)    uno per frame, per sigma_clip (C-02.b §b.1, §b.11)
+  contatori           24·n + 544    parziali del task, sommati in finalize nei totali persistenti Cn
+                              rifiutati, saturi e invalidi per frame (3 · 8 · n) più, per canale
+                              (bound a 4): conteggi per bit (16 · 8 · 4 = 512) e pixel con rejection (4 · 8 = 32)
+  F(n) = 16·n + 16·n + q(n) + 24·n + 544 = 56·n + q(n) + 544
+
+task(t)   = F(n) + t·W·(10·n + 8)                 (sostituisce 16·n + t·W·(10·n + 8))
+
+termini condivisi nuovi:
+  righe     R = 16·Cr·H·n
+              accumulatori in virgola mobile del report per riga: Σr e Σr² (2 · 8 byte) per frame, per canale di
+              riga e per riga (C-02.b §b.7, §b.11); il flat non ha somme di riga (mediana e massimo si calcolano
+              sui piani contati in K·S)
+  costanti  CS = 120·n + 168
+              pesi w, a, c (24·n); W e T (16); per frame e canale m, 1/m, r (3 · 8 · 4 · n = 96·n); κ (8);
+              per canale Σ(1/m), m_H e ρ (3 · 8 · 4 = 96); A (8) e budget (8); norm_level_bias_bound per canale
+              (4 · 8 = 32) (C-02.b §b.6, C-02.b-flat §f.2, §f.6, §f.13 punto 11)
+  contatori persistenti  Cn = 24·n + 544
+              totali interi (rifiutati, saturi, invalidi per frame; conteggi per bit e pixel con rejection per
+              canale), somma dei parziali dei task in finalize
+
+shared'   = shared + R + CS + Cn
+spill     Z = n·S·6 se master_raw_frames, altrimenti 0: quota di spill richiesta, non memoria del pool
+            (vedi «Frame RAW tramite spill»)
+task(t)   = F(n) + t·W·(10·n + 8)
+minimum_feasible_bytes = shared' + task(t_min)
+tile      = tile esplicito, oppure min(t0, floor((floor((B − shared') / k) − F(n)) / (W·(10·n + 8))))
+peak      = shared' + workers·task(tile)
+working_set = shared' + min(C, ceil(H / t0))·task(t0)
+```
+
+Byte per task in funzione di `n`, `w` (cioè `W`) e `tile_rows` (`t`): `task(t) = 56·n + 8·⌈n/8⌉ + 544 + t·W·(10·n + 8)`. Il confronto con R2.r attuale: `master_task_bytes(n, t, W)` in `master.cpp` calcola `16·n + t·W·(10·n + 8)` (puntatori `n·(8 + 8)`, `t·W` per frame `n·(8 + 2)`, appoggio `8·t·W`); la proposta aggiunge solo `40·n + q(n) + 544` per task, indipendente da `t`. I termini `P`, `8·S`, `out`, `K·S`, `(out + HB)`, `D`, `M` di `shared` non cambiano. `K` = 32 resta valido finché i dati per pixel del report sono quelli attuali: `lbe` (8 byte), `ratio` (8), `nonpositive` (1), copia del piano della varianza per la mediana (8) = 25 byte (`master_plan` e `channel_report` in `master.cpp`). Con `median_ratio` `norm_level_bias_bound` è una costante per canale (C-02.b-flat §f.6, §f.7), contata in `CS`; l'unico dato per pixel è il suo rapporto col piano, già contato in `ratio` (8 byte); `level_bias_estimate` è `null` (C-02.b-flat §f.13 punto 3). Se B11 aggiunge un array per pixel oltre questi quattro, `K` cresce di 8 e il test lo mostra.
+
+Limite dichiarato: il modello riserva i buffer di ogni metodo anche se il metodo scelto non li usa. L'eccesso massimo per task è `40·n + q(n) + 544` byte (ordinamento, indicatori, contatori già allocati comunque) e `CS` non dipende dal metodo; per `n` = 1024 sono circa 42 KB per task. Un kernel che ordina più pixel insieme (corsie SIMD) moltiplicherebbe il termine di ordinamento per il numero di corsie: oggi l'ordinamento è per pixel (C-02.b §b.11) e il modello non lo prevede.
+
+### Testo da aggiungere alla sezione «Stop»
+
+Invariato nella forma. Con `shared'` e `task` nuovi: `B < minimum_feasible_bytes` (anche in automatico); worker esplicito e tile automatico senza alcun `t ≥ 1` che entri, con `picco = shared' + k·task(1)`; worker esplicito con `peak > B`. Ogni grandezza di memoria nuova (`R`, `CS`, `Cn`, `F`, e `P` per i RAW) si calcola con prodotti e somme controllati, come `shared` e `task`; oltre 2^64 − 1 dà lo stesso stop con `non rappresentabile`. `Z` non è memoria del pool: i suoi stop sono quelli di «Frame RAW tramite spill». `Cr` fuori da {1, 2}: `invalid_input`, `resources.planner_input`.
+
+#### Frame RAW tramite spill
+
+Per `master_raw_frames` il job decodifica ogni frame per intero in `prepare` (uno alla volta, dopo la lettura verificata), lo scrive nello spill dichiarato del job (`f32` più maschera `uint16`, righe in ordine) e libera la memoria del frame prima del successivo. D8 resta valido anche per i RAW: la pila non è mai residente; i task leggono le fasce dallo spill (`frame_residency = blocks`).
+
+Memoria. `P` (`input_peak_bytes`) è il massimo fra il picco FITS e, per ogni frame RAW, la dimensione del file più `needed` del decoder (`raw_image_bytes + 6·W·H`; per il decoder DNG `6·W·H + seg.buffer_bytes + zlib_cap`), con `S·6` contato una volta sola. Entra in `shared'` e in `minimum_feasible_bytes`. In `prepare` la decodifica usa la memoria già prenotata dal job in `jc.shared`, come `decode_fits` nel job FITS, senza una seconda `pool->reserve` (ADR-08.b §2.8, modo con prenotazione del chiamante). `needed` si calcola prima del piano, dal solo header e senza campioni, con una funzione pura del decoder (nome indicativo `raw_decode_needed_bytes`, B15a). Il piano si chiude prima di ogni prenotazione: OB-08 vale. La prenotazione interna del decoder non è esclusa dal pianificatore: è dentro `P`.
+
+Spill. Quota richiesta `Z = n·S·6`, con prodotto controllato. Con `master_raw_frames` `resource_plan.spill` è valorizzato da `config.scratch`. Stop, nessun percorso residente alternativo:
+
+- `config.scratch` assente: `invalid_input`, `master.raw_requires_spill`, contesto `frame` (il primo frame RAW in ordine canonico) e `n`; è del job, prima del pianificatore e di ogni lettura.
+- `Z` oltre `scratch.quota_bytes` o oltre 2^64 − 1: `budget`, `spill.quota_exceeded`, contesto `richiesti` (o `non rappresentabile`) e `quota`; è del pianificatore, prima di ogni prenotazione.
+
+### Testo da aggiungere alla sezione «Test R2.r»
+
+| ID | Clausola |
+|---|---|
+| T-M3B-MEM-01 | Pianificatore con i termini nuovi: caso di riferimento di R2.r ricalcolato a mano con `Cr` = 1 e `Cr` = 2 e con `n` = 10 (`F(10)` = 560 + 16 + 544 = 1120; `R` = 16·Cr·1000·10 = 160 000·Cr; `CS` = 1368; `Cn` = 784) e con `n` = 3 (dove `q(n)` = 8); caso con `master_raw_frames`: `P` = file + `needed`, `resource_plan.spill` valorizzato, `Z` = n·S·6; stop `master.raw_requires_spill` senza `scratch`, stop `spill.quota_exceeded` con quota minore di `Z` e con `Z` non rappresentabile, entrambi prima di ogni lettura e prenotazione; piano non rappresentabile con `n` o `H` enormi; `minimum_feasible_bytes` − 1, anche per un master RAW, → stop prima di ogni prenotazione (picco del pool 0); tile automatico a confine (`tile` = 1 contro 0); `Cr` fuori da {1, 2} → `resources.planner_input`; T-M2R2R-01…05 rieseguiti con i valori ricalcolati. |
+
+Ricalcolo dei valori di R2.r (tabella p-z) con i termini nuovi: da eseguire a mano nell'unità B3b prima del codice, come nel testo originale; qui si fissano solo le formule.
+
+### Conseguenze sul codice e sui test
+
+- `master_task_bytes` (`master.cpp`, dichiarata in `master.hpp`) e `make_master_model`/`plan_master` (`resources.cpp`) cambiano `fixed = 16·n` in `F(n)` e aggiungono `R`, `CS`, `Cn` a `shared`; `P` dei RAW include il picco di decodifica; `Z` è la quota di spill richiesta, non memoria del pool. Il pianificatore ha 2 chiamanti nel job (`master.cpp`) e il test `test_resources`/`test_master` che lo copre; `codegraph impact` va eseguito in B3b su `plan_resources`, `compute_plan_bounds`, `master_task_bytes` e `planner_input` prima di toccarli, e si rilanciano i test elencati (T-M2R2R-01…05, `test_master`, `test_master_stats`).
+- `master_job_options::on_job_plan` e `details.resource_plan` portano i valori nuovi.
+- I valori di `K`, `D`, `M` non cambiano.

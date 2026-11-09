@@ -118,7 +118,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `CMakeLists.txt` | `7b1a76ed5d18e95b267d724998b1b2d0715382de9618a9e3b71af246afc9ac63` |
-| `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
+| `docs/contracts/ADR-08-decoder-pack.md` | `2356f8f7f730000b6e29b63b1e816c9be0000eaeb696569f3ecd09971ac5018b` |
 | `src/core/CMakeLists.txt` | `5b41d8df67ae8a6f3fa5a5d585f3d1369e8711ce535c1b7b6c1ac22090b7cd5f` |
 | `src/core/include/astro/image.hpp` | `10df60c894f27ecf61eb43cc8d4efc8d0013bce394bbb044c3711fcf5f327537` |
 | `src/core/include/astro/input_format.hpp` | `4f916d0018988fcb99482d6e8458d28d50cda011d7d9c25fdcbd4e229d5ca4d4` |

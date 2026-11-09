@@ -10,7 +10,7 @@
 
 ## Prossimo passo
 1. Lotto chiuso: review `debt-M3a-round2` PASS; `dev-full` 1221/1221, `release` 1221/1221, `dev` 1199/1199, trace M2 63/0 e M3.a 8/0 scoperti; 48 blocchi evidence rigenerati.
-2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 20 unità (B0…B17, B3b, B15a), lacune L1…L11 (L7 chiusa) da decidere in B0. In corso: B0 come Agent sull'abbonamento (worktree `m3b-b0`, proposta in `docs/decisions/M3b-lacune.md`). Poi B0 (decisioni in `docs/decisions/`, emendamento ADR-06 R2.r), B1, B2/B3.
+2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 20 unità (B0…B17, B3b, B15a), lacune L1…L11 (L7 chiusa) da decidere in B0. B0 CHIUSA (review `M3b-B0-round1` FAIL, `round2` PASS): `docs/decisions/M3b-lacune.md`, emendamenti a C-02, F-IO-03, BASE §3.1, ADR-06 R2.r, ADR-08.b §2.8. In corso: B1 protocollo (Agent opus, worktree `m3b-b1`). Poi B2 (fixture, opus) e B3 (tipi).
 - API sospese dall'utente (9/11): deleghe solo come Agent sull'abbonamento, review Argon; niente `delegate.sh`, `agent-api.sh`, `review.sh --reviewer claude`.
 
 ## Non verificato
