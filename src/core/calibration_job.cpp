@@ -49,12 +49,13 @@ json descriptor_json(const std::optional<master_descriptor>& d) {
                  : s == flat_state::calibrated ? "calibrated" : "unknown";
         }));
   o.set("combine_count", d->combine_count ? json::uinteger(*d->combine_count) : json::null());
-  o.set("combine_method", text(d->combine, [](combine_method m) {
-          return m == combine_method::mean ? "mean" : m == combine_method::median ? "median" : "other";
-        }));
+  o.set("combine_method", text(d->combine, [](combine_method m) { return calib_detail::combine_name(m); }));
   // Campi dei master del prodotto: nei parametri solo se presenti, così le chiavi dei nodi esistenti non cambiano.
   if (d->rejection) o.set("rejection", json::string(*d->rejection == master_rejection::none ? "none" : "sigma_clip"));
-  if (d->estimator) o.set("variance_estimator", json::string("empirical"));
+  if (d->estimator) o.set("variance_estimator", json::string(calib_detail::estimator_name(*d->estimator)));
+  if (d->frame_normalization) {
+    o.set("frame_normalization", json::string(*d->frame_normalization == frame_normalization_mode::none ? "none" : "median_ratio"));
+  }
   return o;
 }
 

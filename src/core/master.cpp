@@ -29,13 +29,27 @@ namespace {
        {{"parametro", name}, {"motivo", why}});
 }
 
-[[noreturn]] void outside_variance_domain(const char* name, const char* value) {
+[[noreturn]] void outside_variance_domain(const master_recipe& r, const char* motivo) {
   stop(error_category::unsupported, "master.variance_domain",
-       "metodo fuori dal dominio della varianza derivata in C-02.a (appartiene a F-CAL-01.b)",
-       {{"parametro", name}, {"valore", value}});
+       "metodo, numero di frame o ruolo fuori dal dominio della varianza derivata (C-02.b §b.1, §b.2)",
+       {{"combine", r.combine ? combine_name(*r.combine) : "assente"},
+        {"rejection", r.rejection ? rejection_name(*r.rejection) : "assente"},
+        {"n", std::to_string(r.frames.size())},
+        {"role", role_name(r.role)},
+        {"motivo", motivo}});
 }
 
-const char* flat_norm_name(flat_normalization f) { return f == flat_normalization::none ? "none" : "median_ratio"; }
+const char* flat_norm_name(flat_normalization f) {
+  switch (f) {
+    case flat_normalization::none: return "none";
+    case flat_normalization::median_ratio: return "median_ratio";
+  }
+  ASTRO_ASSERT(false);
+  return "";
+}
+const char* frame_norm_name(frame_normalization_mode m) {
+  return m == frame_normalization_mode::none ? "none" : "median_ratio";
+}
 const char* type_name(sample_type t) { return t == sample_type::f32 ? "f32" : "f64"; }
 const char* policy_name(temperature_policy p) {
   return p == temperature_policy::compare ? "compare" : "not_applicable_declared";
@@ -65,14 +79,114 @@ void check_finite(const std::optional<double>& v, const char* name) {
   if (!std::isfinite(*v)) bad_param(name, "non finito");
 }
 
+void check_integer(const std::optional<double>& v, const char* name, double minimum) {
+  check_finite(v, name);
+  if (*v != std::floor(*v)) bad_param(name, "non intero");
+  if (!(*v >= minimum)) bad_param(name, "sotto il minimo");
+}
+
+void forbid(const std::optional<double>& v, const char* name) {
+  if (v) bad_param(name, "di un metodo non scelto");
+}
+
+enum class method_kind { single, mean, weighted_mean, median, winsorized, sigma_clip };
+
+// Tabella delle coppie (`combine`, `rejection`) di C-02.b §b.1.
+std::optional<method_kind> method_of(combine_method c, master_rejection j) {
+  if (j == master_rejection::sigma_clip) return c == combine_method::mean ? std::optional(method_kind::sigma_clip) : std::nullopt;
+  switch (c) {
+    case combine_method::single: return method_kind::single;
+    case combine_method::mean: return method_kind::mean;
+    case combine_method::weighted_mean: return method_kind::weighted_mean;
+    case combine_method::median: return method_kind::median;
+    case combine_method::winsorized: return method_kind::winsorized;
+    case combine_method::other: return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+// Somma esatta di f64 come espansione non sovrapposta (componenti per modulo crescente). Un overflow intermedio rende la
+// somma non rappresentabile: lo segnala `ok = false`.
+struct exact_sum {
+  std::vector<double> parts;
+  bool ok = true;
+
+  void add(double b) {
+    double q = b;
+    std::vector<double> next;
+    next.reserve(parts.size() + 1);
+    for (const double e : parts) {
+      const double s = q + e;
+      const double bv = s - q;
+      const double err = (q - (s - bv)) + (e - bv);
+      if (!std::isfinite(s)) ok = false;
+      if (err != 0.0) next.push_back(err);
+      q = s;
+    }
+    if (q != 0.0 || next.empty()) next.push_back(q);
+    parts = std::move(next);
+  }
+
+  int sign() const {
+    for (std::size_t i = parts.size(); i-- > 0;) {
+      if (parts[i] != 0.0) return parts[i] > 0 ? 1 : -1;
+    }
+    return 0;
+  }
+};
+
+// Pesi di `weighted_mean` (C-02.b §b.1, §b.10): finiti e > 0, uno per frame; `2 max w < W` confrontato in aritmetica
+// esatta sui valori f64, cioè `max w < somma degli altri`.
+void validate_weights(const master_recipe& r) {
+  double largest = 0;
+  std::size_t at = 0;
+  for (std::size_t k = 0; k < r.frames.size(); ++k) {
+    const std::optional<double>& w = r.frames[k].weight;
+    if (!w) bad_param("weights", "peso assente");
+    if (!std::isfinite(*w)) bad_param("weights", "peso non finito");
+    if (!(*w > 0)) bad_param("weights", "peso non positivo");
+    if (*w > largest) {
+      largest = *w;
+      at = k;
+    }
+  }
+  exact_sum rest;
+  for (std::size_t k = 0; k < r.frames.size(); ++k) {
+    if (k != at) rest.add(*r.frames[k].weight);
+  }
+  if (!rest.ok) bad_param("weights", "somma dei pesi non rappresentabile");
+  rest.add(-largest);
+  if (!rest.ok) bad_param("weights", "somma dei pesi non rappresentabile");
+  if (rest.sign() <= 0) outside_variance_domain(r, "max a_f >= 1/2");
+}
+
 void validate_params(const master_recipe& r) {
   if (!r.combine) bad_param("combine", "assente");
-  if (*r.combine != combine_method::mean) outside_variance_domain("combine", combine_name(*r.combine));
   if (!r.rejection) bad_param("rejection", "assente");
-  if (*r.rejection != master_rejection::none) outside_variance_domain("rejection", rejection_name(*r.rejection));
+  const std::optional<method_kind> found = method_of(*r.combine, *r.rejection);
+  if (!found) outside_variance_domain(r, "coppia fuori tabella");
+  const method_kind method = *found;
+  const std::size_t n = r.frames.size();
+  const bool n_ok = [&] {
+    switch (method) {
+      case method_kind::single: return n == 1;
+      case method_kind::mean: return n >= 2;
+      case method_kind::weighted_mean:
+      case method_kind::sigma_clip: return n >= 3;
+      case method_kind::median:
+      case method_kind::winsorized: return n >= 3 && n <= 1024;
+    }
+    return false;
+  }();
+  if (!n_ok) outside_variance_domain(r, "n fuori dominio");
+  const bool plain = method == method_kind::single || method == method_kind::mean;
   if (r.role == master_role::flat) {
     if (!r.flat_norm) bad_param("flat_normalization", "assente");
-    if (*r.flat_norm != flat_normalization::none) outside_variance_domain("flat_normalization", flat_norm_name(*r.flat_norm));
+    if (*r.flat_norm != flat_normalization::none && *r.flat_norm != flat_normalization::median_ratio) {
+      bad_param("flat_normalization", "fuori dominio");
+    }
+    if (*r.flat_norm != flat_normalization::none) outside_variance_domain(r, "flat_normalization diversa da none");
+    if (!plain) outside_variance_domain(r, "metodo non ammesso per il flat");
     check_finite(r.flat_level_rel_tol, "flat_level_rel_tol");
     if (!(*r.flat_level_rel_tol > 0 && *r.flat_level_rel_tol < 1)) bad_param("flat_level_rel_tol", "deve stare in (0, 1)");
     check_finite(r.flat_min_signal_adu, "flat_min_signal_adu");
@@ -81,6 +195,59 @@ void validate_params(const master_recipe& r) {
     if (r.flat_norm) bad_param("flat_normalization", "solo per il ruolo flat");
     if (r.flat_level_rel_tol) bad_param("flat_level_rel_tol", "solo per il ruolo flat");
     if (r.flat_min_signal_adu) bad_param("flat_min_signal_adu", "solo per il ruolo flat");
+  }
+  if (method == method_kind::winsorized) {
+    check_integer(r.winsor_g, "winsor_g", 1);
+  } else {
+    forbid(r.winsor_g, "winsor_g");
+  }
+  if (method == method_kind::sigma_clip) {
+    check_finite(r.clip_kappa_low, "clip_kappa_low");
+    if (!(*r.clip_kappa_low > 0)) bad_param("clip_kappa_low", "deve essere > 0");
+    check_finite(r.clip_kappa_high, "clip_kappa_high");
+    if (!(*r.clip_kappa_high > 0)) bad_param("clip_kappa_high", "deve essere > 0");
+    check_integer(r.clip_max_iter, "clip_max_iter", 1);
+    check_integer(r.clip_min_kept, "clip_min_kept", 2);
+    if (*r.clip_min_kept > static_cast<double>(n)) bad_param("clip_min_kept", "oltre n");
+  } else {
+    forbid(r.clip_kappa_low, "clip_kappa_low");
+    forbid(r.clip_kappa_high, "clip_kappa_high");
+    forbid(r.clip_max_iter, "clip_max_iter");
+    forbid(r.clip_min_kept, "clip_min_kept");
+  }
+  if (method == method_kind::single) {
+    // Modello di rumore (ADR-17.a): assente = metadata_missing, non finito o fuori dominio = var.param.<nome>.
+    // `offset_adu` solo finito (anche negativo), `conversion_gain_e_per_adu` > 0, `read_noise_adu` >= 0.
+    const auto need_model = [&](const std::optional<double>& v, const char* name, int domain) {
+      if (!v) {
+        stop(error_category::metadata_missing, std::string("var.source.") + name, "parametro del modello di rumore assente",
+             {{"parametro", name}});
+      }
+      if (!std::isfinite(*v) || (domain > 0 && !(*v > 0)) || (domain < 0 && !(*v >= 0))) {
+        stop(error_category::invalid_input, std::string("var.param.") + name, "parametro del modello di rumore fuori dominio",
+             {{"parametro", name}});
+      }
+    };
+    need_model(r.offset_adu, "offset_adu", 0);
+    need_model(r.conversion_gain_e_per_adu, "conversion_gain_e_per_adu", 1);
+    need_model(r.read_noise_adu, "read_noise_adu", -1);
+  } else {
+    forbid(r.offset_adu, "offset_adu");
+    forbid(r.conversion_gain_e_per_adu, "conversion_gain_e_per_adu");
+    forbid(r.read_noise_adu, "read_noise_adu");
+  }
+  if (method == method_kind::weighted_mean) {
+    validate_weights(r);
+  } else {
+    for (const master_frame_spec& f : r.frames) {
+      if (f.weight) bad_param("weights", "pesi con un metodo diverso da weighted_mean");
+    }
+  }
+  if (method == method_kind::winsorized && !(2 * *r.winsor_g + 1 <= static_cast<double>(n))) {
+    outside_variance_domain(r, "n < 2g + 1");
+  }
+  if (r.analysis.type() != json::kind::null && r.analysis.type() != json::kind::object) {
+    bad_param("analysis", "deve essere un oggetto oppure null");
   }
   if (r.saturation_adu) {
     if (!std::isfinite(*r.saturation_adu)) bad_param("saturation_adu", "non finito");
@@ -128,6 +295,7 @@ json descriptor_json(const master_descriptor& d) {
   o.set("combine_method", json::string(combine_name(*d.combine)));
   o.set("rejection", json::string(rejection_name(*d.rejection)));
   o.set("variance_estimator", json::string(estimator_name(*d.estimator)));
+  if (d.frame_normalization) o.set("frame_normalization", json::string(frame_norm_name(*d.frame_normalization)));
   return o;
 }
 
@@ -189,6 +357,11 @@ master_plan make_plan(const master_recipe& r) {
   // Prima della validazione: i confronti sui parametri sono già operazioni in virgola mobile (ADR-07, D23).
   require_fp_environment();
   validate_master_recipe(r);
+  // Il calcolo esiste solo per `mean` senza rejection: ogni altro metodo valido si ferma, mai calcolato come media.
+  if (*r.combine != combine_method::mean || *r.rejection != master_rejection::none) {
+    stop(error_category::unsupported, "master.method_not_computable", "calcolo del metodo non disponibile",
+         {{"combine", combine_name(*r.combine)}, {"rejection", rejection_name(*r.rejection)}});
+  }
   master_plan p;
   p.path = resolve_cpu_path(*r.simd, read_cpu_capabilities());
   p.recipe = r;
@@ -207,21 +380,25 @@ master_plan make_plan(const master_recipe& r) {
   return p;
 }
 
-// Fase e linearità dai metadati, prima di ogni accesso ai campioni (ADR-03, R1).
-void require_phase(const std::string& name, const std::optional<metadata_value<process_phase>>& phase) {
-  if (!phase) stop(error_category::metadata_missing, "master.metadata.phase", "fase di processo non dichiarata", {{"frame", name}});
-  if (phase->value != process_phase::raw) {
-    stop(error_category::unsupported, "master.input_state", "un master si combina da frame raw",
-         {{"frame", name}, {"campo", "phase"}, {"valore", to_string(phase->value)}});
+// Fase e linearità dai metadati, prima di ogni accesso ai campioni: la regola è la tabella delle operazioni di ADR-03
+// (`master_create`, la fase prima della linearità); il contesto porta il ruolo del master e il frame.
+void require_allowed_state(const std::string& name, master_role role, process_state state) {
+  try {
+    require_operation_allowed(operation_kind::master_create, state, role_name(role));
+  } catch (stop_error& e) {
+    e.add_context("frame", name);
+    throw;
   }
 }
 
-void require_linear(const std::string& name, const std::optional<linearity>& lin) {
+void require_phase(const std::string& name, master_role role, const std::optional<metadata_value<process_phase>>& phase) {
+  if (!phase) stop(error_category::metadata_missing, "master.metadata.phase", "fase di processo non dichiarata", {{"frame", name}});
+  require_allowed_state(name, role, process_state{phase->value, linearity_class::linear});
+}
+
+void require_linear(const std::string& name, master_role role, const std::optional<linearity>& lin) {
   if (!lin) stop(error_category::metadata_missing, "master.metadata.linearity", "linearità non dichiarata", {{"frame", name}});
-  if (*lin != linearity::linear) {
-    stop(error_category::unsupported, "master.input_state", "un master si combina da frame lineari",
-         {{"frame", name}, {"campo", "linearity"}, {"valore", "nonlinear"}});
-  }
+  require_allowed_state(name, role, process_state{process_phase::raw, classify_linearity(lin)});
 }
 
 // Linearità dall'header e dalla dichiarazione della ricetta: conflitto = incompatible metadata.declared_conflict.
@@ -265,9 +442,9 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
     stop(error_category::unsupported, "calib.plane_layout", "un master accetta solo frame mono e CFA",
          {{"frame", name}, {"layout", layout_name(im.layout)}});
   }
-  require_phase(name, im.phase);
+  require_phase(name, p.recipe.role, im.phase);
   fs.origins = apply_declared(im, fs.spec->declared, fs.spec->declared_fields, name.c_str());
-  require_linear(name, im.lin);
+  require_linear(name, p.recipe.role, im.lin);
   if (!im.unit) stop(error_category::metadata_missing, "master.metadata.unit", "unità non dichiarata", {{"frame", name}});
   if (*im.unit != pixel_unit::adu) {
     stop(error_category::unsupported, "master.input_state", "un master si combina da frame in ADU",
@@ -633,10 +810,21 @@ json frame_report(const master_plan& p, const frame_state& f) {
 
 json recipe_report(const master_recipe& r) {
   json o = json::object();
-  o.set("name", json::string("master_mean"));
+  std::string name = std::string("master_") + combine_name(*r.combine);
+  if (*r.rejection != master_rejection::none) name += std::string("_") + rejection_name(*r.rejection);
+  o.set("name", json::string(name));
   o.set("role", json::string(role_name(r.role)));
-  o.set("combine", json::string("mean"));
-  o.set("rejection", json::string("none"));
+  o.set("combine", json::string(combine_name(*r.combine)));
+  o.set("rejection", json::string(rejection_name(*r.rejection)));
+  o.set("winsor_g", number_or_null(r.winsor_g));
+  o.set("clip_kappa_low", number_or_null(r.clip_kappa_low));
+  o.set("clip_kappa_high", number_or_null(r.clip_kappa_high));
+  o.set("clip_max_iter", number_or_null(r.clip_max_iter));
+  o.set("clip_min_kept", number_or_null(r.clip_min_kept));
+  o.set("offset_adu", number_or_null(r.offset_adu));
+  o.set("conversion_gain_e_per_adu", number_or_null(r.conversion_gain_e_per_adu));
+  o.set("read_noise_adu", number_or_null(r.read_noise_adu));
+  o.set("analysis", r.analysis);
   o.set("flat_normalization", r.flat_norm ? json::string(flat_norm_name(*r.flat_norm)) : json::null());
   o.set("flat_level_rel_tol", number_or_null(r.flat_level_rel_tol));
   o.set("flat_min_signal_adu", number_or_null(r.flat_min_signal_adu));
@@ -810,15 +998,16 @@ void render(std::ostringstream& out, const json& value, int depth, const std::st
 // Header di uscita: al più tre HDU con max_header_cards card ciascuno, più il riempimento dei blocchi.
 constexpr std::uint64_t output_header_bound = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
 
+[[noreturn]] void not_master_node(const node_spec& node, const char* why) {
+  stop(error_category::invalid_input, "master.not_master_node", "il nodo non è un master del prodotto",
+       {{"operatore", node.operator_id()}, {"motivo", why}});
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------- interfaccia
 
 void validate_master_recipe(const master_recipe& r) {
-  if (r.frames.size() < 2) {
-    stop(error_category::invalid_input, "master.frames_insufficient", "un master richiede almeno 2 frame",
-         {{"frame", std::to_string(r.frames.size())}, {"minimo", "2"}});
-  }
   validate_params(r);
   const std::vector<std::size_t> order = canonical_order(r);
   for (std::size_t k = 1; k < order.size(); ++k) {
@@ -843,6 +1032,7 @@ node_spec make_master_node(const master_recipe& r) {
     o.set("declared_metadata", declared_metadata_json(f.declared));
     o.set("declared_fields", fields_json(f.declared_fields));
     o.set("fits_read_options", read_options_json(f.read_options));
+    o.set("weight", number_or_null(f.weight));
     frames.push(std::move(o));
     inputs.push_back(node_input::from_file(frame_name(k), f.digest));
   }
@@ -853,17 +1043,38 @@ node_spec make_master_node(const master_recipe& r) {
 }
 
 master_descriptor master_descriptor_from_node(const node_spec& node) {
-  const auto bad = [&](const char* why) {
-    stop(error_category::invalid_input, "master.not_master_node", "il nodo non è un master del prodotto",
-         {{"operatore", node.operator_id()}, {"motivo", why}});
-  };
+  const auto bad = [&](const char* why) { not_master_node(node, why); };
   if (node.operator_id() != master_operator_id) bad("operatore diverso");
   const json* role = node.params().find("role");
   const json* combine = node.params().find("combine");
   const json* rejection = node.params().find("rejection");
   const auto is_text = [](const json* j, const char* v) { return j && j->type() == json::kind::string && j->as_string() == v; };
-  if (!is_text(combine, "mean") || !is_text(rejection, "none")) bad("combinazione diversa dalla media senza rejection");
+  const auto parse_combine = [&]() -> combine_method {
+    for (const combine_method m : {combine_method::single, combine_method::mean, combine_method::weighted_mean,
+                                   combine_method::median, combine_method::winsorized}) {
+      if (is_text(combine, combine_name(m))) return m;
+    }
+    not_master_node(node, "combine assente o non riconosciuto");
+  };
+  const auto parse_rejection = [&]() -> master_rejection {
+    for (const master_rejection j : {master_rejection::none, master_rejection::sigma_clip}) {
+      if (is_text(rejection, rejection_name(j))) return j;
+    }
+    not_master_node(node, "rejection assente o non riconosciuto");
+  };
   master_descriptor d;
+  d.combine = parse_combine();
+  d.rejection = parse_rejection();
+  const std::optional<method_kind> method = method_of(*d.combine, *d.rejection);
+  if (!method) bad("coppia combine e rejection fuori tabella");
+  switch (*method) {
+    case method_kind::single: d.estimator = variance_estimator::noise_model; break;
+    case method_kind::mean: d.estimator = variance_estimator::empirical; break;
+    case method_kind::weighted_mean: d.estimator = variance_estimator::empirical_weighted; break;
+    case method_kind::median:
+    case method_kind::winsorized: d.estimator = variance_estimator::gaussian_reference; break;
+    case method_kind::sigma_clip: d.estimator = variance_estimator::frozen_selection; break;
+  }
   if (is_text(role, "bias")) d.role = master_role::bias;
   else if (is_text(role, "dark")) d.role = master_role::dark;
   else if (is_text(role, "dark_flat")) d.role = master_role::dark_flat;
@@ -871,14 +1082,24 @@ master_descriptor master_descriptor_from_node(const node_spec& node) {
   else bad("ruolo assente o non riconosciuto");
   if (d.role == master_role::flat) {
     d.flat = flat_state::raw;
-  } else if (d.role != master_role::bias) {
+    const json* norm = node.params().find("flat_normalization");
+    if (is_text(norm, "none")) d.frame_normalization = frame_normalization_mode::none;
+    else if (is_text(norm, "median_ratio")) d.frame_normalization = frame_normalization_mode::median_ratio;
+    else bad("flat_normalization assente o non riconosciuta");
+    // C-02.b §b.2, C-02.b-flat §f.2: con `none` solo `single` e `mean`; `single` non ammette `median_ratio`.
+    const bool plain = *method == method_kind::single || *method == method_kind::mean;
+    if (*d.frame_normalization == frame_normalization_mode::none ? !plain : *method == method_kind::single) {
+      bad("coppia metodo e flat_normalization fuori tabella");
+    }
+  } else {
+    const json* norm = node.params().find("flat_normalization");
+    if (norm != nullptr && norm->type() != json::kind::null) bad("flat_normalization su un ruolo diverso da flat");
+  }
+  if (d.role != master_role::flat && d.role != master_role::bias) {
     d.additive = additive_state::bias_included;
     d.scaling = scaling_state::unscaled;
   }
   d.combine_count = static_cast<std::uint32_t>(node.inputs().size());
-  d.combine = combine_method::mean;
-  d.rejection = master_rejection::none;
-  d.estimator = variance_estimator::empirical;
   return d;
 }
 
@@ -980,8 +1201,8 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
       const master_frame_spec& f = *p.frames[k].spec;
       inputs.push_back(open_fits_input(f.path));
       const header_peek peek = peek_header(inputs.back(), f.read_options);
-      require_phase(p.frames[k].name, peek.phase);
-      require_linear(p.frames[k].name, merged_linearity(p.frames[k].name, peek.lin, f.declared_fields.lin));
+      require_phase(p.frames[k].name, p.recipe.role, peek.phase);
+      require_linear(p.frames[k].name, p.recipe.role, merged_linearity(p.frames[k].name, peek.lin, f.declared_fields.lin));
       plans.push_back(plan_fits(inputs.back()));
       if (plans.back().planes != 1) {
         stop(error_category::unsupported, "calib.plane_layout", "un master accetta solo frame mono e CFA",

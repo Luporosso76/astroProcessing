@@ -28,13 +28,15 @@ enum class master_role { bias, dark, dark_flat, flat };
 enum class additive_state { bias_included, bias_subtracted, unknown };
 enum class scaling_state { unscaled, scaled, unknown };
 enum class flat_state { raw, corrected_unnormalized, calibrated, unknown };
-enum class combine_method { mean, median, other };
+enum class combine_method { mean, median, single, weighted_mean, winsorized, other };
 enum class normalization_mode { global_median, cfa_channel_median };
 enum class temperature_policy { compare, not_applicable_declared };
 enum class variance_source { plane, noise_model };
 enum class covariance_model { diagonal_independent };
 enum class master_rejection { none, sigma_clip };
-enum class variance_estimator { empirical };
+enum class variance_estimator { empirical, noise_model, empirical_weighted, gaussian_reference, frozen_selection };
+// Normalizzazione per frame del flat del prodotto (C-02.b-flat §f.7): campo `frame_normalization` del descrittore.
+enum class frame_normalization_mode { none, median_ratio };
 
 constexpr const char* calibration_operator_id = "calib.dark_matched_flat_dark_flat";
 constexpr std::uint32_t calibration_algorithm_version = 1;
@@ -75,6 +77,9 @@ struct master_descriptor {
   // Master del prodotto (ADR-16, aggiunte di R2): presenti nel descrittore derivato dal nodo del master.
   std::optional<master_rejection> rejection;
   std::optional<variance_estimator> estimator;
+  // Solo flat del prodotto (C-02.b-flat §f.7): uguale a `flat_normalization` della ricetta; assente per bias, dark e
+  // dark-flat e per i master esterni.
+  std::optional<frame_normalization_mode> frame_normalization;
   // Solo flat `calibrated` (ADR-16.b §b.2): normalizzazione con cui il flat è stato prodotto.
   std::optional<normalization_mode> flat_normalization_declared;
   // Solo master da frame RAW (ADR-16.b §b.7): un elemento per frame, nell'ordine canonico degli ingressi.

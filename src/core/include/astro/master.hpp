@@ -16,7 +16,7 @@ namespace astro {
 enum class flat_normalization { none, median_ratio };
 
 constexpr const char* master_operator_id = "master.combine";
-constexpr std::uint32_t master_algorithm_version = 1;
+constexpr std::uint32_t master_algorithm_version = 2;
 constexpr std::uint32_t master_serialization_version = 1;
 
 struct master_frame_spec {
@@ -25,6 +25,7 @@ struct master_frame_spec {
   frame_metadata declared;  // solo valori con origine `declared`
   declared_image_fields declared_fields;
   fits_read_options read_options;
+  std::optional<double> weight;  // solo `weighted_mean` (C-02.b §b.10, L5): peso del frame, legato al suo digest
 };
 
 // Parametri del §1 di C-02.a: nessun default, tranne output_type (f32, registrato in nodo e report).
@@ -42,6 +43,19 @@ struct master_recipe {
   std::optional<double> temperature_abs_tol_c;
   std::optional<temperature_policy> temp_policy;
   std::optional<simd_request> simd;  // ADR-07: nessun default
+  // C-02.b §b.1, §b.10: parametri del metodo scelto, vietati per gli altri. winsor_g, clip_max_iter e clip_min_kept
+  // sono interi dichiarati come double: un valore non intero è `master.param.<nome>`.
+  std::optional<double> winsor_g;          // solo winsorized, >= 1
+  std::optional<double> clip_kappa_low;    // solo sigma_clip, > 0
+  std::optional<double> clip_kappa_high;   // solo sigma_clip, > 0
+  std::optional<double> clip_max_iter;     // solo sigma_clip, >= 1
+  std::optional<double> clip_min_kept;     // solo sigma_clip, in [2, n]
+  // Modello di rumore di `single` (C-02.b §b.6).
+  std::optional<double> offset_adu;
+  std::optional<double> conversion_gain_e_per_adu;
+  std::optional<double> read_noise_adu;
+  // Esito canonico dell'analisi da cui il nodo nasce (L8): oggetto JSON oppure null per un nodo non proposto.
+  json analysis;
   sample_type output_type = sample_type::f32;
 };
 
@@ -55,8 +69,8 @@ struct master_result {
 };
 
 // Parametri, numero di frame e digest: nessun accesso ai file.
-// Errori: invalid_input master.param.<nome> / master.frames_insufficient; unsupported master.variance_domain /
-// calib.shared_input.
+// Errori: invalid_input master.param.<nome>; metadata_missing / invalid_input var.source.<campo> / var.param.<nome> (solo `single`);
+// unsupported master.variance_domain / calib.shared_input.
 void validate_master_recipe(const master_recipe& recipe);
 
 // Nodo DAG del master: parametri canonici, un ingresso file per frame nell'ordine canonico (digest crescente).

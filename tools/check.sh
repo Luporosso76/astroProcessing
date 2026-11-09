@@ -140,13 +140,13 @@ prepare_junit() {
   fi
 }
 
-# Tracciabilità ID del piano → test, per stadio (M2, M3.a): informativa; TRACE_STRICT=1 la rende bloccante.
+# Tracciabilità ID del piano → test, per stadio (M2, M3.a, M3.b): informativa; TRACE_STRICT=1 la rende bloccante.
 # Il junit del preset dev contiene solo i test `fast`: i `slow` risultano mancanti finché non si usa il junit release.
 # Un'uscita dello strumento senza riepilogo è un errore dello strumento, distinto da una copertura mancante.
 step_trace() {
   prepare_junit require
   local entry stage rest map out trace_status
-  for entry in "M2:tests/trace/M2.tsv:trace-check.txt" "M3.a:tests/trace/M3a.tsv:trace-check-m3a.txt"; do
+  for entry in "M2:tests/trace/M2.tsv:trace-check.txt" "M3.a:tests/trace/M3a.tsv:trace-check-m3a.txt" "M3.b:tests/trace/M3b.tsv:trace-check-m3b.txt"; do
     stage="${entry%%:*}"
     rest="${entry#*:}"
     map="${rest%%:*}"

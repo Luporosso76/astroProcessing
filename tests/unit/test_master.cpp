@@ -301,11 +301,11 @@ TEST(Master, T_M2R2_05_every_group_rule_violation_stops_before_combining) {
        }},
       {"imagetyp", error_category::incompatible, "calib.imagetyp_conflict",
        hdr(1, [](fx::calib_header& h) { h.imagetyp = "Light Frame"; })},
-      {"phase", error_category::unsupported, "master.input_state",
+      {"phase", error_category::incompatible, "op.phase_blocked",  // C-02.b §b.13 punto 1
        hdr(1, [](fx::calib_header& h) { h.phase = "calibrated"; })},
       {"phase_missing", error_category::metadata_missing, "master.metadata.phase",
        hdr(1, [](fx::calib_header& h) { h.phase.clear(); })},
-      {"nonlinear", error_category::unsupported, "master.input_state",
+      {"nonlinear", error_category::incompatible, "op.linearity_blocked",  // C-02.b §b.13 punto 1
        hdr(1, [](fx::calib_header& h) { h.linear_value = false; })},
       {"linearity_missing", error_category::metadata_missing, "master.metadata.linearity",
        hdr(1, [](fx::calib_header& h) { h.with_linear = false; })},
@@ -315,7 +315,8 @@ TEST(Master, T_M2R2_05_every_group_rule_violation_stops_before_combining) {
          g.frames[1].variance = std::vector<double>(g.frames[1].v.size(), 1.0);
          refresh_digests(g, r);
        }},
-      {"frames_insufficient", error_category::invalid_input, "master.frames_insufficient", [](group& g, master_recipe& r) {
+      // C-02.b §b.2: `n` fuori dal dominio del metodo (`mean` richiede n >= 2) è `master.variance_domain`.
+      {"frames_insufficient", error_category::unsupported, "master.variance_domain", [](group& g, master_recipe& r) {
          g.frames.resize(1);
          r.frames.resize(1);
        }},
@@ -323,10 +324,19 @@ TEST(Master, T_M2R2_05_every_group_rule_violation_stops_before_combining) {
          g.frames[2] = g.frames[0];
          refresh_digests(g, r);
        }},
-      {"median", error_category::unsupported, "master.variance_domain",
-       [](group&, master_recipe& r) { r.combine = combine_method::median; }},
-      {"sigma_clip", error_category::unsupported, "master.variance_domain",
-       [](group&, master_recipe& r) { r.rejection = master_rejection::sigma_clip; }},
+      // C-02.b §b.1: `median` richiede n in 3 … 1024; `sigma_clip` richiede i quattro parametri dichiarati.
+      {"median_n2", error_category::unsupported, "master.variance_domain", [](group& g, master_recipe& r) {
+         g.frames.resize(2);
+         r.frames.resize(2);
+         r.combine = combine_method::median;
+       }},
+      {"sigma_clip_params_missing", error_category::invalid_input, "master.param.clip_kappa_low",
+       [](group&, master_recipe& r) {
+         r.rejection = master_rejection::sigma_clip;
+         r.clip_kappa_high = 3;
+         r.clip_max_iter = 1;
+         r.clip_min_kept = 2;
+       }},
       {"combine_missing", error_category::invalid_input, "master.param.combine", [](group&, master_recipe& r) { r.combine.reset(); }},
       {"exposure_tol_nan", error_category::invalid_input, "master.param.exposure_rel_tol",
        [](group&, master_recipe& r) { r.exposure_rel_tol = std::numeric_limits<double>::quiet_NaN(); }},

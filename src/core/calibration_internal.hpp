@@ -113,6 +113,9 @@ inline const char* combine_name(combine_method m) {
   switch (m) {
     case combine_method::mean: return "mean";
     case combine_method::median: return "median";
+    case combine_method::single: return "single";
+    case combine_method::weighted_mean: return "weighted_mean";
+    case combine_method::winsorized: return "winsorized";
     case combine_method::other: return "other";
   }
   ASTRO_ASSERT(false);
@@ -131,6 +134,10 @@ inline const char* rejection_name(master_rejection r) {
 inline const char* estimator_name(variance_estimator e) {
   switch (e) {
     case variance_estimator::empirical: return "empirical";
+    case variance_estimator::noise_model: return "noise_model";
+    case variance_estimator::empirical_weighted: return "empirical_weighted";
+    case variance_estimator::gaussian_reference: return "gaussian_reference";
+    case variance_estimator::frozen_selection: return "frozen_selection";
   }
   ASTRO_ASSERT(false);
   return "";

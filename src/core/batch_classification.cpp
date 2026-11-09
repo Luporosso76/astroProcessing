@@ -1481,13 +1481,33 @@ master_descriptor descriptor_of_declarations(const json& d) {
     const json& v = d.items()[i];
     if (key == "role" || v.type() == json::kind::null) continue;
     const std::string s = v.type() == json::kind::string ? v.as_string() : std::string();
-    if (key == "additive") out.additive = s == "bias_included" ? additive_state::bias_included : s == "bias_subtracted" ? additive_state::bias_subtracted : additive_state::unknown;
-    else if (key == "scaling") out.scaling = s == "unscaled" ? scaling_state::unscaled : s == "scaled" ? scaling_state::scaled : scaling_state::unknown;
-    else if (key == "flat") out.flat = s == "raw" ? flat_state::raw : s == "corrected_unnormalized" ? flat_state::corrected_unnormalized : s == "calibrated" ? flat_state::calibrated : flat_state::unknown;
-    else if (key == "combine_count") out.combine_count = static_cast<std::uint32_t>(v.as_integer());
-    else if (key == "combine_method") out.combine = s == "mean" ? combine_method::mean : s == "median" ? combine_method::median : combine_method::other;
-    else if (key == "rejection") out.rejection = s == "sigma_clip" ? master_rejection::sigma_clip : master_rejection::none;
-    else if (key == "variance_estimator") out.estimator = variance_estimator::empirical;
+    const auto pick = [&](std::initializer_list<const char*> allowed) {
+      for (const char* a : allowed) {
+        if (s == a) return;
+      }
+      report_malformed("master_descriptor");
+    };
+    if (key == "additive") {
+      pick({"bias_included", "bias_subtracted", "unknown"});
+      out.additive = s == "bias_included" ? additive_state::bias_included : s == "bias_subtracted" ? additive_state::bias_subtracted : additive_state::unknown;
+    } else if (key == "scaling") {
+      pick({"unscaled", "scaled", "unknown"});
+      out.scaling = s == "unscaled" ? scaling_state::unscaled : s == "scaled" ? scaling_state::scaled : scaling_state::unknown;
+    } else if (key == "flat") {
+      pick({"raw", "corrected_unnormalized", "calibrated", "unknown"});
+      out.flat = s == "raw" ? flat_state::raw : s == "corrected_unnormalized" ? flat_state::corrected_unnormalized : s == "calibrated" ? flat_state::calibrated : flat_state::unknown;
+    } else if (key == "combine_count") {
+      out.combine_count = static_cast<std::uint32_t>(v.as_integer());
+    } else if (key == "combine_method") {
+      pick({"mean", "median", "other"});
+      out.combine = s == "mean" ? combine_method::mean : s == "median" ? combine_method::median : combine_method::other;
+    } else if (key == "rejection") {
+      pick({"none", "sigma_clip"});
+      out.rejection = s == "sigma_clip" ? master_rejection::sigma_clip : master_rejection::none;
+    } else if (key == "variance_estimator") {
+      pick({"empirical"});
+      out.estimator = variance_estimator::empirical;
+    }
     else report_malformed("master_descriptor");
   }
   return out;

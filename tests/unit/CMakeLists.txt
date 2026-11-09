@@ -46,6 +46,16 @@ target_link_libraries(test_calibration_selection PRIVATE astrocore GTest::gtest_
 target_include_directories(test_calibration_selection PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_calibration_selection PROPERTIES LABELS fast TIMEOUT 1200)
 
+# B3 di M3.b: tipi, ricetta, domini, fase e linearità del master. T-M3B-C02-12, 09, 03(c), T-M3B-DSC-01, T-M3B-FLAT-06
+# (parte parametri), T-M3B-C02-15 (solo `master.param.<nome>`).
+add_executable(test_master_b3 test_master_b3.cpp)
+target_link_libraries(test_master_b3 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b3 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b3 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b3 PROPERTIES LABELS fast)
+
 # I tre eseguibili della suite usano main_utc0.cpp: il decoder RAW (tipo io.raw_import) esige TZ=UTC0 dal main (ADR-08.b §2.6).
 # Suite di conformità della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
 # registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finché l'unità di codice non li paga.
@@ -325,6 +335,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/raw_import_run.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_selection.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b3.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir

@@ -256,6 +256,7 @@ Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli stat
 | T-M3B-C02-14 | F-CAL-01.b; C-02.b §b.6 (flat CFA per canale) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-DSC-01 | F-CAL-01.b; C-02.b §b.7, §b.13 punto 3; C-02.b-flat §f.7 (descrittore, enum e chiave del nodo per ogni metodo, `frame_normalization`, `analysis`, versione dell'algoritmo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 
 ## M3.entry: ID di lavoro di C-02.b-flat
 

@@ -37,7 +37,7 @@ Il preflight verifica tutto prima di ogni calcolo e non esclude mai un frame in 
 |---|---|---|
 | Campo di compatibilità diverso | `incompatible` | `master.mismatch.<campo>`, con valori e tolleranza nel contesto |
 | Campo richiesto assente | `metadata_missing` | `master.metadata.<campo>` |
-| `n` sotto il minimo | `invalid_input` | `master.frames_insufficient` |
+| `n` sotto il minimo | `invalid_input` | `master.frames_insufficient` (da M3.b: `unsupported`, `master.variance_domain`, C-02.b §b.10) |
 | Due frame con lo stesso digest | `unsupported` | `calib.shared_input` |
 | Parametro assente, non finito o di tipo errato | `invalid_input` | `master.param.<nome>` |
 | Metodo o valore fuori dal dominio della varianza (§1, §6) | `unsupported` | `master.variance_domain` |

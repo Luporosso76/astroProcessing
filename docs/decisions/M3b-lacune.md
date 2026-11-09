@@ -371,3 +371,21 @@ Ricalcolo dei valori di R2.r (tabella p-z) con i termini nuovi: da eseguire a ma
 **Conseguenza sul protocollo.** In T-M3B-C02-04 le statistiche diventano 16 per (a) e 14 per (b), quindi `m = 30`, livello per statistica `α/m = 3.333 · 10⁻⁵`, `α/(2m) = 1.667 · 10⁻⁵` per coda. `K` e `P` sono in `docs/evidence/M3b-protocollo.md` §3.2.
 
 Applicato in C-02 §b.12 (C02-01, C02-04(b), C02-05).
+
+---
+
+## Decisioni successive (B3)
+
+**`n` sotto il minimo del metodo.** `mean` con `n = 1` (e in generale `n` sotto il minimo del metodo) è `unsupported`, `master.variance_domain` (C-02.b §b.10; la riga della tabella dei domini di §b.2 estende C-02.a). Motivo: `.b` estende `.a` e la sua tabella dei domini copre il caso; un solo codice per lo stesso caso. Emendata la riga «`n` sotto il minimo» della tabella di C-02.a §2. `master.frames_insufficient` non è più prodotto da `validate_master_recipe`.
+
+**Scelte di test convalidate.**
+- Ordine dei controlli: presenza di `combine` e `rejection`, coppia, `n` e ruolo prima dei parametri; i domini che dipendono da un parametro (`n ≥ 2g + 1`, `max a_f < 1/2`) dopo la validazione del parametro.
+- `winsor_g`, `clip_max_iter` e `clip_min_kept` sono letti come numeri e validati come interi: se non interi, `master.param.<nome>`.
+- Nel nodo i parametri hanno il nome dei campi di ricetta (`null` se assenti); il peso sta nella voce `frames[k]`, legato al digest.
+- `role` nel contesto di `op.phase_blocked` e `op.linearity_blocked` è il nome del ruolo del master.
+
+**Scelte del codice di B3.**
+- Parametri di `single`: assenti → `metadata_missing`, `var.source.<campo>`; non finiti o fuori dominio → `invalid_input`, `var.param.<campo>` (ADR-17.a). `offset_adu`, `conversion_gain_e_per_adu` e `read_noise_adu` sono vietati con un metodo diverso da `single` (`master.param.<nome>`).
+- Un metodo ammesso dai domini ma senza calcolo (tutto tranne `mean` senza rejection, fino a B5 e B6) ferma `combine_master` e il job con `unsupported`, `master.method_not_computable`: mai calcolato come media. Il nodo e il descrittore sono invece costruiti.
+- `master_algorithm_version` = 2: i master `.a` diventano `stale`.
+- `sigma_clip_inert` e i confronti esatti di κ non sono in B3 (B6).
