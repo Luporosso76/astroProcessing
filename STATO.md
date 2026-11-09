@@ -10,7 +10,7 @@
 
 ## Prossimo passo
 1. Lotto chiuso: review `debt-M3a-round2` PASS; `dev-full` 1221/1221, `release` 1221/1221, `dev` 1199/1199, trace M2 63/0 e M3.a 8/0 scoperti; 48 blocchi evidence rigenerati.
-2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 20 unità (B0…B17, B3b, B15a), lacune L1…L11 (L7 chiusa) da decidere in B0. B0 CHIUSA (review `M3b-B0-round1` FAIL, `round2` PASS): `docs/decisions/M3b-lacune.md`, emendamenti a C-02, F-IO-03, BASE §3.1, ADR-06 R2.r, ADR-08.b §2.8. B1 CHIUSA (protocollo SHA-256 `83e30030…`, review PASS). B3 CHIUSA (`e66a112`, review round2 PASS); B2 CHIUSA. B4 CHIUSA (review PASS). In corso: B3b codice del pianificatore (Agent sonnet distinto, worktree `m3b-b3b`, test consegnati). Blocchi evidence dei record che citano `master.cpp` e C-02 da rigenerare al prossimo run completo (codice cambiato dopo l'ultimo junit).
+2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 20 unità (B0…B17, B3b, B15a), lacune L1…L11 (L7 chiusa) da decidere in B0. B0 CHIUSA (review `M3b-B0-round1` FAIL, `round2` PASS): `docs/decisions/M3b-lacune.md`, emendamenti a C-02, F-IO-03, BASE §3.1, ADR-06 R2.r, ADR-08.b §2.8. B1 CHIUSA (protocollo SHA-256 `83e30030…`, review PASS). B3 CHIUSA (`e66a112`, review round2 PASS); B2 CHIUSA. B4 CHIUSA (`38c7cf1`). In corso: B15a codice (Agent opus distinto). B3b CHIUSA. Prossimo: B5 (metodi, opus), dopo B3b e B4. Blocchi evidence dei record che citano `master.cpp` e C-02 da rigenerare al prossimo run completo (codice cambiato dopo l'ultimo junit).
 - API sospese dall'utente (9/11): deleghe solo come Agent sull'abbonamento, review Argon; niente `delegate.sh`, `agent-api.sh`, `review.sh --reviewer claude`.
 
 ## Non verificato

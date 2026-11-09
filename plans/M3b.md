@@ -141,6 +141,8 @@ Test: T-M3B-C02-05 (ancore `κ_med(2) = 1/2`, `κ_med(3) = 1 − √3/π`, winso
 
 ### B3b. Pianificatore di memoria del master — ~150 righe
 
+Stato: **CHIUSA** il 9 novembre 2026 (review `M3b-B3b-round1` PASS, 2 LOW corretti; test e codice da agenti distinti; mutazioni 5/5). Suite fast 1256 test verde in 3 shard sull'albero con B4.
+
 ID: C-02.b §b.11, §b.13 punto 5; C-02.b-flat §f.13 punto 11; estensione ADR-06 R2.r di B0.
 
 Fa: il pianificatore del master conta i buffer nuovi (ordinamento per pixel, indicatori di `sigma_clip`, accumulatori del report per riga, costanti delle scale) per ogni metodo. Test scritto prima e visto fallire; test e codice nello stesso commit, nessun test rosso committato fra unità.
