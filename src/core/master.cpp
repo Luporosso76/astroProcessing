@@ -347,22 +347,39 @@ struct master_plan {
   json master_metadata = json::object();
   json not_common = json::array();
   master_descriptor descriptor;
+  std::optional<kappa_result> kappa;  // metodi robusti: κ del preflight (C-02.b §b.6)
 
   std::size_t channel_of(std::uint32_t x, std::uint32_t y) const noexcept {
     return per_channel ? static_cast<std::size_t>(((y + cfa_y) & 1u) * 2 + ((x + cfa_x) & 1u)) : 0;
   }
 };
 
-master_plan make_plan(const master_recipe& r) {
+// κ dei metodi robusti (C-02.b §b.6) sulla ricetta validata: calcolato una volta, controllato contro la propria stima
+// d'errore prima di ogni lettura di campioni. `mean` e gli altri metodi non hanno κ.
+std::optional<kappa_result> preflight_kappa(const master_recipe& r, const std::function<void(kappa_result&)>& on_kappa) {
+  const method_kind method = *method_of(*r.combine, *r.rejection);
+  if (method != method_kind::median && method != method_kind::winsorized) return std::nullopt;
+  const kappa_estimator estimator = method == method_kind::median ? kappa_estimator::median : kappa_estimator::winsorized;
+  const auto n = static_cast<std::uint32_t>(r.frames.size());
+  const auto g = method == method_kind::winsorized ? static_cast<std::uint32_t>(*r.winsor_g) : 0u;
+  kappa_result k = robust_kappa(estimator, n, g);
+  if (on_kappa) on_kappa(k);
+  check_kappa_accuracy(k, estimator, n, g);
+  return k;
+}
+
+master_plan make_plan(const master_recipe& r, const std::function<void(kappa_result&)>& on_kappa = {}) {
   // Prima della validazione: i confronti sui parametri sono già operazioni in virgola mobile (ADR-07, D23).
   require_fp_environment();
   validate_master_recipe(r);
+  const std::optional<kappa_result> kappa = preflight_kappa(r, on_kappa);
   // Il calcolo esiste solo per `mean` senza rejection: ogni altro metodo valido si ferma, mai calcolato come media.
   if (*r.combine != combine_method::mean || *r.rejection != master_rejection::none) {
     stop(error_category::unsupported, "master.method_not_computable", "calcolo del metodo non disponibile",
          {{"combine", combine_name(*r.combine)}, {"rejection", rejection_name(*r.rejection)}});
   }
   master_plan p;
+  p.kappa = kappa;
   p.path = resolve_cpu_path(*r.simd, read_cpu_capabilities());
   p.recipe = r;
   p.order = canonical_order(r);
@@ -1191,7 +1208,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
   request.mismatch_code = "master.node_mismatch";
   request.resources = &options.resources;
   const auto work = [&](const job_record&) -> job_files_result {
-    master_plan p = make_plan(recipe);
+    master_plan p = make_plan(recipe, options.on_kappa);
     const node_spec& node = *requested;
     // Apertura, fase e linearità dai soli header, piano dei file: nessun campione letto.
     std::vector<fits_input> inputs;

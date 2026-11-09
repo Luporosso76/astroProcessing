@@ -71,6 +71,7 @@ add_library(astrocore STATIC
   calibration_job.cpp
   calibration_analysis.cpp
   master.cpp
+  master_kappa.cpp
   operations.cpp
   inventory.cpp
   thumbnail_cache.cpp

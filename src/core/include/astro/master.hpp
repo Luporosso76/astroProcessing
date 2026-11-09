@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "astro/calibration.hpp"
+#include "astro/master_kappa.hpp"
 
 namespace astro {
 
@@ -100,6 +101,9 @@ struct master_job_options {
   std::function<void(std::string_view)> hook;
   // Solo test: il job_plan effettivamente passato allo scheduler.
   std::function<void(const job_plan&)> on_job_plan;
+  // Solo test: riceve il κ dei metodi robusti calcolato nel preflight, dopo robust_kappa e prima di
+  // check_kappa_accuracy e di ogni lettura di campioni; può alterarne la stima d'errore (C-02.b §b.6).
+  std::function<void(kappa_result&)> on_kappa;
 };
 
 constexpr const char* master_image_role = "primary";

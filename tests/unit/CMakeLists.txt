@@ -136,6 +136,20 @@ target_link_libraries(test_syn_cal PRIVATE GTest::gtest_main)
 target_include_directories(test_syn_cal PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures)
 gtest_discover_tests(test_syn_cal PROPERTIES LABELS fast)
 
+# B4 di M3.b: κ di mediana e winsorized. T-M3B-C02-05 (oracle tests/unit/kappa_oracle.hpp), T-M3B-C02-15 (solo
+# `master.kappa_accuracy`). Le suite *Slow coprono tutte le celle di C-02 §b.12 (circa 10 s di quadratura in dev):
+# `ctest -L slow`; le altre sono `fast`.
+add_executable(test_master_kappa test_master_kappa.cpp)
+target_link_libraries(test_master_kappa PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_master_kappa PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_kappa PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_kappa TEST_FILTER "-*Slow.*" PROPERTIES LABELS fast)
+add_test(NAME T-M3B-C02-05.kappa_all_cells COMMAND test_master_kappa --gtest_filter=*Slow.*)
+set_tests_properties(T-M3B-C02-05.kappa_all_cells PROPERTIES LABELS slow TIMEOUT 1800
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -336,6 +350,7 @@ add_test(NAME T-M2F-01.offline
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_selection.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b3.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_kappa.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
