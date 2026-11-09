@@ -226,12 +226,14 @@ Test: T-M3B-C02-09 (proposta), T-M3B-C02-08 (resto: il preflight di ogni nodo pr
 
 ### B15a. Master da RAW, parte 1: stato del decoder, nodo e preflight — ~250 righe
 
+Stato: **CHIUSA** il 9 novembre 2026 (review `M3b-B15a-round1` FAIL, `round2` PASS, revisore Opus; test e codice da agenti distinti; mutazioni 16/16). Suite fast 1274 test verde in 3 shard sull'albero con B3b.
+
 Dopo B3; prima di B14.
 
 ID: ADR-16.b §b.7 (master), §b.11; C-02.b §b.2 («Selezione ed esecuzione», «RAW»), §b.7 (descrittore), §b.10 (righe RAW).
 
 Fa: `frame_decoder_states` nei parametri del nodo (ordine canonico), invarianti del descrittore (`master.decoder_state_param`), `master.decoder_state_mixed`, preflight su campi strutturali e nero (`master.mismatch.<campo>`, `master.mismatch.decoder_black`), `master.metadata.offset_adu`. Il nero non si sottrae (C-01.b §1). Aggiunge al decoder il modo con prenotazione del chiamante e la funzione `raw_decode_needed_bytes` (ADR-08.b §2.8). Non legge frame RAW nel job: la lettura nel job (decodifica in `prepare`, uno alla volta, nello spill dichiarato, L10 opzione C) è in B16.
-Test: T-M3A-CAL-07, T-M3B-C02-08 (RAW: nodo con un campo strutturale alla volta e nero alla tolleranza e a tolleranza + 1, a livello di preflight del nodo).
+Test: T-M3A-CAL-07, T-M3B-DEC-01 (modo del chiamante, ADR-08.b §2.8), T-M3B-C02-08 (RAW: nodo con un campo strutturale alla volta e nero alla tolleranza e a tolleranza + 1, a livello di preflight del nodo).
 
 ### B15. Master da RAW, parte 2: CFA per canale — ~200 righe
 
