@@ -25,7 +25,7 @@ Un passo saltato si dichiara. Le regole con uno strumento che le impone valgono 
 3. Unità piccola: pochi ID coerenti, contratto e test prima del codice, test visti fallire. Il modello di ogni delega si legge da `tools/model-routing.tsv` e si lancia con `tools/delegate.sh`; mai `agent-api.sh` a mano.
 
 ## 3. Verifica e PASS
-1. L'autore lancia `tools/check.sh` (build, test, lint, trace) e `tools/mutate.sh`. Con controlli rossi non consegna.
+1. L'autore lancia `tools/check.sh` (build, test, lint, trace) e `tools/mutate.sh`. Con controlli rossi non consegna. Se un comando supera i 600 s si usa il modo a passi: `tools/check.sh --step build|test|labels|lint|trace|evidence`, con `--step test --shard K/N` per la suite fast in parti; trace ed evidence uniscono gli shard solo se completi (`tools/check.sh --help`).
 2. PASS di un gate = un solo run completo, sullo stesso commit, in cui ogni test del preset è passato. Un test in timeout, saltato o non eseguito non è PASS. Il rilancio del singolo test è diagnosi, non PASS: se il test dipende dal carico si corregge il carico (esecuzione seriale), non si alza il timeout né si dichiara PASS.
 3. Ogni dichiarazione di chiusura cita comando, commit, passati/totali, elenco dei non passati. Senza queste quattro cose si scrive «non verificato».
 4. Un test o una soglia non si allentano per far tornare il verde (`AGENTS.md`, «Fallback»).
