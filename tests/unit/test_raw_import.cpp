@@ -743,7 +743,7 @@ std::uint64_t decoder_reservation(const std::vector<std::uint8_t>& bytes) {
   std::uint64_t reserved = 0;
   raw_decode_hooks hooks;
   hooks.before_unpack_plan = [&reserved](const raw_unpack_plan& p) { reserved = p.reserved_bytes; };
-  const raw_decode_context ctx{&pool, nullptr, raw_limits::max_pixels, bytes.size()};
+  const raw_decode_context ctx{&pool, nullptr, raw_limits::max_pixels, bytes.size(), std::nullopt};
   (void)decode_raw_buffer(bytes, hooks, ctx);
   return reserved;
 }
@@ -793,7 +793,7 @@ TEST(RawImport, T_M3A_RAW_07_decoder_counts_bytes_held_by_the_caller_before_unpa
   hooks.before_unpack = [&unpacked] { unpacked = true; };
   {
     memory_pool pool(held + needed - 1);
-    const raw_decode_context ctx{&pool, nullptr, raw_limits::max_pixels, held};
+    const raw_decode_context ctx{&pool, nullptr, raw_limits::max_pixels, held, std::nullopt};
     try {
       (void)decode_raw_buffer(bytes, hooks, ctx);
       ADD_FAILURE() << "decodifica riuscita con un budget sotto job + decoder";
@@ -805,7 +805,7 @@ TEST(RawImport, T_M3A_RAW_07_decoder_counts_bytes_held_by_the_caller_before_unpa
   }
   {
     memory_pool pool(held + needed);
-    const raw_decode_context ctx{&pool, nullptr, raw_limits::max_pixels, held};
+    const raw_decode_context ctx{&pool, nullptr, raw_limits::max_pixels, held, std::nullopt};
     EXPECT_NO_THROW((void)decode_raw_buffer(bytes, hooks, ctx));
     EXPECT_TRUE(unpacked);
   }

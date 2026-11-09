@@ -257,6 +257,7 @@ Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli stat
 | T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-DSC-01 | F-CAL-01.b; C-02.b §b.7, §b.13 punto 3; C-02.b-flat §f.7 (descrittore, enum e chiave del nodo per ogni metodo, `frame_normalization`, `analysis`, versione dell'algoritmo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-DEC-01 | ADR-06 R2.r, L10; ADR-08.b §2.8 (modo con prenotazione del chiamante: `raw_decode_needed_bytes` dall'header uguale alla prenotazione del modo pool, decodifica bit a bit uguale con forniti = needed, forniti = needed − 1 → `budget`, `sched.job_exceeds_budget` prima di ogni allocazione, pool e forniti insieme → `invalid_input`, `held_bytes` senza pool → `invalid_input` `raw.decode_context`, `raw_decode_needed_bytes` con `max_pixels` sotto `w·h` → `limit_exceeded` `raw.max_pixels`) | ADR-08.b | M3.b | PIANIFICATO — non eseguito |
 
 ## M3.entry: ID di lavoro di C-02.b-flat
 

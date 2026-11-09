@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -134,6 +135,26 @@ decoder_black_period decoder_black_period_of(const decoder_state& s) {
     }
   }
   return p;
+}
+
+const char* decoder_state_difference(const decoder_state& x, const decoder_black_period& bx, const decoder_state& y,
+                                     const decoder_black_period& by, bool additive, std::uint64_t tol) {
+  if (x.raw_width != y.raw_width) return "raw_width";
+  if (x.raw_height != y.raw_height) return "raw_height";
+  if (!(x.window == y.window)) return "window";
+  if (x.cfa_color_index != y.cfa_color_index) return "cfa_color_index";
+  if (x.black_pattern_rows != y.black_pattern_rows) return "black_pattern_rows";
+  if (x.black_pattern_cols != y.black_pattern_cols) return "black_pattern_cols";
+  if (x.linearization != y.linearization) return "linearization";
+  if (x.curve_sha256 != y.curve_sha256) return "curve_sha256";
+  if (!additive) return nullptr;
+  // Finestra e motivo uguali: i due periodi hanno le stesse dimensioni.
+  ASTRO_ASSERT(bx.values.size() == by.values.size());
+  for (std::size_t i = 0; i < bx.values.size(); ++i) {
+    const std::uint64_t u = bx.values[i], v = by.values[i];
+    if ((u > v ? u - v : v - u) > tol) return "decoder_black";
+  }
+  return nullptr;
 }
 
 light_offset_entry make_light_offset_entry(light_chain chain, const image& light, const light_offset_inputs& inputs) {
@@ -338,25 +359,12 @@ decoder_states states_of(const std::vector<const decoder_state*>& states) {
   return out;
 }
 
-// §b.7: campi strutturali nell'ordine del contratto, poi il nero effettivo per le coppie additive.
 reason compare_decoder(const decoder_state& x, const decoder_black_period& bx, const decoder_state& y,
                        const decoder_black_period& by, bool additive, std::uint64_t tol) {
-  if (x.raw_width != y.raw_width) return "decoder_state_mismatch.raw_width";
-  if (x.raw_height != y.raw_height) return "decoder_state_mismatch.raw_height";
-  if (!(x.window == y.window)) return "decoder_state_mismatch.window";
-  if (x.cfa_color_index != y.cfa_color_index) return "decoder_state_mismatch.cfa_color_index";
-  if (x.black_pattern_rows != y.black_pattern_rows) return "decoder_state_mismatch.black_pattern_rows";
-  if (x.black_pattern_cols != y.black_pattern_cols) return "decoder_state_mismatch.black_pattern_cols";
-  if (x.linearization != y.linearization) return "decoder_state_mismatch.linearization";
-  if (x.curve_sha256 != y.curve_sha256) return "decoder_state_mismatch.curve_sha256";
-  if (!additive) return std::nullopt;
-  // Finestra e motivo uguali: i due periodi hanno le stesse dimensioni.
-  ASTRO_ASSERT(bx.values.size() == by.values.size());
-  for (std::size_t i = 0; i < bx.values.size(); ++i) {
-    const std::uint64_t u = bx.values[i], v = by.values[i];
-    if ((u > v ? u - v : v - u) > tol) return "decoder_black";
-  }
-  return std::nullopt;
+  const char* field = decoder_state_difference(x, bx, y, by, additive, tol);
+  if (field == nullptr) return std::nullopt;
+  if (std::string_view(field) == "decoder_black") return std::string(field);
+  return std::string("decoder_state_mismatch.") + field;
 }
 
 reason compare_all_decoder(const decoder_states& a, const decoder_states& b, bool additive, std::uint64_t tol) {

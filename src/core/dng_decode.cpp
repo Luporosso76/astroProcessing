@@ -852,6 +852,20 @@ std::uint32_t predictor_step(std::uint32_t predictor) {
   }
 }
 
+// §7: campioni f32 e maschera dell'area importata, buffer del segmento, tetto di zlib.
+std::uint64_t needed_of(const checked_ifd& d) {
+  const std::uint32_t w = d.right - d.left, h = d.bottom - d.top;
+  return 6 * std::uint64_t{w} * h + d.segments.buffer_bytes + zlib_cap;
+}
+
+// Provenance dell'arresto (§8): decoder e campi dell'instradamento.
+void add_route_context(stop_error& stop, const route_detail& route) {
+  stop.add_context("decoder", "astro_dng");
+  stop.add_context("compression", std::to_string(*route.result.compression));
+  stop.add_context("sample_format", std::to_string(*route.result.sample_format));
+  stop.add_context("bits_per_sample", std::to_string(*route.result.bits_per_sample));
+}
+
 image decode_checked(std::span<const std::uint8_t> bytes, const route_detail& route, const raw_decode_hooks& hooks,
                      const raw_decode_context& ctx) {
   const reader r(bytes, route.little_endian, tags_function);
@@ -862,18 +876,8 @@ image decode_checked(std::span<const std::uint8_t> bytes, const route_detail& ro
   const segment_plan& seg = d.segments;
   const std::uint32_t w = d.right - d.left, h = d.bottom - d.top;
 
-  // §7: campioni f32 e maschera dell'area importata, buffer del segmento, tetto di zlib; prima del primo segmento.
-  const std::uint64_t needed = 6 * std::uint64_t{w} * h + seg.buffer_bytes + zlib_cap;
-  reservation held;
-  if (ctx.pool != nullptr) {
-    const std::uint64_t held_by_caller = ctx.held_bytes.value_or(bytes.size());
-    if (held_by_caller + needed > ctx.pool->budget_bytes())
-      throw stop_error(error_category::budget, "sched.job_exceeds_budget", "budget sotto la prenotazione del decoder",
-                       {{"minimo", std::to_string(held_by_caller + needed)},
-                        {"file", std::to_string(bytes.size())},
-                        {"budget", std::to_string(ctx.pool->budget_bytes())}});
-    held = ctx.pool->reserve(needed, "raw_decode", ctx.cancel);
-  }
+  // Prima del primo segmento.
+  const reservation held = reserve_decode(bytes.size(), needed_of(d), ctx);
 
   // §4, p. 99: con la tabella il campione è la voce min(v, N − 1).
   std::vector<std::uint16_t> table;
@@ -1115,11 +1119,21 @@ image decode(std::span<const std::uint8_t> bytes, const route_detail& route, con
   try {
     return decode_checked(bytes, route, hooks, ctx);
   } catch (stop_error& stop) {
-    // §8: provenance dell'arresto con il decoder e i campi dell'instradamento.
-    stop.add_context("decoder", "astro_dng");
-    stop.add_context("compression", std::to_string(*route.result.compression));
-    stop.add_context("sample_format", std::to_string(*route.result.sample_format));
-    stop.add_context("bits_per_sample", std::to_string(*route.result.bits_per_sample));
+    add_route_context(stop, route);
+    throw;
+  }
+}
+
+std::uint64_t needed_bytes(std::span<const std::uint8_t> bytes, const route_detail& route, std::uint64_t max_pixels) {
+  ASTRO_ASSERT(route.result.decoder == raw_decoder_kind::astro_dng && route.result.compression &&
+               route.result.sample_format && route.result.bits_per_sample);
+  try {
+    const reader r(bytes, route.little_endian, tags_function);
+    const ifd_table raw = r.table(route.raw_ifd);
+    const ifd_table ifd0 = route.ifd0 == route.raw_ifd ? raw : r.table(route.ifd0);
+    return needed_of(check_tags(raw_tags(r, raw, ifd0), route, max_pixels));
+  } catch (stop_error& stop) {
+    add_route_context(stop, route);
     throw;
   }
 }

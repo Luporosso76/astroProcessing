@@ -27,6 +27,9 @@ struct master_frame_spec {
   declared_image_fields declared_fields;
   fits_read_options read_options;
   std::optional<double> weight;  // solo `weighted_mean` (C-02.b §b.10, L5): peso del frame, legato al suo digest
+  // Solo frame RAW (ADR-16.b §b.7): stato e identità del decoder osservati dalla decodifica dell'analisi. Entrano nei
+  // parametri del nodo come `frame_decoder_states`, nell'ordine canonico degli ingressi.
+  std::optional<frame_decoder_state> decoder;
 };
 
 // Parametri del §1 di C-02.a: nessun default, tranne output_type (f32, registrato in nodo e report).
@@ -55,6 +58,9 @@ struct master_recipe {
   std::optional<double> offset_adu;
   std::optional<double> conversion_gain_e_per_adu;
   std::optional<double> read_noise_adu;
+  // Tolleranza del nero effettivo fra frame RAW (ADR-16.b §b.7, C-02.b §b.2): obbligatoria con frame RAW, vietata
+  // altrimenti.
+  std::optional<std::uint32_t> decoder_black_abs_tol_adu;
   // Esito canonico dell'analisi da cui il nodo nasce (L8): oggetto JSON oppure null per un nodo non proposto.
   json analysis;
   sample_type output_type = sample_type::f32;

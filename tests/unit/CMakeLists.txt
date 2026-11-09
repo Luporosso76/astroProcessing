@@ -56,6 +56,13 @@ target_compile_definitions(test_master_b3 PRIVATE
   ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_master_b3 PROPERTIES LABELS fast)
 
+# B15a di M3.b: master da RAW, parte 1 (stato del decoder nel nodo, invarianti del descrittore, preflight RAW). T-M3A-CAL-07,
+# T-M3B-C02-08 (RAW, preflight del nodo).
+add_executable(test_master_b15a test_master_b15a.cpp)
+target_link_libraries(test_master_b15a PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_master_b15a PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_master_b15a PROPERTIES LABELS fast)
+
 # I tre eseguibili della suite usano main_utc0.cpp: il decoder RAW (tipo io.raw_import) esige TZ=UTC0 dal main (ADR-08.b §2.6).
 # Suite di conformità della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
 # registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finché l'unità di codice non li paga.
@@ -350,6 +357,8 @@ add_test(NAME T-M2F-01.offline
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_calibration_selection.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b3.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b15a.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode_b15a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_kappa.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
@@ -527,6 +536,11 @@ add_executable(test_dng_u13b_hooks test_dng_u13b_hooks.cpp main_utc0.cpp)
 target_link_libraries(test_dng_u13b_hooks PRIVATE astrocore GTest::gtest ZLIB::ZLIB astro_libtiff)
 target_include_directories(test_dng_u13b_hooks PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_dng_u13b_hooks NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600)
+# B15a di M3.b: modo del decoder con prenotazione del chiamante e raw_decode_needed_bytes (ADR-08.b §2.8). T-M3B-DEC-01.
+add_executable(test_raw_decode_b15a test_raw_decode_b15a.cpp main_utc0.cpp)
+target_link_libraries(test_raw_decode_b15a PRIVATE astrocore GTest::gtest ZLIB::ZLIB astro_libtiff)
+target_include_directories(test_raw_decode_b15a PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_raw_decode_b15a NO_PRETTY_VALUES PROPERTIES LABELS fast TIMEOUT 600)
 
 # T-U13-10: un processo nuovo per campione, (a) prima di (c), come T-M3A-RAW-08.
 add_executable(raw_threads_dng raw_threads_dng.cpp)

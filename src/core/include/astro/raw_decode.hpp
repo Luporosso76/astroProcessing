@@ -76,9 +76,19 @@ struct raw_decode_context {
   std::uint64_t max_pixels = raw_limits::max_pixels;
   // Byte che il chiamante tiene già nel pool durante la decodifica (file e prenotazioni del job); assente: i soli byte
   // del file. Con `pool` il decoder si ferma con sched.job_exceeds_budget se questi byte più la prenotazione di §2.8
-  // superano il budget, invece di attendere una prenotazione che non può entrare.
+  // superano il budget, invece di attendere una prenotazione che non può entrare. Senza `pool` (anche nel modo del
+  // chiamante): invalid_input raw.decode_context, prima di ogni lettura.
   std::optional<std::uint64_t> held_bytes;
+  // Modo con prenotazione del chiamante (§2.8): byte già prenotati dal chiamante per la decodifica, file escluso. Con
+  // questo campo `pool` resta nullo e il decoder non prenota; prima di ogni allocazione verifica `needed` ≤ forniti,
+  // altrimenti budget sched.job_exceeds_budget con `minimo` (= needed) e `forniti` nel contesto. Con `pool` valorizzato:
+  // invalid_input raw.decode_context, prima di ogni lettura.
+  std::optional<std::uint64_t> caller_reserved_bytes;
 };
+
+// `needed` di §2.8 dal solo header, senza campioni né prenotazioni: la prenotazione che il modo pool chiede per lo stesso
+// file, byte del file esclusi. Stessi stop del decoder prima della prenotazione (instradamento, tag, limiti).
+std::uint64_t raw_decode_needed_bytes(std::span<const std::uint8_t> bytes, std::uint64_t max_pixels = raw_limits::max_pixels);
 
 // Instradamento puro (U13 §3): legge solo intestazione, IFD0, catena di primo livello e `SubIFDs` di IFD0, nelle voci
 // necessarie. Più IFD raw di cui almeno uno del decoder del progetto: unsupported raw.multi_image. Struttura letta non
@@ -124,6 +134,16 @@ json raw_decoder_record(const image& decoded);
 
 // Identità del decoder di questo processo: le quattro chiavi «Libreria» del record (ADR-08.b §2.9).
 decoder_identity current_decoder_identity();
+
+// Membri di contenuto di `decoder_state` con le chiavi del record (ADR-08.b §2.9, U13 §8), senza i campi dell'immagine né
+// l'identità: l'inverso è `decoder_state_of_record`. Stato `astro_dng` senza `dng`: invalid_input raw.record_source.
+json decoder_state_record(const decoder_state& state);
+
+// Le quattro chiavi «Libreria» del record per un'identità data; l'inverso è `decoder_identity_of_record`.
+json decoder_identity_record(const decoder_identity& identity);
+
+// Le quattro chiavi «Libreria» di un record. Chiave assente o fuori dominio: integrity raw.record_malformed.
+decoder_identity decoder_identity_of_record(const json& record);
 
 // Inverso di `raw_decoder_record` per il `decoder_state` (tutti i membri di contenuto; `source` è provenienza). Chiave
 // assente o fuori dominio: integrity raw.record_malformed.

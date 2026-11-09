@@ -7,8 +7,10 @@
 #include <limits>
 #include <sstream>
 
+#include "astro/calibration_analysis.hpp"
 #include "astro/error.hpp"
 #include "astro/operations.hpp"
+#include "astro/raw_decode.hpp"
 #include "astro/scheduler.hpp"
 #include "calibration_internal.hpp"
 #include "cpu_kernels.hpp"
@@ -215,9 +217,17 @@ void validate_params(const master_recipe& r) {
     forbid(r.clip_max_iter, "clip_max_iter");
     forbid(r.clip_min_kept, "clip_min_kept");
   }
+  // Frame RAW (L9, C-02.b §b.2 «RAW»): `offset_adu` è dichiarato nella ricetta, serve solo a `single` e al flat; senza
+  // frame RAW resta un parametro del solo `single`. Il controllo di frame RAW e FITS insieme precede questo.
+  const bool raw = std::any_of(r.frames.begin(), r.frames.end(), [](const master_frame_spec& f) { return f.decoder.has_value(); });
+  const auto raw_offset_missing = [&] {
+    stop(error_category::metadata_missing, "master.metadata.offset_adu", "offset_adu non dichiarato con frame RAW",
+         {{"parametro", "offset_adu"}, {"role", role_name(r.role)}, {"combine", combine_name(*r.combine)}});
+  };
   if (method == method_kind::single) {
     // Modello di rumore (ADR-17.a): assente = metadata_missing, non finito o fuori dominio = var.param.<nome>.
     // `offset_adu` solo finito (anche negativo), `conversion_gain_e_per_adu` > 0, `read_noise_adu` >= 0.
+    if (raw && !r.offset_adu) raw_offset_missing();
     const auto need_model = [&](const std::optional<double>& v, const char* name, int domain) {
       if (!v) {
         stop(error_category::metadata_missing, std::string("var.source.") + name, "parametro del modello di rumore assente",
@@ -232,10 +242,18 @@ void validate_params(const master_recipe& r) {
     need_model(r.conversion_gain_e_per_adu, "conversion_gain_e_per_adu", 1);
     need_model(r.read_noise_adu, "read_noise_adu", -1);
   } else {
-    forbid(r.offset_adu, "offset_adu");
+    if (raw && r.role == master_role::flat) {
+      if (!r.offset_adu) raw_offset_missing();
+      if (!std::isfinite(*r.offset_adu)) bad_param("offset_adu", "non finito");
+    } else {
+      forbid(r.offset_adu, "offset_adu");
+    }
     forbid(r.conversion_gain_e_per_adu, "conversion_gain_e_per_adu");
     forbid(r.read_noise_adu, "read_noise_adu");
   }
+  // ADR-16.b §b.7 «Parametro»: obbligatoria con frame RAW, vietata altrimenti.
+  if (raw && !r.decoder_black_abs_tol_adu) bad_param("decoder_black_abs_tol_adu", "assente con frame RAW");
+  if (!raw && r.decoder_black_abs_tol_adu) bad_param("decoder_black_abs_tol_adu", "dichiarata senza frame RAW");
   if (method == method_kind::weighted_mean) {
     validate_weights(r);
   } else {
@@ -841,6 +859,8 @@ json recipe_report(const master_recipe& r) {
   o.set("offset_adu", number_or_null(r.offset_adu));
   o.set("conversion_gain_e_per_adu", number_or_null(r.conversion_gain_e_per_adu));
   o.set("read_noise_adu", number_or_null(r.read_noise_adu));
+  o.set("decoder_black_abs_tol_adu",
+        r.decoder_black_abs_tol_adu ? json::integer(*r.decoder_black_abs_tol_adu) : json::null());
   o.set("analysis", r.analysis);
   o.set("flat_normalization", r.flat_norm ? json::string(flat_norm_name(*r.flat_norm)) : json::null());
   o.set("flat_level_rel_tol", number_or_null(r.flat_level_rel_tol));
@@ -1020,13 +1040,147 @@ constexpr std::uint64_t output_header_bound = 3 * (std::uint64_t{fits_limits::ma
        {{"operatore", node.operator_id()}, {"motivo", why}});
 }
 
+// ---------------------------------------------------------------- frame RAW (ADR-16.b §b.7, C-02.b §b.2)
+
+// Prima di ogni altro controllo sui parametri: con frame RAW e FITS insieme le regole dei due casi non si compongono.
+void require_one_frame_kind(const master_recipe& r, const std::vector<std::size_t>& order) {
+  if (order.empty()) return;
+  const bool reference_raw = r.frames[order[0]].decoder.has_value();
+  for (std::size_t k = 1; k < order.size(); ++k) {
+    if (r.frames[order[k]].decoder.has_value() != reference_raw) {
+      stop(error_category::incompatible, "master.decoder_state_mixed", "frame RAW e frame FITS nello stesso master",
+           {{"riferimento", frame_name(0)}, {"riferimento_raw", reference_raw ? "true" : "false"}, {"frame", frame_name(k)}});
+    }
+  }
+}
+
+[[noreturn]] void bad_decoder_state_param(const std::string& frame, const std::string& field, const std::string& why) {
+  stop(error_category::invalid_input, "master.decoder_state_param", "stato del decoder di un frame non valido",
+       {{"frame", frame}, {"campo", field}, {"motivo", why}});
+}
+
+// Elemento di `frame_decoder_states`: chiavi del record del decoder per lo stato (ADR-08.b §2.9) e per l'identità.
+json frame_decoder_state_json(const frame_decoder_state& f) {
+  json o = decoder_state_record(f.state);
+  const json identity = decoder_identity_record(f.identity);
+  for (std::size_t i = 0; i < identity.keys().size(); ++i) o.set(identity.keys()[i], identity.items()[i]);
+  return o;
+}
+
+// Inverso di `frame_decoder_state_json`. L'elemento deve essere esattamente la forma canonica dello stato letto, così
+// una chiave in più o un valore non canonico non passano in silenzio.
+frame_decoder_state frame_decoder_state_of_json(const json& item, const std::string& frame) {
+  if (item.type() != json::kind::object) bad_decoder_state_param(frame, "frame_decoder_states", "elemento non oggetto");
+  frame_decoder_state f;
+  try {
+    f.state = decoder_state_of_record(item);
+    f.identity = decoder_identity_of_record(item);
+  } catch (const stop_error& e) {
+    // Stesso arresto con il codice e il contesto della lettura del record.
+    stop_error::context_list context = {{"frame", frame}, {"campo", "frame_decoder_states"}, {"codice_lettura", e.code()}};
+    for (const auto& entry : e.context()) context.push_back(entry);
+    stop(error_category::invalid_input, "master.decoder_state_param", "stato del decoder di un frame non leggibile",
+         std::move(context));
+  }
+  if (const char* field = decoder_state_violation(f.state)) bad_decoder_state_param(frame, field, "invariante di ADR-03.b §b.2");
+  if (canonical_json(frame_decoder_state_json(f)) != canonical_json(item)) {
+    bad_decoder_state_param(frame, "frame_decoder_states", "elemento con chiavi o valori fuori dalla forma canonica");
+  }
+  return f;
+}
+
+// Valore di un campo strutturale di ADR-16.b §b.7 nella forma JSON canonica del record del decoder.
+std::string structural_text(const decoder_state& s, std::string_view field) {
+  const json record = decoder_state_record(s);
+  const json& black = *record.find("black");
+  if (field == "raw_width") return canonical_json(*record.find("raw_width"));
+  if (field == "raw_height") return canonical_json(*record.find("raw_height"));
+  if (field == "window") return canonical_json(*record.find("crop"));
+  if (field == "cfa_color_index") return canonical_json(*record.find("cfa_color_index"));
+  if (field == "black_pattern_rows") return canonical_json(*black.find("pattern_rows"));
+  if (field == "black_pattern_cols") return canonical_json(*black.find("pattern_cols"));
+  if (field == "linearization") return canonical_json(*record.find("linearization"));
+  if (field == "curve_sha256") return canonical_json(*record.find("linearization_curve_sha256"));
+  ASTRO_ASSERT(false);  // decoder_state_difference restituisce solo i campi di §b.7
+  return {};
+}
+
+// Preflight del nodo per i frame RAW (C-02.b §b.2 «Selezione ed esecuzione»): invarianti di ogni stato, poi campi
+// strutturali per uguaglianza e nero effettivo entro la tolleranza col riferimento canonico. Il nero non si sottrae.
+void validate_raw_frames(const master_recipe& r, const std::vector<std::size_t>& order) {
+  if (order.empty() || !r.frames[order[0]].decoder) return;
+  // Invarianti prima della scrittura dell'elemento, poi rilettura: ricetta e descrittore accettano gli stessi stati.
+  for (std::size_t k = 0; k < order.size(); ++k) {
+    const frame_decoder_state& f = *r.frames[order[k]].decoder;
+    if (const char* field = decoder_state_violation(f.state)) {
+      bad_decoder_state_param(frame_name(k), field, "invariante di ADR-03.b §b.2");
+    }
+    (void)frame_decoder_state_of_json(frame_decoder_state_json(f), frame_name(k));
+  }
+  const std::uint64_t tol = *r.decoder_black_abs_tol_adu;
+  const decoder_state& ref = r.frames[order[0]].decoder->state;
+  const decoder_black_period ref_black = decoder_black_period_of(ref);
+  for (std::size_t k = 1; k < order.size(); ++k) {
+    const decoder_state& s = r.frames[order[k]].decoder->state;
+    const decoder_black_period black = decoder_black_period_of(s);
+    const char* field = decoder_state_difference(s, black, ref, ref_black, true, tol);
+    if (field == nullptr) continue;
+    stop_error::context_list context = {{"coppia", frame_name(0) + "-" + frame_name(k)}, {"campo", field}};
+    if (std::string_view(field) != "decoder_black") {
+      context.emplace_back("sinistra", structural_text(ref, field));
+      context.emplace_back("destra", structural_text(s, field));
+      context.emplace_back("tolleranza", "esatta");
+    } else {
+      std::size_t at = 0;
+      std::uint64_t largest = 0;
+      for (std::size_t i = 0; i < black.values.size(); ++i) {
+        const std::uint64_t u = black.values[i], v = ref_black.values[i];
+        if (const std::uint64_t d = u > v ? u - v : v - u; d > largest) {
+          largest = d;
+          at = i;
+        }
+      }
+      context.emplace_back("differenza_massima_adu", std::to_string(largest));
+      context.emplace_back("riga_periodo", std::to_string(at / black.cols));
+      context.emplace_back("colonna_periodo", std::to_string(at % black.cols));
+      context.emplace_back("tolleranza_adu", std::to_string(tol));
+    }
+    stop(error_category::incompatible, std::string("master.mismatch.") + field,
+         "frame RAW diverso dal riferimento canonico nello stato del decoder", std::move(context));
+  }
+}
+
+[[noreturn]] void bad_node_states(const std::string& why, stop_error::context_list extra = {}) {
+  extra.insert(extra.begin(), {{"campo", "frame_decoder_states"}, {"motivo", why}});
+  stop(error_category::invalid_input, "master.decoder_state_param", "frame_decoder_states del nodo non valido",
+       std::move(extra));
+}
+
+// ADR-16.b §b.7 «Descrittore»: `null` (nessun frame RAW) oppure un elemento valido per ogni ingresso frame.
+std::optional<std::vector<frame_decoder_state>> frame_decoder_states_of_node(const node_spec& node) {
+  const json* states = node.params().find("frame_decoder_states");
+  if (states == nullptr) bad_node_states("parametro assente dal nodo");
+  if (states->type() == json::kind::null) return std::nullopt;
+  if (states->type() != json::kind::array) bad_node_states("non è un array né null");
+  if (states->items().size() != node.inputs().size()) {
+    bad_node_states("numero di elementi diverso dagli ingressi frame",
+                    {{"elementi", std::to_string(states->items().size())}, {"ingressi", std::to_string(node.inputs().size())}});
+  }
+  std::vector<frame_decoder_state> out;
+  for (std::size_t k = 0; k < states->items().size(); ++k) {
+    out.push_back(frame_decoder_state_of_json(states->items()[k], frame_name(k)));
+  }
+  return out;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------- interfaccia
 
 void validate_master_recipe(const master_recipe& r) {
-  validate_params(r);
   const std::vector<std::size_t> order = canonical_order(r);
+  require_one_frame_kind(r, order);
+  validate_params(r);
   for (std::size_t k = 1; k < order.size(); ++k) {
     const master_frame_spec &a = r.frames[order[k - 1]], &b = r.frames[order[k]];
     if (a.digest.sha256 == b.digest.sha256) {
@@ -1034,6 +1188,7 @@ void validate_master_recipe(const master_recipe& r) {
            {{"primo", std::to_string(order[k - 1])}, {"secondo", std::to_string(order[k])}, {"sha256", a.digest.sha256}});
     }
   }
+  validate_raw_frames(r, order);
 }
 
 node_spec make_master_node(const master_recipe& r) {
@@ -1042,9 +1197,12 @@ node_spec make_master_node(const master_recipe& r) {
   const std::vector<std::size_t> order = canonical_order(r);
   json params = recipe_report(r);
   json frames = json::array();
+  // ADR-16.b §b.7: un elemento per ingresso frame nello stesso ordine canonico; null senza frame RAW.
+  json decoder_states = r.frames[order[0]].decoder ? json::array() : json::null();
   std::vector<node_input> inputs;
   for (std::size_t k = 0; k < order.size(); ++k) {
     const master_frame_spec& f = r.frames[order[k]];
+    if (f.decoder) decoder_states.push(frame_decoder_state_json(*f.decoder));
     json o = json::object();
     o.set("declared_metadata", declared_metadata_json(f.declared));
     o.set("declared_fields", fields_json(f.declared_fields));
@@ -1054,6 +1212,7 @@ node_spec make_master_node(const master_recipe& r) {
     inputs.push_back(node_input::from_file(frame_name(k), f.digest));
   }
   params.set("frames", std::move(frames));
+  params.set("frame_decoder_states", std::move(decoder_states));
   return node_spec(master_operator_id, master_algorithm_version, master_serialization_version, std::move(params),
                    std::move(inputs), sample_type::f64, backend_name(resolve_cpu_path(*r.simd, read_cpu_capabilities())),
                    std::nullopt);
@@ -1117,6 +1276,7 @@ master_descriptor master_descriptor_from_node(const node_spec& node) {
     d.scaling = scaling_state::unscaled;
   }
   d.combine_count = static_cast<std::uint32_t>(node.inputs().size());
+  d.frame_decoder_states = frame_decoder_states_of_node(node);
   return d;
 }
 

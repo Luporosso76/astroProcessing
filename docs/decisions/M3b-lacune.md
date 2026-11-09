@@ -389,3 +389,26 @@ Applicato in C-02 §b.12 (C02-01, C02-04(b), C02-05).
 - Un metodo ammesso dai domini ma senza calcolo (tutto tranne `mean` senza rejection, fino a B5 e B6) ferma `combine_master` e il job con `unsupported`, `master.method_not_computable`: mai calcolato come media. Il nodo e il descrittore sono invece costruiti.
 - `master_algorithm_version` = 2: i master `.a` diventano `stale`.
 - `sigma_clip_inert` e i confronti esatti di κ non sono in B3 (B6).
+
+---
+
+## Decisioni successive (B15a)
+
+**Decisioni del coordinatore**, 9 novembre 2026, durante B15a (master da RAW, parte 1). Già nei test dell'unità.
+
+- **`offset_adu` nella ricetta.** Ammesso solo con `single` o con il flat da RAW (L9); altrove `invalid_input`, `master.param.offset_adu`. Assente con `single` da RAW o col flat da RAW: `metadata_missing`, `master.metadata.offset_adu` (riga più specifica di C-02.b §b.10). Con `single` da FITS resta `var.source.offset_adu` (ADR-17.a).
+- **`decoder_black_abs_tol_adu` del master.** Assente con frame RAW o presente con soli frame FITS: `invalid_input`, `master.param.decoder_black_abs_tol_adu`. C-02.b §b.10 non elenca il codice: si segue `master.param.<nome>` e ADR-16.b §b.7 «obbligatorio [...] vietato altrimenti».
+- **Modi del decoder.** `raw_decode_context` con `pool` e `caller_reserved_bytes` insieme: `invalid_input`, `raw.decode_context`, prima di ogni lettura del file (ADR-08.b §2.8: un solo modo per chiamata, scelto a priori).
+- **ID.** `T-M3B-DEC-01` per il modo con prenotazione del chiamante e per `raw_decode_needed_bytes`.
+- **Rinvii.** La chiave della calibrazione con `frame_decoder_states` (ingresso `from_node`) è di M3.c, con la ricetta `.b` della calibrazione: la ricetta `.a` rifiuta un master con `frame_decoder_states`. Il controllo sui campioni del nero non sottratto è di B15.
+
+**Scelte del codice di B15a.**
+- Parametri del nodo: `frame_decoder_states` è `null` senza frame RAW, altrimenti un array con un elemento per ingresso frame in ordine canonico; `decoder_black_abs_tol_adu` è l'intero dichiarato o `null`. Le chiavi dei master da FITS cambiano (due parametri `null` in più): i nodi già pubblicati diventano `stale`.
+- Elemento di `frame_decoder_states`: le chiavi del record del decoder (ADR-08.b §2.9) per i membri di contenuto di `decoder_state` (`decoder_state_record`, inverso `decoder_state_of_record`) più le quattro chiavi dell'identità. Il descrittore lo rilegge e lo accetta solo se coincide con la propria forma canonica; un errore di lettura diventa `master.decoder_state_param` con la chiave e il codice d'origine nel contesto.
+- Invarianti indipendenti dall'immagine (`decoder_state_violation`, condivisa con `validate_image`): `dng` presente se e solo se `astro_dng`, finestra non vuota dentro il buffer senza overflow, motivo del nero, curva, e `cfa_color_index` con un sito 0, un sito 2 e due siti in {1, 3}. Si controllano nel preflight prima del nero effettivo e di nuovo nel descrittore.
+- Ordine del preflight: frame RAW e FITS insieme (`master.decoder_state_mixed`) prima dei parametri, perché le regole di `offset_adu` e della tolleranza dipendono dal tipo dei frame; poi parametri, digest duplicati, invarianti, campi strutturali e nero col riferimento canonico. Il confronto è quello dell'analisi della calibrazione (`decoder_state_difference`, sempre con il nero); lo stop del nero porta differenza massima, posizione nel periodo e tolleranza.
+- Decoder: la prenotazione dei due decoder passa da un solo punto (`reserve_decode`) che precede ogni allocazione della decodifica; nel modo del chiamante non chiama il pool. `raw_decode_needed_bytes` rifà gli stop del decoder fino a quel punto: per LibRaw `open_buffer` senza `unpack`, per il decoder del progetto la lettura dei tag e dei segmenti.
+- Nodi `master.combine` pubblicati prima di B15a, senza `frame_decoder_states`: il descrittore non li legge. Su uno slot ancora `current` lo stop è esplicito, `invalid_input`, `master.decoder_state_param` con motivo «parametro assente dal nodo», mai un descrittore senza stato; il nodo diventa `stale` dopo che lo slot è stato ripuntato su un master ricostruito.
+- Contesto degli stop RAW del preflight: `master.mismatch.<campo>` porta `coppia`, `campo`, `sinistra` (riferimento canonico) e `destra` (frame) nella forma JSON del record del decoder, e `tolleranza` = `esatta`, come lo stop dei FITS; `master.mismatch.decoder_black` porta `differenza_massima_adu`, `riga_periodo`, `colonna_periodo` e `tolleranza_adu`. Il preflight rilegge ogni stato dalla forma scritta nel nodo, così ricetta e descrittore accettano lo stesso insieme di stati.
+- `raw_decode_context` con `held_bytes` senza `pool`, anche nel modo del chiamante: `invalid_input`, `raw.decode_context`, prima di ogni lettura (`held_bytes` vale solo per il modo che prenota dal pool).
+- Limite della prova «prima di ogni allocazione» del modo del chiamante: il contatore delle allocazioni (`allocated_sample_bytes()`) vede l'immagine di `make_image`, non il buffer del segmento del decoder del progetto (`std::vector`, U13 §5), né le allocazioni interne di LibRaw. Che il controllo preceda quel buffer lo mostrano il codice (un solo punto, `reserve_decode`, prima del buffer) e la mutazione che sposta il controllo dopo il tetto di zlib, rilevata dai ganci.

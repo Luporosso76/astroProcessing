@@ -73,7 +73,7 @@ branch_files_job make_raw_import_branch_job(sqlite_dag_store& store, const std::
       if (job_probe::active()) job_probe::notify("input.samples", "sha256:" + sha256_hex(bytes));
       raw_decode_hooks hooks;
       hooks.before_unpack_plan = [&decoder_reserved](const raw_unpack_plan& p) { decoder_reserved = p.reserved_bytes; };
-      raw_decode_context ctx{&pool, &tc.job.cancel, raw_limits::max_pixels, shared_bytes + plan.per_task_bytes};
+      raw_decode_context ctx{&pool, &tc.job.cancel, raw_limits::max_pixels, shared_bytes + plan.per_task_bytes, std::nullopt};
       decoded.emplace(decode_raw_buffer(bytes, hooks, ctx));
       return std::string();
     });

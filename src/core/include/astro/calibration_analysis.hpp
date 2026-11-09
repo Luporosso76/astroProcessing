@@ -44,6 +44,13 @@ struct decoder_black_period {
 // sola dimensione nulla o con dimensioni diverse dai valori, area visibile vuota): invalid_input calib.decoder_state.
 decoder_black_period decoder_black_period_of(const decoder_state& state);
 
+// Confronto di ADR-16.b §b.7 fra due stati coi periodi del nero già calcolati: primo campo strutturale diverso
+// nell'ordine del contratto (`raw_width`, `raw_height`, `window`, `cfa_color_index`, `black_pattern_rows`,
+// `black_pattern_cols`, `linearization`, `curve_sha256`); poi, se `additive`, `decoder_black` se un sito del periodo
+// differisce di più di `tol`. nullptr se compatibili.
+const char* decoder_state_difference(const decoder_state& x, const decoder_black_period& bx, const decoder_state& y,
+                                     const decoder_black_period& by, bool additive, std::uint64_t tol);
+
 // Master che ha tolto l'offset del light.
 struct offset_remover {
   master_role role = master_role::bias;

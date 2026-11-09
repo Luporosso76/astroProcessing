@@ -58,26 +58,39 @@ void validate_decoder_state(const image& img) {
   if (img.layout != plane_layout::cfa) bad_decoder_state("layout");
   if (!img.phase || img.phase->value != process_phase::raw) bad_decoder_state("phase");
   if (s.source.origin != metadata_origin::decoder) bad_decoder_state("source");
-  if (s.dng.has_value() != (s.route.decoder == raw_decoder_kind::astro_dng)) bad_decoder_state("dng");
   const decoder_window& w = s.window;
   if (w.width != img.geometry.width || w.height != img.geometry.height) bad_decoder_state("window");
-  if (std::uint64_t{w.x0} + w.width > s.raw_width || std::uint64_t{w.y0} + w.height > s.raw_height) {
-    bad_decoder_state("window");
-  }
-  const std::uint64_t cells = std::uint64_t{s.black_pattern_rows} * s.black_pattern_cols;
-  if ((s.black_pattern_rows == 0) != (s.black_pattern_cols == 0) || cells > max_black_pattern ||
-      s.black_pattern.size() != cells) {
-    bad_decoder_state("black_pattern");
-  }
-  if (s.curve_sha256.has_value() != (s.linearization == decoder_linearization::decoder_curve)) {
-    bad_decoder_state("curve_sha256");
-  }
+  if (const char* field = decoder_state_violation(s)) bad_decoder_state(field);
   for (unsigned site = 0; site < 4; ++site) {
     const int channel = cfa_site_channel(*img.cfa, site / 2, site % 2);
     const std::uint8_t index = s.cfa_color_index[site];
     if (channel == 1 ? index != 1 && index != 3 : index != channel) bad_decoder_state("cfa_color_index");
   }
 }
+
+}  // namespace
+
+const char* decoder_state_violation(const decoder_state& s) noexcept {
+  if (s.dng.has_value() != (s.route.decoder == raw_decoder_kind::astro_dng)) return "dng";
+  const decoder_window& w = s.window;
+  if (w.width == 0 || w.height == 0) return "window";
+  if (std::uint64_t{w.x0} + w.width > s.raw_width || std::uint64_t{w.y0} + w.height > s.raw_height) return "window";
+  const std::uint64_t cells = std::uint64_t{s.black_pattern_rows} * s.black_pattern_cols;
+  if ((s.black_pattern_rows == 0) != (s.black_pattern_cols == 0) || cells > max_black_pattern ||
+      s.black_pattern.size() != cells) {
+    return "black_pattern";
+  }
+  if (s.curve_sha256.has_value() != (s.linearization == decoder_linearization::decoder_curve)) return "curve_sha256";
+  int count[4] = {0, 0, 0, 0};
+  for (const std::uint8_t index : s.cfa_color_index) {
+    if (index > 3) return "cfa_color_index";
+    ++count[index];
+  }
+  if (count[0] != 1 || count[2] != 1 || count[1] + count[3] != 2) return "cfa_color_index";
+  return nullptr;
+}
+
+namespace {
 
 void validate_measure(const image& img) {
   if (!img.measure) return;

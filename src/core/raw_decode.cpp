@@ -277,33 +277,60 @@ std::optional<std::array<std::uint8_t, 32>> dng_detail::curve_digest(std::span<c
   return out;
 }
 
-image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks,
-                        const raw_decode_context& ctx) {
-  // §2.1: il limite si decide dalla sola dimensione, senza leggere un byte.
-  if (bytes.size() > raw_limits::max_file_bytes)
-    throw stop_error(error_category::limit_exceeded, "raw.max_file_bytes", "file RAW oltre il limite",
-                     {{"byte", std::to_string(bytes.size())}, {"limite", std::to_string(raw_limits::max_file_bytes)}});
-  // U12 obbligo 5: versione e capacità di LibRaw verificate prima della prima chiamata alla libreria.
-  third_party::verify_once();
-  check_process_tz();
-  // U13 §3: un solo punto di scelta, prima di ogni chiamata a LibRaw o a zlib; un errore di un decoder non porta mai
-  // all'altro.
-  const dng_detail::route_detail route = dng_detail::route(bytes);
-  if (hooks.after_route) hooks.after_route(route.result);
-  if (route.result.decoder == raw_decoder_kind::astro_dng) return dng_detail::decode(bytes, route, hooks, ctx);
+namespace dng_detail {
+
+void check_decode_mode(const raw_decode_context& ctx) {
+  if (ctx.pool != nullptr && ctx.caller_reserved_bytes)
+    throw stop_error(error_category::invalid_input, "raw.decode_context",
+                     "pool e byte prenotati dal chiamante insieme: un solo modo di prenotazione per chiamata",
+                     {{"forniti", std::to_string(*ctx.caller_reserved_bytes)}});
+  if (ctx.pool == nullptr && ctx.held_bytes)
+    throw stop_error(error_category::invalid_input, "raw.decode_context",
+                     "held_bytes senza pool: vale solo nel modo che prenota dal pool",
+                     {{"held_bytes", std::to_string(*ctx.held_bytes)}});
+}
+
+reservation reserve_decode(std::size_t file_bytes, std::uint64_t needed, const raw_decode_context& ctx) {
+  if (ctx.caller_reserved_bytes) {
+    if (needed > *ctx.caller_reserved_bytes)
+      throw stop_error(error_category::budget, "sched.job_exceeds_budget", "byte prenotati dal chiamante sotto il decoder",
+                       {{"minimo", std::to_string(needed)}, {"forniti", std::to_string(*ctx.caller_reserved_bytes)}});
+    return reservation();
+  }
+  if (ctx.pool == nullptr) return reservation();
+  // I byte che il chiamante tiene già nel pool (`held_bytes`, altrimenti il file): se insieme alla prenotazione
+  // superano il budget, l'attesa nel pool non finirebbe mai.
+  const std::uint64_t held_by_caller = ctx.held_bytes.value_or(file_bytes);
+  if (held_by_caller + needed > ctx.pool->budget_bytes())
+    throw stop_error(error_category::budget, "sched.job_exceeds_budget", "budget sotto la prenotazione del decoder",
+                     {{"minimo", std::to_string(held_by_caller + needed)},
+                      {"file", std::to_string(file_bytes)},
+                      {"budget", std::to_string(ctx.pool->budget_bytes())}});
+  return ctx.pool->reserve(needed, "raw_decode", ctx.cancel);
+}
+
+}  // namespace dng_detail
+
+namespace {
+
+// Campi di LibRaw dopo `open_buffer` e prenotazione `needed` di §2.8, byte del file esclusi.
+struct libraw_header {
+  raw_probe_fields probe;
+  std::optional<cfa_pattern> pattern;
+  std::uint64_t raw_image_bytes = 0;
+  std::uint64_t needed = 0;
+};
+
+// Dai livelli dell'utente al limite di `raw_image` (§2.1-§2.3, §2.8): stessi stop, nello stesso ordine, per la decodifica
+// e per `raw_decode_needed_bytes`. I gestori puntano a `watch`, che deve vivere quanto `lr`.
+libraw_header open_libraw(LibRaw& lr, unpack_watch& watch, std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks,
+                          std::uint64_t max_pixels) {
   const auto returned = [&hooks](const char* function, int rc) {
     return hooks.libraw_return ? hooks.libraw_return(function, rc) : rc;
   };
-
-  // Dichiarati prima di LibRaw: la prenotazione si rilascia e i gestori smettono di esistere solo dopo che l'oggetto
-  // LibRaw ha liberato raw_image.
-  reservation held;
-  unpack_watch watch{ctx.cancel, false, std::nullopt, 0};
-  // Un oggetto per decodifica, sullo heap, mai condiviso (ADR-08.b §2.1).
-  auto lr = std::make_unique<LibRaw>();
-  libraw_data_t& d = lr->imgdata;
-  lr->set_dataerror_handler(on_data_error, &watch);
-  lr->set_progress_handler(on_progress, &watch);
+  libraw_data_t& d = lr.imgdata;
+  lr.set_dataerror_handler(on_data_error, &watch);
+  lr.set_progress_handler(on_progress, &watch);
 
   // §2.2: il bit è attivo per default e con esso LibRaw convertirebbe in silenzio i DNG in virgola mobile in interi.
   d.rawparams.options &= ~static_cast<unsigned>(LIBRAW_RAWOPTIONS_CONVERTFLOAT_TO_INT);
@@ -320,55 +347,95 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   ASTRO_ASSERT(d.params.user_black == -1 && d.params.user_sat == -1);
   for (int v : d.params.user_cblack) ASTRO_ASSERT(v == -1000001);
 
-  if (const int rc = returned("open_buffer", lr->open_buffer(bytes.data(), bytes.size())); rc != LIBRAW_SUCCESS)
+  if (const int rc = returned("open_buffer", lr.open_buffer(bytes.data(), bytes.size())); rc != LIBRAW_SUCCESS)
     libraw_stop("open_buffer", rc);
 
   // §2.3: per i formati che LibRaw dichiara non supportati (DNG JPEG XL, VC-5) open_buffer riesce e unpack no.
   libraw_decoder_info_t decoder{};
-  if (const int rc = lr->get_decoder_info(&decoder); rc != LIBRAW_SUCCESS) libraw_stop("get_decoder_info", rc);
+  if (const int rc = lr.get_decoder_info(&decoder); rc != LIBRAW_SUCCESS) libraw_stop("get_decoder_info", rc);
   if ((decoder.decoder_flags & LIBRAW_DECODER_UNSUPPORTED_FORMAT) != 0)
     unsupported("raw.file_unsupported", "formato non supportato dichiarato da LibRaw",
                 {{"funzione", "get_decoder_info"},
                  {"decoder_name", decoder.decoder_name != nullptr ? decoder.decoder_name : "null"},
                  {"decoder_flags", std::to_string(decoder.decoder_flags)}});
 
-  raw_probe_fields probe{d.idata.filters,
-                         d.idata.colors,
-                         static_cast<int>(d.idata.is_foveon),
-                         d.idata.raw_count,
-                         d.sizes.pixel_aspect,
-                         lr->is_fuji_rotated(),
-                         lr->is_floating_point(),
-                         d.sizes.raw_width,
-                         d.sizes.raw_height,
-                         d.other.focal_len,
-                         d.lens.makernotes.FocalLengthIn35mmFormat,
-                         d.other.parsed_gps.gpsparsed != 0};
-  if (hooks.after_open) hooks.after_open(probe);
-  const std::optional<cfa_pattern> pattern = check_probe(probe);
+  libraw_header h;
+  h.probe = raw_probe_fields{d.idata.filters,
+                             d.idata.colors,
+                             static_cast<int>(d.idata.is_foveon),
+                             d.idata.raw_count,
+                             d.sizes.pixel_aspect,
+                             lr.is_fuji_rotated(),
+                             lr.is_floating_point(),
+                             d.sizes.raw_width,
+                             d.sizes.raw_height,
+                             d.other.focal_len,
+                             d.lens.makernotes.FocalLengthIn35mmFormat,
+                             d.other.parsed_gps.gpsparsed != 0};
+  if (hooks.after_open) hooks.after_open(h.probe);
+  h.pattern = check_probe(h.probe);
   // §2.1: prodotto a 64 bit, limite incluso.
-  if (const std::uint64_t pixels = std::uint64_t{probe.raw_width} * probe.raw_height; pixels > ctx.max_pixels)
+  if (const std::uint64_t pixels = std::uint64_t{h.probe.raw_width} * h.probe.raw_height; pixels > max_pixels)
     throw stop_error(error_category::limit_exceeded, "raw.max_pixels", "dimensioni dichiarate oltre il limite",
-                     {{"pixel", std::to_string(pixels)}, {"limite", std::to_string(ctx.max_pixels)}});
+                     {{"pixel", std::to_string(pixels)}, {"limite", std::to_string(max_pixels)}});
 
   // §2.1, §2.8: il limite di LibRaw coincide con la parte della prenotazione per raw_image; il resto copre i campioni f32
   // dell'area visibile e la maschera di invalidità (uint16 per pixel). I byte del file li ha prenotati la lettura.
-  const std::uint64_t m = raw_memory_mib(probe.raw_width, probe.raw_height);
+  const std::uint64_t m = raw_memory_mib(h.probe.raw_width, h.probe.raw_height);
   d.rawparams.max_raw_memory_mb = static_cast<unsigned>(m);
-  raw_unpack_plan plan{m << 20, 0, 0};
-  const std::uint64_t needed = plan.raw_image_bytes + 6 * std::uint64_t{d.sizes.width} * d.sizes.height;
-  if (ctx.pool != nullptr) {
-    // I byte che il chiamante tiene già nel pool (`held_bytes`, altrimenti il file): se insieme alla prenotazione
-    // superano il budget, l'attesa nel pool non finirebbe mai.
-    const std::uint64_t held_by_caller = ctx.held_bytes.value_or(bytes.size());
-    if (held_by_caller + needed > ctx.pool->budget_bytes())
-      throw stop_error(error_category::budget, "sched.job_exceeds_budget", "budget sotto la prenotazione del decoder",
-                       {{"minimo", std::to_string(held_by_caller + needed)},
-                        {"file", std::to_string(bytes.size())},
-                        {"budget", std::to_string(ctx.pool->budget_bytes())}});
-    held = ctx.pool->reserve(needed, "raw_decode", ctx.cancel);
-    plan.reserved_bytes = held.bytes();
-  }
+  h.raw_image_bytes = m << 20;
+  h.needed = h.raw_image_bytes + 6 * std::uint64_t{d.sizes.width} * d.sizes.height;
+  return h;
+}
+
+// §2.1: il limite si decide dalla sola dimensione, senza leggere un byte. Poi identità della libreria e fuso, prima
+// della prima chiamata a LibRaw o a zlib.
+void check_before_route(std::span<const std::uint8_t> bytes) {
+  if (bytes.size() > raw_limits::max_file_bytes)
+    throw stop_error(error_category::limit_exceeded, "raw.max_file_bytes", "file RAW oltre il limite",
+                     {{"byte", std::to_string(bytes.size())}, {"limite", std::to_string(raw_limits::max_file_bytes)}});
+  // U12 obbligo 5: versione e capacità di LibRaw verificate prima della prima chiamata alla libreria.
+  third_party::verify_once();
+  check_process_tz();
+}
+
+}  // namespace
+
+std::uint64_t raw_decode_needed_bytes(std::span<const std::uint8_t> bytes, std::uint64_t max_pixels) {
+  check_before_route(bytes);
+  const dng_detail::route_detail route = dng_detail::route(bytes);
+  if (route.result.decoder == raw_decoder_kind::astro_dng) return dng_detail::needed_bytes(bytes, route, max_pixels);
+  unpack_watch watch{nullptr, false, std::nullopt, 0};
+  auto lr = std::make_unique<LibRaw>();
+  return open_libraw(*lr, watch, bytes, {}, max_pixels).needed;
+}
+
+image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_hooks& hooks,
+                        const raw_decode_context& ctx) {
+  dng_detail::check_decode_mode(ctx);
+  check_before_route(bytes);
+  // U13 §3: un solo punto di scelta, prima di ogni chiamata a LibRaw o a zlib; un errore di un decoder non porta mai
+  // all'altro.
+  const dng_detail::route_detail route = dng_detail::route(bytes);
+  if (hooks.after_route) hooks.after_route(route.result);
+  if (route.result.decoder == raw_decoder_kind::astro_dng) return dng_detail::decode(bytes, route, hooks, ctx);
+  const auto returned = [&hooks](const char* function, int rc) {
+    return hooks.libraw_return ? hooks.libraw_return(function, rc) : rc;
+  };
+
+  // Dichiarati prima di LibRaw: la prenotazione si rilascia e i gestori smettono di esistere solo dopo che l'oggetto
+  // LibRaw ha liberato raw_image.
+  reservation held;
+  unpack_watch watch{ctx.cancel, false, std::nullopt, 0};
+  // Un oggetto per decodifica, sullo heap, mai condiviso (ADR-08.b §2.1).
+  auto lr = std::make_unique<LibRaw>();
+  libraw_data_t& d = lr->imgdata;
+  const libraw_header header = open_libraw(*lr, watch, bytes, hooks, ctx.max_pixels);
+  const raw_probe_fields& probe = header.probe;
+  const std::optional<cfa_pattern>& pattern = header.pattern;
+  raw_unpack_plan plan{header.raw_image_bytes, 0, 0};
+  held = dng_detail::reserve_decode(bytes.size(), header.needed, ctx);
+  plan.reserved_bytes = held.bytes();
   plan.max_raw_memory_mb = d.rawparams.max_raw_memory_mb;
   if (hooks.before_unpack_plan) hooks.before_unpack_plan(plan);
   if (hooks.with_handlers)
@@ -554,16 +621,20 @@ json rational_pair(const std::optional<std::array<dng_rational, 2>>& v) {
   return a;
 }
 
-// Campi comuni ai due decoder (ADR-08.b §2.9, U13 §8): instradamento, livelli, geometria, metadati.
-void set_common(json& r, const image& img) {
-  const decoder_state& s = *img.decoder_state;
-  r.set("decoder", json::string(to_string(s.route.decoder)));
-  // Identità del pacchetto di decoder (ADR-08.b §2.9, riga «Libreria»): vale per entrambi i decoder.
-  const decoder_identity identity = current_decoder_identity();
+// Identità del pacchetto di decoder (ADR-08.b §2.9, riga «Libreria»): vale per entrambi i decoder.
+void set_identity(json& r, const decoder_identity& identity) {
   r.set("libraw_version", json::string(identity.libraw_version));
   r.set("libraw_version_number", json::integer(identity.libraw_version_number));
   r.set("libraw_capabilities", json::integer(identity.libraw_capabilities));
   r.set("libraw_tarball_sha256", json::string(identity.libraw_tarball_sha256));
+}
+
+void set_astro_dng(json& r, const dng_decoder_fields& f);
+
+// Membri di contenuto di `decoder_state` (ADR-08.b §2.9, U13 §8), con le chiavi che legge `decoder_state_of_record`.
+// Con `astro_dng` il chiamante ha verificato che `dng` è presente.
+void set_state(json& r, const decoder_state& s) {
+  r.set("decoder", json::string(to_string(s.route.decoder)));
   r.set("compression", optional_integer(s.route.compression));
   r.set("sample_format", optional_integer(s.route.sample_format));
   r.set("bits_per_sample", optional_integer(s.route.bits_per_sample));
@@ -586,13 +657,30 @@ void set_common(json& r, const image& img) {
   r.set("linearization", json::string(s.linearization == decoder_linearization::decoder_curve ? "decoder_curve" : "identity"));
   r.set("linearization_curve_sha256", s.curve_sha256 ? json::string(hex_of(*s.curve_sha256)) : json::null());
   r.set("crop", crop_json(s.window.x0, s.window.y0, s.window.width, s.window.height));
-  r.set("margin_parity", integers({s.window.x0 % 2, s.window.y0 % 2}));
-  r.set("cfa_pattern", json::string(pattern_name(img.cfa->pattern)));
   r.set("raw_width", json::integer(s.raw_width));
   r.set("raw_height", json::integer(s.raw_height));
   json color_index = json::array();
   for (const std::uint8_t c : s.cfa_color_index) color_index.push(json::integer(c));
   r.set("cfa_color_index", std::move(color_index));
+  switch (s.route.decoder) {
+    case raw_decoder_kind::libraw: {
+      r.set("route_reason", json::string(s.route.reason));
+      json insets = json::array();
+      for (const auto& c : s.raw_inset_crops) insets.push(crop_json(c[0], c[1], c[2], c[3]));
+      r.set("raw_inset_crops", std::move(insets));
+      r.set("flip", json::integer(s.flip));
+      r.set("process_warnings", json::integer(s.process_warnings));
+      break;
+    }
+    case raw_decoder_kind::astro_dng: set_astro_dng(r, *s.dng); break;
+  }
+}
+
+// Campi del record che non sono membri di `decoder_state` (ADR-08.b §2.9): geometria derivata, metadati, dichiarazioni.
+void set_common(json& r, const image& img) {
+  const decoder_state& s = *img.decoder_state;
+  r.set("margin_parity", integers({s.window.x0 % 2, s.window.y0 % 2}));
+  r.set("cfa_pattern", json::string(pattern_name(img.cfa->pattern)));
   r.set("metadata_present", metadata_present_names(img.metadata));
   for (const char* absent : {"sensor", "pixel_size_um", "pixel_scale_arcsec", "wcs"}) r.set(absent, json::null());
   r.set("absent_reason", json::string("not_provided_by_decoder"));
@@ -609,16 +697,6 @@ void set_common(json& r, const image& img) {
   r.set("data_state", json::string("raw"));
   r.set("camera_processing", json::string("unknown"));
   r.set("process_tz", json::string("UTC0"));
-}
-
-void set_libraw(json& r, const image& img) {
-  const decoder_state& s = *img.decoder_state;
-  r.set("route_reason", json::string(s.route.reason));
-  json insets = json::array();
-  for (const auto& c : s.raw_inset_crops) insets.push(crop_json(c[0], c[1], c[2], c[3]));
-  r.set("raw_inset_crops", std::move(insets));
-  r.set("flip", json::integer(s.flip));
-  r.set("process_warnings", json::integer(s.process_warnings));
 }
 
 // U13 §8: campi propri del decoder del progetto.
@@ -653,21 +731,34 @@ decoder_identity current_decoder_identity() {
                           static_cast<std::uint32_t>(libraw_capabilities()), ASTRO_LIBRAW_TARBALL_SHA256};
 }
 
+namespace {
+
+void require_dng_fields(const decoder_state& s) {
+  if (s.route.decoder == raw_decoder_kind::astro_dng && !s.dng)
+    throw stop_error(error_category::invalid_input, "raw.record_source", "stato del decoder del progetto senza i suoi campi");
+}
+
+}  // namespace
+
+json decoder_state_record(const decoder_state& state) {
+  require_dng_fields(state);
+  json r = json::object();
+  set_state(r, state);
+  return r;
+}
+
 json raw_decoder_record(const image& img) {
   if (!img.decoder_state || !img.cfa)
     throw stop_error(error_category::invalid_input, "raw.record_source", "immagine non prodotta dal decoder RAW");
-  const decoder_state& s = *img.decoder_state;
-  json r = json::object();
+  json r = decoder_state_record(*img.decoder_state);
+  set_identity(r, current_decoder_identity());
   set_common(r, img);
-  switch (s.route.decoder) {
-    case raw_decoder_kind::libraw: set_libraw(r, img); break;
-    case raw_decoder_kind::astro_dng:
-      if (!s.dng)
-        throw stop_error(error_category::invalid_input, "raw.record_source",
-                         "immagine del decoder del progetto senza i suoi campi");
-      set_astro_dng(r, *s.dng);
-      break;
-  }
+  return r;
+}
+
+json decoder_identity_record(const decoder_identity& identity) {
+  json r = json::object();
+  set_identity(r, identity);
   return r;
 }
 
@@ -896,6 +987,15 @@ decoder_state decoder_state_of_record(const json& record) {
   }
   s.source = metadata_source{metadata_origin::decoder, "decoder_record"};
   return s;
+}
+
+decoder_identity decoder_identity_of_record(const json& record) {
+  decoder_identity id;
+  id.libraw_version = record_text(record, "libraw_version");
+  id.libraw_version_number = record_u32(record, "libraw_version_number");
+  id.libraw_capabilities = record_u32(record, "libraw_capabilities");
+  id.libraw_tarball_sha256 = record_text(record, "libraw_tarball_sha256");
+  return id;
 }
 
 }  // namespace astro

@@ -393,6 +393,12 @@ image make_image(const image_geometry& geometry, sample_type type, plane_layout 
 // Coerenza di buffer, maschere, layout e cfa. Violazione: invalid_input, codice image.*.
 void validate_image(const image& img);
 
+// Invarianti di `decoder_state` (ADR-03.b §b.2) che non dipendono dall'immagine: `dng` presente se e solo se il decoder è
+// `astro_dng`; finestra non vuota dentro il buffer grezzo, senza overflow; motivo del nero di `rows · cols ≤ 4098` valori,
+// mai una sola dimensione nulla; `curve_sha256` presente se e solo se `decoder_curve`; `cfa_color_index` con un sito 0, un
+// sito 2 e due siti in {1, 3} (l'unica forma coerente con un motivo di Bayer). Restituisce il campo violato, o nullptr.
+const char* decoder_state_violation(const decoder_state& state) noexcept;
+
 // Invarianti di un'immagine prodotta da un operatore: `measure` presente (anche vuoto); un campione non finito ha almeno
 // un bit acceso; un pixel con un bit acceso ha campione e varianza NaN.
 bool operator_output_invariants_hold(const image& img);
