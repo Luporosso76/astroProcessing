@@ -101,6 +101,8 @@ ID: nessuno nuovo. (1) Estensione ADR-06 R2.r, solo testo: i buffer di ordinamen
 
 ### B1. Protocollo preregistrato — solo documento
 
+Stato: **CHIUSA** il 9 novembre 2026 (review `M3b-B1-round1` PASS, 1 LOW corretto). Protocollo congelato: `docs/evidence/M3b-protocollo.md`, SHA-256 `83e300300952752e049536db3c3d792db83860ebddfafe8a851f24ae6e86fe00`; emendamento di C-02 §b.12 in `docs/decisions/M3b-lacune.md`, «Decisioni successive (B1)».
+
 ID: C-02.b §b.9; C-02.b-flat §f.9; ADR-09.b §b.4 e T-M3-ADR09-01. File `docs/evidence/M3b-protocollo.md`: per ogni test statistico `K`, `P`, seed, parametri, `α = 10⁻³` con Bonferroni sulle `m` statistiche, margini deterministici `τ_k`. Regola di derivazione di K e P per T-M3B-C02-04(b): semiampiezza relativa di Chebyshev < metà dello scarto relativo fra `κ` esatto e `π/(2n)` per ogni `n`. Committato **prima** del primo record di misura; non si modifica dopo.
 
 ### B2. Fixture `FIX-SYN-CAL-08` — ~400 righe, solo test

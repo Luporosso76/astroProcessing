@@ -357,3 +357,17 @@ Ricalcolo dei valori di R2.r (tabella p-z) con i termini nuovi: da eseguire a ma
 - `master_task_bytes` (`master.cpp`, dichiarata in `master.hpp`) e `make_master_model`/`plan_master` (`resources.cpp`) cambiano `fixed = 16·n` in `F(n)` e aggiungono `R`, `CS`, `Cn` a `shared`; `P` dei RAW include il picco di decodifica; `Z` è la quota di spill richiesta, non memoria del pool. Il pianificatore ha 2 chiamanti nel job (`master.cpp`) e il test `test_resources`/`test_master` che lo copre; `codegraph impact` va eseguito in B3b su `plan_resources`, `compute_plan_bounds`, `master_task_bytes` e `planner_input` prima di toccarli, e si rilanciano i test elencati (T-M2R2R-01…05, `test_master`, `test_master_stats`).
 - `master_job_options::on_job_plan` e `details.resource_plan` portano i valori nuovi.
 - I valori di `K`, `D`, `M` non cambiano.
+
+## Decisioni successive (B1)
+
+### T-M3B-C02-04(b) senza le celle della mediana a `n = 101`
+
+**Decisione del coordinatore**, 9 novembre 2026, durante B1 (protocollo preregistrato, `docs/evidence/M3b-protocollo.md`). La mediana con `n = 101` e winsorized (101, 50), che coincide con la mediana in aritmetica esatta, escono da T-M3B-C02-04(b). Restano in T-M3B-C02-04(a). Winsorized (101, 1) e (101, 2) restano in (b). La mediana con `n = 101` e winsorized (101, 2) diventano punti espliciti di T-M3B-C02-05. T-M3B-C02-01 riceve un caso con `n = 101`: mediana e winsorized con `g` ∈ {1, 2, 50}.
+
+**Conto.** La regola di C-02.b §b.12 chiede `K · P > 4 m (μ_4/κ² − 1)/(α δ²)`, con `δ = |κ − π/(2n)|/κ`. Per la mediana con `n = 101`: `κ = 0.0154862319`, `π/(2n) = 0.0155524389`, `δ = 0.43 %`, `μ_4/κ² − 1 = 2.0027`. Ne segue `K · P` minimo di circa 1.4 · 10¹⁰: con 101 campioni per realizzazione, circa 1.5 · 10¹² estrazioni gaussiane, ore di CPU in un solo test del gate. Le celle winsorized (101, 1) e (101, 2) chiedono circa 7.5 · 10⁵.
+
+**Motivo.** (b) è un controllo di coerenza senza potenza (C-02.b §b.9): confronta la dispersione dei valori del master con `κσ²`, con il `κ` dell'oracle. Non è l'unica prova di nessuna proprietà. L'aritmetica dei valori della mediana e di winsorized la prova esattamente T-M3B-C02-01 (classe E), l'accuratezza di `κ` del prodotto la prova T-M3B-C02-05 (errore relativo ≤ 10⁻⁹). Con le aggiunte sopra, entrambi comprendono le due celle tolte. Il valore atteso di `(M − μ)²` è `κσ²` per il fatto di §b.6 (equivarianza). Togliere le due celle da (b) non toglie quindi una prova; toglie solo il costo.
+
+**Conseguenza sul protocollo.** In T-M3B-C02-04 le statistiche diventano 16 per (a) e 14 per (b), quindi `m = 30`, livello per statistica `α/m = 3.333 · 10⁻⁵`, `α/(2m) = 1.667 · 10⁻⁵` per coda. `K` e `P` sono in `docs/evidence/M3b-protocollo.md` §3.2.
+
+Applicato in C-02 §b.12 (C02-01, C02-04(b), C02-05).

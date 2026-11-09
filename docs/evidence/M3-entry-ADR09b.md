@@ -58,7 +58,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-09-algoritmi.md` | `6c14b9ddb98276fbbed5fe168f90a4360f02f26ce82ebd75ab4d686309e68121` |
 | `docs/contracts/C-01-calibrazione-light.md` | `063e14eacdbf25c92b31cf78c4bb6e19934d39fada23a06ba0c24d7fe8212162` |
-| `docs/contracts/C-02-master.md` | `5d197d88368075b7283ec8ad71b487ee9eaeffa8ae95e4600b8fc58b261ff37c` |
+| `docs/contracts/C-02-master.md` | `58d0157ca532b7d9cdbb8bc64d08c3bb7843b51e8f7938e3ad32689cd7e311b4` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
 | `docs/decisions/D-09-soglie.md` | `b906fe06799f1f250f954734d54410aa443391d2efd07d8ccad6006a39d29d76` |
 | `docs/decisions/README.md` | `997662dc2b54f612eeebedfd7aa285f0707eb5f506c582aa6735ae3e297c8686` |
