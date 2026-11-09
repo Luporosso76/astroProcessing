@@ -131,6 +131,8 @@ Rischio: `master_algorithm_version` nuova rende `stale` i master `.a` esistenti.
 
 ### B4. κ di mediana e winsorized — ~350 righe
 
+Stato: **CHIUSA** il 9 novembre 2026 (review `M3b-B4-round1` PASS senza rilievi; test e codice da agenti distinti; mutazioni 5/5).
+
 ID: C-02.b §b.6 «Metodi robusti» (regola sul calcolo di `κ`), §b.5; ADR-09.b classe P.
 
 Fa: `κ_T(n, g) = Var(T(Z_1…Z_n))` per mediana e winsorized, `n ≤ 1024`, errore relativo ≤ 10⁻⁹; stima d'errore del proprio calcolo; stop `numeric`, `master.kappa_accuracy` prima di ogni lettura di campioni. Funzione pura calcolata una volta nel preflight.
