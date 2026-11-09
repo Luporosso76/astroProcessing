@@ -113,6 +113,8 @@ Generatore in `tests/fixtures/syn_cal.hpp`, scritto da chi non scrive l'operator
 
 ### B3. Tipi, ricetta, domini, fase e linearità — ~350 righe
 
+Stato: **CHIUSA** il 9 novembre 2026 (review `M3b-B3-round1` FAIL, `M3b-B3-round2` PASS; test e codice da agenti distinti; mutazioni 12/12 rilevate). Suite fast 1236 test verde in 3 shard sull'albero con B2.
+
 ID: C-02.b §b.1 (tabella dei metodi), §b.2 (tabella dei domini), §b.10 (parametri e codici), §b.13 punti 1 e 3; C-02.b-flat §f.13 punti 1-2.
 
 Fa:
