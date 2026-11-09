@@ -2,6 +2,10 @@
 
 **Preregistrato: si committa prima del primo record di misura e non si modifica dopo; una modifica è un protocollo nuovo con SHA-256 nuovo.**
 
+Versione 2 (9 novembre 2026): `τ_k` come ampiezza dell'intervallo e criterio di inclusione; versione 1 SHA-256 `83e300300952752e049536db3c3d792db83860ebddfafe8a851f24ae6e86fe00`; motivo in `docs/decisions/M3b-lacune.md`, «Decisioni successive (B5)». Nessun record di misura è stato registrato con la versione 1.
+
+Versione 3 (9 novembre 2026): nota sull'implementazione della regola I nell'oracle (§1, long double arrotondato verso l'esterno), criteri e valori invariati; versione 2 SHA-256 `4b06acb685f79ce9599037efb5b70e82b11fc5a6cf563686fff118c67238e8a9`.
+
 Unità B1 di `plans/M3b.md`. Fonti: `docs/contracts/C-02-master.md` §b.9, §b.12, §b.14, §f.9, §f.12; `docs/contracts/ADR-09-algoritmi.md` §b.3, §b.4, T-M3-ADR09-01; `docs/contracts/ADR-17-varianza.md` §b.12 (MC-lin, modello del margine); C-02.a §9 (quantili, Chebyshev). Il record di ogni test cita il commit e lo SHA-256 di questo file. Le soglie stanno nel contratto; qui ci sono solo `K`, `P`, seed, parametri, `m` e margini.
 
 ## 1. Regole comuni
@@ -20,7 +24,7 @@ Ordine del flusso: realizzazione `k` crescente; dentro, frame per indice di gene
 
 **Campioni.** Frame e master in f64. Campione `x = μ + σ · z`: prima `σ · z`, poi `+ μ`, ciascuno arrotondato in f64. La verità dei test è quella della distribuzione continua con i parametri dichiarati (ADR-09.b §b.3, «riferimento: la verità della simulazione»).
 
-**Margini deterministici `τ_k`.** Per ogni realizzazione `k` l'oracle riesegue la sequenza del contratto (C-02.b §b.6, §f.6) in aritmetica degli intervalli secondo la regola I (ADR-17.b §b.10): ingressi razionali esatti (i campioni f64 realizzati, i livelli esatti della regione di livello, `κ̂` riportato dal prodotto come ingresso puntuale per `gaussian_reference`), fattore `[1 − u, 1 + u]`, `u = 2⁻⁵³`, per ogni operazione arrotondata, estremi per le statistiche d'ordine. `τ_k` è la massima distanza fra l'intervallo e il valore f64 del prodotto. Origine del margine:
+**Margini deterministici `τ_k`.** Per ogni realizzazione `k` l'oracle riesegue la sequenza del contratto (C-02.b §b.6, §f.6) in aritmetica degli intervalli secondo la regola I (ADR-17.b §b.10): ingressi razionali esatti (i campioni f64 realizzati, i livelli esatti della regione di livello, `κ̂` riportato dal prodotto come ingresso puntuale per `gaussian_reference`), fattore `[1 − u, 1 + u]`, `u = 2⁻⁵³`, per ogni operazione arrotondata, estremi per le statistiche d'ordine. `τ_k` è l'ampiezza dell'intervallo, `hi − lo`, massima sui valori confrontati della realizzazione: dipende solo dai campioni e dalla sequenza, mai dal valore del prodotto. Criterio binario, parte di ogni test S: ogni valore f64 del prodotto confrontato sta nel suo intervallo (nessun valore fuori). Fatto: l'intervallo contiene il valore esatto e, se il prodotto segue la sequenza, quello calcolato (ADR-17.b §b.10), quindi con l'inclusione `|x̂ − x| ≤ τ_k`. Implementazione dell'oracle (scelta che non cambia criteri né valori): gli estremi si calcolano in long double (64 bit di mantissa) allargando ogni operazione di `(u + 2⁻⁶⁰)|·|` invece di `u|·|`; il termine `2⁻⁶⁰` copre gli arrotondamenti in long double del passo, quindi l'intervallo calcolato contiene quello razionale della regola I ed è più largo al più di `2⁻⁶⁰/u = 1/128` per operazione. Origine del margine:
 
 - aritmetica: la sola fonte inclusa, come chiede C-02.b §b.9;
 - arrotondamento d'uscita: nessuno, perché i master sono f64 (niente mezzo ulp f32);
@@ -62,8 +66,10 @@ W2 ha `max a = 7/16`, vicino al confine del dominio. L'identità `Σ_f c_f (1 �
 
 Criteri e margini (C-02.b §b.9, §b.12):
 
-- (a) `|media_(K·P)(V̂) − E| ≤ sqrt(m Var(X)/(α K P)) + ρ_c E + max_k τ_k`, con `τ_k` il bound di `V̂`;
-- (b) `sd_pool(M̂) ∈ [sqrt(V_vera q_lo/ν) − Δ, sqrt(V_vera q_hi/ν) + Δ]`, `ν = P (K − 1) = 8 187 904`, `q_lo`, `q_hi` quantili di `χ²_ν` alle code `α/(2m)`, `Δ = sqrt(K/(K − 1)) max_k τ_k` con `τ_k` il bound di `M̂`. Fatto: `|‖c(M̂)‖ − ‖c(M)‖| ≤ ‖M̂ − M‖ ≤ sqrt(K P) max τ`, con `c(·)` gli scarti dalla media di pixel, da cui il fattore `sqrt(K/(K − 1))` anche sulla deviazione raggruppata.
+- (a) `|media_(K·P)(V̂) − E| ≤ sqrt(m Var(X)/(α K P)) + ρ_c E + max_k τ_k`, con `τ_k` l'ampiezza dell'intervallo di `V̂` (§1);
+- (b) `sd_pool(M̂) ∈ [sqrt(V_vera q_lo/ν) − Δ, sqrt(V_vera q_hi/ν) + Δ]`, `ν = P (K − 1) = 8 187 904`, `q_lo`, `q_hi` quantili di `χ²_ν` alle code `α/(2m)`, `Δ = sqrt(K/(K − 1)) max_k τ_k` con `τ_k` l'ampiezza dell'intervallo di `M̂` (§1). Fatto: `|‖c(M̂)‖ − ‖c(M)‖| ≤ ‖M̂ − M‖ ≤ sqrt(K P) max τ`, con `c(·)` gli scarti dalla media di pixel, da cui il fattore `sqrt(K/(K − 1))` anche sulla deviazione raggruppata.
+
+Inclusione (§1): ogni `V̂` e ogni `M̂` nel proprio intervallo della regola I.
 
 `ρ_c` è l'ampiezza relativa massima degli intervalli dei `c_f` calcolati dai `w_f` dichiarati con la regola I: deterministico, dipende solo dai pesi, calcolato dall'oracle prima della misura (§5).
 
@@ -77,9 +83,9 @@ Celle: mediana con `n ∈ {3, 4, 9, 10, 101}`; winsorized con ogni `g ∈ {1, 2,
 
 Fixture: `σ = 4` ADU (`σ² = 16`), `μ_p = 1000 + (p mod 37)` ADU, immagine 64 × 64 (`P = 4096`), una classe. Per ogni `n` un solo flusso: mediana e tutti i winsorized di quel `n` si calcolano sulle stesse realizzazioni. Statistiche dipendenti sono ammesse, perché Bonferroni non chiede indipendenza.
 
-(a) usa le prime `K_a = 256` realizzazioni del flusso, con `K_a · P = 2²⁰`: `ν_a = 2²⁰ (n − 1)`, al più 1.05 · 10⁸, dentro il campo dello strumento dei quantili. Criterio: `media(V̂) ∈ [κσ² q_lo/ν_a − max_k τ_k, κσ² q_hi/ν_a + max_k τ_k]`, con `τ_k` il bound di `V̂`. Semiampiezza relativa attesa `z sqrt(2/ν_a)`, con `z = z_(1 − α/(2m)) ≈ 4.149`: 0.41 % per `n = 3`, 0.057 % per `n = 101`. Basta: `κ` è verificato a 10⁻⁹ da T-M3B-C02-05.
+(a) usa le prime `K_a = 256` realizzazioni del flusso, con `K_a · P = 2²⁰`: `ν_a = 2²⁰ (n − 1)`, al più 1.05 · 10⁸, dentro il campo dello strumento dei quantili. Criterio: `media(V̂) ∈ [κσ² q_lo/ν_a − max_k τ_k, κσ² q_hi/ν_a + max_k τ_k]`, con `τ_k` l'ampiezza dell'intervallo di `V̂` (§1), e ogni `V̂` di queste realizzazioni nel proprio intervallo. Semiampiezza relativa attesa `z sqrt(2/ν_a)`, con `z = z_(1 − α/(2m)) ≈ 4.149`: 0.41 % per `n = 3`, 0.057 % per `n = 101`. Basta: `κ` è verificato a 10⁻⁹ da T-M3B-C02-05.
 
-(b) usa tutte le `K · P` realizzazioni. Criterio: `|media_(K·P)(X̂) − κσ²| ≤ sqrt(m Var(X)/(α K P)) + max_k τ_k (2|M̂_k − μ| + τ_k)`, con `τ_k` il bound di `M̂`.
+(b) usa tutte le `K · P` realizzazioni. Criterio: `|media_(K·P)(X̂) − κσ²| ≤ sqrt(m Var(X)/(α K P)) + max_k τ_k (2|M̂_k − μ| + τ_k)`, con `τ_k` l'ampiezza dell'intervallo di `M̂` (§1), e ogni `M̂` nel proprio intervallo.
 
 **Regola di derivazione di `K · P` per (b)** (C-02.b §b.12). La semiampiezza relativa è `h = sqrt(m (μ_4/κ² − 1)/(α K P))`. Lo scarto relativo è `δ = |κ − π/(2n)|/κ`. La regola chiede `h < δ/2` per ogni cella di (b), quindi
 

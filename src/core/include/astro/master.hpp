@@ -12,7 +12,8 @@
 
 namespace astro {
 
-// Master del prodotto (C-02.a): media per pixel dei frame raw di un gruppo, piano VARIANCE empirico s^2/n.
+// Master del prodotto (C-02.a, C-02.b): combinazione per pixel dei frame raw di un gruppo con il metodo della ricetta e
+// il piano VARIANCE del metodo (C-02.b §b.6).
 
 enum class flat_normalization { none, median_ratio };
 
@@ -67,11 +68,12 @@ struct master_recipe {
 };
 
 struct master_result {
-  image output;  // campioni M, piano VARIANCE s^2/n, maschera
+  image output;  // campioni M, piano VARIANCE del metodo, maschera
   json report;
   std::string report_text;
   std::vector<std::string> warnings;
-  // Solo flat: level_bias_estimate per pixel in f64 (NaN sui pixel invalidi), la stima del §6.2 su M osservato.
+  // Solo flat: level_bias_estimate per pixel in f64 (NaN sui pixel invalidi), la stima del §6.2 su M osservato; con
+  // `single` non è definita (C-02.b §b.7) ed è NaN ovunque.
   std::vector<double> level_bias_estimate;
 };
 

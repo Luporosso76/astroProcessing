@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <limits>
 #include <sstream>
+#include <type_traits>
 
 #include "astro/calibration_analysis.hpp"
 #include "astro/error.hpp"
@@ -365,7 +366,11 @@ struct master_plan {
   json master_metadata = json::object();
   json not_common = json::array();
   master_descriptor descriptor;
+  method_kind method = method_kind::mean;
   std::optional<kappa_result> kappa;  // metodi robusti: κ del preflight (C-02.b §b.6)
+  // `weighted_mean`: costanti del nodo nell'ordine canonico, calcolate nel preflight (C-02.b §b.6).
+  double weight_sum = 0;
+  std::vector<double> weights, residual_coeffs;  // w_f, c_f
 
   std::size_t channel_of(std::uint32_t x, std::uint32_t y) const noexcept {
     return per_channel ? static_cast<std::size_t>(((y + cfa_y) & 1u) * 2 + ((x + cfa_x) & 1u)) : 0;
@@ -386,17 +391,59 @@ std::optional<kappa_result> preflight_kappa(const master_recipe& r, const std::f
   return k;
 }
 
+// Costanti di `weighted_mean` (C-02.b §b.6, «Ordine delle operazioni»), nell'ordine canonico: W, a_f = w_f / W,
+// T = Σ (a_f · a_f) / (1 − 2 · a_f), c_f = (a_f · a_f) / ((1 − 2 · a_f) · (1 + T)). Un a_f, T o c_f non normale, non
+// finito o ≤ 0, oppure un 1 − 2 · a_f ≤ 0, ferma con master.param.weights prima di ogni lettura di campioni: con W
+// arrotondato un a_f in f64 può valere 1/2 o più anche se il dominio esatto 2 max w < W vale. Così ogni c_f è > 0 e
+// il piano è una somma di termini non negativi.
+void weight_constants(master_plan& p) {
+  const auto require_normal = [&](double v, const char* constant, const std::string& frame) {
+    if (!std::isfinite(v) || !is_normal(v) || !(v > 0)) {
+      stop(error_category::invalid_input, "master.param.weights", "costante dei pesi non rappresentabile",
+           {{"costante", constant}, {"frame", frame}, {"valore", num_text(v)}});
+    }
+  };
+  p.weights.resize(p.n);
+  for (std::size_t k = 0; k < p.n; ++k) p.weights[k] = *p.frames[k].spec->weight;
+  double W = p.weights[0];
+  for (std::size_t k = 1; k < p.n; ++k) W += p.weights[k];
+  std::vector<double> sq(p.n), gap(p.n);
+  double T = 0;
+  for (std::size_t k = 0; k < p.n; ++k) {
+    const double a = p.weights[k] / W;
+    require_normal(a, "a_f", p.frames[k].name);
+    sq[k] = a * a;
+    gap[k] = 1 - 2 * a;
+    if (!(gap[k] > 0)) {
+      stop(error_category::invalid_input, "master.param.weights", "costante dei pesi non rappresentabile",
+           {{"costante", "1 - 2 a_f"}, {"frame", p.frames[k].name}, {"valore", num_text(gap[k])}, {"a_f", num_text(a)}});
+    }
+    const double term = sq[k] / gap[k];
+    T = k == 0 ? term : T + term;
+  }
+  require_normal(T, "T", "tutti");
+  const double one_plus_t = 1 + T;
+  p.residual_coeffs.resize(p.n);
+  for (std::size_t k = 0; k < p.n; ++k) {
+    p.residual_coeffs[k] = sq[k] / (gap[k] * one_plus_t);
+    require_normal(p.residual_coeffs[k], "c_f", p.frames[k].name);
+  }
+  p.weight_sum = W;
+}
+
 master_plan make_plan(const master_recipe& r, const std::function<void(kappa_result&)>& on_kappa = {}) {
   // Prima della validazione: i confronti sui parametri sono già operazioni in virgola mobile (ADR-07, D23).
   require_fp_environment();
   validate_master_recipe(r);
   const std::optional<kappa_result> kappa = preflight_kappa(r, on_kappa);
-  // Il calcolo esiste solo per `mean` senza rejection: ogni altro metodo valido si ferma, mai calcolato come media.
-  if (*r.combine != combine_method::mean || *r.rejection != master_rejection::none) {
+  const method_kind method = *method_of(*r.combine, *r.rejection);
+  // `mean` + `sigma_clip` non ha ancora un calcolo: la ricetta valida si ferma, mai calcolata con un altro metodo.
+  if (method == method_kind::sigma_clip) {
     stop(error_category::unsupported, "master.method_not_computable", "calcolo del metodo non disponibile",
          {{"combine", combine_name(*r.combine)}, {"rejection", rejection_name(*r.rejection)}});
   }
   master_plan p;
+  p.method = method;
   p.kappa = kappa;
   p.path = resolve_cpu_path(*r.simd, read_cpu_capabilities());
   p.recipe = r;
@@ -411,6 +458,7 @@ master_plan make_plan(const master_recipe& r, const std::function<void(kappa_res
     p.frames[k].name = frame_name(k);
     p.frames[k].spec = &p.recipe.frames[p.order[k]];
   }
+  if (method == method_kind::weighted_mean) weight_constants(p);
   p.descriptor = master_descriptor_from_node(make_master_node(r));
   return p;
 }
@@ -759,10 +807,192 @@ void finish_preflight(master_plan& p) {
 
 // ---------------------------------------------------------------- combinazione per pixel (C-02.a §6, §6.3, §7)
 
-// `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f. Kernel del percorso risolto nel preflight
-// (ADR-07); ogni banda è l'avvio di un task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
+// Elemento dell'ordinamento per pixel (C-02.b §b.8): valore e indice canonico del frame.
+struct sort_slot {
+  double value;
+  std::uint32_t frame;
+};
+
+// Esito f64 di un pixel valido: `ok` falso se un'operazione viola la regola di rappresentabilità (C-02.a §6.3).
+struct pixel_value {
+  double m = 0, v = 0;
+  bool ok = true;
+};
+
+// s² di C-02.a §6 sugli n campioni nell'ordine canonico: Σ x, / n, (x − x̄)², somma, / (n − 1).
+double sample_variance(const double* const* vals, std::size_t j, std::size_t n, bool& ok) {
+  double s = vals[0][j];
+  for (std::size_t f = 1; f < n; ++f) s += vals[f][j];
+  const double mean = s / static_cast<double>(n);
+  ok = ok && std::isfinite(s) && div_ok(s, mean);
+  double ss = 0;
+  for (std::size_t f = 0; ok && f < n; ++f) {
+    const double d = vals[f][j] - mean;
+    const double sq = d * d;
+    ok = std::isfinite(d) && mul_ok(d, d, sq);
+    if (!ok) break;
+    if (f == 0) {
+      ss = sq;
+    } else {
+      const double t = ss + sq;
+      ok = add_ok(ss, sq, t);
+      ss = t;
+    }
+  }
+  const double s2 = ss / static_cast<double>(n - 1);
+  ok = ok && div_ok(ss, s2);
+  return s2;
+}
+
+// `single`: x_1 − offset_adu, max(·, 0), / conversion_gain_e_per_adu, read_noise_adu², somma (C-02.b §b.6). I
+// parametri sono quelli della ricetta; i valori dell'header non entrano.
+pixel_value single_value(const master_recipe& r, double x) {
+  pixel_value out;
+  out.m = x;
+  const double t = x - *r.offset_adu;
+  const double pos = t > 0 ? t : 0.0;
+  const double gain = *r.conversion_gain_e_per_adu, rn = *r.read_noise_adu;
+  const double shot = pos / gain;
+  const double r2 = rn * rn;
+  out.v = r2 + shot;
+  out.ok = std::isfinite(t) && div_ok(pos, shot) && mul_ok(rn, rn, r2) && add_ok(r2, shot, out.v);
+  return out;
+}
+
+// `weighted_mean`: M = (Σ w_f · x_f) / W, V = Σ c_f · ((x_f − M) · (x_f − M)), somme nell'ordine canonico. I c_f sono
+// > 0 (weight_constants), quindi V è una somma di termini non negativi e add_ok vale.
+pixel_value weighted_value(const master_plan& p, const double* const* vals, std::size_t j) {
+  pixel_value out;
+  double acc = 0;
+  for (std::size_t f = 0; f < p.n; ++f) {
+    const double wx = p.weights[f] * vals[f][j];
+    out.ok = out.ok && mul_ok(p.weights[f], vals[f][j], wx);
+    acc = f == 0 ? wx : acc + wx;
+  }
+  out.m = acc / p.weight_sum;
+  out.ok = out.ok && std::isfinite(acc) && div_ok(acc, out.m);
+  for (std::size_t f = 0; out.ok && f < p.n; ++f) {
+    const double d = vals[f][j] - out.m;
+    const double q = d * d;
+    const double t = p.residual_coeffs[f] * q;
+    out.ok = std::isfinite(d) && mul_ok(d, d, q) && mul_ok(p.residual_coeffs[f], q, t);
+    if (f == 0) {
+      out.v = t;
+    } else {
+      const double sum = out.v + t;
+      out.ok = out.ok && add_ok(out.v, t, sum);
+      out.v = sum;
+    }
+  }
+  return out;
+}
+
+// `median` e `winsorized`: z ordinati su (valore, indice canonico); a parità di valore, compreso −0 == +0, prima il
+// frame canonico minore. Mediana pari: (z_k + z_(k+1)) / 2. Winsorized: Σ v_i per i crescente, poi / n. Piano κ · s².
+pixel_value robust_value(const master_plan& p, const double* const* vals, std::size_t j, sort_slot* z, std::size_t g) {
+  const std::size_t n = p.n;
+  for (std::size_t f = 0; f < n; ++f) z[f] = {vals[f][j], static_cast<std::uint32_t>(f)};
+  std::sort(z, z + n, [](const sort_slot& a, const sort_slot& b) {
+    if (a.value < b.value) return true;
+    if (b.value < a.value) return false;
+    return a.frame < b.frame;
+  });
+  pixel_value out;
+  if (p.method == method_kind::median) {
+    if (n % 2 == 1) {
+      out.m = z[n / 2].value;
+    } else {
+      const double s = z[n / 2 - 1].value + z[n / 2].value;
+      out.m = s / 2.0;
+      out.ok = std::isfinite(s) && div_ok(s, out.m);
+    }
+  } else {
+    double s = z[g].value;
+    for (std::size_t i = 2; i <= n; ++i) s += i <= g ? z[g].value : i > n - g ? z[n - g - 1].value : z[i - 1].value;
+    out.m = s / static_cast<double>(n);
+    out.ok = std::isfinite(s) && div_ok(s, out.m);
+  }
+  const double s2 = sample_variance(vals, j, n, out.ok);
+  const double kappa = p.kappa->value;
+  out.v = kappa * s2;
+  out.ok = out.ok && mul_ok(kappa, s2, out.v);
+  return out;
+}
+
+// Conversione al sample_type del master (C-02.a §6.3). Con uscita f64 è un'identità: un valore subnormale non vi
+// diventa subnormale, e arriva qui solo come campione d'ingresso scelto senza operazione (`single`, mediana dispari),
+// perché ogni prodotto, quoziente e somma di termini non negativi è già controllato; resta valido. Con uscita f32 vale
+// convert_finite: un valore non nullo che diventa zero o subnormale non è rappresentabile.
+template <class T>
+bool to_output(double v, T& out) {
+  if constexpr (std::is_same_v<T, double>) {
+    out = v;
+    return std::isfinite(v);
+  } else {
+    return convert_finite<float>(v, out);
+  }
+}
+
+// Banda dei metodi di C-02.b diversi da `mean`: maschere come C-02.a §7, accumulo f64 e un solo arrotondamento al
+// sample_type (to_output). Lo stesso codice per i due percorsi di ADR-07: ordinamento e selezione per pixel
+// sono operazioni IEEE identiche, quindi bit-identiche fra i percorsi. Il flat ammette qui solo `single` (§b.2): il
+// suo level_bias_estimate non è definito con n = 1 (§b.7, `single_frame`) e resta NaN.
+template <class T>
+void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
+                 const std::uint16_t* const* bits, sort_slot* sort) {
+  T* out = reinterpret_cast<T*>(p.out.samples.data());
+  T* outv = reinterpret_cast<T*>(p.out.variance->samples.data());
+  constexpr T nan = std::numeric_limits<T>::quiet_NaN();
+  const std::size_t g = p.method == method_kind::winsorized ? static_cast<std::size_t>(*p.recipe.winsor_g) : 0;
+  for (std::uint32_t r = 0; r < rows; ++r) {
+    for (std::uint32_t c = 0; c < p.w; ++c) {
+      const std::size_t j = static_cast<std::size_t>(r) * p.w + c;
+      const std::size_t i = static_cast<std::size_t>(y0 + r) * p.w + c;
+      std::uint16_t m = 0;
+      bool saturated = false;
+      for (std::size_t f = 0; f < p.n; ++f) {
+        m = static_cast<std::uint16_t>(m | bits[f][j]);
+        if (p.has_sat && vals[f][j] >= p.sat) saturated = true;
+      }
+      if (saturated) m = static_cast<std::uint16_t>(m | invalid_reason::saturated);
+      if (m == 0) {
+        pixel_value pv;
+        switch (p.method) {
+          case method_kind::single: pv = single_value(p.recipe, vals[0][j]); break;
+          case method_kind::weighted_mean: pv = weighted_value(p, vals, j); break;
+          case method_kind::median:
+          case method_kind::winsorized: pv = robust_value(p, vals, j, sort, g); break;
+          case method_kind::mean:
+          case method_kind::sigma_clip: ASTRO_ASSERT(false); break;
+        }
+        T ms{}, vs{};
+        if (pv.ok && to_output<T>(pv.m, ms) && to_output<T>(pv.v, vs)) {
+          out[i] = ms;
+          outv[i] = vs;
+          p.out.invalid.bits[i] = 0;
+          if (p.flat) p.nonpositive[i] = pv.m - p.offset <= 0 ? 1 : 0;
+          continue;
+        }
+        m = invalid_reason::result_nonfinite;
+      }
+      out[i] = nan;
+      outv[i] = nan;
+      p.out.invalid.bits[i] = m;
+    }
+  }
+}
+
+// `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f; `sort` ha n elementi (ordinamento per pixel di
+// `median` e `winsorized`). `mean` usa il kernel del percorso risolto nel preflight (ADR-07); ogni banda è l'avvio di
+// un task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
 void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
-                  const std::uint16_t* const* bits) {
+                  const std::uint16_t* const* bits, sort_slot* sort) {
+  if (p.method != method_kind::mean) {
+    begin_kernel_task();
+    if (p.out.type == sample_type::f32) method_band<float>(p, y0, rows, vals, bits, sort);
+    else method_band<double>(p, y0, rows, vals, bits, sort);
+    return;
+  }
   kernels::master_band b;
   b.n = p.n;
   b.w = p.w;
@@ -912,7 +1142,14 @@ json channel_report(const master_plan& p) {
     o.set("label", json::string(p.labels[c]));
     o.set("valid_pixels", json::uinteger(valid[c]));
     o.set("variance_plane_median", median_or_null(planes[c]));
-    if (p.flat) {
+    if (p.flat && p.method == method_kind::single) {
+      // C-02.b §b.7: con un solo frame la stima non è definita (nessuna divisione per n − 1).
+      json lb = json::object();
+      for (const char* k : {"median", "max", "ratio_median", "ratio_max", "level_bias_ratio_null"}) lb.set(k, json::null());
+      lb.set("null_reason", json::string("single_frame"));
+      o.set("level_bias_estimate", std::move(lb));
+      o.set("pixels_nonpositive_signal", json::uinteger(nonpositive[c]));
+    } else if (p.flat) {
       json lb = json::object();
       lb.set("median", median_or_null(lbe[c]));
       lb.set("max", max_or_null(lbe[c]));
@@ -942,11 +1179,28 @@ json build_report(master_plan& p) {
   if (p.flat) report.set("flat_level_mean", json::number(p.level_mean));
   report.set("master_metadata", p.master_metadata);
   report.set("metadata_not_common", p.not_common);
+  // Piano e coefficiente di variazione per metodo (C-02.b §b.6, §b.7): sqrt(2/(n − 1)) per `mean`, `median` e
+  // `winsorized`; null con motivo per `single` (`single_frame`) e `weighted_mean` (`not_derived`).
   json var = json::object();
-  var.set("variance_estimator", json::string("empirical"));
+  var.set("variance_estimator", json::string(estimator_name(*p.descriptor.estimator)));
   var.set("variance_source", json::string("plane"));
-  var.set("plane", json::string("s2_over_n"));
-  var.set("variance_cv_gaussian_homoscedastic", json::number(std::sqrt(2.0 / static_cast<double>(p.n - 1))));
+  const char* plane = "s2_over_n";
+  const char* cv_null = nullptr;
+  switch (p.method) {
+    case method_kind::single: plane = "read_noise2_plus_signal_over_gain"; cv_null = "single_frame"; break;
+    case method_kind::weighted_mean: plane = "weighted_residuals"; cv_null = "not_derived"; break;
+    case method_kind::median:
+    case method_kind::winsorized: plane = "kappa_s2"; break;
+    case method_kind::mean:
+    case method_kind::sigma_clip: break;
+  }
+  var.set("plane", json::string(plane));
+  if (cv_null) {
+    var.set("variance_cv_gaussian_homoscedastic", json::null());
+    var.set("variance_cv_null_reason", json::string(cv_null));
+  } else {
+    var.set("variance_cv_gaussian_homoscedastic", json::number(std::sqrt(2.0 / static_cast<double>(p.n - 1))));
+  }
   report.set("variance", std::move(var));
   report.set("channels", channel_report(p));
   std::array<std::uint64_t, 9> counts{};
@@ -1298,6 +1552,7 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
   std::vector<std::vector<std::uint16_t>> bits(p.n, std::vector<std::uint16_t>(band));
   std::vector<const double*> vp(p.n);
   std::vector<const std::uint16_t*> bp(p.n);
+  std::vector<sort_slot> sort(p.n);
   for (std::size_t f = 0; f < p.n; ++f) {
     vp[f] = vals[f].data();
     bp[f] = bits[f].data();
@@ -1312,7 +1567,7 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
         bits[f][j] = im.invalid.bits[first + j];
       }
     }
-    combine_rows(p, y0, rows, vp.data(), bp.data());
+    combine_rows(p, y0, rows, vp.data(), bp.data(), sort.data());
   }
   return finish_result(p);
 }
@@ -1411,6 +1666,8 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     plan.tile_rows = chosen.tile_rows;
     const std::uint64_t rows = chosen.tile_rows;
     const std::uint64_t tasks = chosen.task_count;
+    const std::optional<std::uint64_t> tile_bytes = master_task_bytes(p.n, rows, w);
+    ASTRO_ASSERT(tile_bytes.has_value());
 
     json observed = json::array();
     std::vector<stored_file> files;
@@ -1426,6 +1683,11 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
       auto* vals = reinterpret_cast<double*>(bp + p.n);
       auto* bits = reinterpret_cast<std::uint16_t*>(vals + p.n * rows * w);
       auto* raw = reinterpret_cast<std::byte*>(bits + p.n * rows * w);
+      // Ordinamento per pixel dopo puntatori e blocchi: nei byte per task del modello (ADR-06 R2.r, termine 16·n).
+      const std::size_t sort_at = (static_cast<std::size_t>(*tile_bytes) + alignof(sort_slot) - 1) / alignof(sort_slot) *
+                                  alignof(sort_slot);
+      ASTRO_ASSERT(sort_at + p.n * sizeof(sort_slot) <= buffer.size());
+      auto* sort = reinterpret_cast<sort_slot*>(buffer.data() + sort_at);
       for (std::size_t f = 0; f < p.n; ++f) {
         ctx.check_cancel();
         double* v = vals + f * rows * w;
@@ -1434,7 +1696,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         vp[f] = v;
         bp[f] = b;
       }
-      combine_rows(p, y0, cnt, vp, bp);
+      combine_rows(p, y0, cnt, vp, bp, sort);
       return rows_digest(p.out, y0, y0 + cnt);
     });
 

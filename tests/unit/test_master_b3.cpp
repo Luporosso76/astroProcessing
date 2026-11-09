@@ -938,10 +938,10 @@ TEST(MasterB3, T_M3B_C02_13_noise_model_parameters_are_forbidden_with_a_method_o
   }
 }
 
-// ---------------------------------------------------------------- calcolo non disponibile fino a B5/B6
+// ---------------------------------------------------------------- calcolo non disponibile fino a B6
 
-// Vale fino a B5 (single, weighted_mean, median, winsorized) e B6 (mean + sigma_clip): quando quei metodi diventano
-// calcolabili, questo test cambia. Ricette valide devono fermarsi, mai essere calcolate come media non pesata.
+// `single`, `weighted_mean`, `median` e `winsorized` si calcolano da B5 (test_master_b5.cpp). Resta `mean` +
+// `sigma_clip` (B6): una ricetta valida si ferma, mai calcolata come media senza rejection.
 TEST(MasterB3, T_M3B_C02_09_valid_recipes_of_methods_not_yet_computable_stop_with_method_not_computable) {
   using R = master_recipe;
   struct mc {
@@ -950,10 +950,6 @@ TEST(MasterB3, T_M3B_C02_09_valid_recipes_of_methods_not_yet_computable_stop_wit
     std::function<void(R&)> setup;
   };
   const std::vector<mc> cases = {
-      {"single", 1, [](R& r) { use_single(r); }},
-      {"weighted_mean", 3, [](R& r) { use_weighted(r, {1, 1, 1}); }},
-      {"median", 3, [](R& r) { use_median(r); }},
-      {"winsorized", 3, [](R& r) { use_winsorized(r, 1); }},
       {"sigma_clip", 11, [](R& r) { use_sigma(r, 3, 3, 1, 2); }},
   };
   for (const mc& c : cases) {

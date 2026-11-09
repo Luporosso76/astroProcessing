@@ -157,6 +157,36 @@ add_test(NAME T-M3B-C02-05.kappa_all_cells COMMAND test_master_kappa --gtest_fil
 set_tests_properties(T-M3B-C02-05.kappa_all_cells PROPERTIES LABELS slow TIMEOUT 1800
   FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 
+# B5 di M3.b: `single`, `weighted_mean`, `median`, `winsorized`. T-M3B-C02-01, 07, 13, 15 (solo `result_nonfinite` e
+# `master.param.weights`), capability e maschere: `fast`. T-M3B-C02-03 e 04 (protocollo docs/evidence/M3b-protocollo.md
+# §3.1, §3.2): suite *Slow, un test ctest per configurazione, per n e, con n = 9, per cella; esecuzione seriale:
+# `ctest -L slow`.
+add_executable(test_master_b5 test_master_b5.cpp)
+target_link_libraries(test_master_b5 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b5 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b5 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b5 TEST_FILTER "-*Slow.*" PROPERTIES LABELS fast)
+foreach(b5_slow
+    "T-M3B-C02-03.weighted_mean_W1:MasterB5Slow.T_M3B_C02_03_W1_*"
+    "T-M3B-C02-03.weighted_mean_W2:MasterB5Slow.T_M3B_C02_03_W2_*"
+    "T-M3B-C02-04.n3:MasterB5Slow.T_M3B_C02_04_n3_*"
+    "T-M3B-C02-04.n4:MasterB5Slow.T_M3B_C02_04_n4_*"
+    "T-M3B-C02-04.n9_median:MasterB5Slow.T_M3B_C02_04_n9_median"
+    "T-M3B-C02-04.n9_winsorized_g1:MasterB5Slow.T_M3B_C02_04_n9_winsorized_g1"
+    "T-M3B-C02-04.n9_winsorized_g2:MasterB5Slow.T_M3B_C02_04_n9_winsorized_g2"
+    "T-M3B-C02-04.n9_winsorized_g4:MasterB5Slow.T_M3B_C02_04_n9_winsorized_g4"
+    "T-M3B-C02-04.n10:MasterB5Slow.T_M3B_C02_04_n10_*"
+    "T-M3B-C02-04.n101:MasterB5Slow.T_M3B_C02_04_n101_*")
+  string(REPLACE ":" ";" b5_pair "${b5_slow}")
+  list(GET b5_pair 0 b5_name)
+  list(GET b5_pair 1 b5_filter)
+  add_test(NAME ${b5_name} COMMAND test_master_b5 --gtest_filter=${b5_filter})
+  set_tests_properties(${b5_name} PROPERTIES LABELS slow RUN_SERIAL TRUE TIMEOUT 1800
+    FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+endforeach()
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -360,6 +390,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b15a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode_b15a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_kappa.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b5.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
@@ -395,11 +426,16 @@ set_tests_properties(
   T-M2R0-04.headless T-M2R0-04.headless_negative
   PROPERTIES LABELS fast TIMEOUT 120)
 
-# T-M2R5-01 (ADR-07, aggiunte di R5): le suite di calibrazione (intera e a blocchi), del job e del master sul secondo percorso.
+# T-M2R5-01 (ADR-07, aggiunte di R5): le suite di calibrazione (intera e a blocchi), del job e del master (anche i metodi
+# di B5) sul secondo percorso.
 foreach(t test_calibration test_calibration_job test_master test_calibration_r32)
   add_test(NAME T-M2R5-01.avx2.${t} COMMAND ${t})
   set_tests_properties(T-M2R5-01.avx2.${t} PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2)
 endforeach()
+# I metodi di B5 sul secondo percorso: solo le suite fast (le *Slow statistiche restano una volta, sul percorso scalare).
+add_test(NAME T-M2R5-01.avx2.test_master_b5 COMMAND test_master_b5 --gtest_filter=-*Slow.*)
+set_tests_properties(T-M2R5-01.avx2.test_master_b5 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 
 # T-M2R5-05 e T-M2R5-07 (parte binaria): istruzioni vietate nei kernel, crtfastmath e fast-math nella build.
 set(ASTRO_KERNEL_OBJECTS ${CMAKE_BINARY_DIR}/src/core/CMakeFiles/astrocore.dir)

@@ -412,3 +412,40 @@ Applicato in C-02 §b.12 (C02-01, C02-04(b), C02-05).
 - Contesto degli stop RAW del preflight: `master.mismatch.<campo>` porta `coppia`, `campo`, `sinistra` (riferimento canonico) e `destra` (frame) nella forma JSON del record del decoder, e `tolleranza` = `esatta`, come lo stop dei FITS; `master.mismatch.decoder_black` porta `differenza_massima_adu`, `riga_periodo`, `colonna_periodo` e `tolleranza_adu`. Il preflight rilegge ogni stato dalla forma scritta nel nodo, così ricetta e descrittore accettano lo stesso insieme di stati.
 - `raw_decode_context` con `held_bytes` senza `pool`, anche nel modo del chiamante: `invalid_input`, `raw.decode_context`, prima di ogni lettura (`held_bytes` vale solo per il modo che prenota dal pool).
 - Limite della prova «prima di ogni allocazione» del modo del chiamante: il contatore delle allocazioni (`allocated_sample_bytes()`) vede l'immagine di `make_image`, non il buffer del segmento del decoder del progetto (`std::vector`, U13 §5), né le allocazioni interne di LibRaw. Che il controllo preceda quel buffer lo mostrano il codice (un solo punto, `reserve_decode`, prima del buffer) e la mutazione che sposta il controllo dopo il tetto di zlib, rilevata dai ganci.
+
+## Decisioni successive (B5)
+
+### `τ_k` dei criteri S di T-M3B-C02-03 e 04: ampiezza dell'intervallo e inclusione
+
+**Difetto.** La versione 1 del protocollo (§1) definiva `τ_k` come la massima distanza fra l'intervallo della regola I e il valore f64 del prodotto, e C-02.b §b.9 come «il bound del valore del prodotto». Con questa definizione un errore `D` del prodotto allarga `τ_k` di circa `D`, quindi anche il margine: C02-03 e C02-04 non possono fallire per un errore del prodotto. Il test lo seguiva alla lettera; il conteggio dei valori fuori dall'intervallo era solo stampato.
+
+**Misura** (autore del codice di B5, worktree `m3b-b5`, nessun record registrato). Con κ tolto dal piano della mediana, T-M3B-C02-04.n3 passa: media di `V̂` 16.0 contro `E` 7.18, valori fuori dall'intervallo 1048576/1048576. Con i `c_f` moltiplicati per 1.25, T-M3B-C02-03 W2 passa.
+
+**Decisione del coordinatore**, 9 novembre 2026: emendamento del protocollo preregistrato (versione 2). `τ_k` è l'ampiezza dell'intervallo della regola I (`hi − lo`), che non dipende dal prodotto. Ogni test S ha in più un criterio binario: ogni valore del prodotto confrontato sta nel suo intervallo. Il criterio è strettamente più severo della versione 1 e nessun record di misura era stato registrato, quindi l'emendamento non è un allentamento. La definizione di §1 vale per tutti i test S del protocollo, compresi quelli dei flat (B9).
+
+Applicato in: `docs/evidence/M3b-protocollo.md` §1, §3.1, §3.2 (versione 2; la versione 3 aggiunge in §1 la nota sull'implementazione della regola I nell'oracle, criteri e valori invariati); `docs/contracts/C-02-master.md` §b.9 e §f.9.
+
+### Kernel dei due percorsi
+
+**Decisione del coordinatore**, 9 novembre 2026, durante B5. `single`, `weighted_mean`, `median` e `winsorized` usano lo stesso codice scalare per pixel in entrambi i percorsi di ADR-07 (`method_band` in `src/core/master.cpp`), senza un kernel AVX2. Il percorso risolto resta quello del preflight e sta nel campo `backend` del nodo. Ogni banda chiama `begin_kernel_task()`, quindi il controllo dell'ambiente FP all'avvio del task vale come per `mean`. I contatori `cpu_test::kernel_calls` non contano queste bande: contano solo i kernel dei due percorsi (righe della calibrazione, bande di `mean`, `pixel_sum`).
+
+**Verifica su [ADR-07](../contracts/ADR-07-cpu-simd.md).** ADR-07 non chiede un kernel AVX2 per ogni operatore.
+- «Kernel dei due percorsi» elenca quali sono i kernel: le righe della calibrazione e le bande del master di C-02.a (somma, media, quadrati degli scarti, `s²/n`, statistiche del flat). I metodi di C-02.b non sono nell'elenco.
+- «Riduzione su pixel», **Limite**, ammette già codice comune ai due percorsi per le mediane `N(Fc)` e `m_f`, la media dei livelli `m_f` e la varianza di `N`, bit-identiche fra i percorsi perché è lo stesso codice.
+- «Tolleranze» (a): 0 ulp per le accumulazioni per pixel lungo i frame dei master; la mediana dispari è una selezione e la pari è `(z_k + z_(k+1)) / 2` con le stesse operazioni IEEE. Con un solo codice l'identità fra i percorsi vale per costruzione.
+- Compilazione: `master.cpp` usa `-fno-fast-math -ffp-contract=off` (`ASTRO_FP_FLAGS`), senza FMA né istruzioni approssimate (§«Percorsi», (c)). Non ha `-fno-tree-vectorize`, che ADR-07 chiede solo all'unità del kernel scalare (`kernels_scalar.cpp`). Una vettorizzazione automatica non cambia i risultati: senza riassociazione ogni operazione IEEE resta la stessa, nello stesso ordine per pixel.
+
+**Limite dichiarato.** Sul percorso `cpu_avx2` i quattro metodi non sono vettorizzati fra pixel, a differenza di quanto (a) descrive per le bande di `mean`. La verifica dei due percorsi li copre: T-M2R5-01 riesegue con `ASTRO_TEST_SIMD=avx2` anche i test fast di `test_master_b5` (`T-M2R5-01.avx2.test_master_b5`, escluse le statistiche lente `*Slow.*`), con le stesse attese esatte e gli stessi oracle del percorso scalare. Un kernel AVX2 per questi metodi, se servirà per le prestazioni, è un'unità separata con il proprio confronto fra percorsi (T-M2R5-02).
+
+### Segno delle costanti dei pesi
+
+**Decisione del coordinatore**, 9 novembre 2026, review di B5 (giro 1). Il dominio `2 max w < W` si confronta in aritmetica esatta, ma `W` in f64 è arrotondato: un `a_f = w_f / W` può valere 1/2 o più anche con il dominio esatto valido. Esempio dalla review: pesi `(2⁵³, 2⁵² + 1, 2⁵¹ + 1, 2⁵¹ − 1.5)`, con `T` negativo e `c_f` negativi ma normali. Regola: nel preflight un `1 − 2 · a_f` ≤ 0, `T` ≤ 0 o un `c_f` ≤ 0 in f64 fermano con `invalid_input`, `master.param.weights`, con il valore nel contesto, prima di ogni lettura. Così ogni `c_f` è > 0, il piano è una somma di termini non negativi e la regola delle somme di §6.3 vale. Applicata in C-02 §b.6, «Rappresentabilità».
+
+### Campione subnormale d'ingresso con uscita f64
+
+**Decisione del coordinatore**, 9 novembre 2026, review di B5 (giro 1). Con uscita f64 la conversione al tipo di uscita è un'identità: un campione d'ingresso subnormale scelto senza operazione (`single`, mediana a conteggio dispari) non vi diventa subnormale e resta valido (C-02.a §6.3: «un valore f64 non nullo che diventa zero o subnormale»; i subnormali in ingresso sono valori finiti validi). Con uscita f32 vale la regola: un valore non nullo che diventa zero o subnormale rende il pixel `result_nonfinite`. Nei metodi di B5 ogni prodotto, quoziente e somma di termini non negativi è controllato prima della conversione, quindi un subnormale f64 prodotto da un'operazione non arriva all'uscita come valido. La funzione condivisa `convert_finite` della calibrazione e del kernel di `mean` non cambia in B5. Lì la stessa classe resta aperta con uscita f64: `convert_finite<double>` marca un subnormale che passa per una differenza esatta (`src/core/calibration_internal.hpp:298`). Va decisa con il confine comune, fuori da B5.
+
+### Rinvii a B11
+
+- `κ` dei metodi robusti e le costanti `a_f`, `c_f` di `weighted_mean`: oltre che nel report (§b.7, «Stato»), vanno nei `details` del job (§b.10). In B5 sono calcolati nel preflight ma non registrati né nel report né nei `details`.
+- Valori del campo `plane` nel blocco `variance` del report: `read_noise2_plus_signal_over_gain` (`single`), `weighted_residuals` (`weighted_mean`), `kappa_s2` (`median`, `winsorized`), accanto a `s2_over_n` di `mean`. Sono nomi provvisori, da fissare in C-02.b §b.7 in B11.
