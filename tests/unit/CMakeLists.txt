@@ -120,6 +120,12 @@ set_tests_properties(T-M2R2-09.real_palomar_product_masters PROPERTIES LABELS sl
 # T-M2E-13 e T-M2R2-09 oltre 600 s sotto ASan: in parallelo con altri test superano il timeout, quindi girano da soli.
 set_tests_properties(T-M2E-13.real_palomar_lfc T-M2R2-09.real_palomar_product_masters PROPERTIES RUN_SERIAL TRUE)
 
+# B2 (M3.b): fixture FIX-SYN-CAL-08 (tests/fixtures/syn_cal.hpp) e il suo test; indipendente da astrocore.
+add_executable(test_syn_cal test_syn_cal.cpp)
+target_link_libraries(test_syn_cal PRIVATE GTest::gtest_main)
+target_include_directories(test_syn_cal PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures)
+gtest_discover_tests(test_syn_cal PROPERTIES LABELS fast)
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)

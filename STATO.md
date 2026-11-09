@@ -10,7 +10,7 @@
 
 ## Prossimo passo
 1. Lotto chiuso: review `debt-M3a-round2` PASS; `dev-full` 1221/1221, `release` 1221/1221, `dev` 1199/1199, trace M2 63/0 e M3.a 8/0 scoperti; 48 blocchi evidence rigenerati.
-2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 20 unità (B0…B17, B3b, B15a), lacune L1…L11 (L7 chiusa) da decidere in B0. B0 CHIUSA (review `M3b-B0-round1` FAIL, `round2` PASS): `docs/decisions/M3b-lacune.md`, emendamenti a C-02, F-IO-03, BASE §3.1, ADR-06 R2.r, ADR-08.b §2.8. B1 CHIUSA (protocollo SHA-256 `83e30030…`, review PASS). In corso: B3 test (Agent sonnet, worktree `m3b-b3-tests`). Poi codice B3, B2, B4.
+2. `plans/M3b.md` PLANNED (review `M3b-plan-round1` FAIL, `round2` PASS, 1 LOW corretto): 20 unità (B0…B17, B3b, B15a), lacune L1…L11 (L7 chiusa) da decidere in B0. B0 CHIUSA (review `M3b-B0-round1` FAIL, `round2` PASS): `docs/decisions/M3b-lacune.md`, emendamenti a C-02, F-IO-03, BASE §3.1, ADR-06 R2.r, ADR-08.b §2.8. B1 CHIUSA (protocollo SHA-256 `83e30030…`, review PASS). In corso: B3 codice (Agent sonnet distinto dai test, worktree `m3b-b3-tests`; test rossi 17/18 consegnati); B2 CHIUSA (fixture `syn_cal.hpp`). Poi codice B3, B4.
 - API sospese dall'utente (9/11): deleghe solo come Agent sull'abbonamento, review Argon; niente `delegate.sh`, `agent-api.sh`, `review.sh --reviewer claude`.
 
 ## Non verificato

@@ -107,6 +107,8 @@ ID: C-02.b §b.9; C-02.b-flat §f.9; ADR-09.b §b.4 e T-M3-ADR09-01. File `docs/
 
 ### B2. Fixture `FIX-SYN-CAL-08` — ~400 righe, solo test
 
+Stato: **CHIUSA** il 9 novembre 2026 (review `M3b-B2-round1` PASS, 1 LOW corretto). `tests/fixtures/syn_cal.hpp`, `tests/unit/test_syn_cal.cpp` (13 test).
+
 Generatore in `tests/fixtures/syn_cal.hpp`, scritto da chi non scrive l'operatore (`tests/fixtures/exact_rational.hpp` come aritmetica esatta). B, D, F, DF noti; rumore gaussiano di varianza nota, anche eteroschedastico (`σ_f² = c_f g / G + R²`); outlier in posizioni note; flat a livelli diversi per canale con regione di livello (più della metà dei pixel del canale con `g = 1`, `β = 0`, nessun rumore) e regione di misura (C-02.b-flat §f.9); frame RAW sintetici da `FIX-SYN-DNG-01`. Senza codice di prodotto.
 
 ### B3. Tipi, ricetta, domini, fase e linearità — ~350 righe
