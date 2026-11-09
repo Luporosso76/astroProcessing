@@ -21,7 +21,7 @@ constexpr std::uint32_t master_serialization_version = 1;
 
 struct master_frame_spec {
   std::string path;       // solo per il job
-  content_digest digest;  // identita' attesa del file; determina l'ordine canonico
+  content_digest digest;  // identità attesa del file; determina l'ordine canonico
   frame_metadata declared;  // solo valori con origine `declared`
   declared_image_fields declared_fields;
   fits_read_options read_options;
@@ -66,7 +66,7 @@ node_spec make_master_node(const master_recipe& recipe);
 // master.not_master_node.
 master_descriptor master_descriptor_from_node(const node_spec& node);
 
-// Preflight completo e combinazione in memoria. `frames[i]` e' il frame di `recipe.frames[i]`.
+// Preflight completo e combinazione in memoria. `frames[i]` è il frame di `recipe.frames[i]`.
 master_result combine_master(const master_recipe& recipe, std::vector<image> frames);
 
 // Resa testuale dello stesso documento JSON del report del master.
@@ -99,7 +99,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
                            const std::optional<budget_snapshot>& budget = std::nullopt);
 
 // Byte per task del job a blocchi (C-02.a, aggiunte di R2): puntatori, righe f64 e bit degli n frame, appoggio della
-// lettura. nullopt se il valore non e' rappresentabile in 64 bit.
+// lettura. nullopt se il valore non è rappresentabile in 64 bit.
 std::optional<std::uint64_t> master_task_bytes(std::uint64_t frames, std::uint64_t rows, std::uint64_t width);
 
 // Ingresso della calibrazione per il master pubblicato da uno slot (ADR-16, aggiunte di R2).

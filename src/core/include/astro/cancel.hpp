@@ -5,7 +5,7 @@
 namespace astro {
 
 // Richiesta di annullamento condivisa fra chi la imposta (CLI, gestore di segnale) e chi la controlla.
-// Solo operazioni atomiche lock-free: `request` e' ammesso in un gestore di segnale.
+// Solo operazioni atomiche lock-free: `request` è ammesso in un gestore di segnale.
 class cancel_token {
  public:
   void request() noexcept { flag_.store(true, std::memory_order_release); }

@@ -184,7 +184,7 @@ TEST(Thumbnail, T_M2R1_12_absent_entry_is_computed_valid_entry_is_a_hit_and_the_
   ASSERT_EQ(third.exit_code, 0);
   EXPECT_EQ(cache.computations(), 2u);
   EXPECT_EQ(at(at(at(persisted_provenance(p, third), "details"), "cache"), "outcome").as_string(), "computed");
-  EXPECT_EQ(read_file(files[0]), entry_bytes) << "la voce ricalcolata e' identica";
+  EXPECT_EQ(read_file(files[0]), entry_bytes) << "la voce ricalcolata è identica";
 
   // Quota: la nuova voce oltre la somma massima si ferma prima di scrivere; nessuna rimozione automatica.
   {
@@ -338,7 +338,7 @@ TEST(Thumbnail, T_M2R1_04_T_M2R1_11_a_corrupt_entry_stops_and_only_the_explicit_
     return run_cache_rebuild_job(*p.store, "rebuild", src.path.string(), src.digest, req, cache_rebuild_cause_corrupt, cache, pool, never());
   });
   ASSERT_EQ(rb.exit_code, 0);
-  EXPECT_EQ(read_file(entry), original) << "la nuova voce e' identica byte per byte all'originale";
+  EXPECT_EQ(read_file(entry), original) << "la nuova voce è identica byte per byte all'originale";
   EXPECT_EQ(entries_in(thumbs_dir(p)).size(), 1u);
   const json rb_prov = persisted_provenance(p, rb);
   const json& rc = at(at(rb_prov, "details"), "cache");
@@ -364,7 +364,7 @@ TEST(Thumbnail, T_M2R1_04_T_M2R1_11_a_corrupt_entry_stops_and_only_the_explicit_
   EXPECT_EQ(none.stop->category(), error_category::invalid_input);
   EXPECT_EQ(none.stop->code(), "cache.rebuild_nothing");
   EXPECT_STOP(make_cache_rebuild_node(src.digest, req, "perche_si"), error_category::invalid_input, "cache.rebuild_cause");
-  // La causa non valida nel job e' un arresto prima del lavoro (R5.d): job `failed` registrato con la provenance
+  // La causa non valida nel job è un arresto prima del lavoro (R5.d): job `failed` registrato con la provenance
   // dell'arresto senza nodo, stop propagato invariato, nessuna ricostruzione.
   const std::uint64_t computations_before = cache.computations();
   const std::uint64_t generation_before = p.store->get_slot("nothing")->current_generation;

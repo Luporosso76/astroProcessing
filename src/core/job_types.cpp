@@ -131,7 +131,7 @@ minimal_job make_calibration(const job_type_inputs& inputs, const std::string& v
             calibration_job_options o;
             o.resources = env.resources;
             // Residenza dichiarata prima dell'esecuzione: il checkpoint implica i blocchi; senza scratch plan_resources
-            // non puo' scegliere i blocchi e la residenza e' intera.
+            // non può scegliere i blocchi e la residenza è intera.
             if (blocks) {
               o.checkpoint = calibration_job_options::checkpoint_options{env.checkpoint_name, 1, env.resume};
             } else {

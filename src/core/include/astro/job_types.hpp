@@ -23,7 +23,7 @@ namespace astro {
 // run_job_files. Ogni voce dichiara operatore, ruoli degli input, varianti fissate prima dell'esecuzione, passaggio
 // dallo scheduler e costruttore del job minimo valido. Nessun comportamento: il lavoro resta nelle funzioni dei job.
 
-// Input di un ruolo: percorso e identita' attesa del file.
+// Input di un ruolo: percorso e identità attesa del file.
 struct job_type_input {
   std::string path;
   content_digest digest;
@@ -63,8 +63,8 @@ struct job_type_entry {
   std::map<std::string, const input_format*> role_formats;
   std::vector<job_type_variant> variants;
   bool scheduler = false;
-  // Costruisce nodo e chiamata del job minimo dagli input per ruolo, per la variante indicata. `project_root` e' la
-  // radice dello store su cui il job girera': un tipo con precondizioni nel progetto (voce di cache esistente per
+  // Costruisce nodo e chiamata del job minimo dagli input per ruolo, per la variante indicata. `project_root` è la
+  // radice dello store su cui il job girerà: un tipo con precondizioni nel progetto (voce di cache esistente per
   // cache.rebuild) le crea qui, prima di ogni esecuzione.
   std::function<minimal_job(const job_type_inputs& inputs, const std::string& variant,
                             const std::filesystem::path& project_root)>

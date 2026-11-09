@@ -40,7 +40,7 @@ struct raw_probe_fields {
   unsigned raw_width = 0;   // sizes.raw_width: base di max_pixels e di M (§2.1)
   unsigned raw_height = 0;  // sizes.raw_height
   // Campi che LibRaw espone dopo `open_buffer` e che il decoder non usa (§2.6, emendamento L4): focale, focale
-  // equivalente a 35 mm e presenza della posizione GPS non producono sensore, scala pixel ne' WCS.
+  // equivalente a 35 mm e presenza della posizione GPS non producono sensore, scala pixel né WCS.
   float focal_len = 0.0f;                      // other.focal_len
   float focal_length_in_35mm_format = 0.0f;    // lens.makernotes.FocalLengthIn35mmFormat
   bool parsed_gps_present = false;             // other.parsed_gps.gpsparsed
@@ -74,9 +74,9 @@ struct raw_decode_context {
   memory_pool* pool = nullptr;
   const cancel_token* cancel = nullptr;
   std::uint64_t max_pixels = raw_limits::max_pixels;
-  // Byte che il chiamante tiene gia' nel pool durante la decodifica (file e prenotazioni del job); assente: i soli byte
-  // del file. Con `pool` il decoder si ferma con sched.job_exceeds_budget se questi byte piu' la prenotazione di §2.8
-  // superano il budget, invece di attendere una prenotazione che non puo' entrare.
+  // Byte che il chiamante tiene già nel pool durante la decodifica (file e prenotazioni del job); assente: i soli byte
+  // del file. Con `pool` il decoder si ferma con sched.job_exceeds_budget se questi byte più la prenotazione di §2.8
+  // superano il budget, invece di attendere una prenotazione che non può entrare.
   std::optional<std::uint64_t> held_bytes;
 };
 
@@ -110,7 +110,7 @@ struct raw_decode_hooks {
   std::function<void(std::size_t segment, std::uint64_t zlib_peak_bytes)> after_segment;
 };
 
-// Decodifica un RAW gia' letto in memoria (ADR-08.b §2.2-§2.4, §2.6): area visibile di LibRaw in f32 = uint16, layout
+// Decodifica un RAW già letto in memoria (ADR-08.b §2.2-§2.4, §2.6): area visibile di LibRaw in f32 = uint16, layout
 // cfa, fase raw, nero e bianco dichiarati e non sottratti in `decoder_state`. `bytes` resta valido per tutta la chiamata.
 // Ogni caso non riproducibile esattamente si ferma con il codice del contratto, prima di produrre l'immagine.
 // Precondizione (§2.6): il processo ha `TZ=UTC0` dal `main`, prima dei thread; altrimenti ASTRO_ASSERT.

@@ -5,6 +5,8 @@ include(GoogleTest)
 # Ogni test ha l'etichetta `fast` (ciclo veloce, selezionata dai preset di test) oppure `slow` (`ctest -L slow`).
 
 add_executable(test_build_info test_build_info.cpp)
+# <regex> di libstdc++ con -O1 e sanitizer: falso positivo -Wmaybe-uninitialized dentro l'header di sistema; resta un warning visibile, non un errore.
+set_source_files_properties(test_build_info.cpp PROPERTIES COMPILE_OPTIONS "-Wno-error=maybe-uninitialized")
 target_link_libraries(test_build_info PRIVATE astrocore GTest::gtest_main)
 if(ASTRO_SOURCE_REVISION)
   target_compile_definitions(test_build_info PRIVATE ASTRO_EXPLICIT_REVISION=1)
@@ -45,8 +47,8 @@ target_include_directories(test_calibration_selection PRIVATE ${PROJECT_SOURCE_D
 gtest_discover_tests(test_calibration_selection PROPERTIES LABELS fast TIMEOUT 1200)
 
 # I tre eseguibili della suite usano main_utc0.cpp: il decoder RAW (tipo io.raw_import) esige TZ=UTC0 dal main (ADR-08.b §2.6).
-# Suite di conformita' della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
-# registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finche' l'unita' di codice non li paga.
+# Suite di conformità della base comune (docs/contracts/BASE-confini.md §3): T-M3BASE-01…17 e 19 per ogni voce del
+# registro dei tipi di job. I casi dei debiti aperti (§4) restano rossi finché l'unità di codice non li paga.
 add_executable(test_conformance test_conformance.cpp main_utc0.cpp)
 target_link_libraries(test_conformance PRIVATE astrocore GTest::gtest SQLite::SQLite3)
 target_include_directories(test_conformance PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
@@ -66,7 +68,7 @@ target_compile_definitions(test_conformance_gaps PRIVATE
 gtest_discover_tests(test_conformance_gaps NO_PRETTY_VALUES TEST_FILTER "*ConformanceGaps*:HashGaps.*"
   PROPERTIES LABELS fast)
 
-# T-M3BASE-20…22 (emendamento L1, unita' U0 di plans/M3a.md): lettura degli input indipendente dal formato. Il file
+# T-M3BASE-20…22 (emendamento L1, unità U0 di plans/M3a.md): lettura degli input indipendente dal formato. Il file
 # include test_conformance.cpp per il banco di prova; il filtro limita ctest ai casi nuovi.
 add_executable(test_conformance_format test_conformance_format.cpp main_utc0.cpp)
 target_link_libraries(test_conformance_format PRIVATE astrocore GTest::gtest SQLite::SQLite3)
@@ -115,6 +117,8 @@ set_tests_properties(T-M2E-13.real_palomar_lfc PROPERTIES LABELS slow TIMEOUT 18
 add_test(NAME T-M2R2-09.real_palomar_product_masters COMMAND test_calibration_real --gtest_filter=CalibReal.T_M2R2_09_*)
 set_tests_properties(T-M2R2-09.real_palomar_product_masters PROPERTIES LABELS slow TIMEOUT 1800
   FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+# T-M2E-13 e T-M2R2-09 oltre 600 s sotto ASan: in parallelo con altri test superano il timeout, quindi girano da soli.
+set_tests_properties(T-M2E-13.real_palomar_lfc T-M2R2-09.real_palomar_product_masters PROPERTIES RUN_SERIAL TRUE)
 
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
@@ -240,6 +244,10 @@ foreach(i RANGE 0 7)
 endforeach()
 set_tests_properties(${ASTRO_U3_FUZZ_TESTS} PROPERTIES LABELS slow TIMEOUT 14400
   ENVIRONMENT "OMP_NUM_THREADS=1;${ASTRO_RAW_PIXLS_ENV}")
+# I semi 0-6 superano 600 s sotto ASan (il seme 7 e quello sintetico no): girano da soli.
+foreach(i RANGE 0 6)
+  set_tests_properties(T-M3A-RAW-10.fuzz_real_${i} PROPERTIES RUN_SERIAL TRUE)
+endforeach()
 
 # T-M3A-RAW-08: un processo nuovo per campione e per fase; (a) prima di (b), (c) dopo tutti (ADR-08.b §2.7).
 add_executable(raw_threads raw_threads.cpp)

@@ -73,8 +73,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-08-decoder-pack.md` | `44cc42cda59c6b958f1911a643a07ddc0fe02f7e82aa01885d43b672051a4195` |
 | `docs/contracts/README.md` | `353e714178f05198679290fc445edac14ca3aa881f4f1d4e91c44d7c8df00b7c` |
-| `docs/decisions/README.md` | `860b4a0b676f845260ed4a326d228c44b1b89ac58910261949fb640d354cad9b` |
+| `docs/decisions/README.md` | `65a2018261ab00625f63ee0fac4881e76542755f6e22c6533fa6dd1af31e068f` |
 | `docs/licenses.md` | `8f26eaa032e5d7c2352f3102542b08caf41880d32d602988c7007111cd8576b1` |
-| `docs/test-matrix.md` | `4c0cdc989add3ce566996917155b30f0dbe2559312c7dfdebf7ef482d5ea02bc` |
+| `docs/test-matrix.md` | `10e2a269e066f817d16594cad55fe64a7175a0ddea104dbea72155f4402aa543` |
 
 <!-- evidence:end -->

@@ -430,7 +430,7 @@ TEST(Recovery, T_M2R4_02_resume_with_a_different_recipe_parameters_or_backend_is
   runner_env env;
   const workflow good = make_workflow(*store, f, env, {});
   const auto must_not_run = []() -> job_outcome {
-    ADD_FAILURE() << "un passo e' stato eseguito da un resume rifiutato";
+    ADD_FAILURE() << "un passo è stato eseguito da un resume rifiutato";
     throw std::runtime_error("passo eseguito da un resume rifiutato");
   };
   const auto variant = [&](const std::function<void(workflow&)>& change) {
@@ -454,7 +454,7 @@ TEST(Recovery, T_M2R4_02_resume_with_a_different_recipe_parameters_or_backend_is
   expect_refused("parametri", variant([&](workflow& wf) { wf.steps[1].node = make_calibration_node(other); }), "resume.recipe");
   expect_refused("ordine", variant([](workflow& wf) { std::swap(wf.steps[0], wf.steps[1]); }), "resume.recipe");
   expect_refused("passo mancante", variant([](workflow& wf) { wf.steps.pop_back(); }), "resume.recipe");
-  expect_refused("passo in piu'", variant([&](workflow& wf) { wf.steps.push_back(workflow_step{"cal9", wf.steps[0].node, must_not_run}); }),
+  expect_refused("passo in più", variant([&](workflow& wf) { wf.steps.push_back(workflow_step{"cal9", wf.steps[0].node, must_not_run}); }),
                  "resume.recipe");
   expect_refused("backend", variant([](workflow& wf) {
                    const node_spec& n = wf.steps[2].node;
@@ -770,7 +770,7 @@ void powerloss_matrix(const std::string& name, std::size_t imports, std::size_t 
   const std::size_t steps = imports + k_count;
   const frames f = make_frames(name, k_count);
   // Un output del passo 0, ricavato da un progetto separato: lo si ripristina in artifacts/ senza fsync durante il
-  // workflow, cosi' la scrittura atomica lo riusa (EEXIST) e deve renderlo durevole prima del commit.
+  // workflow, così la scrittura atomica lo riusa (EEXIST) e deve renderlo durevole prima del commit.
   std::string reused_name;
   std::string reused_bytes;
   {
@@ -832,7 +832,7 @@ void powerloss_matrix(const std::string& name, std::size_t imports, std::size_t 
   powerloss::install(nullptr);
   // Eventi obbligatori per passo: 4 file (calibrazione) o 3 (import) con fsync del file e della directory; almeno avvio del job e commit nel WAL
   // (db_syncs conta xSync e xDelete).
-  EXPECT_EQ(file_syncs, 4 * k_count + 3 * imports + 1) << "piu' il fsync del file riusato";
+  EXPECT_EQ(file_syncs, 4 * k_count + 3 * imports + 1) << "più il fsync del file riusato";
   EXPECT_EQ(dir_syncs, 4 * k_count + 3 * imports);
   EXPECT_GE(db_syncs, 2 * steps);
   ASSERT_GE(states.size(), 2u);
@@ -1115,7 +1115,7 @@ TEST(Recovery, T_M2R4_05_hardlinks_in_the_thumbnail_cache_stop_as_security_witho
     EXPECT_EQ(after.listing, before.listing) << "nessuna voce scritta o rimossa";
     EXPECT_TRUE(same_times(after.dir_times, before.dir_times)) << "directory della cache non modificata (nemmeno un temporaneo creato e rimosso)";
     EXPECT_EQ(after.computations, before.computations) << "nessun calcolo";
-    EXPECT_EQ(after.artifacts, before.artifacts) << "nessun output pubblicato dai due slot (la provenance dello stop e' l'unico artefatto aggiunto)";
+    EXPECT_EQ(after.artifacts, before.artifacts) << "nessun output pubblicato dai due slot (la provenance dello stop è l'unico artefatto aggiunto)";
     EXPECT_EQ(after.thumb_artifact, before.thumb_artifact);
     EXPECT_EQ(x.store->read_slot("rebuild").state, freshness::missing) << "nulla pubblicato dallo slot rebuild";
     for (const std::string& p : cache_points) EXPECT_NE(p.rfind("cache.entry.", 0), 0u) << "scrittura della cache: " << p;

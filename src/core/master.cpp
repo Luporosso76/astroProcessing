@@ -186,7 +186,7 @@ struct master_plan {
 };
 
 master_plan make_plan(const master_recipe& r) {
-  // Prima della validazione: i confronti sui parametri sono gia' operazioni in virgola mobile (ADR-07, D23).
+  // Prima della validazione: i confronti sui parametri sono già operazioni in virgola mobile (ADR-07, D23).
   require_fp_environment();
   validate_master_recipe(r);
   master_plan p;
@@ -207,7 +207,7 @@ master_plan make_plan(const master_recipe& r) {
   return p;
 }
 
-// Fase e linearita' dai metadati, prima di ogni accesso ai campioni (ADR-03, R1).
+// Fase e linearità dai metadati, prima di ogni accesso ai campioni (ADR-03, R1).
 void require_phase(const std::string& name, const std::optional<metadata_value<process_phase>>& phase) {
   if (!phase) stop(error_category::metadata_missing, "master.metadata.phase", "fase di processo non dichiarata", {{"frame", name}});
   if (phase->value != process_phase::raw) {
@@ -217,14 +217,14 @@ void require_phase(const std::string& name, const std::optional<metadata_value<p
 }
 
 void require_linear(const std::string& name, const std::optional<linearity>& lin) {
-  if (!lin) stop(error_category::metadata_missing, "master.metadata.linearity", "linearita' non dichiarata", {{"frame", name}});
+  if (!lin) stop(error_category::metadata_missing, "master.metadata.linearity", "linearità non dichiarata", {{"frame", name}});
   if (*lin != linearity::linear) {
     stop(error_category::unsupported, "master.input_state", "un master si combina da frame lineari",
          {{"frame", name}, {"campo", "linearity"}, {"valore", "nonlinear"}});
   }
 }
 
-// Linearita' dall'header e dalla dichiarazione della ricetta: conflitto = incompatible metadata.declared_conflict.
+// Linearità dall'header e dalla dichiarazione della ricetta: conflitto = incompatible metadata.declared_conflict.
 std::optional<linearity> merged_linearity(const std::string& name, const std::optional<linearity>& header,
                                           const std::optional<linearity>& declared) {
   if (header && declared && *header != *declared) {
@@ -268,7 +268,7 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
   require_phase(name, im.phase);
   fs.origins = apply_declared(im, fs.spec->declared, fs.spec->declared_fields, name.c_str());
   require_linear(name, im.lin);
-  if (!im.unit) stop(error_category::metadata_missing, "master.metadata.unit", "unita' non dichiarata", {{"frame", name}});
+  if (!im.unit) stop(error_category::metadata_missing, "master.metadata.unit", "unità non dichiarata", {{"frame", name}});
   if (*im.unit != pixel_unit::adu) {
     stop(error_category::unsupported, "master.input_state", "un master si combina da frame in ADU",
          {{"frame", name}, {"campo", "unit"}});
@@ -279,12 +279,12 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
   }
   if (im.variance) {
     stop(error_category::unsupported, "master.input_variance",
-         "piano VARIANCE in un frame: la varianza del master e' empirica e il piano non avrebbe uso", {{"frame", name}});
+         "piano VARIANCE in un frame: la varianza del master è empirica e il piano non avrebbe uso", {{"frame", name}});
   }
   validate_image(im);
   const bool finite_ok = im.type == sample_type::f32 ? all_finite_or_flagged<float>(im) : all_finite_or_flagged<double>(im);
   if (!finite_ok) {
-    stop(error_category::invalid_input, "calib.nonfinite_unflagged", "campione non finito senza bit di invalidita'",
+    stop(error_category::invalid_input, "calib.nonfinite_unflagged", "campione non finito senza bit di invalidità",
          {{"frame", name}});
   }
   const master_recipe& r = p.recipe;
@@ -374,7 +374,7 @@ json record_of(const std::string& pair, const char* field, json left, json right
        {{"coppia", pair}, {"campo", field}, {"sinistra", left}, {"destra", right}, {"tolleranza", tolerance}});
 }
 
-// Compatibilita' del frame k con il frame di riferimento canonico (C-02.a §2).
+// Compatibilità del frame k con il frame di riferimento canonico (C-02.a §2).
 void compare_with_reference(master_plan& p, std::size_t k) {
   if (k == 0) return;
   const image& a = p.frames[0].header;
@@ -548,7 +548,7 @@ void finish_preflight(master_plan& p) {
 // ---------------------------------------------------------------- combinazione per pixel (C-02.a §6, §6.3, §7)
 
 // `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f. Kernel del percorso risolto nel preflight
-// (ADR-07); ogni banda e' l'avvio di un task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
+// (ADR-07); ogni banda è l'avvio di un task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
 void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
                   const std::uint16_t* const* bits) {
   kernels::master_band b;
@@ -650,7 +650,7 @@ json recipe_report(const master_recipe& r) {
   return o;
 }
 
-// La mediana di un numero pari di valori finiti puo' andare in overflow nella media dei due centrali.
+// La mediana di un numero pari di valori finiti può andare in overflow nella media dei due centrali.
 json median_or_null(std::vector<double>& v) {
   if (v.empty()) return json::null();
   const double m = median_of(v);
@@ -807,7 +807,7 @@ void render(std::ostringstream& out, const json& value, int depth, const std::st
   }
 }
 
-// Header di uscita: al piu' tre HDU con max_header_cards card ciascuno, piu' il riempimento dei blocchi.
+// Header di uscita: al più tre HDU con max_header_cards card ciascuno, più il riempimento dei blocchi.
 constexpr std::uint64_t output_header_bound = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
 
 }  // namespace
@@ -854,7 +854,7 @@ node_spec make_master_node(const master_recipe& r) {
 
 master_descriptor master_descriptor_from_node(const node_spec& node) {
   const auto bad = [&](const char* why) {
-    stop(error_category::invalid_input, "master.not_master_node", "il nodo non e' un master del prodotto",
+    stop(error_category::invalid_input, "master.not_master_node", "il nodo non è un master del prodotto",
          {{"operatore", node.operator_id()}, {"motivo", why}});
   };
   if (node.operator_id() != master_operator_id) bad("operatore diverso");
@@ -972,7 +972,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
   const auto work = [&](const job_record&) -> job_files_result {
     master_plan p = make_plan(recipe);
     const node_spec& node = *requested;
-    // Apertura, fase e linearita' dai soli header, piano dei file: nessun campione letto.
+    // Apertura, fase e linearità dai soli header, piano dei file: nessun campione letto.
     std::vector<fits_input> inputs;
     std::vector<fits_plan> plans;
     inputs.reserve(p.n);

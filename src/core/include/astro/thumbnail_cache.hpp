@@ -50,7 +50,7 @@ class thumbnail_cache {
   static std::string key_of(const content_digest& source, const preview_request& request);
 
   // Voce valida: cache_hit (nessun calcolo). Assente: calcola, scrive, computed. Presente ma corrotta: integrity
-  // cache.corrupt, nessuna modifica. `source` e' il digest gia' verificato del file.
+  // cache.corrupt, nessuna modifica. `source` è il digest già verificato del file.
   thumbnail_result get(const fits_input& input, const content_digest& source, const preview_request& request,
                        io_memory memory, const cancel_token* cancel = nullptr);
 
@@ -62,7 +62,7 @@ class thumbnail_cache {
 
   // Picco di memoria di get e rebuild con voci valide per `request`: il massimo fra il calcolo dell'anteprima e la
   // voce con l'anteprima (lettura o serializzazione). Legge i soli header di `input`. Una voce presente di dimensione
-  // diversa da quella valida puo' superarlo: dentro un job dello scheduler, budget pool.reservation_exceeded.
+  // diversa da quella valida può superarlo: dentro un job dello scheduler, budget pool.reservation_exceeded.
   static std::uint64_t peak_bytes(const fits_input& input, const preview_request& request);
 
   // Elimina i soli `.tmp-*` regolari con st_nlink = 1; symlink o hardlink: security, nulla viene toccato.

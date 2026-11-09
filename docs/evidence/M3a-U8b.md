@@ -29,13 +29,14 @@ Tutte rilevate con `tools/mutate.sh`, salvo dove indicato.
 | Gruppo | Patch |
 |---|---|
 | Codice (`tmp/u8b-mut/`) | `m1` riferimento dei flat idonei, `m2` scelta automatica solo se unico, `m3` confronto con i flat idonei, `m4` `temperature_policy` mancante, `m5` coppia L–D, `m7` flat idoneo, `m8` `exposure_rel_tol` mancante, `m9` candidato scelto, `m10` tolleranza del nero mancante; `m6` non più applicabile dopo l'arbitraggio, sostituita da `m6b` |
+| Debito slot `master.combine` (`tmp/debt-u8b-mut/` del worktree `debt-u8b`, rimosso) | `m1` caricamento differito dei campioni del master in slot, `m2` slot `master.combine` ignorati |
+| Debito slot `master.combine`, giro 2 (`tmp/r2-u8b-mut/`) | `slot-state` stato dello slot non `current`, `slot-detached` slot `detached`; `slot-artifact` (`|| !view.artifact`) sopravvive: mutante equivalente, `read_slot` restituisce `freshness::current` solo con artefatto pubblicato |
 | Arbitraggio (`tmp/u8b-arb-mut/`) | `m6b` portata di `params_missing`, `a1-import-stopped`, `a5-lights`, `a5-declarations`, `a5-candidates`, `a6-flat-gate`, `a6-bias-gate`, `a7-sample-type`, `a7-black-pattern`, `a7-slot-node`, `a8-thermal-input-lambda`, `a9-dup-user-declarations` |
 
 ## Limiti
 
 - Il motivo di esclusione di un bias incompatibile sia con L–B sia con F–B non è deciso dal contratto e non ha test (si controllano stato e tipo di scelta).
 - `coverage` non è nel report di import FITS: nel percorso sullo store non è osservabile.
-- Il percorso sullo store per gli slot `master.combine` non è coperto da un test, compreso il caricamento differito dei campioni di un master in slot (serve una fixture con un nodo `master.combine` pubblicato, unità successiva).
 
 ## Review
 
@@ -57,11 +58,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
 | `src/core/include/astro/batch_classification.hpp` | `3ff40fc084e923fc70ad5c62dfcd60e72b9bada5eb3c928930233d1e8747c98d` |
 | `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
-| `src/core/raw_decode.cpp` | `e114fbf53cad623be8ab4a4c4fd952fc33227f29e171e8788259f5e0b493029e` |
+| `src/core/raw_decode.cpp` | `962885ee61bb61c8c72002f357367922909a1699d7e16fbdf48d5cb023d1513b` |
 | `tests/unit/raw_record_keys.hpp` | `ff32b3c8f5e0942397921048068e0cd13b0859bf11f5e81dae13c8f7e9169baf` |
-| `tests/unit/test_batch_analysis.cpp` | `46dab6c51f440cb4e09a28ac74712c40b442e4c47c7898e45d1f87913223959e` |
+| `tests/unit/test_batch_analysis.cpp` | `1bb699f0ab2fa65f44807d545f44264eb28c1622bbfbe553070523151a618f64` |
 | `tests/unit/test_verify_selection.cpp` | `6f5aaaf67fbc983c4f909bec5178b56ba7191c6c27ccae5e2bff5ab2f859c642` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

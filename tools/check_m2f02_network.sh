@@ -2,7 +2,7 @@
 # T-M2F-02: il workflow M2.e completo (tests/unit/m2e_workflow) non esegue chiamate di rete.
 # Uso: check_m2f02_network.sh <eseguibile m2e_workflow> <directory temporanea nel progetto>
 # Prima si verifica che strace rilevi davvero una chiamata di rete (canarino), poi si traccia il workflow:
-# il test passa solo se il canarino e' visto e il workflow non produce alcuna riga di rete.
+# il test passa solo se il canarino è visto e il workflow non produce alcuna riga di rete.
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then

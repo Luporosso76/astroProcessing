@@ -230,10 +230,10 @@ TEST(Resources, T_M2R3_08_job_queue_capacity_stops_job_n_plus_1) {
       cancel.request();
       hold.release();
       for (std::thread& t : waiting) t.join();
-      FAIL() << "i job in coda non hanno raggiunto la capacita'";
+      FAIL() << "i job in coda non hanno raggiunto la capacità";
     }
     job_spec spec(node, 1, [](task_context&) { return std::string(); });
-    // Il token e' gia' richiesto: se la coda non fosse piena il job attenderebbe e si fermerebbe con sched.cancelled
+    // Il token è già richiesto: se la coda non fosse piena il job attenderebbe e si fermerebbe con sched.cancelled
     // invece di bloccare il test.
     cancel_token probe_cancel;
     probe_cancel.request();
@@ -241,7 +241,7 @@ TEST(Resources, T_M2R3_08_job_queue_capacity_stops_job_n_plus_1) {
     cancel.request();
     hold.release();
     for (std::thread& t : waiting) t.join();
-    // Dopo il cancel un job in coda o si ferma con sched.cancelled o, se ha gia' preso il pool, termina.
+    // Dopo il cancel un job in coda o si ferma con sched.cancelled o, se ha già preso il pool, termina.
     for (const std::string& o : outcomes) EXPECT_TRUE(o == "completed" || o == "sched.cancelled") << o;
   }
 }
@@ -339,7 +339,7 @@ TEST(Resources, T_M2R3_09_config_is_persisted_and_revalidated_on_reopen) {
     EXPECT_STOP(save_resource_config(*store, full_config()), error_category::schema, "store.read_only");
   }
   {
-    // Un valore alterato fuori dal dominio o con chiavi sconosciute e' rifiutato in lettura, non riparato.
+    // Un valore alterato fuori dal dominio o con chiavi sconosciute è rifiutato in lettura, non riparato.
     auto store = sqlite_dag_store::open(root, open_intent::read_write);
     const std::string good = canonical_json(resource_config_json(full_config()));
     const auto replaced = [&](const std::string& from, const std::string& to) {
@@ -364,8 +364,8 @@ TEST(Resources, T_M2R3_09_config_is_persisted_and_revalidated_on_reopen) {
       store->put_setting(resource_config_setting_key, replaced(original, negative));
       EXPECT_STOP(load_resource_config(*store), error_category::invalid_input, "resources.setting_malformed");
     }
-    // Il parser legge come intero fino a 2^53 incluso: 2^53 e' un intero oltre il limite configurativo (2^53 - 1) e dà
-    // resources.<campo>; oltre 2^53 e' un numero non intero (limite del parser): setting_malformed. Un reale fuori dominio (psi_threshold) e' un dominio, non un tipo.
+    // Il parser legge come intero fino a 2^53 incluso: 2^53 è un intero oltre il limite configurativo (2^53 - 1) e dà
+    // resources.<campo>; oltre 2^53 è un numero non intero (limite del parser): setting_malformed. Un reale fuori dominio (psi_threshold) è un dominio, non un tipo.
     for (const auto& [from, to, code] : std::vector<std::tuple<std::string, std::string, std::string>>{
              {"\"rss_target_bytes\":123456789", "\"rss_target_bytes\":9007199254740994", "resources.setting_malformed"},
              {"\"rss_target_bytes\":123456789", "\"rss_target_bytes\":9007199254740992", "resources.rss_target_bytes"},
@@ -450,7 +450,7 @@ TEST(Resources, T_M2R3_09_cpu_set_is_applied_to_workers_only_and_validated_again
   for (unsigned i = 0; i < CPU_SETSIZE && cpus.size() < 2; ++i) {
     if (CPU_ISSET(i, &allowed)) cpus.push_back(i);
   }
-  ASSERT_EQ(cpus.size(), 2u) << "servono almeno due CPU nell'affinita'";
+  ASSERT_EQ(cpus.size(), 2u) << "servono almeno due CPU nell'affinità";
   resource_config c;
   c.cpu_set = cpus;
   c.worker_count = 2;
@@ -483,7 +483,7 @@ TEST(Resources, T_M2R3_09_cpu_set_is_applied_to_workers_only_and_validated_again
   const cpu_set_t after = current_affinity();
   EXPECT_TRUE(CPU_EQUAL(&before, &after));  // il thread chiamante non cambia
 
-  // CPU fuori dall'affinita' (iniettata): stop prima di ogni task.
+  // CPU fuori dall'affinità (iniettata): stop prima di ogni task.
   const affinity_fn only_cpu0 = [](cpu_set_t* set) {
     CPU_ZERO(set);
     CPU_SET(0, set);
@@ -510,7 +510,7 @@ TEST(Resources, T_M2R3_09_cpu_set_is_applied_to_workers_only_and_validated_again
 }
 
 TEST(Resources, T_M2R3_09_a_failed_affinity_application_stops_the_job_with_the_system_error) {
-  // L'affinita' iniettata dichiara la CPU 1000, che il kernel non conosce: pthread_setaffinity_np fallisce davvero.
+  // L'affinità iniettata dichiara la CPU 1000, che il kernel non conosce: pthread_setaffinity_np fallisce davvero.
   // Precondizione ambientale: la macchina ha meno di 1000 CPU configurate.
   ASSERT_LT(::sysconf(_SC_NPROCESSORS_CONF), 1000);
   const affinity_fn fake = [](cpu_set_t* set) {
@@ -685,7 +685,7 @@ TEST(Resources, T_M2R3_03_monitor_reports_pool_rss_scratch_cache_vram_and_signal
   EXPECT_FALSE(s.budget_below_working_set);
   EXPECT_EQ(pool.reserved_bytes(), 10 * MiB);  // nessuna azione automatica
 
-  // Cache entro quota: il segnale e' spento.
+  // Cache entro quota: il segnale è spento.
   resource_config roomy = cfg;
   roomy.disk_cache = dir_quota{fs::absolute(cache_dir), 2000};
   mi.config = &roomy;

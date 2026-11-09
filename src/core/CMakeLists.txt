@@ -8,14 +8,14 @@ set(ASTRO_COMPILER "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 configure_file(build_info_generated.cpp.in
   ${CMAKE_CURRENT_BINARY_DIR}/build_info_generated.cpp @ONLY)
 
-set(ASTRO_SOURCE_REVISION "" CACHE STRING "Identificatore del sorgente quando non e' un checkout git")
+set(ASTRO_SOURCE_REVISION "" CACHE STRING "Identificatore del sorgente quando non è un checkout git")
 execute_process(COMMAND git -C "${CMAKE_SOURCE_DIR}" rev-parse HEAD
   RESULT_VARIABLE ASTRO_GIT_RC OUTPUT_QUIET ERROR_QUIET)
 if(ASTRO_SOURCE_REVISION AND ASTRO_GIT_RC EQUAL 0)
   message(FATAL_ERROR "ASTRO_SOURCE_REVISION passato in un checkout git: due fonti in conflitto")
 endif()
 if(NOT ASTRO_SOURCE_REVISION AND NOT ASTRO_GIT_RC EQUAL 0)
-  message(FATAL_ERROR "Il sorgente non e' un checkout git: passare -DASTRO_SOURCE_REVISION=<id>")
+  message(FATAL_ERROR "Il sorgente non è un checkout git: passare -DASTRO_SOURCE_REVISION=<id>")
 endif()
 if(ASTRO_SOURCE_REVISION AND NOT ASTRO_SOURCE_REVISION MATCHES "^[A-Za-z0-9._+-]+$")
   message(FATAL_ERROR "ASTRO_SOURCE_REVISION non valido: ammessi [A-Za-z0-9._+-]")
@@ -92,3 +92,6 @@ target_include_directories(astrocore PUBLIC include)
 target_compile_features(astrocore PUBLIC cxx_std_20)
 target_link_libraries(astrocore PUBLIC astro_cfitsio)
 target_link_libraries(astrocore PRIVATE OpenSSL::Crypto SQLite::SQLite3 ZLIB::ZLIB astro_libraw astro_wcslib)
+
+# <regex> di libstdc++ con -O1 e sanitizer: falso positivo -Wmaybe-uninitialized dentro l'header di sistema; resta un warning visibile, non un errore.
+set_source_files_properties(resources.cpp PROPERTIES COMPILE_OPTIONS "-Wno-error=maybe-uninitialized")

@@ -27,7 +27,7 @@ constexpr ratio pressure_ratio{1, 4};
 static_assert(budget_fraction_normal == double(normal_ratio.num) / double(normal_ratio.den));
 static_assert(budget_fraction_pressure == double(pressure_ratio.num) / double(pressure_ratio.den));
 
-// floor(v·num/den) senza calcolare v·num, che puo' superare 2^64.
+// floor(v·num/den) senza calcolare v·num, che può superare 2^64.
 constexpr std::uint64_t scale(std::uint64_t v, ratio r) { return v / r.den * r.num + v % r.den * r.num / r.den; }
 static_assert(scale(~std::uint64_t{0}, normal_ratio) == ~std::uint64_t{0} / 8 * 3 + 7 * 3 / 8);
 constexpr std::uint64_t max_source_bytes = std::uint64_t{1} << 16;
@@ -146,7 +146,7 @@ std::vector<fs::path> cgroup_levels(const budget_sources& sources) {
     }
     if (id == "0") {
       if (!controllers.empty()) cgroup_parse("gerarchia 0 con lista di controller non vuota", self);
-      if (v2_path) cgroup_parse("piu' righe cgroup v2", self);
+      if (v2_path) cgroup_parse("più righe cgroup v2", self);
       v2_path = path;
     } else if (controllers.empty() || id.front() == '0') {
       cgroup_parse("riga cgroup v1 con id o controller non validi", self);
@@ -193,7 +193,7 @@ std::optional<cgroup_limit> read_cgroup(const budget_sources& sources) {
     const std::uint64_t current = parse_cgroup_number(strip_newline(*current_text), current_path);
     if (current >= max) {
       throw stop_error(error_category::budget, "budget.cgroup_over_limit",
-                       "il cgroup ha gia' raggiunto il proprio limite",
+                       "il cgroup ha già raggiunto il proprio limite",
                        {{"cgroup_max", std::to_string(max)}, {"cgroup_current", std::to_string(current)},
                         {"cgroup", level.string()}});
     }
@@ -354,7 +354,7 @@ budget_snapshot compute_manual_budget(const manual_budget& manual, const budget_
   }
   s.budget_bytes = floor_mib(bytes);
   if (s.budget_bytes == 0 || s.budget_bytes > s.mem_total_bytes) {
-    out_of_range("il budget manuale e' zero o supera mem_total",
+    out_of_range("il budget manuale è zero o supera mem_total",
                  {{"budget_bytes", std::to_string(s.budget_bytes)}, {"mem_total", std::to_string(s.mem_total_bytes)},
                   {"valore", to_string(checked)}});
   }

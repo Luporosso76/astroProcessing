@@ -76,8 +76,8 @@ TEST(U12Check, CapabilitiesCfitsioNotReentrant) {
   expect_check_dies([](observed& o) { o.cfitsio_reentrant = 0; });
 }
 
-// Un processo figlio per prova: `verified()` e' per processo e il genitore non deve mai avere chiamato verify_once.
-// Esiti del figlio: 0 ok, 2 gia' vero all'inizio, 4 ancora falso dopo l'uso, 5 la libreria e' stata raggiunta con valori
+// Un processo figlio per prova: `verified()` è per processo e il genitore non deve mai avere chiamato verify_once.
+// Esiti del figlio: 0 ok, 2 già vero all'inizio, 4 ancora falso dopo l'uso, 5 la libreria è stata raggiunta con valori
 // alterati; un'eccezione termina il figlio (134).
 [[noreturn]] void finish(int code, const char* what) {
   if (code != 0) std::fprintf(stderr, "U12Verified: %s\n", what);
@@ -86,7 +86,7 @@ TEST(U12Check, CapabilitiesCfitsioNotReentrant) {
 
 // Punti d'iniezione del punto di verifica (nome scelto dai test, header atteso: `third_party::set_fault_injector`):
 // per ciascun valore osservato un valore non nullo restituito dall'iniettore sostituisce quello letto dalla libreria
-// (numero di versione, capacita', versione CFITSIO in millesimi); zero lascia il valore letto.
+// (numero di versione, capacità, versione CFITSIO in millesimi); zero lascia il valore letto.
 constexpr const char* kPointLibRawVersionNumber = "third_party.libraw_version_number";
 constexpr const char* kPointCfitsioVersionMilli = "third_party.cfitsio_version_milli";
 
@@ -165,7 +165,7 @@ void child_encode_bad_value() {
 }
 
 // Ordine LibRaw: con il guasto iniettato nessun punto raggiungibile solo dopo l'ingresso in open_buffer deve scattare:
-// ne' il gancio prima di open_buffer, ne' libraw_return("open_buffer"), ne' i ganci successivi. Il buffer e' un DNG
+// né il gancio prima di open_buffer, né libraw_return("open_buffer"), né i ganci successivi. Il buffer è un DNG
 // valido: se open_buffer fosse chiamato, libraw_return scatterebbe comunque.
 void child_decode_order_before_open_buffer() {
   exit_instead_of_core_dump();

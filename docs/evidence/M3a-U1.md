@@ -108,17 +108,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
-| `src/core/calibration_internal.hpp` | `9e536cf219d574cfae3959259d9396228b21e48bee8bc481034dca6106a83a4c` |
-| `src/core/fits.cpp` | `ef596caae35a0bf99f0384d53bf2d901fed8609794db13ff32a50f1865789b5b` |
-| `src/core/fits_blocks.cpp` | `af6c39463726457e4951d39e9672dcb9072cc86a5d97caa90ae4d375cc4b1c7a` |
-| `src/core/fits_header.cpp` | `0ac963b56356149b128339563f688294664ca9c8770a523bbcf925fc690e1b45` |
-| `src/core/fits_internal.hpp` | `15a8f763955ad2e0fc6358e240ee19cb9e23730b28f2b8856b8e19f52b24b07b` |
-| `src/core/image.cpp` | `1328d714b18320f0190c394ac08a08dce7d93f4d8328502f5b275cd402616761` |
-| `src/core/import_job.cpp` | `304aeffb88c57fd4698a861ba22058a9b4867080e83c72feebe63005bd2d6fb6` |
-| `src/core/include/astro/image.hpp` | `216e96b4fc5088e01775261255f8ecbeda63c35e5925d2523e0a743bb984da03` |
-| `tests/unit/CMakeLists.txt` | `e3c343d6d071dd685e381d590046e523e1444612ec45d0935158634425c1f98f` |
-| `tests/unit/test_decoder_types.cpp` | `63adee44ced66be345321731e77d2b4a352d9055410f057890ae82a1c457dc46` |
+| `src/core/calibration_internal.hpp` | `2fe553cd10701f906dd64be0005386d5662a0848ded01fd32c5884557ace1808` |
+| `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
+| `src/core/fits_blocks.cpp` | `1866760822bf9c9a8759e00af3bd74b105c5cb05be80b18be7574df9b72eaac5` |
+| `src/core/fits_header.cpp` | `ff80ce493bf7c58bef5952e60fbac5bfe1dfe2c65eaa0a785482a0f249dec22d` |
+| `src/core/fits_internal.hpp` | `12e42b7ff88eb36cb32625ff8703d860f31c93256f21f2e50e99853c2563d7b2` |
+| `src/core/image.cpp` | `ac289188bb822477092d8ec410becc65e1fa024290c598f75c9abe79b0e3a4fe` |
+| `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |
+| `src/core/include/astro/image.hpp` | `10df60c894f27ecf61eb43cc8d4efc8d0013bce394bbb044c3711fcf5f327537` |
+| `tests/unit/CMakeLists.txt` | `245405ec419284a27b5c3fc4ef39a08c05684c6a925f5b32ce0a2d5edefdb3ed` |
+| `tests/unit/test_decoder_types.cpp` | `494dc8f8865a8140fea8a25cb13c5be4d990377b272b1227c0f9e5690b9a2dc7` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

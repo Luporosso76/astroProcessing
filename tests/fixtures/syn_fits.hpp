@@ -75,7 +75,7 @@ inline std::uint64_t bits_of(double d) {
 struct raw_hdu {
   int bitpix = 16;
   std::vector<std::uint64_t> axes;
-  std::vector<std::string> cards;  // card extra, gia' da 80 caratteri
+  std::vector<std::string> cards;  // card extra, già da 80 caratteri
   bytes data;                      // data unit non imbottita, big-endian
   bool primary = true;
   std::string xtension = "IMAGE";
@@ -166,7 +166,7 @@ enum class frame_kind { light, dark, flat, dark_flat, bias };
 
 struct synth_frame {
   bytes file;
-  std::vector<std::uint16_t> adu;  // verita': campioni attesi, riga per riga
+  std::vector<std::uint16_t> adu;  // verità: campioni attesi, riga per riga
   std::uint32_t width = 0;
   std::uint32_t height = 0;
   double exposure_s = 0;
@@ -216,7 +216,7 @@ inline synth_frame make_synth_frame(frame_kind kind, std::uint32_t width, std::u
 
 // ---------------------------------------------------------------- frame M2.e con valori arbitrari
 
-// Header di un frame di calibrazione: ogni campo e' una card; `cfa` aggiunge BAYERPAT e gli offset.
+// Header di un frame di calibrazione: ogni campo è una card; `cfa` aggiunge BAYERPAT e gli offset.
 struct calib_header {
   std::string imagetyp = "Light Frame";
   double exposure = 60;
@@ -233,7 +233,7 @@ struct calib_header {
   int xbin = 1;
   int ybin = 1;
   bool with_unit_and_linear = true;
-  // Con `with_unit_and_linear`: LINEAR assente se `with_linear` e' falso, altrimenti `linear_value`.
+  // Con `with_unit_and_linear`: LINEAR assente se `with_linear` è falso, altrimenti `linear_value`.
   bool with_linear = true;
   bool linear_value = true;
   // Fase di processo (card ASTRPHAS); vuota = card assente.

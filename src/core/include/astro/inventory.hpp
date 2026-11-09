@@ -39,7 +39,7 @@ struct fits_inventory {
   std::optional<pixel_unit> unit;
   std::optional<linearity> lin;
   linearity_class lin_class = linearity_class::unknown;
-  // Origine della linearita': assente quando `lin_class` e' `unknown` e nessuno l'ha dichiarata.
+  // Origine della linearità: assente quando `lin_class` è `unknown` e nessuno l'ha dichiarata.
   std::optional<metadata_origin> lin_origin;
   std::optional<metadata_value<process_phase>> phase;
   std::optional<std::uint32_t> binning_x;
@@ -54,7 +54,7 @@ struct fits_inventory {
 reservation reserve_or_stop(memory_pool& pool, std::uint64_t bytes, const char* label);
 
 // Memoria delle letture: il pool, con reserve_or_stop, per le chiamate fuori da un job; la prenotazione di un job dello
-// scheduler, gia' presa prima del primo task, con sotto-prenotazioni (oltre il residuo: budget
+// scheduler, già presa prima del primo task, con sotto-prenotazioni (oltre il residuo: budget
 // pool.reservation_exceeded).
 class io_memory {
  public:

@@ -44,15 +44,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-16-stati-master.md` | `0f42ff8697090990163c54147559f4f7435121acf91b42ff46a142f5f5ebbf58` |
 | `docs/contracts/C-01-calibrazione-light.md` | `063e14eacdbf25c92b31cf78c4bb6e19934d39fada23a06ba0c24d7fe8212162` |
-| `src/core/calibration.cpp` | `552fcc48742a6a543c408e8c7adb2cd20c68bd71d3deb08fa1a4cdd2076d430d` |
+| `src/core/calibration.cpp` | `afb96d94684d9752c001363a90557d2eed55a5ea6caa7faf87863985d9ad2e6b` |
 | `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
-| `src/core/fits.cpp` | `ef596caae35a0bf99f0384d53bf2d901fed8609794db13ff32a50f1865789b5b` |
+| `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
 | `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
 | `src/core/include/astro/operations.hpp` | `0ff6fe02460c785052085650cbeb2214d49051318f10f5d83c80a4c73010f6df` |
 | `src/core/operations.cpp` | `f1f5b17966332891c75e50c0ee8d91e73034f32b19d65c082a66a1b75d1a88ae` |
-| `tests/unit/test_calibration.cpp` | `27eba24afcba2e21b4f50e65b2e49608f06e6abe12e902340976d8efb40bb373` |
+| `tests/unit/test_calibration.cpp` | `407b69be394609bc9f01fe47740b3eeca59eb3c438d3a9c1b24b2aa8a4256958` |
 | `tests/unit/test_calibration_analysis_u6.cpp` | `170dcf881f515c5d029c3cbadc16b96ba65170ad2d9c06c20d28613cb58589d0` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

@@ -81,7 +81,7 @@ void memory_dag_store::create_slot(const std::string& slot_name, const std::stri
   std::lock_guard lock(mutex_);
   require_node(target_node_key);
   if (!slots_.emplace(slot_name, slot_record{slot_name, 0, target_node_key, std::nullopt}).second) {
-    throw stop_error(error_category::invalid_input, "dag.duplicate_slot", "slot gia' esistente",
+    throw stop_error(error_category::invalid_input, "dag.duplicate_slot", "slot già esistente",
                      {{"slot", slot_name}});
   }
 }
@@ -173,7 +173,7 @@ void memory_dag_store::publish(std::uint64_t job_id, std::uint64_t artifact_id) 
                      {{"job", std::to_string(job_id)}, {"artefatto", std::to_string(artifact_id)}});
   }
   if (job->second.state != job_state::running) {
-    throw stop_error(error_category::invalid_input, "dag.job_not_running", "il job non e' in esecuzione",
+    throw stop_error(error_category::invalid_input, "dag.job_not_running", "il job non è in esecuzione",
                      {{"job", std::to_string(job_id)}});
   }
   if (!artifact->second.present) {
@@ -188,7 +188,7 @@ void memory_dag_store::publish(std::uint64_t job_id, std::uint64_t artifact_id) 
   slot_record& slot = slot_ref(job->second.slot_name);
   if (slot.current_generation != job->second.generation) {
     throw stop_error(error_category::stale_generation, "dag.stale_publish",
-                     "la generazione dello slot e' cambiata durante il job",
+                     "la generazione dello slot è cambiata durante il job",
                      {{"slot", slot.slot_name},
                       {"generazione_job", std::to_string(job->second.generation)},
                       {"generazione_slot", std::to_string(slot.current_generation)}});

@@ -86,16 +86,16 @@ spill_file& spill_area::open_named_file(const std::string& name, bool existing) 
       throw stop_error(error_category::metadata_missing, "sched.checkpoint_missing", "staging del checkpoint assente",
                        {{"nome", name}});
     }
-    if (err == ELOOP) unsafe_staging(name, "lo staging e' un symlink");
-    if (err == EISDIR) unsafe_staging(name, "lo staging non e' un file regolare");
+    if (err == ELOOP) unsafe_staging(name, "lo staging è un symlink");
+    if (err == EISDIR) unsafe_staging(name, "lo staging non è un file regolare");
     throw_errno(error_category::io, "spill.staging_open", "apertura dello staging fallita", err, {{"nome", name}});
   }
   spill_file file(*this, fd);
   open_files_.fetch_add(1);
   struct stat st {};
   if (::fstat(fd, &st) != 0) throw_errno(error_category::io, "spill.staging_open", "fstat dello staging fallita", errno);
-  if (!S_ISREG(st.st_mode)) unsafe_staging(name, "lo staging non e' un file regolare");
-  if (st.st_nlink != 1) unsafe_staging(name, "lo staging ha piu' di un collegamento");
+  if (!S_ISREG(st.st_mode)) unsafe_staging(name, "lo staging non è un file regolare");
+  if (st.st_nlink != 1) unsafe_staging(name, "lo staging ha più di un collegamento");
   if (!existing) {
     if (::ftruncate(fd, 0) != 0) throw_errno(error_category::io, "spill.staging_open", "troncamento dello staging fallito", errno);
   } else {

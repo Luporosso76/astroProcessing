@@ -300,7 +300,7 @@ TEST(Fits, T_M2A_04_declared_value_conflicting_with_header_stops) {
   EXPECT_EQ(img.metadata.saturation_adu->source.origin, metadata_origin::declared);
   EXPECT_STOP(declare_metadata(img.metadata.saturation_adu, 60000.0, "saturation_adu"),
               error_category::incompatible, "metadata.declared_conflict");
-  // un valore dichiarato viene scritto nella sua keyword; l'origine e' provenienza e non entra nel file
+  // un valore dichiarato viene scritto nella sua keyword; l'origine è provenienza e non entra nel file
   image again = decode(encode_fits(img));
   ASSERT_TRUE(again.metadata.saturation_adu.has_value());
   EXPECT_EQ(again.metadata.saturation_adu->value, 65535.0);
@@ -540,7 +540,7 @@ TEST(Fits, T_M2A_05_peak_over_budget_stops_before_reading) {
   EXPECT_EQ(plan.peak_bytes, f.file.size() + 512u * 4u + 512u * 2u);
   EXPECT_NO_THROW(read_fits_bytes(in, plan.peak_bytes));
   EXPECT_STOP(read_fits_bytes(in, plan.peak_bytes - 1), error_category::budget, "sched.job_exceeds_budget");
-  // la lettura non e' tentata: con il file cresciuto vince il budget, non size_changed
+  // la lettura non è tentata: con il file cresciuto vince il budget, non size_changed
   { std::ofstream a(path, std::ios::binary | std::ios::app); a << "extra"; }
   EXPECT_STOP(read_fits_bytes(in, 1), error_category::budget, "sched.job_exceeds_budget");
   fs::remove(path);
@@ -830,7 +830,7 @@ TEST(Fits, T_M2A_09_invalid_and_variance_extensions_roundtrip_identically) {
     EXPECT_EQ(inv.bitpix, 16);
     fx::raw_primary_view var = fx::parse_hdu(out, 2);
     EXPECT_EQ(var.bitpix, t == sample_type::f32 ? -32 : -64);
-    // verita' indipendente della maschera: parole big-endian con offset 32768
+    // verità indipendente della maschera: parole big-endian con offset 32768
     for (int i = 0; i < 20; ++i) {
       const std::uint16_t word = static_cast<std::uint16_t>((inv.data[2 * i] << 8) | inv.data[2 * i + 1]);
       EXPECT_EQ(static_cast<std::uint16_t>(word ^ 0x8000u), img.invalid.bits[i]) << i;
@@ -964,7 +964,7 @@ TEST(Fits, T_M2A_13_rgb_and_multi_plane_are_read_kept_and_rewritten_bit_exact) {
       EXPECT_EQ(again.layout, img.layout);
     }
   }
-  // CTYPE3 = RGB con planes != 3 non e' un rgb
+  // CTYPE3 = RGB con planes != 3 non è un rgb
   image five = decode(fx::build_fits({raw_image(16, {2, 2, 4}, {fx::card_str("CTYPE3", "RGB")})}));
   EXPECT_EQ(five.layout, plane_layout::multi_plane);
   EXPECT_EQ(five.header_cards.size(), 1u);
@@ -1179,7 +1179,7 @@ TEST(Fits, REVIEW_declared_geometry_and_rgb_card_are_preserved) {
   EXPECT_EQ(fx::parse_hdu(encode_fits(flat3)).axes, (std::vector<std::uint64_t>{3, 2, 1}));
   EXPECT_TRUE(decode(encode_fits(flat3)) == flat3);
 
-  // CTYPE3 resta dov'e' nel file e non viene duplicato
+  // CTYPE3 resta dov'è nel file e non viene duplicato
   const std::vector<std::string> cards = {fx::card_str("OBJECT", "a"), fx::card_str("CTYPE3", "RGB"), fx::card_str("OBJECT2", "b")};
   image rgb = decode(fx::build_fits({raw_image(8, {2, 2, 3}, cards)}));
   EXPECT_EQ(rgb.layout, plane_layout::rgb);

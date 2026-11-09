@@ -80,7 +80,7 @@ TEST(Budget, T_M2D_01_manual_value_is_checked_against_mem_total_and_denominators
   sys.cgroup("app", "17179869184\n", "0\n");  // 16 GiB: il 100 % supera mem_total
   EXPECT_STOP(compute_manual_budget(parse_manual_budget("100%:cgroup_max"), src), error_category::invalid_input,
               "budget.out_of_range");
-  sys.cgroup("app", "52428800\n", "0\n");  // 50 MiB: l'1 % arrotondato per difetto a 1 MiB e' zero
+  sys.cgroup("app", "52428800\n", "0\n");  // 50 MiB: l'1 % arrotondato per difetto a 1 MiB è zero
   EXPECT_STOP(compute_manual_budget(parse_manual_budget("1%:cgroup_max"), src), error_category::invalid_input,
               "budget.out_of_range");
 }
@@ -199,7 +199,7 @@ TEST(Budget, T_M2D_03_cgroup_headroom_bounds_the_available_memory) {
   EXPECT_EQ(s.cgroup_max_bytes, std::nullopt);
   EXPECT_EQ(s.budget_bytes, 1536 * MiB);
 
-  sys.cgroup("app", "1610612736\n", "536870912\n");  // l'antenato ha 1 GiB di margine: stringe piu' del livello proprio
+  sys.cgroup("app", "1610612736\n", "536870912\n");  // l'antenato ha 1 GiB di margine: stringe più del livello proprio
   s = compute_automatic_budget(sys.sources());
   EXPECT_EQ(s.cgroup_max_bytes, 1536 * MiB);
   EXPECT_EQ(s.cgroup_current_bytes, 512 * MiB);

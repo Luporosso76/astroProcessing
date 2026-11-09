@@ -89,17 +89,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
-| `src/core/include/astro/job.hpp` | `452dd5673b6050bb19e6c78ed94c572e704055865c7b49463c042930458bd020` |
-| `src/core/include/astro/sqlite_dag_store.hpp` | `783fa87a3f6778e1976a1f4846635a500683887a0dabfcd99ff7753eb083fe16` |
+| `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
+| `src/core/include/astro/job.hpp` | `0fee416857ca8512700e91b0550d9db9df20089369de792360a46b08a881f696` |
+| `src/core/include/astro/sqlite_dag_store.hpp` | `da0919b01c2c79fcd4778ba7bcd8ca57f60f60e7cce098fdb50f91d51732711b` |
 | `src/core/include/astro/workflow.hpp` | `9afee58d34b3b806c1183e6eefe236fd5c5d43b14a73377623f9b8713df94358` |
-| `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
-| `src/core/sqlite_dag_store.cpp` | `141422518f46f6367902eab709e6a9203d74fef453096db8f4f9fc04e16a06d3` |
-| `src/core/stop_internal.hpp` | `583e74243a3e8c28fa0cc15e918639a0acc083e95a69ded2241066b1a52eb9c4` |
-| `src/core/workflow.cpp` | `9eaadacfce9fb87b2d5dc4998411efc27d15c4d6084cd48595ae446a50ffa84a` |
-| `tests/unit/test_conformance.cpp` | `1a0ba9ea22e1823b805156c36435f106d89c1e253896a430e8f8ffda9c125918` |
-| `tests/unit/test_store.cpp` | `06de27ef8db29c9c45d168c3858883a2a6528e6004b36518bc3adfac52bdbdac` |
+| `src/core/job.cpp` | `2a9e50d9c727188f495e7c929032e33ec507eb4f60aa5cf26751aa6d5dccb438` |
+| `src/core/sqlite_dag_store.cpp` | `72d97ae8f15069d3c4bbdf0c46b2ef81a1b9a50b4bc3a6d7d80f7ac3c6b0bd72` |
+| `src/core/stop_internal.hpp` | `d6971cf39d82c30fb98965f59abb392cf7797b745c7b6fe0136e2c9577c90878` |
+| `src/core/workflow.cpp` | `0a84c17a95ac15ad821c4ef210df6d24af7fad937840b26c7c531c619068c881` |
+| `tests/unit/test_conformance.cpp` | `ec1c929815e7bfcc4f008873a9412356844953f3dadf097cb6a799621b7e3107` |
+| `tests/unit/test_store.cpp` | `6901f6e2b089f825076bfcff6b09a8b98d0286e2c3b580b8db929ce803c03fa8` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

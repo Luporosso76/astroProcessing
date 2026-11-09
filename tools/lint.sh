@@ -53,6 +53,27 @@ scan() {
   [ "$found" -eq 0 ]
 }
 
+# Accenti: parole italiane scritte con l'apostrofo al posto dell'accento («piu'», «e'»). Elenco esplicito, perché
+# l'apostrofo delle elisioni («l'immagine») e i letterali carattere («'e'») sono legittimi. Il controllo è testo puro
+# (commenti, stringhe, Python, shell): ast-grep non copre tutti i linguaggi di src/ tests/ tools/ allo stesso modo.
+accent_words='meta|utilita|piu|gia|puo|unita|identita|linearita|verita|capacita|cosi|affinita|finche|affinche|rappresentabilita|conformita|compatibilita|invalidita|disuniformita|perche|durabilita|purche|cioe|proprieta|profondita|parita|liberta|affidabilita|sara|fallira|girera|rifa|poiche|benche|pero|stabilita|qualita|citta|novita|possibilita|necessita|quantita|attivita|ahime|nonche|ne|e|da|cio'
+# Parola isolata seguita da apostrofo; e la stessa dopo l'apostrofo di un'elisione («l'unita'»).
+accent_re_word="(^|[^A-Za-z'])(${accent_words})'([^A-Za-z]|\$)"
+accent_re_elided="[A-Za-z]'(${accent_words})'([^A-Za-z]|\$)"
+
+# accent_scan <percorso>...: stampa le occorrenze (file:riga:testo), ritorna 1 se ce ne sono, 2 se grep fallisce.
+# Questo file è escluso: contiene l'elenco e gli esempi del controllo, quindi le parole con apostrofo per definizione.
+accent_scan() {
+  local hits st=0
+  hits="$(grep -rIEn --exclude-dir=third_party --exclude-dir=build --exclude=lint.sh -e "$accent_re_word" -e "$accent_re_elided" "$@")" || st=$?
+  if [ "$st" -eq 1 ]; then return 0; fi
+  if [ "$st" -ne 0 ]; then echo "lint: grep degli accenti fallito (uscita $st)" >&2; return 2; fi
+  while IFS= read -r hit; do
+    printf 'accenti\t%s\n' "$hit"
+  done <<<"$hits"
+  return 1
+}
+
 mkdir -p tmp
 
 if [ "${1:-}" = "--selftest" ]; then
@@ -96,15 +117,36 @@ if [ "${1:-}" = "--selftest" ]; then
   status=0
   out="$(scan "$d/allow-empty.txt" "$d/good.cpp" "$d/good.py")" || status=$?
   [ "$status" -eq 0 ] || fail "la scansione dei file puliti doveva uscire con 0, uscita $status"
+  # Il difetto è composto a runtime: così questo sorgente non contiene la parola con apostrofo che cerca.
+  ad="tmp/lint-selftest-accenti"
+  rm -rf "$ad"
+  mkdir -p "$ad"
+  w="pi"
+  w2="meta"
+  printf "// il conto %su' sbagliato\n// vedi %s' qui\n" "$w" "$w2" > "$ad/bad.cpp"
+  printf "// l'unit\303\240 e il valore 'e' sono corretti: piu\303\271 e \303\250\n" > "$ad/good.cpp"
+  status=0
+  out="$(accent_scan "$ad")" || status=$?
+  [ "$status" -eq 1 ] || fail "l'accento con apostrofo doveva dare uscita 1, uscita $status"
+  printf '%s\n' "$out" | grep -q 'bad.cpp:1:' || fail "difetto piu' non rilevato"
+  printf '%s\n' "$out" | grep -q 'bad.cpp:2:' || fail "secondo difetto meta' non rilevato nello stesso file"
+  if printf '%s\n' "$out" | grep -qv $'^accenti\t'; then fail "riga di uscita senza prefisso accenti"; fi
+  if printf '%s\n' "$out" | grep -q 'good.cpp'; then fail "falso positivo su good.cpp (elisione o letterale carattere)"; fi
   echo "lint selftest: ok"
   exit 0
 fi
 
 allow="$root/tools/lint-allowlist.txt"
-if scan "$allow" src tests tools; then
+rc=0
+scan "$allow" src tests tools || rc=$?
+[ "$rc" -eq 2 ] && exit 2
+[ "$rc" -eq 1 ] && echo "lint: difetti fuori allowlist (tools/lint-allowlist.txt)" >&2
+accent_rc=0
+accent_scan src tests tools cmake || accent_rc=$?
+[ "$accent_rc" -eq 2 ] && exit 2
+if [ "$accent_rc" -eq 1 ]; then echo "lint: accenti con apostrofo (usare la lettera accentata)" >&2; fi
+if [ "$rc" -eq 0 ] && [ "$accent_rc" -eq 0 ]; then
   echo "lint: ok"
 else
-  rc=$?
-  [ "$rc" -eq 1 ] && echo "lint: difetti fuori allowlist (tools/lint-allowlist.txt)" >&2
-  exit "$rc"
+  exit 1
 fi

@@ -119,7 +119,7 @@ void validate_shared(const calibration_recipe& r) {
     for (std::size_t j = i + 1; j < s.size(); ++j) {
       if (s[i].spec.digest == s[j].spec.digest) {
         stop(error_category::unsupported, "calib.shared_input",
-             "due input con lo stesso digest: la covarianza non e' modellata in M2",
+             "due input con lo stesso digest: la covarianza non è modellata in M2",
              {{"primo", s[i].name}, {"secondo", s[j].name}, {"sha256", s[i].spec.digest.sha256}});
       }
     }
@@ -205,7 +205,7 @@ void check_image(const frame& f) {
   const bool ok = f.img->type == sample_type::f32 ? all_finite_or_flagged<float>(*f.img)
                                                   : all_finite_or_flagged<double>(*f.img);
   if (!ok) {
-    stop(error_category::invalid_input, "calib.nonfinite_unflagged", "campione non finito senza bit di invalidita'",
+    stop(error_category::invalid_input, "calib.nonfinite_unflagged", "campione non finito senza bit di invalidità",
          {{"input", f.name}});
   }
 }
@@ -397,7 +397,7 @@ input_view make_view(const frame& f, const calibration_input_spec& spec, bool pi
     v.offset = off;
     v.read_noise_sq = *vs.read_noise_adu * *vs.read_noise_adu;
     if (!calib_detail::mul_ok(*vs.read_noise_adu, *vs.read_noise_adu, v.read_noise_sq) || !std::isfinite(v.read_noise_sq)) {
-      var_param_bad(who, "read_noise_adu", "il quadrato non e' rappresentabile in modo normale");
+      var_param_bad(who, "read_noise_adu", "il quadrato non è rappresentabile in modo normale");
     }
     v.n = spec.descriptor ? static_cast<double>(*spec.descriptor->combine_count) : 1.0;
   }
@@ -506,7 +506,7 @@ void calib_detail::finish_normalization(prepared_calibration::impl& p, const std
     }
     if (ch.n_valid >= 2 && acc[c].mean != 0.0) {
       ch.fc_cv = std::sqrt(acc[c].m2 / static_cast<double>(ch.n_valid - 1)) / std::fabs(acc[c].mean);
-      if (!std::isfinite(*ch.fc_cv)) ch.fc_cv.reset();  // non calcolabile: nel report resta null e l'ipotesi iid non e' verificata
+      if (!std::isfinite(*ch.fc_cv)) ch.fc_cv.reset();  // non calcolabile: nel report resta null e l'ipotesi iid non è verificata
     }
     ch.iid_not_verified = !ch.fc_cv || !(*ch.fc_cv <= iid_cv_threshold);
     ch.n = median_fc(c);
@@ -576,7 +576,7 @@ void require_calibration_linearity(const char* input_name, const std::optional<l
     lin = declared;
   }
   if (!lin) {
-    throw stop_error(error_category::metadata_missing, "calib.metadata.linearity", "linearita' non dichiarata",
+    throw stop_error(error_category::metadata_missing, "calib.metadata.linearity", "linearità non dichiarata",
                      {{"input", input_name}});
   }
   if (*lin != linearity::linear) {
@@ -626,7 +626,7 @@ namespace {
 // e l'uscita li fa chi legge a blocchi (calibration_blocks.cpp) con le stesse funzioni.
 std::unique_ptr<prepared_calibration::impl> prepare_impl(const calibration_recipe& recipe, calibration_images images,
                                                          bool pixels) {
-  // Prima della validazione: i confronti sui parametri sono gia' operazioni in virgola mobile (ADR-07, D23). Vale per
+  // Prima della validazione: i confronti sui parametri sono già operazioni in virgola mobile (ADR-07, D23). Vale per
   // le due residenze.
   require_fp_environment();
   validate_calibration_recipe(recipe);
@@ -648,7 +648,7 @@ std::unique_ptr<prepared_calibration::impl> prepare_impl(const calibration_recip
            {{"input", f.name}, {"layout", layout_name(f.img->layout)}});
     }
   }
-  // Tabella di compatibilita' (ADR-03, R1): la fase si controlla sui metadati, prima di ogni accesso ai campioni.
+  // Tabella di compatibilità (ADR-03, R1): la fase si controlla sui metadati, prima di ogni accesso ai campioni.
   for (const frame& f : frames) require_calibration_phase(f.name, f.img->phase);
   std::array<field_origins, 4> origins;
   for (std::size_t i = 0; i < frames.size(); ++i) origins[i] = apply_declared(*frames[i].img, specs[i].spec.declared, specs[i].spec.declared_fields, frames[i].name);
@@ -809,7 +809,7 @@ std::unique_ptr<prepared_calibration::impl> calib_detail::prepare_headers(const 
 // ---------------------------------------------------------------- calcolo per righe
 
 // Kernel del percorso risolto nel preflight, per le due residenze: il percorso non cambia durante l'esecuzione. Ogni
-// chiamata e' l'avvio di un task: controllo dell'ambiente FP prima del kernel (ADR-07, D23).
+// chiamata è l'avvio di un task: controllo dell'ambiente FP prima del kernel (ADR-07, D23).
 void calib_detail::calibrate_band(const prepared_calibration::impl& p, const kernel_io& io, std::uint32_t row_begin,
                                   std::uint32_t row_end, void* scratch) {
   ASTRO_ASSERT(io.row0 <= row_begin && row_begin <= row_end && row_end <= p.h);

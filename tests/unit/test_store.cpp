@@ -19,7 +19,7 @@ TEST(Store, T_M2C_01_create_save_reopen_keeps_the_same_logical_state) {
   std::map<std::string, std::string> canonical;
   {
     auto store = make_project("t01", &dir);
-    // add_input legge l'identita' dell'originale (ADR-04, estensione R4): il file deve esistere.
+    // add_input legge l'identità dell'originale (ADR-04, estensione R4): il file deve esistere.
     const fs::path light = dir.parent_path() / "t01_light.fits";
     write_text(light, std::string(2880, 'L'));
     store->add_input(input_record{0, light.string(), 2880, std::string(64, 'a'), "light", 0, 0, "fits"});
@@ -652,7 +652,7 @@ TEST(Store, T_M2B_12_cancelled_stop_before_work_keeps_the_resume_context) {
   EXPECT_EQ(doc.find("stop")->find("code")->as_string(), "sched.cancelled");
 }
 
-// OB-03: insert_setting non sostituisce, cosi' un record di arresto del workflow non ne copre un altro.
+// OB-03: insert_setting non sostituisce, così un record di arresto del workflow non ne copre un altro.
 TEST(Store, insert_setting_refuses_an_existing_key_and_keeps_the_value) {
   auto store = make_project("i4set");
   store->insert_setting("k", "{\"a\":1}");

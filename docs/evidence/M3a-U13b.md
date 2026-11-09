@@ -56,9 +56,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/licenses.md` | `8f26eaa032e5d7c2352f3102542b08caf41880d32d602988c7007111cd8576b1` |
 | `src/core/dng_decode.cpp` | `337735e3da8c1237796b971b7a27520a5c3674970e5b6363cacf2fab2ed008e1` |
 | `src/core/dng_internal.hpp` | `ac95b16fc39ffd6fd7668cbcaeba341f534b7f4af484811839705e1e8cb3685d` |
-| `src/core/include/astro/image.hpp` | `216e96b4fc5088e01775261255f8ecbeda63c35e5925d2523e0a743bb984da03` |
-| `src/core/include/astro/raw_decode.hpp` | `0a2b8aa117998b429ac983439f67a3360ba08a481dd2106dddb606f858e99be6` |
-| `src/core/raw_decode.cpp` | `e114fbf53cad623be8ab4a4c4fd952fc33227f29e171e8788259f5e0b493029e` |
+| `src/core/include/astro/image.hpp` | `10df60c894f27ecf61eb43cc8d4efc8d0013bce394bbb044c3711fcf5f327537` |
+| `src/core/include/astro/raw_decode.hpp` | `693013684e5512f4e08be7114f13facb5cddc41b00c11e24d43da49aacd22dba` |
+| `src/core/raw_decode.cpp` | `962885ee61bb61c8c72002f357367922909a1699d7e16fbdf48d5cb023d1513b` |
 | `tests/fixtures/syn_dng_deflate.hpp` | `c743a7edc04c127f74d3a45819eeca452d006e2816d4c0914aa3d494cc6ac8ba` |
 | `tests/unit/dng_u13b_support.hpp` | `304b89c048e4320aa2894ffd9671f72f9c40ca682d4acd927aeb764894b496ca` |
 | `tests/unit/raw_record_keys.hpp` | `ff32b3c8f5e0942397921048068e0cd13b0859bf11f5e81dae13c8f7e9169baf` |
@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_dng_u13b_hooks.cpp` | `c0e3fd9f534c8ceff4ec33ac6863af23661f40f2f7b89c8d4524b832f5dbfa1d` |
 | `third_party/libtiff/SHA256SUMS` | `bc546ce0298da64f8a43a2a8662ccb0df3e0e9ef53312623cfb8474086655ab6` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

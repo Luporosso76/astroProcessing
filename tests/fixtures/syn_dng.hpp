@@ -1,14 +1,14 @@
 #pragma once
 
 // FIX-SYN-DNG-01: scrittore TIFF/DNG minimale, little-endian, non compresso. Scritto a mano (struttura TIFF 6.0 e tag
-// di Adobe DNG Specification 1.4.0.0): non condivide codice con astrocore, con LibRaw ne' con libtiff, cosi' i valori
-// attesi dei test sono una verita' indipendente dal parser sotto prova.
+// di Adobe DNG Specification 1.4.0.0): non condivide codice con astrocore, con LibRaw né con libtiff, così i valori
+// attesi dei test sono una verità indipendente dal parser sotto prova.
 //
-// Convenzione dei dati: `pixels` e' nelle coordinate del buffer grezzo (origine = angolo del TIFF); `active_area`
+// Convenzione dei dati: `pixels` è nelle coordinate del buffer grezzo (origine = angolo del TIFF); `active_area`
 // seleziona l'area visibile dentro quel buffer. Adobe DNG Specification 1.6.0.0 (pp. 21, 26, 42, 84; ADR-08.b §2.3): CFAPattern
 // e BlackLevel (con BlackLevelRepeatDim) sono ancorati all'angolo in alto a sinistra di ActiveArea. Il colore del
-// campione grezzo (r, c) e' quindi cfa[((r - top) % cfa_rows) * cfa_cols + (c - left) % cfa_cols], con top = left = 0
-// se ActiveArea e' assente.
+// campione grezzo (r, c) è quindi cfa[((r - top) % cfa_rows) * cfa_cols + (c - left) % cfa_cols], con top = left = 0
+// se ActiveArea è assente.
 
 #include <algorithm>
 #include <array>
@@ -40,14 +40,14 @@ struct dng_spec {
   std::uint16_t cfa_cols = 2;
   std::vector<std::uint8_t> cfa = {0, 1, 1, 2};  // 0 R, 1 G, 2 B; riga per riga
   std::optional<dng_active_area> active_area;
-  // BlackLevel scalare se black_dim e' assente; con black_dim, black_dim.first * black_dim.second valori.
+  // BlackLevel scalare se black_dim è assente; con black_dim, black_dim.first * black_dim.second valori.
   std::optional<std::pair<std::uint16_t, std::uint16_t>> black_dim;
   std::vector<std::uint16_t> black;
   std::optional<std::uint32_t> white;
   std::vector<std::uint16_t> linearization;  // vuota = tag assente
   std::optional<std::array<std::uint32_t, 4>> crop;  // DefaultCropOrigin x, y e DefaultCropSize w, h
   std::uint16_t orientation = 1;
-  // IFD EXIF, scritto se almeno uno dei tre e' valorizzato.
+  // IFD EXIF, scritto se almeno uno dei tre è valorizzato.
   std::optional<std::pair<std::uint32_t, std::uint32_t>> exposure_time;  // numeratore, denominatore
   std::optional<std::uint16_t> iso;
   std::string datetime_original;  // "AAAA:MM:GG hh:mm:ss"; vuota = assente
@@ -211,7 +211,7 @@ inline ifd_position append_ifd(std::vector<std::uint8_t>& out, const dng_spec& s
 
 }  // namespace dng_detail
 
-// Uno o piu' IFD concatenati; l'intestazione (8 byte) punta al primo.
+// Uno o più IFD concatenati; l'intestazione (8 byte) punta al primo.
 inline std::vector<std::uint8_t> make_dng(const std::vector<dng_spec>& images) {
   using namespace dng_detail;
   std::vector<std::uint8_t> out = {'I', 'I', 42, 0, 0, 0, 0, 0};

@@ -90,7 +90,7 @@ std::int64_t as_integral(const located& l) {
   return static_cast<std::int64_t>(*v);
 }
 
-// Card intera senza coercizione: un reale, anche di parte frazionaria nulla, e' un errore di tipo.
+// Card intera senza coercizione: un reale, anche di parte frazionaria nulla, è un errore di tipo.
 std::int64_t as_strict_integer(const located& l) {
   auto v = try_integer(l.card);
   if (!v) bad_value(l.card.key, "intero");
@@ -245,7 +245,7 @@ void interpret_cfa(const card_index& idx, std::uint32_t planes, const fits_read_
     }
     return;
   }
-  if (planes != 1) fail(error_category::invalid_input, "fits.cfa_planes", "immagine CFA con piu' di un piano");
+  if (planes != 1) fail(error_category::invalid_input, "fits.cfa_planes", "immagine CFA con più di un piano");
   const cfa_pattern p = parse_pattern(as_string(*pattern));
   const std::uint8_t x = resolve_offset(header_x, opt.declared_bayer_x_offset, "XBAYROFF");
   const std::uint8_t y = resolve_offset(header_y, opt.declared_bayer_y_offset, "YBAYROFF");
@@ -343,7 +343,7 @@ header_info interpret_header(const std::vector<std::string>& cards, std::uint32_
     if (info.lin) {
       const linearity_class found = *info.lin == linearity::linear ? linearity_class::linear : linearity_class::nonlinear;
       if (declared != found) {
-        fail(error_category::incompatible, "metadata.declared_conflict", "linearita' dichiarata diversa dall'header",
+        fail(error_category::incompatible, "metadata.declared_conflict", "linearità dichiarata diversa dall'header",
              {{"campo", "linearity"}});
       }
     } else {

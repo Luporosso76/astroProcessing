@@ -19,8 +19,8 @@
 #include "syn_dng.hpp"
 
 // mktime del processo di test, interposta: con `g_wrong_month >= 0` il risultato per la data di riferimento di §2.6 di quel
-// mese (mese 0 = 15 gennaio 2026, mese 6 = 15 luglio 2026, ore 12:00) e' spostato di un'ora; altrimenti e' quello di libc.
-// Prova ciascuno dei due controlli di mktime separatamente, con TZ gia' uguale a "UTC0".
+// mese (mese 0 = 15 gennaio 2026, mese 6 = 15 luglio 2026, ore 12:00) è spostato di un'ora; altrimenti è quello di libc.
+// Prova ciascuno dei due controlli di mktime separatamente, con TZ già uguale a "UTC0".
 int g_wrong_month = -1;
 
 extern "C" time_t mktime(std::tm* t) noexcept {
@@ -75,7 +75,7 @@ TEST(RawDecodeU2b, T_M3A_RAW_05_parsefuji_with_allowed_bit_records_both) {
   EXPECT_EQ(img.decoder_state->process_warnings, parsefuji_processed | no_metadata);
 }
 
-// T-M3A-RAW-05 (§2.5): insieme a un bit non ammesso lo stop e' per quel bit, con il suo nome nel contesto.
+// T-M3A-RAW-05 (§2.5): insieme a un bit non ammesso lo stop è per quel bit, con il suo nome nel contesto.
 TEST(RawDecodeU2b, T_M3A_RAW_05_parsefuji_with_disallowed_bit_stops_for_the_other) {
   try {
     (void)decode_with_warnings(parsefuji_processed | no_jpeglib);
@@ -93,7 +93,7 @@ TEST(RawDecodeU2b, T_M3A_RAW_05_parsefuji_with_disallowed_bit_stops_for_the_othe
   }
 }
 
-// Senza avvisi il campo registrato e' 0.
+// Senza avvisi il campo registrato è 0.
 TEST(RawDecodeU2b, T_M3A_RAW_05_no_warning_records_zero) {
   const image img = decode_with_warnings(0);
   ASSERT_TRUE(img.decoder_state.has_value());
@@ -141,7 +141,7 @@ TEST(RawDecodeU2bDeathTest, T_M3A_RAW_01_each_mktime_reference_is_checked) {
   EXPECT_DEATH(run(6)(), "ASTRO_ASSERT");
 }
 
-// Controllo positivo del death test: con TZ=UTC0 (main di test) la stessa decodifica riesce, e il valore e' timegm dei campi.
+// Controllo positivo del death test: con TZ=UTC0 (main di test) la stessa decodifica riesce, e il valore è timegm dei campi.
 TEST(RawDecodeU2b, T_M3A_RAW_01_utc0_decodes) {
   const image img = decode_raw_buffer(small_dng());
   ASSERT_TRUE(img.metadata.capture_time_libraw.has_value());

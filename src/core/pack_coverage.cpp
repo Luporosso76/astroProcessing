@@ -12,8 +12,8 @@ constexpr double pi = 3.14159265358979323846;
 constexpr double deg = pi / 180.0;
 // Margine sull'arrotondamento in virgola mobile, sempre nel verso che rifiuta. Ipotesi non derivata: gli angoli si
 // calcolano con atan2 sul prodotto vettoriale e la componente trasversale delle direzioni non si ricava da z, quindi
-// l'errore atteso e' di pochi ulp (ordine 1e-15 rad) anche ai poli; non c'e' un limite d'errore dimostrato per
-// max_pixrad e per le conversioni ang-vec a ordine 29, dove una cella e' larga circa 3e-9 rad e il margine ne e' una
+// l'errore atteso è di pochi ulp (ordine 1e-15 rad) anche ai poli; non c'è un limite d'errore dimostrato per
+// max_pixrad e per le conversioni ang-vec a ordine 29, dove una cella è larga circa 3e-9 rad e il margine ne è una
 // frazione non trascurabile.
 constexpr double rounding_margin_rad = 1e-9;
 
@@ -21,11 +21,12 @@ struct vec3 {
   double x, y, z;
 };
 
-// Direzione da z = cos(colatitudine), s = sin(colatitudine) e longitudine; s e' passata a parte perche' vicino ai poli
+// Direzione da z = cos(colatitudine), s = sin(colatitudine) e longitudine; s è passata a parte perché vicino ai poli
 // 1 - z*z perde la componente trasversale.
 vec3 from_z_s_phi(double z, double s, double phi) { return {s * std::cos(phi), s * std::sin(phi), z}; }
 
-// Per una calotta polare con q = 1 - |z| (esatto nel prodotto del chiamante): s = sqrt(q (2 - q)).
+// Per una calotta polare con q = 1 - |z| passato dal chiamante (non esatto in double: contiene un fattore 1/3):
+// s = sqrt(q (2 - q)) evita la cancellazione di 1 - z*z vicino ai poli.
 double polar_s(double q) { return std::sqrt(q * (2.0 - q)); }
 
 double angle_between(const vec3& a, const vec3& b) {

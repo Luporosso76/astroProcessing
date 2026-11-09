@@ -108,7 +108,7 @@ struct fits_block_source::impl {
   std::uint32_t w = 0, h = 0;
   std::uint64_t elem = 4, raw_elem = 4, tiles = 0;
   bool verified = false;
-  // Regioni lette: 0 primario, poi INVALID (se c'e'), poi VARIANCE (se letta). Digest di ogni blocco per regione.
+  // Regioni lette: 0 primario, poi INVALID (se c'è), poi VARIANCE (se letta). Digest di ogni blocco per regione.
   struct region {
     const hdu_scan* hdu = nullptr;
     std::uint64_t bytes_per_sample = 0;
@@ -414,12 +414,12 @@ std::uint64_t primary_sample_bytes(const fits_input& input) {
 fits_stream_writer::fits_stream_writer(const image& header_only, bool with_invalid) : with_invalid_(with_invalid) {
   reject_decoder_state(header_only);
   reject_coverage(header_only);
-  // Lo staging contiene campioni in virgola mobile del tipo dell'immagine: solo l'encoding identita' corrispondente.
+  // Lo staging contiene campioni in virgola mobile del tipo dell'immagine: solo l'encoding identità corrispondente.
   const int float_bitpix = header_only.type == sample_type::f32 ? -32 : -64;
   if (header_only.encoding && (header_only.encoding->bitpix != float_bitpix || header_only.encoding->bzero != 0.0 ||
                                header_only.encoding->bscale != 1.0)) {
     fail(error_category::invalid_input, "fits.encoding",
-         "FITS in streaming: ammesso solo l'encoding in virgola mobile identita' del tipo dei campioni",
+         "FITS in streaming: ammesso solo l'encoding in virgola mobile identità del tipo dei campioni",
          {{"bitpix", std::to_string(header_only.encoding->bitpix)}});
   }
   const image_geometry& g = header_only.geometry;

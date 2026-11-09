@@ -162,7 +162,7 @@ node_spec make_fits_decode_node(const content_digest& input, const fits_read_opt
   json read_options = json::object();
   read_options.set("declared_bayer_x_offset", optional_offset(options.declared_bayer_x_offset));
   read_options.set("declared_bayer_y_offset", optional_offset(options.declared_bayer_y_offset));
-  // Solo se dichiarate: le chiavi dei nodi senza fase ne' linearita' dichiarate non cambiano (ADR-05, R1).
+  // Solo se dichiarate: le chiavi dei nodi senza fase né linearità dichiarate non cambiano (ADR-05, R1).
   if (options.declared_phase) read_options.set("declared_phase", json::string(to_string(*options.declared_phase)));
   if (options.declared_linearity) {
     read_options.set("declared_linearity", json::string(to_string(*options.declared_linearity)));

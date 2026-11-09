@@ -17,11 +17,11 @@ namespace sqlint {
 void check_managed_file(const struct stat& st, const inode_set* originals, std::string_view name) {
   if (originals != nullptr &&
       originals->count({static_cast<std::uint64_t>(st.st_dev), static_cast<std::uint64_t>(st.st_ino)}) != 0) {
-    throw stop_error(error_category::security, "fs.original_inode", "il file e' lo stesso inode di un originale registrato",
+    throw stop_error(error_category::security, "fs.original_inode", "il file è lo stesso inode di un originale registrato",
                      {{"file", std::string(name)}, {"inode", std::to_string(st.st_ino)}});
   }
   if (st.st_nlink != 1) {
-    throw stop_error(error_category::security, "fs.hardlink", "file gestito dal progetto con piu' di un collegamento",
+    throw stop_error(error_category::security, "fs.hardlink", "file gestito dal progetto con più di un collegamento",
                      {{"file", std::string(name)}, {"nlink", std::to_string(st.st_nlink)}});
   }
 }
@@ -314,7 +314,7 @@ void sqlite_dag_store::recover() {
   const inode_set originals = original_inodes(db_);
   for (const auto& [name, e] : entries) {
     if (originals.count({e.dev, e.ino}) != 0) {
-      throw stop_error(error_category::security, "fs.original_inode", "un originale registrato e' in artifacts/",
+      throw stop_error(error_category::security, "fs.original_inode", "un originale registrato è in artifacts/",
                        {{"file", name}});
     }
   }

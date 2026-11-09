@@ -15,22 +15,22 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-05-dag-provenance.md` | `7b4b4d4a0610799ae5e405e7d8e50fb28061f2100e9441b9b33a65ea48b01bcb` |
 | `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
-| `src/core/calibration_job.cpp` | `beddb1fe3c9ab0ab1a320408c3593d562b34ea491729293a1c4a4c94748baeac` |
-| `src/core/import_job.cpp` | `304aeffb88c57fd4698a861ba22058a9b4867080e83c72feebe63005bd2d6fb6` |
-| `src/core/include/astro/job.hpp` | `452dd5673b6050bb19e6c78ed94c572e704055865c7b49463c042930458bd020` |
-| `src/core/include/astro/provenance.hpp` | `9d95b56f73c0a046c18c737013fa8dfceea31f43a3c959ec89aaa9e54f98417d` |
-| `src/core/job.cpp` | `9d9a61e9cc58b5bff036faae4889f71c1a0724fbdd78bdbcdc6408c5430d364d` |
-| `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
+| `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
+| `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |
+| `src/core/include/astro/job.hpp` | `0fee416857ca8512700e91b0550d9db9df20089369de792360a46b08a881f696` |
+| `src/core/include/astro/provenance.hpp` | `71a0f190f78c62ae4b7b9881fd134f416ff031e78c3637ce9ee5ca15bebf39d3` |
+| `src/core/job.cpp` | `2a9e50d9c727188f495e7c929032e33ec507eb4f60aa5cf26751aa6d5dccb438` |
+| `src/core/master.cpp` | `9a2ec6568fcd55144cfc45df100c3e5b38ed7aec37b2a4ef623d271be49d5d8e` |
 | `src/core/provenance.cpp` | `ba81e4469d42f3836dc7aa3ab5ef53509d17ad3526a5dca94e4c206e7e7db55e` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
-| `tests/unit/test_import.cpp` | `1da08927791cc7e1a1df0f238e77bfdb50c724ec1afff7d0ac52eef28f228f79` |
-| `tests/unit/test_job.cpp` | `b2152761e26c834002db4c02538d07ad9d2402dd7a6bb44bd3ff5a48ce862c2e` |
-| `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
-| `tests/unit/test_store.cpp` | `06de27ef8db29c9c45d168c3858883a2a6528e6004b36518bc3adfac52bdbdac` |
-| `tests/unit/test_store_review.cpp` | `23e1dc408879523e5fe06725dd029ee0968f07ef21d7ee76aac76381987d034e` |
+| `tests/unit/test_import.cpp` | `94abbaec4860b2635da21a9c9dd83771ac51cb56c936cbe913a5e864f9175b67` |
+| `tests/unit/test_job.cpp` | `b9c9dc4537bc7b6dff7d678dafc9889b6ddab039b4dd08d001544915aa325b40` |
+| `tests/unit/test_simd.cpp` | `e5293e4f1221df3f2ab90a15c247271bf8a81dec1cddea1e757fa232d613bbdd` |
+| `tests/unit/test_store.cpp` | `6901f6e2b089f825076bfcff6b09a8b98d0286e2c3b580b8db929ce803c03fa8` |
+| `tests/unit/test_store_review.cpp` | `c51e9603505ed61d1f5bddf20e9e89d02a35fdafda3a026fc69834f2c62a8103` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

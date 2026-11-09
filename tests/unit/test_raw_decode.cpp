@@ -3,7 +3,7 @@
 // Tutti i valori attesi derivano dalla fixture (campioni scritti, pattern e nero scritti, area attiva), mai dall'uscita del
 // decoder. Tolleranze: esatte (0), tranne l'esposizione (derivazione nel test T_M3A_RAW_01_metadata_present).
 //
-// Convenzioni della verita' (Adobe DNG Specification 1.6.0.0, letta il 30 ottobre 2026):
+// Convenzioni della verità (Adobe DNG Specification 1.6.0.0, letta il 30 ottobre 2026):
 //  - CFAPattern e BlackLevel con BlackLevelRepeatDim hanno l'origine nell'angolo in alto a sinistra di ActiveArea (p. 21,
 //    p. 26; ActiveArea p. 42; LinearizationTable p. 84: un valore oltre la tabella vale l'ultima voce);
 //  - finestra visibile per ActiveArea con origine dispari (ADR-08.b §2.3): il margine passa al pari successivo, la
@@ -193,7 +193,7 @@ TEST(RawDecode, T_M3A_RAW_01_pattern_origin_samples) {
       }
 }
 
-// T-M3A-RAW-01 (stato e metadati, ADR-08.b §2.6): fase, linearita', origine decoder, nessun valore di comodo.
+// T-M3A-RAW-01 (stato e metadati, ADR-08.b §2.6): fase, linearità, origine decoder, nessun valore di comodo.
 TEST(RawDecode, T_M3A_RAW_01_state_and_metadata) {
   const fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
   const image img = decode(s);
@@ -241,9 +241,9 @@ TEST(RawDecode, T_M3A_RAW_01_metadata_present) {
   const image img = decode(s);
   validate_image(img);
   ASSERT_TRUE(img.metadata.exposure_s.has_value());
-  // `other.shutter` e' un float: il valore scritto 1/250 = 0.004 e' arrotondato al float piu' vicino. 0.004 sta in
-  // [2^-8, 2^-7), dove il passo dei float e' 2^-8 * 2^-23 = 2^-31; l'errore di arrotondamento e' al piu' mezzo passo e la
-  // tolleranza e' un passo intero (2^-31, circa 4.7e-10), senza margine ulteriore.
+  // `other.shutter` è un float: il valore scritto 1/250 = 0.004 è arrotondato al float più vicino. 0.004 sta in
+  // [2^-8, 2^-7), dove il passo dei float è 2^-8 * 2^-23 = 2^-31; l'errore di arrotondamento è al più mezzo passo e la
+  // tolleranza è un passo intero (2^-31, circa 4.7e-10), senza margine ulteriore.
   EXPECT_NEAR(img.metadata.exposure_s->value, 0.004, std::ldexp(1.0, -31));
   EXPECT_EQ(img.metadata.exposure_s->source.origin, metadata_origin::decoder);
   ASSERT_TRUE(img.metadata.gain.has_value());
@@ -251,7 +251,7 @@ TEST(RawDecode, T_M3A_RAW_01_metadata_present) {
   EXPECT_EQ(img.metadata.gain->source.origin, metadata_origin::decoder);
   ASSERT_TRUE(img.metadata.capture_time_libraw.has_value());
   EXPECT_EQ(img.metadata.capture_time_libraw->source.origin, metadata_origin::decoder);
-  // Il main di test imposta TZ=UTC0 (ADR-08.b §2.6): il valore e' timegm dei campi scritti, esatto.
+  // Il main di test imposta TZ=UTC0 (ADR-08.b §2.6): il valore è timegm dei campi scritti, esatto.
   constexpr std::int64_t as_utc = 1793363696;  // timegm(2026-10-30 12:34:56), calcolato con calendar.timegm di Python
   EXPECT_EQ(img.metadata.capture_time_libraw->value, as_utc);
 }
@@ -327,7 +327,7 @@ TEST(RawDecode, T_M3A_RAW_02_black_white_not_subtracted) {
   }
 }
 
-// T-M3A-RAW-02: H3 esatta con origine dispari quando il motivo e' invariante sull'asse spostato (§2.4, misura).
+// T-M3A-RAW-02: H3 esatta con origine dispari quando il motivo è invariante sull'asse spostato (§2.4, misura).
 TEST(RawDecode, T_M3A_RAW_02_black_pattern_invariant_odd_origin) {
   for (const auto& pc : cfa_cases()) {
     check_black_case(pc, {64, 64, 80, 80}, 1, 0);
@@ -403,7 +403,7 @@ TEST(RawDecode, T_M3A_RAW_01_temperature_injected) {
   EXPECT_FALSE(decode(s, hooks).metadata.temperature_c.has_value());
 }
 
-// T-M3A-RAW-02 (H3, nero per canale distinto per ogni sito): un nero diverso per ognuno dei quattro siti, cosi' uno
+// T-M3A-RAW-02 (H3, nero per canale distinto per ogni sito): un nero diverso per ognuno dei quattro siti, così uno
 // scambio di indici tra canali cambia il valore.
 TEST(RawDecode, T_M3A_RAW_02_black_distinct_per_site) {
   fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
@@ -418,7 +418,7 @@ TEST(RawDecode, T_M3A_RAW_02_black_distinct_per_site) {
 }
 
 // T-M3A-RAW-02: parametri utente iniziali (H1, §2.2): un valore diverso da quello iniziale di LibRaw 0.21.5 (-1 per
-// user_black e user_sat, -1000001 per user_cblack) e' un difetto (ASTRO_ASSERT) rilevato prima dell'apertura del buffer.
+// user_black e user_sat, -1000001 per user_cblack) è un difetto (ASTRO_ASSERT) rilevato prima dell'apertura del buffer.
 TEST(RawDecodeDeathTest, T_M3A_RAW_02_user_params_must_be_initial) {
   const fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
   const auto run = [&](auto mutate) {
@@ -453,7 +453,7 @@ TEST(RawDecode, T_M3A_RAW_02_user_params_initial_values) {
   EXPECT_TRUE(called);
 }
 
-// T-M3A-RAW-03 da fixture: X-Trans, LinearRaw a 3 campioni, pattern non 2x2, virgola mobile, file con piu' immagini.
+// T-M3A-RAW-03 da fixture: X-Trans, LinearRaw a 3 campioni, pattern non 2x2, virgola mobile, file con più immagini.
 TEST(RawDecode, T_M3A_RAW_03_stops_from_fixtures) {
   {
     SCOPED_TRACE("X-Trans 6x6");
@@ -537,7 +537,7 @@ TEST(RawDecode, T_M3A_RAW_03_stops_from_injected_fields) {
   expect_inject("raw_count = 2", "raw.multi_image", [](raw_probe_fields& f) { f.raw_count = 2; });
   expect_inject("pixel_aspect = 2", "raw.geometry", [](raw_probe_fields& f) { f.pixel_aspect = 2.0; });
   expect_inject("pixel_aspect = 0.5", "raw.geometry", [](raw_probe_fields& f) { f.pixel_aspect = 0.5; });
-  // `fuji_width` e' il valore di is_fuji_rotated() dopo open_buffer.
+  // `fuji_width` è il valore di is_fuji_rotated() dopo open_buffer.
   expect_inject("is_fuji_rotated = 100", "raw.geometry", [](raw_probe_fields& f) { f.fuji_width = 100; });
   expect_inject("is_floating_point = 1 su DNG intero", "raw.float_data",
                 [](raw_probe_fields& f) { f.is_floating_point = 1; });
@@ -574,7 +574,7 @@ TEST(RawDecode, T_M3A_RAW_03_conforming_injection_decodes) {
   expect_samples_are_written(img, s, expected_window(s));
 }
 
-// T-M3A-RAW-03 (§2.2): il bit CONVERTFLOAT_TO_INT e' gia' tolto quando il gancio prima di open_buffer legge le opzioni.
+// T-M3A-RAW-03 (§2.2): il bit CONVERTFLOAT_TO_INT è già tolto quando il gancio prima di open_buffer legge le opzioni.
 TEST(RawDecode, T_M3A_RAW_03_convert_float_bit_removed_before_open) {
   constexpr unsigned convert_float_to_int = 0x2;  // LIBRAW_RAWOPTIONS_CONVERTFLOAT_TO_INT (ADR-08.b §2.2)
   const fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
@@ -616,7 +616,7 @@ TEST(RawDecode, T_M3A_RAW_03_injected_floating_point_stops_before_unpack) {
 }
 
 // T-M3A-RAW-03 (§2.3): DNG con Compression VC-5 (9): open_buffer riesce, get_decoder_info dichiara il formato non
-// supportato. Lo stop e' unsupported/raw.file_unsupported con funzione, nome e flag del decoder, prima della prenotazione
+// supportato. Lo stop è unsupported/raw.file_unsupported con funzione, nome e flag del decoder, prima della prenotazione
 // delle risorse (before_unpack_plan) e di unpack.
 void expect_unsupported_compression(std::uint16_t compression, memory_pool* pool = nullptr) {
   fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
@@ -727,7 +727,7 @@ TEST(RawDecode, T_M3A_RAW_03_dng_vc5_unsupported_before_reservation_with_pool) {
   expect_unsupported_compression(9, &pool);
 }
 
-// T-M3A-RAW-01 (indici per sito, §2.3): con `filters` iniettati con assegnazioni note, l'indice di LibRaw di ogni sito e'
+// T-M3A-RAW-01 (indici per sito, §2.3): con `filters` iniettati con assegnazioni note, l'indice di LibRaw di ogni sito è
 // quello iniettato; scambiare i due verdi (1 e 3) cambia il risultato.
 TEST(RawDecode, T_M3A_RAW_01_color_index_exact_per_site) {
   const fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
@@ -882,7 +882,7 @@ TEST(RawDecode, T_M3A_RAW_04_linearization_table) {
     shifted[i] = static_cast<std::uint16_t>(i * 3 + 6);
   }
 
-  // Tabella identica su tutto il dominio a 16 bit (65536 voci): identita'.
+  // Tabella identica su tutto il dominio a 16 bit (65536 voci): identità.
   const image id_img = decode(make(identity, 65535, 65536));
   validate_image(id_img);
   check_values(id_img, identity, 65536);
@@ -919,13 +919,13 @@ TEST(RawDecode, T_M3A_RAW_04_linearization_table) {
   check_digest(sh_img, shifted);
   EXPECT_NE(hex(expected_curve_digest(triple)), hex(expected_curve_digest(shifted)));
 
-  // Dominio 0..65535 (§2.4): una tabella identica salvo una voce alta e' una curva non identita'.
+  // Dominio 0..65535 (§2.4): una tabella identica salvo una voce alta è una curva non identità.
   std::vector<std::uint16_t> high_only = identity;
   high_only[60000] = 60001;
   const image high_img = decode(make(high_only, 65535, 65536));
   check_digest(high_img, high_only);
 
-  // Senza LinearizationTable: identita'.
+  // Senza LinearizationTable: identità.
   fx::dng_spec none = base_spec({0, 1, 1, 2}, 0, 0);
   none.active_area.reset();
   const image none_img = decode(none);
@@ -935,7 +935,7 @@ TEST(RawDecode, T_M3A_RAW_04_linearization_table) {
 }
 
 // T-M3A-RAW-03 (§2.3, aggiunto dall'autore del codice): `filters = 0` iniettato dopo open_buffer su un DNG Bayer. Dopo
-// unpack `raw_image` non e' nullo, ma nessuna cella CFA e' codificata: stop `raw.cfa_pattern`, nessuna immagine.
+// unpack `raw_image` non è nullo, ma nessuna cella CFA è codificata: stop `raw.cfa_pattern`, nessuna immagine.
 TEST(RawDecode, T_M3A_RAW_03_filters_zero_with_raw_image_stops) {
   const fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
   int unpack_calls = 0;
@@ -947,7 +947,7 @@ TEST(RawDecode, T_M3A_RAW_03_filters_zero_with_raw_image_stops) {
 }
 
 // T-M3A-RAW-03 (§2.3, aggiunto dall'autore del codice): cella periodica con un rosso, un blu e due verdi adiacenti (RB/GG)
-// non e' una delle quattro celle Bayer: stop `raw.cfa_pattern`, anche se i conteggi dei colori sono quelli di una Bayer.
+// non è una delle quattro celle Bayer: stop `raw.cfa_pattern`, anche se i conteggi dei colori sono quelli di una Bayer.
 TEST(RawDecode, T_M3A_RAW_03_cell_with_adjacent_greens_stops) {
   const fx::dng_spec s = base_spec({0, 1, 1, 2}, 0, 0);
   raw_decode_hooks hooks;
@@ -955,7 +955,7 @@ TEST(RawDecode, T_M3A_RAW_03_cell_with_adjacent_greens_stops) {
   EXPECT_STOP(decode(s, hooks), error_category::unsupported, "raw.cfa_pattern");
 }
 
-// timegm indipendente dei campi civili "AAAA:MM:GG hh:mm:ss" (non passa dal decoder ne' da LibRaw).
+// timegm indipendente dei campi civili "AAAA:MM:GG hh:mm:ss" (non passa dal decoder né da LibRaw).
 std::int64_t timegm_of(const char* civil) {
   std::tm t{};
   int y = 0, mo = 0, d = 0, h = 0, mi = 0, sec = 0;
@@ -977,8 +977,8 @@ std::optional<std::int64_t> decoded_capture_time(const char* civil) {
   return img.metadata.capture_time_libraw->value;
 }
 
-// T-M3A-RAW-01 (§2.6): `capture_time_libraw` e' `other.timestamp` copiato senza alterazioni. Con TZ=UTC0 impostata dal
-// main di test il valore atteso e' esatto: 2026-10-30 12:34:56 = 1793363696 (calendar.timegm di Python); un troncamento
+// T-M3A-RAW-01 (§2.6): `capture_time_libraw` è `other.timestamp` copiato senza alterazioni. Con TZ=UTC0 impostata dal
+// main di test il valore atteso è esatto: 2026-10-30 12:34:56 = 1793363696 (calendar.timegm di Python); un troncamento
 // dei secondi o dei minuti cambia il valore.
 TEST(RawDecode, T_M3A_RAW_01_timestamp_copied_exactly) {
   EXPECT_EQ(timegm_of("2026:10:30 12:34:56"), 1793363696);
@@ -987,7 +987,7 @@ TEST(RawDecode, T_M3A_RAW_01_timestamp_copied_exactly) {
   EXPECT_EQ(*t, 1793363696);
 }
 
-// T-M3A-RAW-01 (§2.6): sotto UTC0 l'ora che in Europe/Rome non esiste (salto del 29 marzo 2026) e quella che vi e' doppia
+// T-M3A-RAW-01 (§2.6): sotto UTC0 l'ora che in Europe/Rome non esiste (salto del 29 marzo 2026) e quella che vi è doppia
 // (25 ottobre 2026) restano timegm dei campi scritti.
 TEST(RawDecode, T_M3A_RAW_01_timestamp_nonexistent_and_repeated_local_hours) {
   EXPECT_EQ(timegm_of("2026:03:29 02:30:00"), 1774751400);

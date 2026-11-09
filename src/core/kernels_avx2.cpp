@@ -1,5 +1,5 @@
 // Percorso cpu_avx2 (ADR-07): 4 pixel per vettore in f64. Ogni funzione che usa i registri ymm ha target("avx2"); il
-// resto dell'unita' resta nell'ISA di base, cosi' le funzioni inline condivise non portano istruzioni AVX altrove.
+// resto dell'unità resta nell'ISA di base, così le funzioni inline condivise non portano istruzioni AVX altrove.
 // Stesse operazioni IEEE, nello stesso ordine per pixel, del kernel scalare: niente FMA (target senza "fma",
 // -ffp-contract=off) e nessuna istruzione approssimata.
 
@@ -196,7 +196,7 @@ ASTRO_AVX2 void rows_kernel(const prepared_calibration::impl& p, const kernel_io
       if (F.has_saturation) bits = _mm256_or_si256(bits, bit_if(f_saturated, saturated));
       const __m256d clean = bits_zero(bits);
 
-      // C e Var(C), con la regola di rappresentabilita' su ogni passo.
+      // C e Var(C), con la regola di rappresentabilità su ogni passo.
       const __m256d lc = _mm256_sub_pd(l, d);
       const __m256d c = _mm256_div_pd(lc, q);
       const __m256d vl = variance4(L, i, cnt, l), vd = variance4(D, i, cnt, d);
@@ -283,7 +283,7 @@ ASTRO_AVX2 void band_kernel(const master_band& b) {
     const int good_lanes = _mm256_movemask_pd(mask_and(mask_and(clean, ok), mask_and(ms.ok, vs.ok)));
     const int clean_lanes = _mm256_movemask_pd(clean);
 
-    // Statistiche del flat (§6.2), stessa regola di rappresentabilita'.
+    // Statistiche del flat (§6.2), stessa regola di rappresentabilità.
     alignas(32) double a[4], lbe[4], ratio[4], v[4];
     int lbe_ok = 0, ratio_ok = 0;
     if (b.flat) {
@@ -337,7 +337,7 @@ ASTRO_AVX2 void band_kernel(const master_band& b) {
 }
 
 // 4 corsie, termine i nella corsia i mod 4, ciascuna inizializzata col primo termine; riduzione (c0 + c1) + (c2 + c3).
-// Con meno di 4 termini le corsie vuote non entrano: la somma e' quella nell'ordine degli indici.
+// Con meno di 4 termini le corsie vuote non entrano: la somma è quella nell'ordine degli indici.
 ASTRO_AVX2 double lanes_sum(const double* x, std::size_t n) {
   if (n < 4) {
     double s = x[0];

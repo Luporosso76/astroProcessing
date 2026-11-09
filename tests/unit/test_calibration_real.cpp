@@ -2,11 +2,11 @@
 // Lungo: label `slow`. I file non sono versionati: se mancano o hanno un SHA-256 diverso da quello dichiarato il test
 // FALLISCE (nessuno skip). Il lettore dei file grezzi e l'oracolo sono del test (fixture independent writer/parser).
 //
-// Verita' indipendente: maschera attesa, N e campioni su ogni pixel sono ricalcolati dal test con la stessa formula in
+// Verità indipendente: maschera attesa, N e campioni su ogni pixel sono ricalcolati dal test con la stessa formula in
 // aritmetica double sui campioni memorizzati dei master. Tolleranza sui campioni validi (uscita f32):
-// mezzo ulp f32 + 2 gamma_6 |C| (il prodotto e il test differiscono ciascuno di al piu' gamma_6 |C| dal valore esatto).
-// Le proprieta' fisiche (appiattimento del fondo, scarto overscan) si misurano e si registrano, senza soglie tarate
-// sull'uscita: l'asserzione e' solo la diminuzione della disuniformita' a grande scala dopo il flat.
+// mezzo ulp f32 + 2 gamma_6 |C| (il prodotto e il test differiscono ciascuno di al più gamma_6 |C| dal valore esatto).
+// Le proprietà fisiche (appiattimento del fondo, scarto overscan) si misurano e si registrano, senza soglie tarate
+// sull'uscita: l'asserzione è solo la diminuzione della disuniformità a grande scala dopo il flat.
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -58,7 +58,7 @@ struct raw_frame {
 raw_frame load_raw(const std::string& rel) {
   const std::string path = std::string(kRoot) + rel;
   std::ifstream in(path, std::ios::binary);
-  if (!in) throw std::runtime_error("dato reale mancante: " + path + " (data/public non e' versionato: vedi docs/datasets/PUB-LFC-01.md)");
+  if (!in) throw std::runtime_error("dato reale mancante: " + path + " (data/public non è versionato: vedi docs/datasets/PUB-LFC-01.md)");
   raw_frame f;
   f.file.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
   if (sha256_hex(f.file) != kSha.at(rel)) throw std::runtime_error("SHA-256 diverso da quello dichiarato: " + path);
@@ -121,7 +121,7 @@ struct band {
   const char* filter;
 };
 
-// Disuniformita' a grande scala: coefficiente di variazione delle mediane di blocchi 64x64 della regione dati.
+// Disuniformità a grande scala: coefficiente di variazione delle mediane di blocchi 64x64 della regione dati.
 double block_cv(const std::vector<double>& img, std::uint32_t w, const std::vector<std::uint8_t>& valid) {
   std::vector<double> meds;
   for (std::uint32_t by = 0; by + 64 <= 4128; by += 64) {
@@ -163,10 +163,10 @@ band_master test_master(const master& m, const fs::path& path, master_role role,
   return out;
 }
 
-// T-M2R2-09: master del prodotto dai frame grezzi, uscita f64. Verita' indipendente in long double dai campioni interi:
+// T-M2R2-09: master del prodotto dai frame grezzi, uscita f64. Verità indipendente in long double dai campioni interi:
 // somma esatta S (interi < 2^53), media S/n e piano s^2/n = (n sum x^2 - S^2)/(n^2 (n-1)), numeratore intero esatto; una
 // sola divisione long double (errore relativo <= 2^-64). Tolleranze di C-02.a §6.3 con uscita f64 (nessun mezzo ulp),
-// piu' l'errore dell'oracle 2^-63 |valore|.
+// più l'errore dell'oracle 2^-63 |valore|.
 band_master product_master(sqlite_dag_store& store, const std::string& slot, master_role role,
                            const std::vector<std::string>& rels, const char* filter, double offset, memory_pool& pool,
                            std::ostream& log) {
@@ -345,7 +345,7 @@ void run_band(const band& b, const std::map<std::string, double>& env, master_so
   ASSERT_EQ(result.type, sample_type::f32);
   const json report = parse_json(read_text(store->artifact_path(roles.at("report").rel_path)));
 
-  // Verita' indipendente sul pixel, con le stesse regole di maschera della calibrazione (ADR-16 §6, §7).
+  // Verità indipendente sul pixel, con le stesse regole di maschera della calibrazione (ADR-16 §6, §7).
   const std::size_t n = static_cast<std::size_t>(w) * h;
   const double sat = 65535;
   const auto f_saturated = [&](std::size_t i) { return flat.v[i] >= sat; };
@@ -421,7 +421,7 @@ void run_band(const band& b, const std::map<std::string, double>& env, master_so
   }
   const double cv_before = block_cv(lc_img, w, region);
   const double cv_after = block_cv(c_img, w, region);
-  EXPECT_LT(cv_after, cv_before) << "il flat non riduce la disuniformita' a grande scala";
+  EXPECT_LT(cv_after, cv_before) << "il flat non riduce la disuniformità a grande scala";
 
   std::vector<double> overscan_lc, data_c;
   for (std::uint32_t y = 0; y < h; ++y) {
@@ -437,7 +437,7 @@ void run_band(const band& b, const std::map<std::string, double>& env, master_so
      << n - valid << "\n";
   for (const auto& [name, count] : bit_counts) os << "  bit " << name << ": " << count << "\n";
   os << "  varianza media sui validi=" << var_sum / static_cast<double>(valid) << " ADU^2, mediana C regione dati=" << median_copy(data_c)
-     << " ADU\n  disuniformita' a grande scala (CV blocchi 64x64): prima=" << cv_before << " dopo=" << cv_after
+     << " ADU\n  disuniformità a grande scala (CV blocchi 64x64): prima=" << cv_before << " dopo=" << cv_after
      << "\n  mediana di L-D nell'overscan=" << median_copy(overscan_lc) << " ADU (registrata, nessuna soglia)\n"
      << "  rel_var_estimate di N=" << as_double(*at(report, {"normalization"}).items()[0].find("normalization_rel_var_estimate"))
      << " iid_assumption=" << at(report, {"normalization"}).items()[0].find("iid_assumption")->as_string() << "\n  avvisi:";

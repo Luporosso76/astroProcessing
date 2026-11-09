@@ -94,13 +94,13 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 
 | File | SHA-256 |
 |---|---|
-| `docs/test-matrix.md` | `4c0cdc989add3ce566996917155b30f0dbe2559312c7dfdebf7ef482d5ea02bc` |
+| `docs/test-matrix.md` | `10e2a269e066f817d16594cad55fe64a7175a0ddea104dbea72155f4402aa543` |
 | `plans/M3a.md` | `3794610361e92d8e1433a64b8f7df1a29e840ddd02de7b003744819365a3eb91` |
 | `tests/trace/M3a.tsv` | `b029c3b8cbd5b5382c21b266867bf9ddc0ae4052d6483d783954f2216bd51fe6` |
 | `tools/trace.py` | `ef7185ebc60b152f3b8436c55ef7b94704bfddf33568a9ebf21939702c08f040` |
 
-- Test dev-full (`tmp/dev-full-junit.xml`): totali 1212, fast 1190, slow 22, falliti 1
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
+- Test dev-full (`tmp/dev-full-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
 - Test dev-palomar (`tmp/dev-junit-palomar.xml`): totali 1, fast 0, slow 1, falliti 0
 - Tracciabilità (`tests/trace/M3a.tsv`, build `build/dev`, junit `tmp/dev-full-junit.xml`): trace: 8 ID nello stadio M3.a, 0 non coperti
 - Tracciabilità (`tests/trace/M3a.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 8 ID nello stadio M3.a, 0 non coperti
@@ -109,3 +109,5 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 ## Arbitraggio 8/11/2026
 
 Gate M3.a PASS per arbitraggio dell'utente (8/11/2026). Run `dev-full` 1211/1212: `T-M2R2-09` in timeout a 1800 s, passato da solo in 1659,84 s. Debito: esecuzione seriale degli slow pesanti (prima voce dei debiti in `STATO.md`). Da qui vale la regola «PASS = un run completo in cui ogni test è passato».
+
+Debiti chiusi il 9/11/2026 (review `debt-M3a-round1` FAIL, `debt-M3a-round2` PASS): preset `dev` a `-O1` ed esecuzione seriale (`docs/decisions/M3-dev-preset.md`), test U7, U8b e U9, accenti e regola di lint. Run completo sull'albero del lotto (base `ba385bc`): `ctest --preset dev-full` 1221/1221, `ctest --preset release` 1221/1221, `ctest --preset dev` 1199/1199, nessun test non passato; `T-M2R2-09` 484,85 s, `T-M2E-13` 464,38 s nel run `dev-full`.

@@ -6,7 +6,7 @@
 #include "astro/fault_injector.hpp"
 
 // Verifica a runtime delle librerie compilate nel progetto (U12, docs/contracts/U12-third-party.md, obblighi 5 e 6).
-// Una versione o una capacita' diversa da quella fissata e' un difetto della build, non un errore dell'input:
+// Una versione o una capacità diversa da quella fissata è un difetto della build, non un errore dell'input:
 // ASTRO_ASSERT.
 namespace astro::third_party {
 

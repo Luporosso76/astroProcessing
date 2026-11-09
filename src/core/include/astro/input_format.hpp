@@ -11,7 +11,7 @@ struct input_format {
   const char* prefix;            // prefisso dei codici propri del formato: `<prefisso>.open`, `.fstat`, `.read`, ...
   std::uint64_t max_file_bytes;  // limite applicato dall'apertura, prima di ogni lettura e allocazione
   // Vero: gli header si leggono prima del digest per il piano e si riconfrontano sui byte verificati. Falso: nessun
-  // byte del file si interpreta prima del digest; il solo valore usato prima e' la dimensione da fstat.
+  // byte del file si interpreta prima del digest; il solo valore usato prima è la dimensione da fstat.
   bool header_plan;
 };
 

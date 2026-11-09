@@ -176,7 +176,7 @@ class parser {
     const std::size_t start = pos_;
     consume('-');
     if (consume('0')) {
-      // una cifra iniziale zero non puo' essere seguita da altre cifre
+      // una cifra iniziale zero non può essere seguita da altre cifre
     } else if (pos_ < text_.size() && text_[pos_] >= '1' && text_[pos_] <= '9') {
       skip_digits();
     } else {

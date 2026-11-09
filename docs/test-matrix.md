@@ -389,7 +389,7 @@ Contiene solo gli ID di M3.a non elencati nelle sezioni M3.entry (queste ultime 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
 | T-M3A-RAW-13 | F-IO-04 | ADR-08.b §2.6 (emendamento L4) | U4 | verde (U4) |
-| T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8b) |
+| T-M3A-04 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8b; slot `master.combine` pubblicati dal prodotto: candidato risolto dallo store, campioni letti solo per il controllo termico e verificati contro il digest, nodo dello slot assente = stop `batch.slot_node_missing`) |
 | T-M3A-05 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8a, U8b) |
 | T-M3A-06 | F-IO-03 | F-IO-03 §12 | U8 | verde (U8a, U8b) |
 | T-M3A-07 | F-IO-08 | F-IO-08 §10 | U9 | verde (U9) |

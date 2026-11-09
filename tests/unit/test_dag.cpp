@@ -148,7 +148,7 @@ TEST(Dag, T_M2B_04_apply_recipe_retargets_only_changed_slots_and_stale_is_declar
   EXPECT_EQ(store.read_slot("sc").state, freshness::current);
   EXPECT_EQ(store.read_slot("sd").state, freshness::stale);
   EXPECT_EQ(store.read_slot("sb").artifact->node_key, keys_of(v1).at("b"));
-  // i nodi di v1 restano nello store: b, c, d di v1 piu' b e d di v2
+  // i nodi di v1 restano nello store: b, c, d di v1 più b e d di v2
   EXPECT_EQ(store.descendants(keys_of(v2).at("a")).size(), 5u);
   EXPECT_EQ(store.descendants(keys_of(v2).at("c")).size(), 2u);
 }

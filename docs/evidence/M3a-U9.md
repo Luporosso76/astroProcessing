@@ -54,18 +54,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/F-IO-08-ricollegamento.md` | `668c1e42622e805a9068334b26d8e0b817891d5ebdf6d6cf50e33bdf23ca730d` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
-| `src/core/include/astro/hash.hpp` | `2043851aa8b5e01288e40841a44bd77476bfe12f9a6ff2100984117409256481` |
-| `src/core/include/astro/sqlite_dag_store.hpp` | `783fa87a3f6778e1976a1f4846635a500683887a0dabfcd99ff7753eb083fe16` |
-| `src/core/sqlite_dag_store.cpp` | `141422518f46f6367902eab709e6a9203d74fef453096db8f4f9fc04e16a06d3` |
-| `src/core/sqlite_project.cpp` | `4defa68b1292f66d893ba24b6ca17222a82e126376ab8fc438704515d214b9c5` |
+| `src/core/include/astro/hash.hpp` | `890e62d0d82bf0f9fdd154ccc83fae8e70f8543fe62f46a3fcaf5b2898b41613` |
+| `src/core/include/astro/sqlite_dag_store.hpp` | `da0919b01c2c79fcd4778ba7bcd8ca57f60f60e7cce098fdb50f91d51732711b` |
+| `src/core/sqlite_dag_store.cpp` | `72d97ae8f15069d3c4bbdf0c46b2ef81a1b9a50b4bc3a6d7d80f7ac3c6b0bd72` |
+| `src/core/sqlite_project.cpp` | `7d37ca279a8e717ffd293a8a0c417955851cc763e9150b3cf91eb93c6cc5a73d` |
 | `src/core/sqlite_relink.cpp` | `1394326d8151c68dc22d815af66a65817fc217ab6b72c0936316559fa5d76f0b` |
 | `tests/fixtures/fs_probe.hpp` | `c14734822290c68094bb0f12798193d085e5b55ce380c5063ab4b24ccec401e3` |
-| `tests/unit/relink_support.hpp` | `bda3adf4df1f20770469f7d8acf3db5d036d5f669e1e0af97cdaba407c324291` |
-| `tests/unit/test_relink.cpp` | `eea897da6d62ba969b397cf3342043c49c20f89e4dacfa52ff59759dfee3585f` |
+| `tests/unit/relink_support.hpp` | `cea989ed39ee06874c7f68074207269d7235dbc1cf6d6c98a1cc666397b994b4` |
+| `tests/unit/test_relink.cpp` | `5c76c008d7e18c35b575ebd3c668750da08f84d995b1ca95e22ec022c092f94d` |
 | `tests/unit/test_relink_blocked.cpp` | `e25c319228fe26616f720611cf81e945fda0b4de30c22400ed479f4f157adace` |
-| `tests/unit/test_relink_nostat.cpp` | `f384b46e5748ddb13a32cd34170546d5f05231a750bcb0c8887f43d56fa77b07` |
-| `tests/unit/test_relink_status.cpp` | `457386c57cbedbb6f31a96ad70d531bf1e7762fbf064fb7d5cb39ac53f61fa9d` |
+| `tests/unit/test_relink_nostat.cpp` | `06a6df43b4b95dc499781a7aa499593cdae4f76106ade27ebea4bf6250c47c92` |
+| `tests/unit/test_relink_status.cpp` | `13da8e17de4e6d3ce64ff2a407df1a473ac61f5da84e3666e07a69f0cf9210ec` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

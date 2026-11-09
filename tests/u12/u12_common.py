@@ -88,7 +88,7 @@ def run(cmd, cwd=None, env=None, check=True):
 
 
 def rm_tree(path):
-    """Cancella `path`; l'assenza e' ammessa, ogni altro errore e' una diagnosi col percorso."""
+    """Cancella `path`; l'assenza è ammessa, ogni altro errore è una diagnosi col percorso."""
     if not os.path.lexists(path):
         return
     try:
@@ -219,7 +219,7 @@ def linked_archives(build):
         if name not in found:
             fail("il collegamento di %s non include %s: astrocore non collega l'archivio del progetto" % (PRODUCT_LINK_TARGET, name))
         if len(found[name]) != 1:
-            fail("archivio %s con piu' copie nel collegamento: %s" % (name, sorted(found[name])))
+            fail("archivio %s con più copie nel collegamento: %s" % (name, sorted(found[name])))
     paths = [next(iter(found[n])) for n in LIB_ARCHIVES]
     for path in paths:
         if not os.path.isfile(path):
@@ -248,8 +248,8 @@ def unit_include_options(entry, build):
 
 
 def core_include_options(build, rels):
-    """Opzioni di inclusione delle unita' di src/core che includono davvero gli header `rels` (il decoder include
-    libraw, l'unita' CFITSIO fitsio.h): ordine e tipo dei comandi di compilazione, nessun riordino. Le unita' che
+    """Opzioni di inclusione delle unità di src/core che includono davvero gli header `rels` (il decoder include
+    libraw, l'unità CFITSIO fitsio.h): ordine e tipo dei comandi di compilazione, nessun riordino. Le unità che
     includono lo stesso header devono risolverlo nella stessa directory."""
     path = os.path.join(build, "compile_commands.json")
     try:
@@ -266,7 +266,7 @@ def core_include_options(build, rels):
         pat = re.compile(r'#\s*include\s*[<"]%s[>"]' % re.escape(anchor))
         users = [e for e in core if pat.search(read_text(os.path.join(e.get("directory", build), e["file"])))]
         if not users:
-            fail("nessuna unita' di src/core include %s: libreria non nel progetto" % anchor)
+            fail("nessuna unità di src/core include %s: libreria non nel progetto" % anchor)
         resolved = set()
         for e in users:
             opts = unit_include_options(e, build)
@@ -275,7 +275,7 @@ def core_include_options(build, rels):
                 fail("%s: header %s non raggiungibile dalle opzioni di inclusione" % (e["file"], rel))
             resolved.add(hit)
         if len(resolved) != 1:
-            fail("le unita' di src/core che includono %s lo risolvono in directory diverse: %s" % (rel, sorted(resolved)))
+            fail("le unità di src/core che includono %s lo risolvono in directory diverse: %s" % (rel, sorted(resolved)))
         for opt in unit_include_options(users[0], build):
             if opt not in merged:
                 merged.append(opt)

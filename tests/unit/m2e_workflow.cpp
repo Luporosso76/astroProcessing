@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
   if (argc != 2) return fail("uso: m2e_workflow <directory di lavoro>");
   try {
     const fs::path dir = argv[1];
-    if (fs::exists(dir)) return fail("la directory di lavoro esiste gia'");
+    if (fs::exists(dir)) return fail("la directory di lavoro esiste già");
     fs::create_directories(dir);
     const set_def s = synth_set(64, 48, -32);
     calibration_recipe recipe = recipe_of(s);

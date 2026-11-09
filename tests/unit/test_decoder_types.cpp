@@ -1,6 +1,6 @@
 // U1 (M3.a): tipi del decoder. T-M3A-TYP-01, -02, -03 e le coppie `decoder_state` di T-M3A-TYP-12
 // (docs/contracts/ADR-03-pixel-maschere.md, parte .b: §b.1, §b.2, §b.9 righe 1-2, §b.10).
-// Valori attesi scritti a mano dal contratto; la verita' di riferimento per i byte FITS e' il writer di syn_fits.hpp.
+// Valori attesi scritti a mano dal contratto; la verità di riferimento per i byte FITS è il writer di syn_fits.hpp.
 #include <gtest/gtest.h>
 
 #include <array>
@@ -474,7 +474,7 @@ TEST(DecoderTypes, T_M3A_TYP_02_cfa_color_index_must_agree_with_the_pattern) {
 }
 
 TEST(DecoderTypes, T_M3A_TYP_02_cfa_color_index_follows_the_cfa_offset) {
-  // rggb con x_offset = 1: la cella all'origine e' G R / B G; con y_offset = 1: G B / R G (periodo 2)
+  // rggb con x_offset = 1: la cella all'origine è G R / B G; con y_offset = 1: G B / R G (periodo 2)
   image x = decoder_image({cfa_pattern::rggb, 1, 0});
   x.decoder_state->cfa_color_index = {1, 0, 2, 3};
   EXPECT_NO_THROW(validate_image(x));
@@ -518,7 +518,7 @@ TEST(DecoderTypes, T_M3A_TYP_02_fits_writer_refuses_an_image_with_decoder_state)
   EXPECT_NO_THROW(encode_fits(without));
 }
 
-// Lo scrittore FITS in streaming e' l'altro ingresso dello scrittore.
+// Lo scrittore FITS in streaming è l'altro ingresso dello scrittore.
 TEST(DecoderTypes, T_M3A_TYP_02_fits_stream_writer_refuses_an_image_with_decoder_state) {
   const image with = decoder_image();
   EXPECT_STOP(fits_stream_writer(with, false), error_category::unsupported, "fits.decoder_state");
@@ -556,7 +556,7 @@ TEST(DecoderTypes, T_M3A_TYP_03_astrtstp_is_written_as_integer_and_read_back) {
     const fx::bytes file = encode_fits(img);
     const auto card = find_card(file, "ASTRTSTP");
     ASSERT_TRUE(card.has_value());
-    // oracle: la card intera e' esattamente quella che il writer indipendente produce per un intero
+    // oracle: la card intera è esattamente quella che il writer indipendente produce per un intero
     EXPECT_EQ(card->substr(0, 30), fx::card_int("ASTRTSTP", t).substr(0, 30));
     EXPECT_FALSE(find_card(file, "DATE-OBS").has_value());
     const image back = decode(file);

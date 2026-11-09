@@ -9,7 +9,7 @@
 
 namespace astro {
 
-// Catalog pack (docs/contracts/ADR-08-decoder-pack.md §3). La ricetta nomina un solo pack con identita' attesa e un
+// Catalog pack (docs/contracts/ADR-08-decoder-pack.md §3). La ricetta nomina un solo pack con identità attesa e un
 // solo percorso della directory: nessun percorso di ricerca, nessun pack di default, nessun download (§3.2).
 struct pack_recipe {
   std::string pack_id;
@@ -33,7 +33,7 @@ struct pack_band {
   std::string name, system;
 };
 
-// `license`: identificativo SPDX o LicenseRef-public-domain; `attribution` e' l'unico campo che puo' essere vuoto.
+// `license`: identificativo SPDX o LicenseRef-public-domain; `attribution` è l'unico campo che può essere vuoto.
 struct pack_component {
   std::string name, source, release, license, license_file, license_evidence, attribution;
   std::vector<pack_band> bands;
@@ -92,10 +92,10 @@ struct verified_pack {
 // directory della ricetta e i record di audit sotto `audit.evidence_root`; ricalcola ogni hash a ogni chiamata.
 // Directory della ricetta e `audit.evidence_root` sono percorsi assoluti: altrimenti invalid_input
 // `pack.path_not_absolute`, prima di ogni apertura.
-// Ordine dei controlli: directory e manifest, forma canonica, pack_format, schema, digest e identita'; poi l'albero
+// Ordine dei controlli: directory e manifest, forma canonica, pack_format, schema, digest e identità; poi l'albero
 // della directory in ordine di nome senza seguire link simbolici (voce non elencata, non regolare, dimensione prima
 // dell'hash, hash), file elencati assenti; conteggi e indice (le righe del file dati sono verificate da
-// `read_pack_cell`, non qui); licenze per componente; scopo e bande. Il primo controllo fallito e' uno stop_error con
+// `read_pack_cell`, non qui); licenze per componente; scopo e bande. Il primo controllo fallito è uno stop_error con
 // categoria e codice della tabella di §3.4; errori del sistema operativo: io `pack.io`.
 // Conteggi: righe del file dati (dimensione / lunghezza del record, resto nullo), `count` del manifest e somma dei
 // `count` dei componenti diversi: `pack.count_mismatch`. Indice: dimensione diversa da 24 byte per cella di
@@ -110,22 +110,22 @@ struct sky_cap {
 
 // §3.3 punto 7 sulla `coverage` del manifest verificato: ogni cella che interseca la calotta allargata del raggio
 // angolare massimo di una cella all'ordine di coverage deve essere in coverage, altrimenti incompatible
-// `pack.out_of_coverage`. Il controllo e' conservativo (usa il centro della cella e due raggi massimi): puo' rifiutare
-// un campo coperto al bordo, mai accettare uno scoperto. Il raggio massimo e' quello di max_pixrad della libreria
-// HEALPix (ipotesi: e' la distanza centro-punto piu' grande della cella). Regione con un campo non finito, raggio
+// `pack.out_of_coverage`. Il controllo è conservativo (usa il centro della cella e due raggi massimi): può rifiutare
+// un campo coperto al bordo, mai accettare uno scoperto. Il raggio massimo è quello di max_pixrad della libreria
+// HEALPix (ipotesi: è la distanza centro-punto più grande della cella). Regione con un campo non finito, raggio
 // negativo o |dec| > 90: invalid_input `pack.region_invalid`.
 void verify_pack_coverage(const verified_pack& pack, const sky_cap& region);
 
-// Una riga letta: values[c] e' il valore della colonna c di manifest.columns convertito in double senza perdita
-// (f64 identico, f32 allargato, u16 e u32 esatti); un'assenza e' NaN.
+// Una riga letta: values[c] è il valore della colonna c di manifest.columns convertito in double senza perdita
+// (f64 identico, f32 allargato, u16 e u32 esatti); un'assenza è NaN.
 struct pack_row {
   std::vector<double> values;
 };
 
 // Righe della cella `cell`, lette dal data_file della ricetta attraverso l'index_file. L'indice e la dimensione del
-// file dati sono riverificati su cio' che si legge (hash dell'indice, dimensione dei dati). Ogni riga e' controllata
-// secondo §3.1: assenza se e solo se il bit e' 1 e il valore NaN, infiniti, bit non dichiarati: `pack.row_invalid`.
-// Cella non in coverage: `pack.out_of_coverage`; una cella coperta puo' avere zero righe.
+// file dati sono riverificati su ciò che si legge (hash dell'indice, dimensione dei dati). Ogni riga è controllata
+// secondo §3.1: assenza se e solo se il bit è 1 e il valore NaN, infiniti, bit non dichiarati: `pack.row_invalid`.
+// Cella non in coverage: `pack.out_of_coverage`; una cella coperta può avere zero righe.
 std::vector<pack_row> read_pack_cell(const pack_recipe& recipe, const verified_pack& pack, std::uint64_t cell);
 
 }  // namespace astro

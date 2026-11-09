@@ -58,7 +58,7 @@ struct job_record {
   std::string stop_code;
 };
 
-// Interfaccia del DAG: ogni operazione e' una transazione. M2.c la implementa su SQLite.
+// Interfaccia del DAG: ogni operazione è una transazione. M2.c la implementa su SQLite.
 class dag_store {
  public:
   virtual ~dag_store() = default;
@@ -87,7 +87,7 @@ class dag_store {
   virtual std::vector<artifact_record> artifacts_for(const std::string& node_key) const = 0;
 
   // Il job deve essere `running` (dag.job_not_running) e l'artefatto `present` (dag.artifact_not_present) e
-  // del nodo del job (dag.artifact_node_mismatch). Se la generazione dello slot e' ancora quella del job lo slot
+  // del nodo del job (dag.artifact_node_mismatch). Se la generazione dello slot è ancora quella del job lo slot
   // punta all'artefatto; altrimenti stale_generation dag.stale_publish, senza modificare lo slot.
   virtual void publish(std::uint64_t job_id, std::uint64_t artifact_id) = 0;
   // Registra l'artefatto, lo pubblica come `publish` e chiude il job `completed`. Gli store durevoli lo fanno in

@@ -176,7 +176,7 @@ void require_rebuild_cause(const std::string& cause) {
 // coda FIFO prima di `prepare`. In shared_bytes (un blocco di digest) `prepare` verifica il digest di `input` e
 // `finalize` lo riverifica prima della pubblicazione (OB-11); il task lavora in per_task_bytes.
 // worker_count e tile_rows della configurazione non si applicano: un solo task non si divide fra worker, e
-// tile_rows e' l'altezza della fascia letta dal task (1 se il task non legge campioni). Restituisce il piano eseguito.
+// tile_rows è l'altezza della fascia letta dal task (1 se il task non legge campioni). Restituisce il piano eseguito.
 std::shared_ptr<const resource_plan> run_single_task(const node_spec& node, const fits_input& input, const std::string& path,
                                                      const content_digest& digest, const job_hook& hook,
                                                      std::uint64_t per_task_bytes, std::uint32_t tile_rows,
@@ -275,7 +275,7 @@ node_spec make_cache_rebuild_node(const content_digest& source, const preview_re
 json import_report_json(const fits_inventory& inv, const content_digest& digest) {
   if (!inv.phase) {
     fail(error_category::metadata_missing, "import.phase_missing",
-         "la fase di processo non e' dichiarata ne' presente nell'header");
+         "la fase di processo non è dichiarata né presente nell'header");
   }
   for (std::size_t i = 0; i < inv.header_cards.size(); ++i) {
     for (const char c : inv.header_cards[i]) {
@@ -444,7 +444,7 @@ job_outcome run_cache_rebuild_job(sqlite_dag_store& store, const std::string& sl
                                   thumbnail_cache& cache, memory_pool& pool, const cancel_token& cancel,
                                   const std::optional<budget_snapshot>& budget, const job_hook& hook,
                                   const resource_config* resources) {
-  // Una causa non valida e' un arresto prima del lavoro sullo slot (job.hpp).
+  // Una causa non valida è un arresto prima del lavoro sullo slot (job.hpp).
   prepare_job_start(store, slot_name, [&] { require_rebuild_cause(cause); });
   std::optional<node_spec> node;
   const auto work = [&](const job_record&) -> job_files_result {

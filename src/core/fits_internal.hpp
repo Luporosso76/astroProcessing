@@ -35,7 +35,7 @@ bool is_structural_key(const std::string& key);
 // ASTRMCAP o ASTRMLnn: card della capacità di misura, che il writer rigenera da `image::measure`.
 bool is_measure_key(const std::string& key);
 
-// Tipi numerici: nullopt se il testo non e' un intero (o reale) FITS completo.
+// Tipi numerici: nullopt se il testo non è un intero (o reale) FITS completo.
 std::optional<std::int64_t> try_integer(const parsed_card& card);
 std::optional<double> try_real(const parsed_card& card);
 
@@ -75,7 +75,7 @@ sample_type type_for_encoding(int bitpix, double bscale, double bzero);
 struct header_info {
   std::optional<pixel_unit> unit;
   std::optional<linearity> lin;
-  // Origine della linearita': assente se non e' ne' nell'header ne' dichiarata (classe `unknown`).
+  // Origine della linearità: assente se non è né nell'header né dichiarata (classe `unknown`).
   std::optional<metadata_origin> lin_origin;
   std::optional<metadata_value<process_phase>> phase;
   std::optional<cfa_layout> cfa;
@@ -91,7 +91,7 @@ struct header_info {
 header_info interpret_header(const std::vector<std::string>& cards, std::uint32_t planes,
                              const fits_read_options& options);
 
-// Card dei campi interpretati dell'immagine che non sono gia' in `existing`.
+// Card dei campi interpretati dell'immagine che non sono già in `existing`.
 std::vector<std::string> missing_cards(const image& img, const std::vector<std::string>& existing);
 
 // Stop `fits.header_inconsistent` se i campi interpretati dell'immagine non coincidono con l'header.

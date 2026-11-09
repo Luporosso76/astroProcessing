@@ -4,7 +4,7 @@
 // Tolleranze derivate prima della misura (ADR-16 §6, ADR-17):
 //  - casi dyadic: zero;
 //  - C, uscita f64: gamma_6 |C|; uscita f32: mezzo ulp f32 + gamma_6 |C|.
-//    Conteggio: Lc 1, Fc 1, N pari 2 (Fc centrale + somma; il dimezzamento e' esatto), Q = Fc/N: 1, C = Lc/Q: 1.
+//    Conteggio: Lc 1, Fc 1, N pari 2 (Fc centrale + somma; il dimezzamento è esatto), Q = Fc/N: 1, C = Lc/Q: 1.
 //  - Var(C): gamma_36 Var(C). Tutti i termini sono non negativi.
 //    Var(X) = (rn2 + max(X-off,0)/g)/n: ramo Poisson sub, div, add, div = 4 operazioni, ramo lettura mul, add, div = 3;
 //    Var(Lc), Var(Fc): +1 somma = 5. Q: Fc 1 + N 2 + div 1 = 4; q2 = Q*Q: 2*4+1 = 9; q4 = q2*q2: 9+9+1 = 19.
@@ -159,7 +159,7 @@ TEST(CalibM2E, T_M2E_25_value_below_offset_keeps_read_noise_only) {
 
 // ---------------------------------------------------------------- T-M2E-04 / 05: maschere di Q
 // Il Q non finito con input validi si ottiene solo per overflow (Fc = inf da F, DF finiti); un campione NaN
-// nell'input e' un pixel di input invalido, mai q_nonfinite.
+// nell'input è un pixel di input invalido, mai q_nonfinite.
 
 set_def mask_set() {
   set_def s = empty_set(8, 4, -64);
@@ -187,7 +187,7 @@ calibration_recipe plane_recipe(const set_def& s, double q_min, double rel_max) 
 TEST(CalibM2E, T_M2E_04_05_q_bits_separate_and_together) {
   constexpr std::uint16_t below = invalid_reason::q_below_min, unrel = invalid_reason::q_unreliable;
   const set_def s = mask_set();
-  // Soglia di affidabilita': sqrt(Var(Q))/Q > 0.02 con Var(Q) = 2/1000^2, cioe' Q < 0.0707.
+  // Soglia di affidabilità: sqrt(Var(Q))/Q > 0.02 con Var(Q) = 2/1000^2, cioè Q < 0.0707.
   {
     const calibration_result r = calibrate(plane_recipe(s, 0.05, 0.02), images_of(s));
     const auto& m = r.output.invalid.bits;
@@ -224,7 +224,7 @@ TEST(CalibM2E, T_M2E_04_nan_flat_sample_is_input_invalid_not_q_bit) {
   EXPECT_EQ(r.output.invalid.bits[9], invalid_reason::source_nonfinite | invalid_reason::master_invalid);
 }
 
-// ADR-16 §7 (aggiunte di R2): una Var(Q) non rappresentabile calcolata da input finiti e' result_nonfinite, mai
+// ADR-16 §7 (aggiunte di R2): una Var(Q) non rappresentabile calcolata da input finiti è result_nonfinite, mai
 // q_unreliable. Fc = N = 1e-150 ovunque (Q = 1, N^2 = 1e-300 normale); la mediana di Var(Fc) resta normale.
 TEST(CalibM2E, T_M2E_04_var_q_overflow_is_result_nonfinite_not_q_unreliable) {
   set_def s = empty_set(8, 4, -64);
@@ -294,7 +294,7 @@ TEST(CalibM2E, T_M2E_29_nonfinite_variance_term_stops_before_the_median) {
 }
 
 TEST(CalibM2E, T_M2E_29_normalization_square_underflow_stops) {
-  // N = 1e-160: N^2 = 1e-320 e' subnormale e perde precisione.
+  // N = 1e-160: N^2 = 1e-320 è subnormale e perde precisione.
   set_def s = empty_set(8, 4, -64);
   for (std::size_t i = 0; i < 32; ++i) {
     s.dark_flat.v[i] = 0;
@@ -316,7 +316,7 @@ TEST(CalibM2E, T_M2E_29_pixel_intermediate_overflow_is_result_nonfinite) {
   EXPECT_EQ(r.output.invalid.bits[9], invalid_reason::result_nonfinite);
   EXPECT_TRUE(std::isnan(sample_at(r.output, 9)));
   EXPECT_TRUE(std::isnan(variance_at(r.output, 9)));
-  // Il CV spaziale di Fc non e' finito: il report lo dichiara null e l'ipotesi iid non e' verificata.
+  // Il CV spaziale di Fc non è finito: il report lo dichiara null e l'ipotesi iid non è verificata.
   const json& ch = r.report.find("normalization")->items()[0];
   EXPECT_EQ(ch.find("fc_cv")->type(), json::kind::null);
   EXPECT_EQ(ch.find("iid_assumption")->as_string(), "not_verified");
@@ -364,7 +364,7 @@ set_def underflow_base(int bitpix) {
 }
 
 TEST(CalibM2E, T_M2E_32_variance_underflow_is_result_nonfinite) {
-  // N = Fc = 1e150, Lc = 1e150, Var(Fc) = 1e-30 sul pixel 0: Var(Q) = 1e-330 non e' rappresentabile (prima: Var(C) = 0).
+  // N = Fc = 1e150, Lc = 1e150, Var(Fc) = 1e-30 sul pixel 0: Var(Q) = 1e-330 non è rappresentabile (prima: Var(C) = 0).
   set_def s = empty_set(8, 4, -64);
   for (std::size_t i = 0; i < 32; ++i) {
     s.dark_flat.v[i] = 100;
@@ -409,7 +409,7 @@ TEST(CalibM2E, T_M2E_32_f32_subnormal_result_from_normal_f64_is_result_nonfinite
 }
 
 TEST(CalibM2E, T_M2E_32_model_step_underflow_is_result_nonfinite) {
-  // Rumore di lettura 1e-170: rn^2 = 1e-340 non e' rappresentabile; il parametro e' respinto.
+  // Rumore di lettura 1e-170: rn^2 = 1e-340 non è rappresentabile; il parametro è respinto.
   set_def s = synth_set(8, 4, -64);
   EXPECT_STOP(calibrate(recipe_of(s, 1e-170), images_of(s)), error_category::invalid_input, "var.param.read_noise_adu");
 }
@@ -500,7 +500,7 @@ TEST(CalibM2E, T_M2E_07_normalization_errors_and_exclusions) {
   }
 }
 
-// ---------------------------------------------------------------- T-M2E-08 / 09 / 19: compatibilita'
+// ---------------------------------------------------------------- T-M2E-08 / 09 / 19: compatibilità
 
 struct mismatch_case {
   const char* field;
@@ -712,7 +712,7 @@ TEST(CalibM2E, T_M2E_10_master_states_roles_and_imagetyp) {
   }
   {
     set_def c = synth_set(8, 4, -64);
-    c.dark_flat.hdr.imagetyp = "dark frame";  // un IMAGETYP di dark e' compatibile col ruolo dark_flat dichiarato
+    c.dark_flat.hdr.imagetyp = "dark frame";  // un IMAGETYP di dark è compatibile col ruolo dark_flat dichiarato
     c.flat.hdr.imagetyp = "FLAT";
     c.light.hdr.imagetyp = "Mystery";
     const calibration_result r = calibrate(recipe_of(c), images_of(c));
@@ -825,7 +825,7 @@ TEST(CalibM2E, T_M2E_18_dark_at_flat_exposure_only_as_declared_dark_flat) {
   EXPECT_NO_THROW(calibrate(rec, images_of(s)));
   rec.dark_flat.descriptor->role = master_role::dark;
   EXPECT_STOP(calibrate(rec, images_of(s)), error_category::invalid_input, "calib.role_slot");
-  // Lo slot dark non e' riempito con un dark all'esposizione del flat: la compatibilita' L-D lo rifiuta.
+  // Lo slot dark non è riempito con un dark all'esposizione del flat: la compatibilità L-D lo rifiuta.
   frame_def short_dark = s.dark_flat;
   short_dark.v[0] += 1;
   calibration_recipe swapped = recipe_of(s);
@@ -920,7 +920,7 @@ TEST(CalibM2E, T_M2E_23_variance_sources_and_parameters) {
   stops([](auto& r, auto&) { r.dark.descriptor->combine.reset(); }, error_category::metadata_missing, "var.source.combine_method");
   stops([](auto&, auto& im) { im.light.metadata.conversion_gain_e_per_adu.reset(); }, error_category::metadata_missing,
         "var.source.conversion_gain_e_per_adu");
-  // offset_adu e' richiesto dalla compatibilita' di tutti gli input: l'assenza ferma prima, con calib.metadata.offset_adu.
+  // offset_adu è richiesto dalla compatibilità di tutti gli input: l'assenza ferma prima, con calib.metadata.offset_adu.
   stops([](auto&, auto& im) { im.light.metadata.offset_adu.reset(); }, error_category::metadata_missing,
         "calib.metadata.offset_adu");
   stops([](auto& r, auto&) { r.light.variance.read_noise_adu = std::numeric_limits<double>::quiet_NaN(); },
@@ -942,7 +942,7 @@ TEST(CalibM2E, T_M2E_23_variance_sources_and_parameters) {
           im.light.variance = variance_plane{aligned_buffer(8)};
         },
         error_category::invalid_input, "var.plane_geometry");
-  // La mediana e' ammessa con un piano dichiarato.
+  // La mediana è ammessa con un piano dichiarato.
   {
     set_def p = mask_set();
     calibration_recipe rec = plane_recipe(p, 0.05, 10.0);
@@ -1015,7 +1015,7 @@ TEST(CalibM2E, report_text_matches_report_content) {
   EXPECT_EQ(at(r.report, {"variance_model", "shared_master_digests"}).items().size(), 3u);
   const json& ch = r.report.find("normalization")->items()[0];
   EXPECT_EQ(ch.find("hypothesis")->as_string(), "iid_gaussian_fc");
-  EXPECT_EQ(ch.find("iid_assumption")->as_string(), "not_verified");  // la risposta del flat sintetico varia piu' dell'1%
+  EXPECT_EQ(ch.find("iid_assumption")->as_string(), "not_verified");  // la risposta del flat sintetico varia più dell'1%
 }
 
 }  // namespace

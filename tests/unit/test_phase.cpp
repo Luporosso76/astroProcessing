@@ -1,4 +1,4 @@
-// R1: fase e linearita' nella calibrazione (ADR-03, aggiunte di R1). T-M2R1-05 (calibrazione), T-M2R1-07 (calibrazione).
+// R1: fase e linearità nella calibrazione (ADR-03, aggiunte di R1). T-M2R1-05 (calibrazione), T-M2R1-07 (calibrazione).
 #include <gtest/gtest.h>
 
 #include <limits>
@@ -56,7 +56,7 @@ TEST(PhaseCalib, T_M2R1_05_calibration_stops_on_a_wrong_phase_before_computing) 
       EXPECT_EQ(ctx(e, "input"), name);
     }
   }
-  // La fase si controlla prima della linearita'; la linearita' non nota o NL ferma con i codici propri di M2.e.
+  // La fase si controlla prima della linearità; la linearità non nota o NL ferma con i codici propri di M2.e.
   {
     set_def s = synth_set(8, 4, -64);
     s.light.hdr.phase = "calibrated";
@@ -162,7 +162,7 @@ TEST(PhaseCalib, T_M2R1_07_calibration_job_provenance_lists_the_observed_inputs)
   const json& light_keywords = *observed.items()[0].find("uninterpreted_keywords");
   ASSERT_EQ(light_keywords.items().size(), 1u);
   EXPECT_EQ(light_keywords.items()[0].as_string(), "OBSERVER");
-  // La stessa osservazione e' nella provenance persistita.
+  // La stessa osservazione è nella provenance persistita.
   json persisted;
   for (const artifact_record& a : store->artifacts_for(node.key())) {
     if (a.output_role == "provenance") persisted = parse_json(read_text(store->artifact_path(a.rel_path)));
@@ -274,7 +274,7 @@ TEST(PhaseCalib, T_M2R1_05_the_job_checks_the_linearity_from_headers_and_recipe_
 
 
 TEST(PhaseCalib, T_M2R1_05_prepare_calibration_checks_the_linearity_before_it_visits_the_samples) {
-  // Campione non finito senza bit di invalidita': check_image lo rifiuterebbe con calib.nonfinite_unflagged.
+  // Campione non finito senza bit di invalidità: check_image lo rifiuterebbe con calib.nonfinite_unflagged.
   const auto unflagged_nan = [](image& im) { im.data<double>()[3] = std::numeric_limits<double>::quiet_NaN(); };
   {
     set_def s = synth_set(8, 4, -64);
@@ -291,7 +291,7 @@ TEST(PhaseCalib, T_M2R1_05_prepare_calibration_checks_the_linearity_before_it_vi
     EXPECT_STOP(prepare_calibration(recipe_of(s), std::move(im)), error_category::metadata_missing, "calib.metadata.linearity");
   }
   {
-    // Controllo negativo: con linearita' valida lo stesso campione ferma check_image.
+    // Controllo negativo: con linearità valida lo stesso campione ferma check_image.
     set_def s = synth_set(8, 4, -64);
     calibration_images im = images_of(s);
     unflagged_nan(im.light);

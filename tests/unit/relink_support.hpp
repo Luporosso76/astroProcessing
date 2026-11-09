@@ -71,21 +71,26 @@ inline bytes read_bytes(const fs::path& p) {
   return bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
 
-inline void write_bytes(const fs::path& p, const bytes& b) {
+// Crea un file che non esiste (modifiche in place: `append_byte`, `overwrite_byte`; file nuovo al posto di uno esistente: `replace_with_new_inode`): fallisce se `p` c'è già, così un test non riscrive per errore un file esistente.
+inline void write_new_file(const fs::path& p, const bytes& b) {
   fs::create_directories(p.parent_path());
-  std::ofstream out(p, std::ios::binary | std::ios::trunc);
+  if (fs::symlink_status(p).type() != fs::file_type::not_found) throw std::runtime_error("file già presente: " + p.string());
+  std::ofstream out(p, std::ios::binary);
   out.write(reinterpret_cast<const char*>(b.data()), static_cast<std::streamsize>(b.size()));
+  out.flush();
   if (!out) throw std::runtime_error("scrittura fallita: " + p.string());
 }
 
 // Sostituisce `p` con un file nuovo (stesso contenuto o altro): scrive accanto e rinomina, quindi inode nuovo.
 inline void replace_with_new_inode(const fs::path& p, const bytes& b) {
+  if (!fs::is_regular_file(p)) throw std::runtime_error("file regolare assente: " + p.string());
   const fs::path tmp = p.parent_path() / (p.filename().string() + ".nuovo");
-  write_bytes(tmp, b);
+  write_new_file(tmp, b);
   fs::rename(tmp, p);
 }
 
 inline void append_byte(const fs::path& p, std::uint8_t v) {
+  if (!fs::is_regular_file(p)) throw std::runtime_error("file regolare assente: " + p.string());
   std::ofstream out(p, std::ios::binary | std::ios::app);
   out.put(static_cast<char>(v));
   out.flush();
@@ -237,7 +242,7 @@ struct orig {
 
 inline orig make_orig(const fs::path& path, const bytes& content, const std::string& role = "light",
                       const std::string& format = "fits") {
-  write_bytes(path, content);
+  write_new_file(path, content);
   return orig{path, content, sha256_ref(content), content.size(), role, format};
 }
 
@@ -477,7 +482,10 @@ inline world make_world(const std::string& name) {
   world w;
   w.proj = st::fresh_dir("rl_" + name);
   w.base = w.proj.parent_path() / ("rl_" + name + "_w");
-  fs::create_directories(w.base);
+  std::error_code ec;
+  fs::remove_all(w.base, ec);
+  if (ec) throw std::runtime_error("pulizia di " + w.base.string() + " fallita: " + ec.message());
+  if (!fs::create_directories(w.base)) throw std::runtime_error("creazione di " + w.base.string() + " fallita");
   return w;
 }
 

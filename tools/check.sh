@@ -25,23 +25,30 @@ fi
 
 tools/lint.sh
 
-# Tracciabilità ID del piano → test (stadio M2): informativa; TRACE_STRICT=1 la rende bloccante.
+# Tracciabilità ID del piano → test, per stadio (M2, M3.a): informativa; TRACE_STRICT=1 la rende bloccante.
 # Il junit del preset dev contiene solo i test `fast`: i `slow` risultano mancanti finché non si usa il junit release.
-trace_status=0
-python3 -S tools/trace.py check --stage M2 --map tests/trace/M2.tsv --build-dir "$root/build/dev" \
-  --ctest-junit "$root/tmp/dev-junit.xml" \
-  > "$root/tmp/trace-check.txt" || trace_status=$?
-if ! grep -q '^trace: [0-9]* ID nello stadio' "$root/tmp/trace-check.txt"; then
-  echo "trace: errore dello strumento (nessun riepilogo), non una copertura mancante" >&2
-  exit 1
-fi
-tail -n 1 "$root/tmp/trace-check.txt"
-if [ "$trace_status" -ne 0 ]; then
-  echo "trace: ID non coperti (elenco in tmp/trace-check.txt)" >&2
-  if [ "${TRACE_STRICT:-0}" = "1" ]; then
+# Un'uscita dello strumento senza riepilogo è un errore dello strumento, distinto da una copertura mancante.
+for entry in "M2:tests/trace/M2.tsv:trace-check.txt" "M3.a:tests/trace/M3a.tsv:trace-check-m3a.txt"; do
+  stage="${entry%%:*}"
+  rest="${entry#*:}"
+  map="${rest%%:*}"
+  out="$root/tmp/${rest#*:}"
+  trace_status=0
+  python3 -S tools/trace.py check --stage "$stage" --map "$map" --build-dir "$root/build/dev" \
+    --ctest-junit "$root/tmp/dev-junit.xml" \
+    > "$out" || trace_status=$?
+  if ! grep -q '^trace: [0-9]* ID nello stadio' "$out"; then
+    echo "trace $stage: errore dello strumento (nessun riepilogo), non una copertura mancante" >&2
     exit 1
   fi
-fi
+  tail -n 1 "$out"
+  if [ "$trace_status" -ne 0 ]; then
+    echo "trace $stage: ID non coperti (elenco in tmp/$(basename "$out"))" >&2
+    if [ "${TRACE_STRICT:-0}" = "1" ]; then
+      exit 1
+    fi
+  fi
+done
 
 # Record di evidenza con blocco generato: informativo; EVIDENCE_STRICT=1 lo rende bloccante.
 # Il blocco di M2-R0 legge anche tmp/release-junit.xml (`ctest --preset release --output-junit tmp/release-junit.xml`).

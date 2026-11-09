@@ -28,7 +28,7 @@ TEST(RelinkNoStat, T_M3A_07_status_is_one_stat_per_registered_path_and_no_search
     recs.push_back(register_input(*store, origs.back()));
   }
   fs::remove(origs[1].path);  // esca: stesso nome e stesso contenuto in una directory sorella
-  write_bytes(w.base / "sorella" / "l1.fits", origs[1].content);
+  write_new_file(w.base / "sorella" / "l1.fits", origs[1].content);
   fs::rename(origs[2].path, w.base / "orig" / "l2_rinominato.fits");
 
   std::vector<std::string> events;

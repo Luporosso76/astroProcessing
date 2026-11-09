@@ -94,10 +94,10 @@ branch_files_job make_raw_import_branch_job(sqlite_dag_store& store, const std::
     const node_spec built = make_raw_import_node(request.digest, record);
     if (built.key() != request.node.key()) {
       throw stop_error(error_category::invalid_input, "raw_import.node_mismatch",
-                       "il record del decoder non e' quello del nodo dello slot",
+                       "il record del decoder non è quello del nodo dello slot",
                        {{"nodo_slot", request.node.key()}, {"nodo_richiesta", built.key()}});
     }
-    // Lo scrittore FITS non rappresenta `decoder_state` (ADR-03.b §b.2): il suo contenuto e' nel record di provenance.
+    // Lo scrittore FITS non rappresenta `decoder_state` (ADR-03.b §b.2): il suo contenuto è nel record di provenance.
     img.decoder_state.reset();
     img.measure = merge_measure({}, {});
     const std::uint64_t sample_bytes = img.samples.size();

@@ -14,7 +14,7 @@
 //    chi2_(K-1) su 16 sonde per i valori del master (18 statistiche).
 //  D (stessa fixture, regione fuori da nonnegative_signal: b - offset = 2, c g = -2, sigma = 2): media della stima
 //    contro il valore atteso esatto con la troncatura, Chebyshev con secondo e quarto momento di max(Y, 0) (1).
-//  La regione di fondo del flat (meta' dei pixel piu' uno, senza rumore, b = offset, g = 1) fissa m_f = c_f esatto.
+//  La regione di fondo del flat (metà dei pixel più uno, senza rumore, b = offset, g = 1) fissa m_f = c_f esatto.
 // T-M2E-21 sui master del prodotto: alpha = 1e-3, Bonferroni su m = 16, K = 2000.
 //  (a) 8 sonde: (K-1) var_K(C)/Var_vera(C) in chi2_(K-1), Var_vera dal primo ordine con le varianze vere dei master
 //      (sigma^2/n), regime Var(Q)/Q^2 <= 1e-4. (b) 8 sonde, flat e dark-flat senza rumore, Fc costante (Q = 1),
@@ -54,7 +54,7 @@ TEST(MasterStats, chi2_quantiles_match_closed_forms) {
   }
 }
 
-// Frame f64 con campioni `mu` e una card propria (digest distinti anche a parita' di valori).
+// Frame f64 con campioni `mu` e una card propria (digest distinti anche a parità di valori).
 mframe base_frame(master_role role, std::uint32_t w, std::uint32_t h, std::size_t k) {
   mframe f = frame_for(role, w, h, -64);
   f.hdr.extra = {fx::card_int("FRAMENO", static_cast<long long>(k))};
@@ -234,7 +234,7 @@ TEST(MasterStats, T_M2R2_04_monte_carlo_variance_plane_master_and_level_bias) {
   constexpr double off = 10, cbar = 1024, eps = 1.0 / 16, gC = 0.75, gD = -2.0 / 1024, sC = 8, sD = 2;
   std::vector<double> c(n);
   for (std::size_t k = 0; k < n; ++k) c[k] = cbar * (k % 2 == 0 ? 1 + eps : 1 - eps);
-  // Righe 0-32 fondo (4224 pixel > meta' + 1), 33-48 regione C (2048), 49-63 regione D (1920).
+  // Righe 0-32 fondo (4224 pixel > metà + 1), 33-48 regione C (2048), 49-63 regione D (1920).
   const auto region = [](std::size_t i) { const std::size_t y = i / fw; return y <= 32 ? 0 : y <= 48 ? 1 : 2; };
   std::vector<std::vector<double>> mu(n, std::vector<double>(fpx)), sigma(n, std::vector<double>(fpx));
   for (std::size_t k = 0; k < n; ++k) {

@@ -165,7 +165,7 @@ unsigned fc(unsigned filters, unsigned r, unsigned c) {
 int channel_of(unsigned index) { return index == 3 ? 1 : static_cast<int>(index); }
 
 // Cella 2x2 all'origine dell'area visibile come pattern Bayer di ADR-03; assente se `filters` non ripete la stessa cella
-// sulle otto righe codificate o se la cella non e' una delle quattro celle Bayer (un rosso, un blu, verdi in diagonale).
+// sulle otto righe codificate o se la cella non è una delle quattro celle Bayer (un rosso, un blu, verdi in diagonale).
 std::optional<cfa_pattern> bayer_pattern(unsigned filters) {
   for (unsigned r = 0; r < 8; ++r)
     for (unsigned c = 0; c < 2; ++c)
@@ -187,7 +187,7 @@ std::optional<cfa_pattern> bayer_pattern(unsigned filters) {
 std::optional<cfa_pattern> check_probe(const raw_probe_fields& f) {
   if (f.filters == 9) unsupported("raw.xtrans", "sensore X-Trans non supportato");
   if (f.raw_count > 1)
-    unsupported("raw.multi_image", "file con piu' immagini raw", {{"raw_count", std::to_string(f.raw_count)}});
+    unsupported("raw.multi_image", "file con più immagini raw", {{"raw_count", std::to_string(f.raw_count)}});
   if (f.is_floating_point != 0) unsupported("raw.float_data", "dati raw in virgola mobile");
   if (f.is_foveon != 0 || f.colors != 3)
     unsupported("raw.cfa_pattern", "sensore non Bayer a tre colori", {{"colors", std::to_string(f.colors)}});
@@ -202,7 +202,7 @@ std::optional<cfa_pattern> check_probe(const raw_probe_fields& f) {
 // Motivo di nero dopo unpack: `cblack[4] x cblack[5]` valori da `cblack[6]`; dimensioni nulle = nessun motivo.
 // LibRaw arrotonda al pari il margine di un'ActiveArea DNG con origine dispari e riallinea `filters`, non il motivo, che
 // resta ancorato all'origine del file (ADR-08.b §2.4): con margine > 0 su un asse il motivo deve essere invariante per un
-// passo su quell'asse, altrimenti il nero per posizione non e' determinabile.
+// passo su quell'asse, altrimenti il nero per posizione non è determinabile.
 std::vector<std::uint32_t> black_pattern(const libraw_data_t& d, std::uint32_t& rows, std::uint32_t& cols) {
   const unsigned* cb = d.color.cblack;
   if (std::uint64_t{cb[4]} * cb[5] == 0) {
@@ -212,7 +212,7 @@ std::vector<std::uint32_t> black_pattern(const libraw_data_t& d, std::uint32_t& 
   rows = cb[4];
   cols = cb[5];
   if (std::uint64_t{rows} * cols > LIBRAW_CBLACK_SIZE - 6)
-    throw stop_error(error_category::integrity, "raw.data_error", "motivo di nero oltre la capacita' di LibRaw",
+    throw stop_error(error_category::integrity, "raw.data_error", "motivo di nero oltre la capacità di LibRaw",
                      {{"righe", std::to_string(rows)}, {"colonne", std::to_string(cols)}});
   const auto at = [&](std::uint32_t i, std::uint32_t j) { return cb[6 + i * cols + j]; };
   if (d.idata.dng_version != 0) {
@@ -283,7 +283,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   if (bytes.size() > raw_limits::max_file_bytes)
     throw stop_error(error_category::limit_exceeded, "raw.max_file_bytes", "file RAW oltre il limite",
                      {{"byte", std::to_string(bytes.size())}, {"limite", std::to_string(raw_limits::max_file_bytes)}});
-  // U12 obbligo 5: versione e capacita' di LibRaw verificate prima della prima chiamata alla libreria.
+  // U12 obbligo 5: versione e capacità di LibRaw verificate prima della prima chiamata alla libreria.
   third_party::verify_once();
   check_process_tz();
   // U13 §3: un solo punto di scelta, prima di ogni chiamata a LibRaw o a zlib; un errore di un decoder non porta mai
@@ -305,7 +305,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   lr->set_dataerror_handler(on_data_error, &watch);
   lr->set_progress_handler(on_progress, &watch);
 
-  // §2.2: il bit e' attivo per default e con esso LibRaw convertirebbe in silenzio i DNG in virgola mobile in interi.
+  // §2.2: il bit è attivo per default e con esso LibRaw convertirebbe in silenzio i DNG in virgola mobile in interi.
   d.rawparams.options &= ~static_cast<unsigned>(LIBRAW_RAWOPTIONS_CONVERTFLOAT_TO_INT);
   raw_user_params user{d.params.user_black,
                        {d.params.user_cblack[0], d.params.user_cblack[1], d.params.user_cblack[2],
@@ -316,7 +316,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   d.params.user_black = user.user_black;
   for (int i = 0; i < 4; ++i) d.params.user_cblack[i] = user.user_cblack[static_cast<std::size_t>(i)];
   d.params.user_sat = user.user_sat;
-  // §2.2: nero e saturazione dell'utente restano quelli iniziali, cosi' LibRaw non sostituisce i livelli del file.
+  // §2.2: nero e saturazione dell'utente restano quelli iniziali, così LibRaw non sostituisce i livelli del file.
   ASTRO_ASSERT(d.params.user_black == -1 && d.params.user_sat == -1);
   for (int v : d.params.user_cblack) ASTRO_ASSERT(v == -1000001);
 
@@ -391,7 +391,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
 
   // §2.3: stop valutati prima di ogni lettura di raw_image.
   if (d.rawdata.float_image != nullptr) unsupported("raw.float_data", "dati raw in virgola mobile");
-  if (d.rawdata.raw_image == nullptr) unsupported("raw.not_cfa", "dati raw a piu' canali per pixel");
+  if (d.rawdata.raw_image == nullptr) unsupported("raw.not_cfa", "dati raw a più canali per pixel");
   if (!pattern) unsupported("raw.cfa_pattern", "nessuna CFA codificata (filters = 0)");
 
   raw_unpack_fields levels{{d.color.cblack[0], d.color.cblack[1], d.color.cblack[2], d.color.cblack[3]},
@@ -421,7 +421,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
   st.window = {sz.left_margin, sz.top_margin, sz.width, sz.height};
   for (unsigned site = 0; site < 4; ++site)
     st.cfa_color_index[site] = static_cast<std::uint8_t>(fc(probe.filters, site / 2, site % 2));
-  // §2.4: nero e bianco dichiarati, mai sottratti ne' applicati.
+  // §2.4: nero e bianco dichiarati, mai sottratti né applicati.
   st.black = d.color.black;
   for (std::size_t i = 0; i < 4; ++i) st.black_per_color[i] = levels.cblack[i];
   st.white = d.color.maximum;
@@ -441,7 +441,7 @@ image decode_raw_buffer(std::span<const std::uint8_t> bytes, const raw_decode_ho
 
   image img = make_image(image_geometry(sz.width, sz.height), sample_type::f32, plane_layout::cfa,
                          cfa_layout{*pattern, 0, 0});
-  // §2.6: campioni f32 uguali al uint16 letto (esatto: ogni intero <= 65535 e' rappresentabile in f32).
+  // §2.6: campioni f32 uguali al uint16 letto (esatto: ogni intero <= 65535 è rappresentabile in f32).
   float* out = img.data<float>();
   const unsigned short* raw = d.rawdata.raw_image;
   for (std::uint64_t r = 0; r < sz.height; ++r)
@@ -678,7 +678,7 @@ namespace {
                    {{"chiave", key}, {"motivo", why}});
 }
 
-// `name` e' la chiave riportata nella diagnosi: per un membro annidato e' il nome qualificato `<padre>.<chiave>`.
+// `name` è la chiave riportata nella diagnosi: per un membro annidato è il nome qualificato `<padre>.<chiave>`.
 const json& record_nested(const json& record, const char* key, const char* name) {
   const json* v = record.type() == json::kind::object ? record.find(key) : nullptr;
   if (v == nullptr) record_malformed(name, "assente");

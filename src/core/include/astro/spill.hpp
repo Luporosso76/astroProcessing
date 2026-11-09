@@ -33,7 +33,7 @@ class spill_file {
   ~spill_file();
 
   // Quota superata: budget spill.quota_exceeded (nessun byte scritto). Errori di sistema: io spill.write con l'errno.
-  // Una scrittura che estende il file e' esclusiva fino all'esito; se fallisce, estensione e quota restano quelle dei
+  // Una scrittura che estende il file è esclusiva fino all'esito; se fallisce, estensione e quota restano quelle dei
   // byte scritti davvero (anche una scrittura corta).
   void write(std::uint64_t offset, std::span<const std::byte> data);
   // Oltre l'estensione scritta o lettura corta: integrity spill.short_read. Errori di sistema: io spill.read.
@@ -42,7 +42,7 @@ class spill_file {
   std::uint64_t size_bytes() const noexcept { return size_.load(std::memory_order_acquire); }
   // Byte effettivamente allocati su disco (st_blocks), distinti dall'estensione logica.
   std::uint64_t allocated_bytes() const;
-  // Byte del file presenti nella page cache (mincore). La page cache non e' parte del budget del pool.
+  // Byte del file presenti nella page cache (mincore). La page cache non è parte del budget del pool.
   std::uint64_t resident_bytes() const;
   // Scrive su disco e chiede al kernel di liberare la page cache dell'intervallo. Non cambia il contenuto.
   void drop_cache(std::uint64_t offset, std::uint64_t length) const;
@@ -63,7 +63,7 @@ class spill_area {
   explicit spill_area(const spill_config& config);
   spill_area(const spill_area&) = delete;
   spill_area& operator=(const spill_area&) = delete;
-  // Tutti gli spill_file devono essere gia' stati distrutti.
+  // Tutti gli spill_file devono essere già stati distrutti.
   ~spill_area();
 
   // File posseduto da chi lo riceve: va distrutto prima dell'area.
@@ -78,7 +78,7 @@ class spill_area {
   // metadata_missing sched.checkpoint_missing; altri errori: io spill.staging_open.
   spill_file& open_named_file(const std::string& name, bool existing);
 
-  // Solo test: chiamato con "spill.write" prima di ogni pwrite; un valore diverso da zero e' l'errno della scrittura.
+  // Solo test: chiamato con "spill.write" prima di ogni pwrite; un valore diverso da zero è l'errno della scrittura.
   void set_fault_injector(fault_injector injector) { fault_ = std::move(injector); }
 
   std::uint64_t quota_bytes() const noexcept { return quota_bytes_; }

@@ -1,5 +1,5 @@
 // Main condiviso dei test che collegano il decoder RAW (ADR-08.b §2.6): TZ=UTC0 prima di ogni thread, poi l'ambiente non
-// si tocca piu'.
+// si tocca più.
 #include <gtest/gtest.h>
 
 #include <cstdio>

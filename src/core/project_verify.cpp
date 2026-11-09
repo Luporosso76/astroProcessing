@@ -237,13 +237,13 @@ std::optional<opened_regular> open_regular(int dirfd, const std::string& rel) {
   opened_regular r{unique_fd(raw), {}};
   struct stat st {};
   if (::fstat(r.fd.get(), &st) != 0) throw_errno(error_category::io, "export.open", "fstat fallita", errno);
-  if (!S_ISREG(st.st_mode)) bad_path(rel, "il file non e' regolare");
+  if (!S_ISREG(st.st_mode)) bad_path(rel, "il file non è regolare");
   r.id = identity_of(st);
   return r;
 }
 
 void changed(const std::string& rel) {
-  throw stop_error(error_category::integrity, "export.changed_during_verify", "il file e' cambiato durante la verifica",
+  throw stop_error(error_category::integrity, "export.changed_during_verify", "il file è cambiato durante la verifica",
                    {{"rel_path", rel}});
 }
 
@@ -353,7 +353,7 @@ export_manifest verify_export(const fs::path& dir, const fault_injector& hook) {
     }
   }
   std::string extra;
-  if (has_extra_entries(root.get(), "", files, dirs, extra, hook)) incomplete("file in piu'", extra);
+  if (has_extra_entries(root.get(), "", files, dirs, extra, hook)) incomplete("file in più", extra);
   listings scanned;
   scan_listings(root.get(), "", dirs, scanned, hook);
   inject(&hook, "verify.after_read");
@@ -366,7 +366,7 @@ export_manifest verify_export(const fs::path& dir, const fault_injector& hook) {
     scan_listings(again.get(), "", dirs, rescanned, hook);
     if (rescanned != scanned) changed("elenco delle directory");
     std::string late_extra;
-    if (has_extra_entries(again.get(), "", files, dirs, late_extra, hook)) incomplete("file in piu'", late_extra);
+    if (has_extra_entries(again.get(), "", files, dirs, late_extra, hook)) incomplete("file in più", late_extra);
   }
   expect_unchanged(root.get(), "manifest.json", *manifest_file);
   expect_unchanged(root.get(), "COMMIT", *commit);

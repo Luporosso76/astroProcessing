@@ -1,6 +1,6 @@
 // T-M2E-21 e T-M2E-26: Monte Carlo con seed fisso. Lungo: label `slow`.
 //
-// Soglie fissate prima dell'esecuzione. Quantile chi-quadro con nu gradi di liberta' dall'approssimazione di
+// Soglie fissate prima dell'esecuzione. Quantile chi-quadro con nu gradi di libertà dall'approssimazione di
 // Wilson-Hilferty, chi2(nu, z) = nu (1 - 2/(9 nu) + z sqrt(2/(9 nu)))^3, errore relativo trascurabile per nu ~ 2000.
 //  - T-M2E-21: alpha complessivo 1e-3 con Bonferroni su P = 8 pixel, due code: coda per pixel 1e-3/(2*8) = 6.25e-5,
 //    z = 3.83. nu = K - 1 con K = 2000. Statistica (K-1) s^2 / Var_propagata, con Var_propagata calcolata dalla

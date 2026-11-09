@@ -47,7 +47,7 @@ struct schema_migration {
 struct open_options {
   std::uint32_t schema_version = project_schema_version;
   std::vector<schema_migration> migrations;
-  // Attivo gia' durante l'apertura (migrazione); resta installato nello store.
+  // Attivo già durante l'apertura (migrazione); resta installato nello store.
   fault_injector fault;
   // Solo test di perdita di energia (ADR-04, D17): VFS SQLite registrato della connessione in lettura-scrittura (vuoto:
   // VFS predefinito) e osservatore della scrittura atomica degli artefatti.
@@ -66,7 +66,7 @@ struct incomplete_result {
 
 // Output non verificato del job produttore (ADR-04, Fase sicura). `absent`: riga present = 0 con file assente (nome
 // libero, trovato vuoto) o con il contenuto registrato (nome riusabile, trovato uguale all'atteso); il nodo si
-// ricostruisce. `digest`: file presente con dimensione o digest diversi, anche se la riga e' present = 0; il nodo no.
+// ricostruisce. `digest`: file presente con dimensione o digest diversi, anche se la riga è present = 0; il nodo no.
 enum class phase_defect_cause { absent, digest };
 
 struct phase_defect {
@@ -74,17 +74,17 @@ struct phase_defect {
   std::string rel_path;
   phase_defect_cause cause = phase_defect_cause::absent;
   std::string expected_sha256;
-  std::string found_sha256;  // vuoto se il file e' assente
+  std::string found_sha256;  // vuoto se il file è assente
   bool operator==(const phase_defect&) const = default;
 };
 
-// Fase di uno slot il cui artefatto pubblicato (present o no) e' del nodo target (D16): sicura se `defects` e' vuoto,
+// Fase di uno slot il cui artefatto pubblicato (present o no) è del nodo target (D16): sicura se `defects` è vuoto,
 // altrimenti danneggiata. `artifact_ids`: output verificati del job produttore (righe con il suo job_id), crescenti.
 struct phase_record {
   std::string slot_name;
   std::string node_key;
   std::uint64_t generation = 0;               // dell'artefatto pubblicato
-  std::optional<std::uint64_t> job_id;        // job produttore; nullo se la riga e' fuori da un commit
+  std::optional<std::uint64_t> job_id;        // job produttore; nullo se la riga è fuori da un commit
   std::vector<std::uint64_t> artifact_ids;
   std::vector<phase_defect> defects;
   bool operator==(const phase_record&) const = default;
@@ -111,7 +111,7 @@ struct input_record {
   std::uint64_t size_bytes = 0;
   std::string sha256;
   std::string role;
-  // Identita' dell'originale letta da add_input con stat (regola hardlink, D18); ignorate in ingresso.
+  // Identità dell'originale letta da add_input con stat (regola hardlink, D18); ignorate in ingresso.
   std::uint64_t dev = 0;
   std::uint64_t ino = 0;
   // Dichiarazione di formato del confine (BASE §2.5): `fits` o `raw`, con cui si riapre l'originale. Fuori elenco o
@@ -186,7 +186,7 @@ struct artifact_content {
   std::string kind;
   std::optional<content_digest> expected;
   std::string role = "primary";  // [a-z0-9_]{1,32}, distinto fra gli output dello stesso job
-  // Contenuto in streaming al posto di `bytes` (ADR-06, estensione R3.2): chiamato finche' restituisce 0. Richiede
+  // Contenuto in streaming al posto di `bytes` (ADR-06, estensione R3.2): chiamato finché restituisce 0. Richiede
   // `expected` (il nome finale deriva dal digest prima della scrittura): senza, invalid_input store.stream_digest.
   std::function<std::size_t(std::span<std::uint8_t>)> source = nullptr;
 };
@@ -201,7 +201,7 @@ class stored_file {
   const std::string& kind() const noexcept { return kind_; }
   const std::string& role() const noexcept { return role_; }
 
-  // Identita' del file scritto e dello store che lo ha scritto: il commit rifiuta token altrui o file sostituiti.
+  // Identità del file scritto e dello store che lo ha scritto: il commit rifiuta token altrui o file sostituiti.
   struct identity {
     std::uint64_t dev = 0, ino = 0, size = 0;
     std::int64_t mtime_ns = 0;
@@ -254,11 +254,11 @@ struct export_manifest {
 // Verifica un export trattando manifest e contenuto come input non fidato. Non scrive nulla.
 // Errori: limit_exceeded export.manifest_size; invalid_input export.manifest_malformed; security
 // export.manifest_path; integrity export.incomplete / export.node_key_mismatch / export.report_mismatch; io export.open.
-// `hook` (solo test) e' chiamato con "verify.after_read" dopo la lettura e prima del controllo finale d'identita';
+// `hook` (solo test) è chiamato con "verify.after_read" dopo la lettura e prima del controllo finale d'identità;
 // un file sostituito o modificato nel frattempo: integrity export.changed_during_verify.
 export_manifest verify_export(const std::filesystem::path& dir, const fault_injector& hook = {});
 
-// DAG durevole su SQLite (ADR-04.a): stessa semantica di memory_dag_store, piu' artefatti su disco, snapshot e export.
+// DAG durevole su SQLite (ADR-04.a): stessa semantica di memory_dag_store, più artefatti su disco, snapshot e export.
 // Ogni metodo che scrive su uno store aperto in sola lettura: schema store.read_only.
 class sqlite_dag_store : public dag_store {
  public:
@@ -281,7 +281,7 @@ class sqlite_dag_store : public dag_store {
   // present assente: io store.artifact_missing.
   std::optional<phase_record> check_phase(const std::string& slot_name) const;
 
-  // Contesto del resume in corso (resume_workflow): finche' e' impostato entra nella provenance di ogni job (ADR-05).
+  // Contesto del resume in corso (resume_workflow): finché è impostato entra nella provenance di ogni job (ADR-05).
   void set_resume_context(std::optional<json> context);
   std::optional<json> resume_context() const;
   const std::filesystem::path& root() const noexcept { return root_; }
@@ -316,12 +316,12 @@ class sqlite_dag_store : public dag_store {
                                         const std::map<std::string, std::string>& slot_targets) override;
 
   // Ruolo dell'output che lo slot pubblica (default `primary`). Mutazione della ricetta: ricollega lo slot all'artefatto
-  // del nuovo ruolo (o missing), incrementa la generazione, crea uno snapshot (il ruolo vi e' registrato).
+  // del nuovo ruolo (o missing), incrementa la generazione, crea uno snapshot (il ruolo vi è registrato).
   void set_publish_role(const std::string& slot_name, const std::string& role);
 
   // `settings`: `value_canonical` deve essere JSON canonico (altrimenti invalid_input store.setting_not_canonical).
   void put_setting(const std::string& key, const std::string& value_canonical);
-  // Come put_setting senza sostituzione: chiave gia' presente = invalid_input store.setting_exists, nulla scritto.
+  // Come put_setting senza sostituzione: chiave già presente = invalid_input store.setting_exists, nulla scritto.
   void insert_setting(const std::string& key, const std::string& value_canonical);
   std::optional<std::string> get_setting(const std::string& key) const;
 
@@ -355,7 +355,7 @@ class sqlite_dag_store : public dag_store {
   // Passi 1-5 della scrittura atomica per ogni file; nessuna riga viene scritta.
   std::vector<stored_file> write_files(const std::vector<artifact_content>& files);
   // Passo 6: un'unica transazione inserisce le righe di artifacts (nodo del job) e chiude il job `completed`;
-  // se la generazione dello slot e' quella del job, lo slot punta al file con il proprio ruolo di pubblicazione
+  // se la generazione dello slot è quella del job, lo slot punta al file con il proprio ruolo di pubblicazione
   // (assente fra i file: invalid_input store.role_not_produced). Generazione cambiata: le righe
   // restano come cache (tranne il file di ruolo `provenance`, che dichiarerebbe `completed`: non ha riga e resta
   // orfano per la recovery), il job diventa `failed` e si lancia stale_generation dag.stale_publish.

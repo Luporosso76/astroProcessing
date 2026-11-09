@@ -319,7 +319,7 @@ TEST(Spill, T_M2R3_06_named_file_rules) {
   EXPECT_EQ(read_text(dir / "target"), "x");
 }
 
-// Scrittura corta reale: RLIMIT_FSIZE nel processo figlio tronca il pwrite e il successivo da' EFBIG.
+// Scrittura corta reale: RLIMIT_FSIZE nel processo figlio tronca il pwrite e il successivo dà EFBIG.
 TEST(Spill, T_M2R3_05_a_short_write_keeps_extension_and_quota_of_the_bytes_written) {
   const fs::path dir = fresh_dir("spill_short_write");
   const pid_t pid = ::fork();
@@ -373,7 +373,7 @@ TEST(Spill, T_M2R3_05_a_write_inside_a_failing_extension_waits_and_keeps_its_byt
   std::thread failing([&] { EXPECT_STOP(f.write(1000, pattern(9000, 2)), error_category::io, "spill.write"); });
   EXPECT_TRUE(wait_until([&] { return first_inside.load(); }));
   std::thread inside([&] {
-    f.write(2000, pattern(500, 3));  // dentro l'estensione della scrittura che fallira'
+    f.write(2000, pattern(500, 3));  // dentro l'estensione della scrittura che fallirà
     second_done = true;
   });
   std::this_thread::sleep_for(std::chrono::milliseconds(30));

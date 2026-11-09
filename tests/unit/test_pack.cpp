@@ -40,7 +40,7 @@
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Osservatore di aperture di file e di chiamate di rete. Le funzioni libc sono interposte da questo eseguibile
-// (libastrocore e' statica); registrano solo mentre una `probe::window` e' viva, quindi attorno alla sola chiamata
+// (libastrocore è statica); registrano solo mentre una `probe::window` è viva, quindi attorno alla sola chiamata
 // di G-PACK. Le aperture dello store fatte dal runner (artifacts/) cadono fuori dalla finestra.
 // ---------------------------------------------------------------------------------------------------------------------
 namespace probe {
@@ -99,7 +99,7 @@ class window {
   int network() const { return network_calls.load(); }
 };
 
-// O_TMPFILE include O_DIRECTORY: il modo c'e' solo con O_CREAT o con tutti i bit di O_TMPFILE.
+// O_TMPFILE include O_DIRECTORY: il modo c'è solo con O_CREAT o con tutti i bit di O_TMPFILE.
 inline bool takes_mode(int flags) { return (flags & O_CREAT) != 0 || (flags & O_TMPFILE) == O_TMPFILE; }
 
 template <class F>
@@ -291,7 +291,7 @@ void write_bytes(const fs::path& path, const std::string& bytes) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Albero JSON del test e serializzatore canonico (RFC 8785 ristretto a ASCII e interi, che e' tutto cio' che il test usa).
+// Albero JSON del test e serializzatore canonico (RFC 8785 ristretto a ASCII e interi, che è tutto ciò che il test usa).
 // ---------------------------------------------------------------------------------------------------------------------
 
 struct jv {
@@ -484,7 +484,7 @@ struct synth {
     write_bytes(dir / "manifest.json", manifest_bytes);
     digest = sha256_of(manifest_bytes);
   }
-  // Aggiorna dimensione e SHA-256 della voce di files[] dopo che il file e' stato riscritto su disco.
+  // Aggiorna dimensione e SHA-256 della voce di files[] dopo che il file è stato riscritto su disco.
   void refresh_entry(const std::string& rel) {
     const std::string bytes = read_text(dir / rel);
     for (jv& f : manifest.at("files").items) {
@@ -836,12 +836,12 @@ TEST(Pack, T_M3A_PACK_01_valid_synthetic_pack_passes_and_reports_manifest_identi
   std::set<std::string> listed;
   for (const pack_file& f : v.manifest.files) listed.insert(f.path);
   EXPECT_EQ(listed, (std::set<std::string>{"data.bin", "index.bin", "licenses/synthetic.txt"}));
-  // Forma del digest: 64 caratteri esadecimali; il valore atteso e' lo SHA-256 (OpenSSL) dei byte canonici scritti dal generatore.
+  // Forma del digest: 64 caratteri esadecimali; il valore atteso è lo SHA-256 (OpenSSL) dei byte canonici scritti dal generatore.
   EXPECT_EQ(p.digest.size(), 64u);
   EXPECT_EQ(p.manifest_bytes.find("\": "), std::string::npos);
   EXPECT_EQ(p.manifest_bytes.find(", \""), std::string::npos);
   EXPECT_EQ(p.manifest_bytes.find('\n'), std::string::npos);
-  // La verifica e' ripetibile e non cambia l'identita'.
+  // La verifica è ripetibile e non cambia l'identità.
   EXPECT_EQ(g.expect_ok(p.recipe(), use_of(), p.audit()).pack_digest, p.digest);
 }
 
@@ -893,7 +893,7 @@ TEST(Pack, T_M3A_PACK_01_pack_digest_is_in_the_node_key_and_in_the_provenance) {
   const auto texts = provenance_texts(*reopened, run.keys.at("p"));
   ASSERT_EQ(texts.size(), 1u);
   EXPECT_NE(texts[0].find("\"state\":\"completed\""), std::string::npos);
-  // Il digest compare anche fra i parametri del nodo: la prova e' che il G-PACK lo riporti nei `details` del job.
+  // Il digest compare anche fra i parametri del nodo: la prova è che il G-PACK lo riporti nei `details` del job.
   EXPECT_NE(texts[0].find("\"details\":{"), std::string::npos);
   EXPECT_NE(texts[0].find("\"pack\":{\"pack_digest\":\"" + p.digest + "\""), std::string::npos);
   EXPECT_NE(texts[0].find("\"pack_id\":\"syn-pack\",\"pack_version\":\"1.0.0\""), std::string::npos);
@@ -922,7 +922,7 @@ TEST(Pack, T_M3A_PACK_02_valid_pack_control_runs_the_operation_and_the_observer_
 
 TEST(Pack, T_M3A_PACK_02_missing_pack_stops_only_the_dependent_branch) {
   const fs::path base = fresh_dir("pk02");
-  // Un pack valido accanto e sopra il percorso della ricetta: G-PACK non deve cercarlo ne' leggerlo.
+  // Un pack valido accanto e sopra il percorso della ricetta: G-PACK non deve cercarlo né leggerlo.
   const synth sibling = make_pack(base / "sibling");
   write_bytes(base / "manifest.json", read_text(sibling.dir / "manifest.json"));
   pack_recipe recipe = sibling.recipe();
@@ -1029,13 +1029,13 @@ TEST(Pack, T_M3A_PACK_03_corruption_stops_with_the_codes_of_the_table_and_never_
       {"dati mancanti", remove("data.bin"), error_category::integrity, "pack.file_missing"},
       {"indice mancante", remove("index.bin"), error_category::integrity, "pack.file_missing"},
       {"licenza mancante", remove("licenses/synthetic.txt"), error_category::integrity, "pack.file_missing"},
-      {"file in piu' nella radice", extra("extra.txt"), error_category::integrity, "pack.unlisted_file"},
-      {"file nascosto in piu'", extra(".hidden"), error_category::integrity, "pack.unlisted_file"},
-      {"file in piu' in licenses/", extra("licenses/extra.txt"), error_category::integrity, "pack.unlisted_file"},
-      {"file in piu' in una sottodirectory", extra("sub/dir/x.bin"), error_category::integrity, "pack.unlisted_file"},
-      {"dati piu' lunghi di un byte", append("data.bin"), error_category::integrity, "pack.size_mismatch"},
-      {"indice piu' corto di un byte", truncate_last("index.bin"), error_category::integrity, "pack.size_mismatch"},
-      {"licenza piu' lunga di un byte", append("licenses/synthetic.txt"), error_category::integrity, "pack.size_mismatch"},
+      {"file in più nella radice", extra("extra.txt"), error_category::integrity, "pack.unlisted_file"},
+      {"file nascosto in più", extra(".hidden"), error_category::integrity, "pack.unlisted_file"},
+      {"file in più in licenses/", extra("licenses/extra.txt"), error_category::integrity, "pack.unlisted_file"},
+      {"file in più in una sottodirectory", extra("sub/dir/x.bin"), error_category::integrity, "pack.unlisted_file"},
+      {"dati più lunghi di un byte", append("data.bin"), error_category::integrity, "pack.size_mismatch"},
+      {"indice più corto di un byte", truncate_last("index.bin"), error_category::integrity, "pack.size_mismatch"},
+      {"licenza più lunga di un byte", append("licenses/synthetic.txt"), error_category::integrity, "pack.size_mismatch"},
       {"dati azzerati in lunghezza", [](synth& p) { write_bytes(p.dir / "data.bin", ""); }, error_category::integrity,
        "pack.size_mismatch"},
   };
@@ -1072,13 +1072,13 @@ TEST(Pack, T_M3A_PACK_03_wrong_filesystem_types_stop_before_the_operation) {
     const synth p = make_pack(base / "recipe-is-a-file");
     pack_recipe r = p.recipe();
     r.directory = (p.dir / "manifest.json").string();
-    g.expect_stop(r, use_of(), p.audit(), error_category::metadata_missing, "pack.missing", "il percorso della ricetta e' un file");
+    g.expect_stop(r, use_of(), p.audit(), error_category::metadata_missing, "pack.missing", "il percorso della ricetta è un file");
   }
   {
     const synth p = make_pack(base / "manifest-is-a-directory");
     fs::remove(p.dir / "manifest.json");
     fs::create_directories(p.dir / "manifest.json");
-    g.expect_stop(p.recipe(), use_of(), p.audit(), error_category::metadata_missing, "pack.missing", "manifest.json e' una directory");
+    g.expect_stop(p.recipe(), use_of(), p.audit(), error_category::metadata_missing, "pack.missing", "manifest.json è una directory");
   }
   for (const char* rel : {"data.bin", "index.bin", "licenses/synthetic.txt"}) {
     const synth p = make_pack(base / (std::string("listed-dir-") + std::to_string(std::strlen(rel))));
@@ -1242,7 +1242,7 @@ TEST(Pack, T_M3A_PACK_04_schema_violations_stop_as_manifest_invalid) {
   EXPECT_EQ(g.operations, 1);
 }
 
-// Voce aggiunta a files[] che punta a un file reale con dimensione e SHA-256 corretti: l'unica violazione e' la forma del
+// Voce aggiunta a files[] che punta a un file reale con dimensione e SHA-256 corretti: l'unica violazione è la forma del
 // percorso (assoluto, oppure fuori dal pack con `..`).
 TEST(Pack, T_M3A_PACK_04_listed_paths_outside_the_pack_stop_as_manifest_invalid) {
   const fs::path base = fresh_dir("pk04p");
@@ -1287,9 +1287,9 @@ TEST(Pack, T_M3A_PACK_04_non_canonical_or_malformed_manifest_stops_as_manifest_i
       {"a capo finale", canonical + "\n"},
       {"spazio iniziale", " " + canonical},
       {"chiave duplicata", "{\"count\":12," + canonical.substr(1)},
-      {"troncato a meta'", canonical.substr(0, canonical.size() / 2)},
+      {"troncato a metà", canonical.substr(0, canonical.size() / 2)},
       {"vuoto", ""},
-      {"non JSON", "questo non e' JSON"},
+      {"non JSON", "questo non è JSON"},
       {"array al livello superiore", "[]"},
       {"UTF-8 non valido", std::string("{\"pack_id\":\"\xff\xfe\"}")},
   };

@@ -47,8 +47,8 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/decisions/D-16-calibrazione-incompleta.md` | `17d99880649e716815e5a57741c71362fee41710535c0e2b99662a392649abb7` |
 | `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
 | `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
-| `tests/unit/test_calibration_selection.cpp` | `a485f56ddf7ba710df0d2dfe06369114cc2ba1fb2ced09010270551e0adfb3a5` |
+| `tests/unit/test_calibration_selection.cpp` | `7acdefc0db361d1a472165425ffecda398acace16d506f08d82a4c8fa1da0694` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

@@ -55,8 +55,8 @@ std::string setup_single_slot(memory_dag_store& store) {
   return node.key();
 }
 
-// T-M2B-09 e' PARZIALE: qui si verificano le primitive (errore dell'input, confine del job, descendants);
-// il blocco automatico dei soli dipendenti e' dello scheduler (M2.d).
+// T-M2B-09 è PARZIALE: qui si verificano le primitive (errore dell'input, confine del job, descendants);
+// il blocco automatico dei soli dipendenti è dello scheduler (M2.d).
 TEST(Job, T_M2B_09_missing_input_stops_its_job_and_descendants_identify_the_dependent_branch) {
   const auto good_file = fx::make_synth_frame(fx::frame_kind::dark, 8, 6, 0).file;
   const fs::path dir = fs::path(ASTRO_TEST_TMP) / "job";
@@ -243,7 +243,7 @@ TEST(Job, T_M2B_12_failed_job_start_propagates_unchanged_without_a_job) {
   EXPECT_FALSE(store.get_job(1).has_value());
 }
 
-// Nodo assente e chiusura del job fallita: lo stop originale si propaga con tutto il suo contesto (`nodo`) piu' il solo
+// Nodo assente e chiusura del job fallita: lo stop originale si propaga con tutto il suo contesto (`nodo`) più il solo
 // campo `registrazione_arresto` con l'errore secondario.
 class store_failing_finish_without_node : public memory_dag_store {
  public:

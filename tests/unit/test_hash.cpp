@@ -172,8 +172,8 @@ TEST(Hash, reverify_input_stops_a_file_appended_during_the_reading) {
   EXPECT_NO_THROW(reverify_input(p.string(), fits_input_format(), nullptr, digest_of(data), work, {}));
 }
 
-// Precondizioni (BASE §2.5, emendamento L1): il piano c'e' se e solo se il formato dell'input ha il piano degli header;
-// la riverifica di un input aperto usa il formato con cui e' stato aperto.
+// Precondizioni (BASE §2.5, emendamento L1): il piano c'è se e solo se il formato dell'input ha il piano degli header;
+// la riverifica di un input aperto usa il formato con cui è stato aperto.
 TEST(HashDeathTest, verified_read_and_reverify_require_the_declared_format_of_the_input) {
   const fs::path p = tmp_file("formato.bin");
   const std::vector<std::uint8_t> data = pattern(4096);
@@ -205,7 +205,7 @@ TEST(HashDeathTest, verified_read_and_reverify_require_the_declared_format_of_th
 }
 
 // I codici propri del formato dopo l'apertura (`.read` della lettura, `.fstat` del controllo del percorso) usano il
-// prefisso della dichiarazione con cui l'input e' stato aperto.
+// prefisso della dichiarazione con cui l'input è stato aperto.
 TEST(Hash, read_and_path_codes_use_the_prefix_of_the_declared_format) {
   const fs::path dir = tmp_file("prefisso");
   fs::create_directories(dir);

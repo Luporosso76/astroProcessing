@@ -78,7 +78,7 @@ class memory_pool {
   explicit memory_pool(const budget_snapshot& snapshot) : memory_pool(snapshot.budget_bytes) {}
   memory_pool(const memory_pool&) = delete;
   memory_pool& operator=(const memory_pool&) = delete;
-  // Tutte le prenotazioni devono essere gia' state rilasciate.
+  // Tutte le prenotazioni devono essere già state rilasciate.
   ~memory_pool();
 
   std::uint64_t budget_bytes() const noexcept { return budget_bytes_; }
@@ -87,12 +87,12 @@ class memory_pool {
   std::uint64_t peak_reserved_bytes() const;
   std::size_t waiting_count() const;
 
-  // Tutto o niente, senza attesa: nullopt se non entra subito o se qualcuno e' in coda davanti.
+  // Tutto o niente, senza attesa: nullopt se non entra subito o se qualcuno è in coda davanti.
   // Oltre il budget: budget pool.exceeds_budget.
   std::optional<reservation> try_reserve(std::uint64_t bytes, std::string label);
 
-  // Attende in coda FIFO stretta finche' la richiesta entra. Con `max_waiters` richieste gia' in coda:
-  // budget sched.queue_full. `cancel` e' controllato durante l'attesa: cancelled sched.cancelled.
+  // Attende in coda FIFO stretta finché la richiesta entra. Con `max_waiters` richieste già in coda:
+  // budget sched.queue_full. `cancel` è controllato durante l'attesa: cancelled sched.cancelled.
   reservation reserve(std::uint64_t bytes, std::string label, const cancel_token* cancel = nullptr,
                       std::size_t max_waiters = unlimited_waiters);
 

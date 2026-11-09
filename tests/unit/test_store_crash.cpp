@@ -1,4 +1,4 @@
-// I kill simulano la morte del processo (SIGKILL) in punti del protocollo; non provano la durabilita' contro
+// I kill simulano la morte del processo (SIGKILL) in punti del protocollo; non provano la durabilità contro
 // perdita di corrente o guasti del dispositivo.
 #include "store_test_support.hpp"
 
@@ -45,7 +45,7 @@ TEST(StoreCrash, T_M2C_02_sigkill_at_every_step_of_the_commit_protocol_leaves_a_
     SCOPED_TRACE("kill prima di " + points[i - 1]);
     const scenario s = prepare("t02");
     const child_outcome out = run_child([&](const fault_injector& f) { commit_body(s, f); }, static_cast<int>(i));
-    ASSERT_TRUE(out.killed) << "il figlio non e' stato ucciso, exit " << out.exit_code;
+    ASSERT_TRUE(out.killed) << "il figlio non è stato ucciso, exit " << out.exit_code;
     auto store = sqlite_dag_store::open(s.dir, open_intent::read_write);
     const bool committed = points[i - 1] == "commit.after_commit";
     const job_record job = *store->get_job(s.job_id);
@@ -104,7 +104,7 @@ TEST(StoreCrash, T_M2C_06_sigkill_inside_the_migration_transaction_and_in_the_ba
     const bool in_transaction = points[i - 1] == "migration.statement";
     if (in_transaction) {
       ++statements;
-      ASSERT_GT(static_cast<std::ptrdiff_t>(i - 1), publish - points.begin()) << "il punto non e' dopo il backup";
+      ASSERT_GT(static_cast<std::ptrdiff_t>(i - 1), publish - points.begin()) << "il punto non è dopo il backup";
     }
     SCOPED_TRACE("kill al punto " + points[i - 1] + (in_transaction ? " (transazione di migrazione)" : " (backup)"));
     const fs::path dir = fresh_dir("t06k");

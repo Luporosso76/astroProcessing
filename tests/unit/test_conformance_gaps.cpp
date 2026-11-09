@@ -1,6 +1,6 @@
 // Casi di OB-07 e OB-11 (docs/contracts/BASE-confini.md) che isolano un controllo alla volta: ogni campo dell'header del
-// piano, il file aperto invariato, la riverifica al percorso, il cancel nei prepare di piu' blocchi e nel finalize.
-// Il banco di prova e' quello di test_conformance.cpp, incluso senza modificarlo; il filtro di ctest seleziona solo i
+// piano, il file aperto invariato, la riverifica al percorso, il cancel nei prepare di più blocchi e nel finalize.
+// Il banco di prova è quello di test_conformance.cpp, incluso senza modificarlo; il filtro di ctest seleziona solo i
 // casi di questo file.
 
 #pragma GCC diagnostic ignored "-Wsubobject-linkage"
@@ -46,7 +46,7 @@ std::string context_value(const stop_error& e, const std::string& key) {
   return {};
 }
 
-// Frame light f32 largo e alto a sufficienza da occupare piu' blocchi di digest (1 MiB ciascuno).
+// Frame light f32 largo e alto a sufficienza da occupare più blocchi di digest (1 MiB ciascuno).
 fx::bytes large_light_frame(std::uint32_t w, std::uint32_t h) {
   fx::calib_header hd;
   hd.egain = 2.0;
@@ -71,7 +71,7 @@ class ConformanceGapsIo : public testing::TestWithParam<type_param> {};
 class ConformanceGapsMaster : public testing::TestWithParam<type_param> {};
 class ConformanceGapsBlocks : public testing::TestWithParam<type_param> {};
 
-// Mappa un file in lettura e scrittura condivisa: una scrittura su una pagina gia' sporca non aggiorna mtime e ctime.
+// Mappa un file in lettura e scrittura condivisa: una scrittura su una pagina già sporca non aggiorna mtime e ctime.
 class shared_mapping {
  public:
   explicit shared_mapping(const fs::path& p) {
@@ -128,7 +128,7 @@ planned_case make_planned_case(const std::string& name) {
   return c;
 }
 
-// `read_verified_input` sul file di `c` con il piano `planned`: lo stop atteso e' integrity `code` sul campo `field`.
+// `read_verified_input` sul file di `c` con il piano `planned`: lo stop atteso è integrity `code` sul campo `field`.
 void expect_header_stop(const planned_case& c, const fits_plan& planned, const char* code, const char* field) {
   const fits_input input = open_fits_input(c.path.string());
   try {
@@ -149,7 +149,7 @@ TEST(HashGaps, T_M3BASE_11_each_planned_header_field_alone_stops_the_read) {
     const fits_input input = open_fits_input(c.path.string());
     EXPECT_NO_THROW((void)read_verified_input(input, c.path.string(), digest_of(c.bytes), std::uint64_t{1} << 30, &c.plan));
   }
-  {  // dimensione sola: ogni altro valore del piano e' quello del file
+  {  // dimensione sola: ogni altro valore del piano è quello del file
     fits_plan p = c.plan;
     p.file_bytes += 2880;
     expect_header_stop(c, p, "input.size_changed", "dimensione");
@@ -213,7 +213,7 @@ TEST(HashGaps, T_M3BASE_11_bitpix_change_with_the_same_sample_type_is_header_cha
 // ---------------------------------------------------------------- T-M3BASE-11 (OB-11): file aperto invariato
 
 // Il digest e l'header del file aperto coincidono con quelli attesi (le attese sono quelle del contenuto nuovo), ma
-// il file e' cambiato dopo l'apertura: lo stop e' input.modified. Il contenuto nuovo ha lo stesso header e la stessa
+// il file è cambiato dopo l'apertura: lo stop è input.modified. Il contenuto nuovo ha lo stesso header e la stessa
 // dimensione, quindi nessun altro confronto lo ferma.
 TEST(HashGaps, T_M3BASE_11_read_verified_input_stops_a_file_modified_after_the_open) {
   planned_case c = make_planned_case("read_modified.fits");
@@ -228,7 +228,7 @@ TEST(HashGaps, T_M3BASE_11_read_verified_input_stops_a_file_modified_after_the_o
               error_category::integrity, "input.modified");
 }
 
-// Il percorso riaperto e' invariato e ha il digest atteso; l'input aperto prima del lavoro e' cambiato.
+// Il percorso riaperto è invariato e ha il digest atteso; l'input aperto prima del lavoro è cambiato.
 TEST(HashGaps, T_M3BASE_11_reverify_input_stops_an_opened_input_modified_since_the_open) {
   planned_case c = make_planned_case("reverify_opened.fits");
   const fits_input opened = open_fits_input(c.path.string());
@@ -246,9 +246,9 @@ TEST(HashGaps, T_M3BASE_11_reverify_input_stops_an_opened_input_modified_since_t
               error_category::integrity, "input.modified");
 }
 
-// ---------------------------------------------------------------- T-M3BASE-07 (OB-07): prepare dei tipi di I/O, input di piu' blocchi
+// ---------------------------------------------------------------- T-M3BASE-07 (OB-07): prepare dei tipi di I/O, input di più blocchi
 
-// Il file occupa piu' blocchi di digest: il cancel richiesto all'ingresso del prepare ferma prima di ogni lettura, e il
+// Il file occupa più blocchi di digest: il cancel richiesto all'ingresso del prepare ferma prima di ogni lettura, e il
 // cancel richiesto durante la lettura del digest ferma prima del blocco successivo.
 TEST_P(ConformanceGapsIo, T_M3BASE_07_prepare_cancel_in_a_multi_block_input) {
   const fx::bytes big = large_light_frame(1000, 1000);
@@ -351,8 +351,8 @@ TEST_P(ConformanceGapsMaster, T_M3BASE_07_finalize_reverify_stops_at_the_cancel)
 // ---------------------------------------------------------------- T-M3BASE-11 (OB-11): riverifica della residenza a blocchi
 
 // Un input riscritto da una mappatura condivisa dopo l'ultimo task e prima del finalize non cambia dimensione, mtime
-// ne' ctime (la pagina e' gia' sporca): lo ferma solo la riverifica del digest al percorso, integrity
-// input.digest_mismatch. Il file e' lo stesso inode, quindi il controllo del percorso passa.
+// né ctime (la pagina è già sporca): lo ferma solo la riverifica del digest al percorso, integrity
+// input.digest_mismatch. Il file è lo stesso inode, quindi il controllo del percorso passa.
 TEST_P(ConformanceGapsBlocks, T_M3BASE_11_finalize_reverifies_the_digest_of_every_input) {
   for (const std::string& role : registered_job_types()[GetParam().entry].input_roles) {
     SCOPED_TRACE(role);

@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
   try {
     const fs::path dir = fs::absolute(argv[1]);
     if (fs::exists(dir)) {
-      std::fputs("conformance_network: la directory di lavoro esiste gia'\n", stderr);
+      std::fputs("conformance_network: la directory di lavoro esiste già\n", stderr);
       return 1;
     }
     fs::create_directories(dir / "scratch");

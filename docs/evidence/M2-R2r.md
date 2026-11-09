@@ -15,18 +15,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-06-budget-scheduler.md` | `4c24c69f4559e3ddc9db4de78358c58326790438f350e1b286f8e2988f53b44e` |
 | `docs/contracts/C-02-master.md` | `c34b078781862e905ddd53734909d34113f893367a92ad8bf9f37a514336876d` |
-| `src/core/include/astro/master.hpp` | `f6214e982869003b763d78c8098bccbaed28c527ef6197fad68907f83f42815f` |
-| `src/core/include/astro/resources.hpp` | `74b04a71563aa738636ae48a224c634b063058fe0d6269a80034329e4ecfc030` |
-| `src/core/master.cpp` | `072185946e2fc962dbe555eb86cdd7cd5a6404591c4ab29ae87750597b03d6ba` |
-| `src/core/resources.cpp` | `b4cec8995f8457d770c2ce47ff6afc1c282c804b5709c291973473c26b3006de` |
+| `src/core/include/astro/master.hpp` | `8880e3aa91d0d86b1852621a1a09b05c33d719c682d88dccb8cf8933a5229e6c` |
+| `src/core/include/astro/resources.hpp` | `6e0981962530dba7177fdd7db9a2f0bd9d262b9dcb4041d6cf4b27daf834a7f1` |
+| `src/core/master.cpp` | `9a2ec6568fcd55144cfc45df100c3e5b38ed7aec37b2a4ef623d271be49d5d8e` |
+| `src/core/resources.cpp` | `cb5af247114d3f7a1f882862ef0c0935626f3b5527e726a81bba709f3ad99cef` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
-| `tests/unit/test_calibration_real.cpp` | `4d6dbaf66b1b6f70d88516acb1a425e7c23917eccc06c4c39d8a1e71d25434c5` |
-| `tests/unit/test_master.cpp` | `0ebd2a6c43e09f5965de4304e3a4f1e995b270fb88989328c93470777b3b7761` |
-| `tests/unit/test_resources.cpp` | `6fc874ef4942a393e2cac3e8331174f9b2eb2aa6334b8844dc02be7b03108cab` |
-| `tests/unit/test_simd.cpp` | `4f9255394776ce59d6832eeda7971d6fca44f06953977a5f9c15654f39a00536` |
+| `tests/unit/test_calibration_real.cpp` | `2386462398dc5cdaf9a3cc04a4d1432b599c6bfde5b894986b6cdebd15d9c01c` |
+| `tests/unit/test_master.cpp` | `6d2a81dae59178c44f0f6a8ffcbffb6c1342522cc4417e9fd7af4e23be4d26bf` |
+| `tests/unit/test_resources.cpp` | `26e978ecef334779f0ce7bc05834f561d2a63256101557df42411650dc330d5c` |
+| `tests/unit/test_simd.cpp` | `e5293e4f1221df3f2ab90a15c247271bf8a81dec1cddea1e757fa232d613bbdd` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

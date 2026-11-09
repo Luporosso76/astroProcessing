@@ -32,14 +32,14 @@ void sqlite_dag_store::check_identity(const stored_file& f) const {
   const auto changed = [&](const char* why) {
     return stop_error(error_category::integrity, "store.file_identity_changed", why, {{"rel_path", f.rel_path()}});
   };
-  if (f.store_id_ != store_id_) throw changed("il file e' stato prodotto da un altro store");
+  if (f.store_id_ != store_id_) throw changed("il file è stato prodotto da un altro store");
   const unique_fd dir = open_dir_nofollow(root_fd_, "artifacts", "store.symlink");
   struct stat st {};
   if (::fstatat(dir.get(), f.rel_path().c_str(), &st, AT_SYMLINK_NOFOLLOW) != 0) {
-    if (errno == ENOENT) throw changed("il file scritto non esiste piu'");
+    if (errno == ENOENT) throw changed("il file scritto non esiste più");
     throw_errno(error_category::io, "store.fstat", "fstatat fallita", errno, {{"rel_path", f.rel_path()}});
   }
-  if (!S_ISREG(st.st_mode) || !(file_identity(st) == f.id_)) throw changed("il file scritto e' stato sostituito o modificato");
+  if (!S_ISREG(st.st_mode) || !(file_identity(st) == f.id_)) throw changed("il file scritto è stato sostituito o modificato");
 }
 
 stored_file sqlite_dag_store::require_written_locked(const artifact_record& a) const {
@@ -54,12 +54,12 @@ stored_file sqlite_dag_store::require_written_locked(const artifact_record& a) c
       return file;
     } catch (const stop_error& e) {
       if (e.category() != error_category::integrity) throw;
-      stale_token = e;  // un altro token dello stesso nome puo' essere ancora valido
+      stale_token = e;  // un altro token dello stesso nome può essere ancora valido
     }
   }
   if (stale_token) throw *stale_token;
   throw stop_error(error_category::invalid_input, "store.file_not_written_by_store",
-                   "il file non e' stato prodotto da write_files di questo store", {{"rel_path", a.rel_path}});
+                   "il file non è stato prodotto da write_files di questo store", {{"rel_path", a.rel_path}});
 }
 
 std::vector<stored_file> sqlite_dag_store::write_files(const std::vector<artifact_content>& files) {
@@ -125,7 +125,7 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
   for (const auto& f : files) {
     if (written_.count(f.token_) == 0) {
       throw stop_error(error_category::invalid_input, "store.file_not_written_by_store",
-                       "token gia' consumato o non prodotto da questo store", {{"rel_path", f.rel_path()}});
+                       "token già consumato o non prodotto da questo store", {{"rel_path", f.rel_path()}});
     }
     check_identity(f);
     if (!committed_roles.insert(f.role()).second) {
@@ -140,7 +140,7 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
     throw stop_error(error_category::invalid_input, "dag.unknown_job", "job inesistente", {{"job", std::to_string(job_id)}});
   }
   if (js.text(2) != "running") {
-    throw stop_error(error_category::invalid_input, "dag.job_not_running", "il job non e' in esecuzione",
+    throw stop_error(error_category::invalid_input, "dag.job_not_running", "il job non è in esecuzione",
                      {{"job", std::to_string(job_id)}});
   }
   const std::string node_key = js.text(0);
@@ -200,7 +200,7 @@ std::vector<artifact_record> sqlite_dag_store::commit_locked(std::uint64_t job_i
   check_fault("commit.after_commit");
   if (!current) {
     throw stop_error(error_category::stale_generation, "dag.stale_publish",
-                     "la generazione dello slot e' cambiata durante il job",
+                     "la generazione dello slot è cambiata durante il job",
                      {{"slot", slot_name},
                       {"generazione_job", std::to_string(generation)},
                       {"generazione_slot", std::to_string(slot.current_generation)}});

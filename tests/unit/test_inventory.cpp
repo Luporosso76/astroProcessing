@@ -1,4 +1,4 @@
-// R1: inventario dei soli header, anteprima a blocchi, fase e linearita' (ADR-03, aggiunte di R1).
+// R1: inventario dei soli header, anteprima a blocchi, fase e linearità (ADR-03, aggiunte di R1).
 // T-M2R1-01, T-M2R1-02, T-M2R1-03, T-M2R1-05 (stato), T-M2R1-10.
 #include <gtest/gtest.h>
 #include <fcntl.h>
@@ -73,7 +73,7 @@ long double gamma_k(std::uint32_t k) {
   return k * u / (1 - k * u);
 }
 
-// Tolleranza derivata: gamma_k * max|x| piu' mezzo ulp f32 sull'arrotondamento finale; zero se esatto per costruzione.
+// Tolleranza derivata: gamma_k * max|x| più mezzo ulp f32 sull'arrotondamento finale; zero se esatto per costruzione.
 void expect_preview(const gen& g, const fits_preview& got, std::uint32_t bw, std::uint32_t bh, bool exact) {
   const expected_preview e = oracle(g, bw, bh);
   ASSERT_EQ(got.width, e.width);
@@ -367,7 +367,7 @@ TEST(Phase, T_M2R1_05_declarations_against_the_header) {
   }
   EXPECT_STOP(inventory_of(small_gen({phase_card("bogus")})), error_category::unsupported, "fits.phase");
 
-  // Linearita': LINEAR presente o assente, dichiarata o no.
+  // Linearità: LINEAR presente o assente, dichiarata o no.
   const auto lin_inv = [&](std::vector<std::string> cards, std::optional<linearity_class> declared) {
     fits_read_options o;
     o.declared_linearity = declared;
@@ -564,7 +564,7 @@ TEST(InventoryFuzz, T_M2R1_10_limits_stop_inventory_and_preview_without_allocati
     stops(fx::build_fits(hdus), error_category::limit_exceeded, "fits.max_hdus");
   }
   {
-    // Immagine compressa a tile: tabella binaria con ZIMAGE. Non e' un HDU immagine: rifiutata.
+    // Immagine compressa a tile: tabella binaria con ZIMAGE. Non è un HDU immagine: rifiutata.
     fx::raw_hdu primary;
     primary.bitpix = 8;
     primary.axes = {2, 2};

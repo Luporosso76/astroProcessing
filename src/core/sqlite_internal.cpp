@@ -245,7 +245,7 @@ bool same_existing_content(const atomic_options& o, const std::string& name, con
   return true;
 }
 
-// Regola hardlink sul file gia' presente col nome finale, prima di creare il temporaneo.
+// Regola hardlink sul file già presente col nome finale, prima di creare il temporaneo.
 void precheck_existing(const atomic_options& o) {
   const std::string& name = !o.final_name.empty() ? o.final_name : o.known_name;
   if (!o.managed || name.empty()) return;
@@ -280,7 +280,7 @@ content_digest stream_digest(int fd, std::uint64_t max_bytes, std::string_view n
   while (const std::size_t n = reader(block)) {
     total += n;
     if (total > max_bytes) {
-      throw stop_error(error_category::integrity, "store.size_changed", "il file e' piu' grande del previsto",
+      throw stop_error(error_category::integrity, "store.size_changed", "il file è più grande del previsto",
                        {{"file", std::string(name)}});
     }
     hasher.update({block.data(), n});
@@ -334,7 +334,7 @@ atomic_result atomic_write_stream(const atomic_options& o, const byte_reader& re
     if (!same) {
       ::unlinkat(o.dirfd, tmp.c_str(), 0);
       throw stop_error(error_category::security, o.conflict_code,
-                       "esiste gia' un file con quel nome ma contenuto diverso o non regolare", {{"file", name}});
+                       "esiste già un file con quel nome ma contenuto diverso o non regolare", {{"file", name}});
     }
     if (::unlinkat(o.dirfd, tmp.c_str(), 0) != 0) {
       throw_errno(error_category::io, "store.unlink", "rimozione del temporaneo fallita", errno, {{"file", tmp}});
@@ -351,26 +351,26 @@ atomic_result atomic_write_stream(const atomic_options& o, const byte_reader& re
   const auto changed = [&](const char* why) {
     return stop_error(error_category::integrity, "store.file_identity_changed", why, {{"file", name}});
   };
-  // Il digest registrato e' quello del contenuto riletto dal file pubblicato, con identita' uguale prima e dopo.
+  // Il digest registrato è quello del contenuto riletto dal file pubblicato, con identità uguale prima e dopo.
   unique_fd published(::openat(o.dirfd, name.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
   if (!published) throw_errno(error_category::io, "store.open", "apertura del file pubblicato fallita", errno, {{"file", name}});
   struct stat before {};
   if (::fstat(published.get(), &before) != 0) throw_errno(error_category::io, "store.fstat", "fstat fallita", errno, {{"file", name}});
-  if (!S_ISREG(before.st_mode)) throw changed("il file pubblicato non e' regolare");
+  if (!S_ISREG(before.st_mode)) throw changed("il file pubblicato non è regolare");
   if (!reused) {
     struct stat fd_stat {};
     if (::fstat(written.fd.get(), &fd_stat) != 0) throw_errno(error_category::io, "store.fstat", "fstat fallita", errno, {{"file", name}});
-    if (!same_stat(fd_stat, before)) throw changed("il file finale non e' quello scritto");
+    if (!same_stat(fd_stat, before)) throw changed("il file finale non è quello scritto");
   }
   if (static_cast<std::uint64_t>(before.st_size) != digest.size_bytes) throw changed("dimensione diversa dal digest calcolato");
   const content_digest reread = stream_digest(published.get(), digest.size_bytes, name);
   struct stat after {};
   if (::fstat(published.get(), &after) != 0) throw_errno(error_category::io, "store.fstat", "fstat fallita", errno, {{"file", name}});
-  if (!same_stat(before, after)) throw changed("il file e' cambiato durante la rilettura");
+  if (!same_stat(before, after)) throw changed("il file è cambiato durante la rilettura");
   if (!(reread == digest)) throw changed("il contenuto pubblicato differisce dal digest calcolato");
   struct stat named {};
   if (::fstatat(o.dirfd, name.c_str(), &named, AT_SYMLINK_NOFOLLOW) != 0 || !same_stat(named, after)) {
-    throw changed("il nome finale non indica piu' il file riletto");
+    throw changed("il nome finale non indica più il file riletto");
   }
   result.final_stat = after;
   return result;
@@ -444,7 +444,7 @@ unique_fd open_dir_nofollow(int parent_fd, const char* name, const char* symlink
   if (fd) return fd;
   const int err = errno;
   if (err == ELOOP || err == ENOTDIR) {
-    throw stop_error(error_category::security, symlink_code, "la directory e' un symlink o non e' una directory",
+    throw stop_error(error_category::security, symlink_code, "la directory è un symlink o non è una directory",
                      {{"nome", name}});
   }
   throw_errno(error_category::io, "store.open", "apertura della directory fallita", err, {{"nome", name}});

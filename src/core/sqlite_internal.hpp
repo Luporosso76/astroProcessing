@@ -55,7 +55,7 @@ class statement {
   statement& bind_opt(int index, const std::optional<std::string>& text);
   statement& bind_opt_u64(int index, const std::optional<std::uint64_t>& value);
 
-  // true se c'e' una riga; false a fine; altro: stop_error.
+  // true se c'è una riga; false a fine; altro: stop_error.
   bool step();
   void run();  // esegue e richiede la fine senza righe
   std::string text(int column) const;
@@ -70,7 +70,7 @@ class statement {
   sqlite3_stmt* stmt_ = nullptr;
 };
 
-// BEGIN IMMEDIATE; rollback nel distruttore se commit() non e' stato chiamato.
+// BEGIN IMMEDIATE; rollback nel distruttore se commit() non è stato chiamato.
 class transaction {
  public:
   explicit transaction(sqlite3* db);
@@ -86,11 +86,11 @@ class transaction {
 
 void exec(sqlite3* db, const char* sql);
 
-// Identita' (st_dev, st_ino) degli originali registrati (ADR-04, regola hardlink).
+// Identità (st_dev, st_ino) degli originali registrati (ADR-04, regola hardlink).
 using inode_set = std::set<std::pair<std::uint64_t, std::uint64_t>>;
 inode_set original_inodes(sqlite3* db);
 
-// Regola hardlink su un file gestito dal progetto: (dev, ino) di un originale (se `originals` non e' nullo):
+// Regola hardlink su un file gestito dal progetto: (dev, ino) di un originale (se `originals` non è nullo):
 // security fs.original_inode; st_nlink diverso da 1: security fs.hardlink. Nessun effetto sul file.
 void check_managed_file(const struct stat& st, const inode_set* originals, std::string_view name);
 
@@ -108,7 +108,7 @@ std::map<std::string, artifact_entry> scan_artifacts(int dirfd);
 using byte_reader = std::function<std::size_t(std::span<std::uint8_t>)>;
 
 // Passi 1-5 del protocollo atomico dentro `dirfd`, con digest e scrittura a memoria costante.
-// `final_name` vuoto: il nome e' <sha256>.<estensione>. `fault_prefix` precede i nomi dei punti
+// `final_name` vuoto: il nome è <sha256>.<estensione>. `fault_prefix` precede i nomi dei punti
 // (create, write, fsync_file, rename, fsync_dir). `expected` diverso dal digest letto: integrity
 // store.expected_digest_mismatch, il temporaneo viene rimosso prima di ogni rename.
 struct atomic_options {
@@ -120,7 +120,7 @@ struct atomic_options {
   // Il nome finale esistente viene sostituito (rename atomico) invece di essere un conflitto.
   bool replace = false;
   const fault_injector* injector = nullptr;
-  // File gestiti dal progetto: regola hardlink sul file esistente col nome finale, prima del temporaneo se il nome e'
+  // File gestiti dal progetto: regola hardlink sul file esistente col nome finale, prima del temporaneo se il nome è
   // noto (final_name, o known_name calcolato da atomic_write) e di nuovo sul file riusato (EEXIST).
   bool managed = false;
   const inode_set* originals = nullptr;
@@ -148,7 +148,7 @@ std::string random_name(std::size_t bytes);
 
 
 // Voci di una directory (senza . e ..); errore di readdir distinto dalla fine. Con `injector`, il punto "dir.readdir"
-// e' chiamato una volta per elenco e un valore diverso da zero e' l'errno restituito dal primo readdir.
+// è chiamato una volta per elenco e un valore diverso da zero è l'errno restituito dal primo readdir.
 std::vector<std::string> read_directory(int dirfd, const char* code, const fault_injector* injector = nullptr);
 
 // Rilancia `e` con categoria/codice nuovi conservando contesto (incluso errno, sqlite_rc, sqlite_msg) e causa.
@@ -156,7 +156,7 @@ std::vector<std::string> read_directory(int dirfd, const char* code, const fault
 
 void inject(const fault_injector* injector, std::string_view point);
 
-// Legge un file regolare gia' aperto (fstat, dimensione attesa, nessun file piu' grande di `max_bytes`).
+// Legge un file regolare già aperto (fstat, dimensione attesa, nessun file più grande di `max_bytes`).
 std::vector<std::uint8_t> read_all(int fd, std::uint64_t max_bytes, const char* code, std::string_view name);
 void fsync_fd(int fd, const char* code, std::string_view name);
 unique_fd open_dir_nofollow(int parent_fd, const char* name, const char* symlink_code);

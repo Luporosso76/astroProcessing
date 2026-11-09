@@ -74,8 +74,8 @@ void rows_kernel(const prepared_calibration::impl& p, const kernel_io& io, std::
         const double t1 = vlc / q2;
         const double t2 = term_q / q4;
         const double var_c = t1 + t2;
-        // Ogni prodotto, quoziente e somma deve essere finito e, con operandi non nulli, normale (ne' zero ne'
-        // subnormale per underflow, ne' infinito): altrimenti il pixel e' result_nonfinite.
+        // Ogni prodotto, quoziente e somma deve essere finito e, con operandi non nulli, normale (né zero né
+        // subnormale per underflow, né infinito): altrimenti il pixel è result_nonfinite.
         const bool intermediates_ok = !std::isnan(vl) && !std::isnan(vd) && add_ok(vl, vd, vlc) && is_finite_ok(vlc) &&
                                       div_ok(lc, c) && mul_ok(q, q, q2) && mul_ok(q2, q2, q4) && q2 > 0 && q4 > 0 &&
                                       mul_ok(lc, lc, lc2) && mul_ok(lc2, varq[x], term_q) && div_ok(vlc, t1) &&
@@ -146,8 +146,8 @@ void band_kernel(const master_band& b) {
           if (b.flat) {
             const double a = mean - b.offset;
             const double ac = a > 0 ? a : 0.0;
-            // Stessa regola di rappresentabilita' dei pixel (§6.3): prodotti e quozienti di operandi non nulli devono
-            // restare normali; altrimenti la statistica non e' rappresentabile e il job si ferma.
+            // Stessa regola di rappresentabilità dei pixel (§6.3): prodotti e quozienti di operandi non nulli devono
+            // restare normali; altrimenti la statistica non è rappresentabile e il job si ferma.
             const double e2 = b.eps * b.eps;
             const double e2a = e2 * ac;
             const double t = e2a * ac;

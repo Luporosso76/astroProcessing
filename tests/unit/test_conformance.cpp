@@ -1,4 +1,4 @@
-// Suite di conformita' della base comune (docs/contracts/BASE-confini.md §3): ogni caso T-M3BASE-NN gira per ogni voce
+// Suite di conformità della base comune (docs/contracts/BASE-confini.md §3): ogni caso T-M3BASE-NN gira per ogni voce
 // del registro dei tipi di job (registered_job_types) e per ogni variante dichiarata. Il `work` della suite avvolge il
 // `work` dell'operatore (job_probe::set_work_wrapper), conta le proprie invocazioni e ospita le iniezioni «dentro
 // work»; i punti del confine (job_probe::set_observer) contano costruzioni del nodo, aperture e letture degli input,
@@ -49,7 +49,7 @@ constexpr unsigned mxcsr_daz = 1u << 6;
 constexpr unsigned mxcsr_dm = 1u << 8;
 constexpr unsigned mxcsr_rc_down = 1u << 13;
 constexpr unsigned mxcsr_ftz = 1u << 15;
-// I quattro modi vietati di require_fp_environment: FZ, DAZ, arrotondamento non al piu' vicino, una maschera spenta.
+// I quattro modi vietati di require_fp_environment: FZ, DAZ, arrotondamento non al più vicino, una maschera spenta.
 struct fp_mode {
   const char* name;
   unsigned bits;
@@ -185,7 +185,7 @@ file_state state_of(const fs::path& p) {
           static_cast<unsigned>(sb.st_mode & 07777), true};
 }
 
-// Identita' di un input per i dettagli di input.samples: inode del file e digest dei contenuti indicati.
+// Identità di un input per i dettagli di input.samples: inode del file e digest dei contenuti indicati.
 std::set<std::string> sample_ids(const fs::path& p, const std::vector<std::vector<std::uint8_t>>& contents) {
   std::set<std::string> ids{"ino:" + std::to_string(state_of(p).inode)};
   for (const auto& b : contents) ids.insert("sha256:" + sha256_hex(b));
@@ -379,9 +379,9 @@ std::string text_at(const json& o, const char* key) {
 }
 
 struct expected_stop {
-  std::optional<error_category> category;  // vuoto: quella osservata, purche' coerente in (a), (b) e (d)
-  std::string code;            // esatto; vuoto = quello osservato, purche' coerente in (a), (b) e (d)
-  std::string code_suffix;     // alternativa a `code`: il codice deve terminare cosi'
+  std::optional<error_category> category;  // vuoto: quella osservata, purché coerente in (a), (b) e (d)
+  std::string code;            // esatto; vuoto = quello osservato, purché coerente in (a), (b) e (d)
+  std::string code_suffix;     // alternativa a `code`: il codice deve terminare così
   std::set<std::string> codes; // alternativa: uno dei codici
   bool before_work = false;
 };
@@ -520,7 +520,7 @@ class ConformanceCheckpoint : public testing::TestWithParam<type_param> {};
 
 // ---------------------------------------------------------------- T-M3BASE-01 (OB-01)
 
-// Eccezione dal `prepare` di prepare_job_start: il prepare del runner e' il controllo dell'ambiente FP, che con FZ acceso
+// Eccezione dal `prepare` di prepare_job_start: il prepare del runner è il controllo dell'ambiente FP, che con FZ acceso
 // lancia numeric cpu.fp_mode. Nodo dello slot assente: graph dag.missing_node. In entrambi: arresto prima del lavoro
 // registrato, eccezione propagata con categoria, codice e contesto del record.
 TEST_P(Conformance, T_M3BASE_01_stop_before_work_is_recorded_and_propagated) {
@@ -547,7 +547,7 @@ TEST_P(Conformance, T_M3BASE_01_stop_before_work_is_recorded_and_propagated) {
     }
   }
   // Nodo dello slot assente: sullo store durevole la chiave esterna jobs.node_key -> nodes rifiuta start_job, il cui
-  // errore e' il limite dichiarato di OB-01 (nessun job da registrare). Il ramo del runner si esercita con il nodo
+  // errore è il limite dichiarato di OB-01 (nessun job da registrare). Il ramo del runner si esercita con il nodo
   // presente ma illeggibile (parametri non analizzabili): node_of fallisce dopo start_job, come per un nodo assente.
   {
     type_case c(GetParam(), "_unreadable_node");
@@ -737,7 +737,7 @@ std::string definition_digest(const workflow& wf) {
   return sha256_hex({reinterpret_cast<const std::uint8_t*>(c.data()), c.size()});
 }
 
-// Righe nuove dello store dopo il rifiuto: un record di arresto del workflow con la sua identita' (digest della
+// Righe nuove dello store dopo il rifiuto: un record di arresto del workflow con la sua identità (digest della
 // definizione), categoria e codice, solo stringhe e interi; nessun job nuovo.
 failures check_workflow_stop_record(const std::vector<db_row>& before, const std::vector<db_row>& after,
                                     const std::vector<std::string>& digests, const stop_error& e) {
@@ -770,7 +770,7 @@ failures check_workflow_stop_record(const std::vector<db_row>& before, const std
     }
   }
   if (!record) {
-    f.push_back("nessun record di arresto del workflow nello store con identita' del workflow, categoria e codice (" +
+    f.push_back("nessun record di arresto del workflow nello store con identità del workflow, categoria e codice (" +
                 std::string(e.what()) + ")");
   }
   return f;
@@ -918,8 +918,8 @@ TEST_P(Conformance, T_M3BASE_06_cancel_at_the_publication_boundary) {
 // ---------------------------------------------------------------- T-M3BASE-07 (OB-07)
 
 // Cancel nel `prepare` (punto sched.prepare) e nel primo blocco di righe (primo sched.task). Dopo la richiesta: blocchi
-// letti nel prepare al piu' uno (il prepare gira in un solo thread), blocchi elaborati (sched.task_done) al piu' uno
-// per worker, task avviati dopo la richiesta al piu' quelli gia' ammessi dagli altri worker, nessun finalize.
+// letti nel prepare al più uno (il prepare gira in un solo thread), blocchi elaborati (sched.task_done) al più uno
+// per worker, task avviati dopo la richiesta al più quelli già ammessi dagli altri worker, nessun finalize.
 TEST_P(Conformance, T_M3BASE_07_cancel_during_the_work) {
   {
     type_case c(GetParam(), "_prepare");
@@ -963,7 +963,7 @@ TEST_P(Conformance, T_M3BASE_07_cancel_during_the_work) {
       const std::uint64_t w = plan_field(*plan, "worker_count");
       EXPECT_GT(cf::height / plan_field(*plan, "tile_rows"), w + 1) << "blocchi ancora da elaborare all'iniezione";
       EXPECT_LE(pr.count("sched.task_done", mark), w) << "blocchi elaborati dopo la richiesta";
-      EXPECT_LE(pr.count("sched.task", mark), w - 1) << "task avviati dopo la richiesta oltre quelli gia' ammessi";
+      EXPECT_LE(pr.count("sched.task", mark), w - 1) << "task avviati dopo la richiesta oltre quelli già ammessi";
       EXPECT_EQ(pr.count("sched.finalize"), 0u) << "finalize eseguito";
     }
   }
@@ -1019,7 +1019,7 @@ TEST_P(Conformance, T_M3BASE_08_job_peak_reserved_before_the_first_task) {
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     const bool waited = pool.waiting_count() == 1;
-    EXPECT_TRUE(waited) << "il job non e' in attesa FIFO del pool con spazio libero sotto il picco";
+    EXPECT_TRUE(waited) << "il job non è in attesa FIFO del pool con spazio libero sotto il picco";
     EXPECT_EQ(pr.count("sched.task"), 0u) << "task avviati senza il picco prenotato";
     held.release();
     t.join();
@@ -1253,7 +1253,7 @@ TEST_P(Conformance, T_M3BASE_11_inputs_verified_before_use) {
                                                                              "input.digest_mismatch", "input.consumed_digest"},
                                        false}));
     }
-    // header cambiato fra il piano e la verifica: il file letto per il piano ha la card mutata, quello verificato e'
+    // header cambiato fra il piano e la verifica: il file letto per il piano ha la card mutata, quello verificato è
     // l'originale (ripristinato all'ingresso dello scheduler, sched.plan); stop integrity prima di usare un pixel.
     // Un formato senza piano degli header (RAW) non ha questa iniezione: nessun header si legge prima del digest
     // (BASE-confini.md §3.2, nota sotto la tabella dei casi; emendamento L1).
@@ -1356,7 +1356,7 @@ TEST_P(Conformance, T_M3BASE_14_nothing_published_on_error) {
 
 namespace {
 
-// Stop a meta' dei task (cancel al terzo blocco elaborato) con checkpoint a ogni task.
+// Stop a metà dei task (cancel al terzo blocco elaborato) con checkpoint a ogni task.
 void stop_halfway(type_case& c) {
   probe pr;
   memory_pool pool(pool_bytes);
@@ -1685,18 +1685,18 @@ TEST_P(ConformanceCheckpoint, T_M3BASE_19_checkpoint_removed_only_after_publicat
   const auto present = [](const type_case& c) {
     return fs::exists(c.dir / "scratch" / "ckpt.ckpt.json") && fs::exists(c.dir / "scratch" / "ckpt.stage");
   };
-  {  // stop a meta'
+  {  // stop a metà
     type_case c(GetParam(), "_stop");
     probe pr;
     std::atomic<int> started{0};
     pr.action = [&](std::string_view p, std::string_view) {
-      if (p == "sched.task" && ++started == 4) throw stop_error(error_category::io, "test.injected", "arresto a meta'");
+      if (p == "sched.task" && ++started == 4) throw stop_error(error_category::io, "test.injected", "arresto a metà");
     };
     const ran r = c.run_default();
     ASSERT_NE(stop_of(r), nullptr) << describe(r);
     EXPECT_TRUE(present(c)) << "checkpoint o staging rimossi dopo lo stop";
   }
-  {  // cancel a meta'
+  {  // cancel a metà
     type_case c(GetParam(), "_cancel");
     stop_halfway(c);
     EXPECT_TRUE(present(c)) << "checkpoint o staging rimossi dopo il cancel";

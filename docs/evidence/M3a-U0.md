@@ -103,18 +103,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `1b13b4db031eafeb75f998197e775163547625dfb626ddcbcacd07ebf9eea61e` |
-| `src/core/fits.cpp` | `ef596caae35a0bf99f0384d53bf2d901fed8609794db13ff32a50f1865789b5b` |
+| `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
-| `src/core/include/astro/fits.hpp` | `37d4c4a21797c3a54c1d1bdc80c2e12b383d00d729571a3e41ef8fe07976abd7` |
-| `src/core/include/astro/hash.hpp` | `2043851aa8b5e01288e40841a44bd77476bfe12f9a6ff2100984117409256481` |
-| `src/core/include/astro/input_format.hpp` | `40e4924aaf3a808ed54e394cc187cf2be1efb075c699dc73a1ba5af2ff6421d7` |
-| `src/core/include/astro/job_types.hpp` | `98d1f80ede5ecb0da92cdb55f2aa8cec050b0cb163b6df1c7968b7367ace70e6` |
+| `src/core/include/astro/fits.hpp` | `4e82d0846dcd1423f402f9e127b9ab4dd10740cfab8b0277fc8abedf6f86ab3c` |
+| `src/core/include/astro/hash.hpp` | `890e62d0d82bf0f9fdd154ccc83fae8e70f8543fe62f46a3fcaf5b2898b41613` |
+| `src/core/include/astro/input_format.hpp` | `4f916d0018988fcb99482d6e8458d28d50cda011d7d9c25fdcbd4e229d5ca4d4` |
+| `src/core/include/astro/job_types.hpp` | `7cd081f68443c4a5a3fcdfd3d1ad2138d212b46b12d68c2600d2e298052775b1` |
 | `src/core/input_format.cpp` | `343f626aebe72b9496007a01d144a40fd24613d94b58f814a9afcdd608570704` |
-| `src/core/job_types.cpp` | `5041b210e2aeb2f3c76f1f81e5fbb02932505886e55df9f4d2754953a047ecdc` |
-| `tests/unit/test_conformance_format.cpp` | `34d9def5399ec94003cb775a88f9ae2697ed5e26fb6fddcb4d3e6264dad7910e` |
-| `tests/unit/test_conformance_gaps.cpp` | `c451f8af129f3194e2824541571ecc2f0cd7f389a9b36de80c855c48df46a9af` |
-| `tests/unit/test_hash.cpp` | `77efb55f69446ee0b932b63687f7d6f6e187e78eddad6f7805741213902fb6c3` |
+| `src/core/job_types.cpp` | `aff329b9a8a22739649ea5e080bfe84b53f6de4ed10b698e684071df2ff2e359` |
+| `tests/unit/test_conformance_format.cpp` | `ef487a95fd34bdb51a7e60d1f5b03bfa070a7ef7bf09433b24700c0fa74dd002` |
+| `tests/unit/test_conformance_gaps.cpp` | `11a80df7e444932b2c2d6a4ce5b2fb3753f163c24e7ac098c2c86e8a05f643d3` |
+| `tests/unit/test_hash.cpp` | `406556aba73f96176520ca5019d23c3155b20b206677cb0fbadc20e5dbef2bc4` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 <!-- evidence:end -->

@@ -32,8 +32,8 @@ constexpr std::uint64_t task_reserve = 3 * tile_bytes;
 // SYN-DYADIC per indice assoluto: k_j = ((73 j + 19) mod 1024) - 512, x_j = k_j / 1024.
 std::int64_t k_of(std::uint64_t j) { return static_cast<std::int64_t>((73 * j + 19) % 1024) - 512; }
 
-// Oracle indipendente dal prodotto: y = 3x/4 + 1/8 espresso in unita' 1/4096 vale 3k + 512 per elemento.
-// 73 e' dispari, quindi su 1024 indici consecutivi k percorre una volta ogni valore -512..511 (somma -512).
+// Oracle indipendente dal prodotto: y = 3x/4 + 1/8 espresso in unità 1/4096 vale 3k + 512 per elemento.
+// 73 è dispari, quindi su 1024 indici consecutivi k percorre una volta ogni valore -512..511 (somma -512).
 std::int64_t gt_prefix(std::uint64_t n) {
   const std::uint64_t periods = n / 1024;
   const std::int64_t per_period = 3 * -512 + 512 * 1024;
@@ -68,7 +68,7 @@ std::int64_t checksum(const float* out) {
   return sum;
 }
 
-// Una lettura di /proc mancante o non interpretabile e' un errore: mai uno zero che farebbe passare la guardia.
+// Una lettura di /proc mancante o non interpretabile è un errore: mai uno zero che farebbe passare la guardia.
 std::uint64_t proc_kib(const char* path, const char* key) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error(std::string("apertura di ") + path + " fallita");

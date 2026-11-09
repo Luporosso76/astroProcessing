@@ -11,7 +11,7 @@ else()
   execute_process(COMMAND git -C "${SOURCE_DIR}" rev-parse HEAD
     OUTPUT_VARIABLE revision OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE rc ERROR_QUIET)
   if(NOT rc EQUAL 0 OR NOT revision MATCHES "^[0-9a-f]+$")
-    message(FATAL_ERROR "Revisione del sorgente non determinabile: non e' un checkout git. Passare -DASTRO_SOURCE_REVISION=<id>.")
+    message(FATAL_ERROR "Revisione del sorgente non determinabile: non è un checkout git. Passare -DASTRO_SOURCE_REVISION=<id>.")
   endif()
   execute_process(COMMAND git -C "${SOURCE_DIR}" status --porcelain -- src cmake tests third_party tools CMakeLists.txt CMakePresets.json
     OUTPUT_VARIABLE status RESULT_VARIABLE rc ERROR_QUIET)

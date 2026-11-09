@@ -110,7 +110,7 @@ header_fields read_header(int root_fd, const fs::path& root) {
   const ssize_t n = ::pread(fd.get(), buf, sizeof(buf), 0);
   if (n < 0) throw_errno(error_category::io, "store.read", "lettura dell'header fallita", errno, {{"file", db_path}});
   if (n < 100 || std::memcmp(buf, "SQLite format 3", 16) != 0 || be32(buf + 68) != project_application_id) {
-    not_a_project("project.db non e' un database di progetto", root);
+    not_a_project("project.db non è un database di progetto", root);
   }
   return header_fields{be32(buf + 68), be32(buf + 60)};
 }
@@ -149,7 +149,7 @@ void check_integrity(sqlite3* db) {
 void make_dir(const fs::path& path) {
   if (::mkdir(path.c_str(), 0755) != 0) {
     if (errno == EEXIST) {
-      throw stop_error(error_category::security, "store.target_exists", "il progetto esiste gia'",
+      throw stop_error(error_category::security, "store.target_exists", "il progetto esiste già",
                        {{"percorso", path.string()}});
     }
     throw_errno(error_category::io, "store.mkdir", "mkdir fallita", errno, {{"percorso", path.string()}});
@@ -303,7 +303,7 @@ void sqlite_dag_store::open_database(open_intent intent, const open_options& opt
   };
   auto refuse_future_with_wal = [&] {
     throw stop_error(error_category::schema, "store.wal_pending_future_schema",
-                     "schema piu' recente con WAL non vuoto: nessuna apertura che possa applicarlo",
+                     "schema più recente con WAL non vuoto: nessuna apertura che possa applicarlo",
                      {{"progetto", root_.string()}});
   };
   if (header.user_version > options.schema_version) {
@@ -319,7 +319,7 @@ void sqlite_dag_store::open_database(open_intent intent, const open_options& opt
   const int rc = sqlite3_open_v2(db_path.c_str(), &db_, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX,
                                  options.vfs.empty() ? nullptr : options.vfs.c_str());
   if (rc != SQLITE_OK) throw_sql(db_, rc, "apertura in lettura-scrittura fallita");
-  // Finche' la versione non e' nota, la chiusura non deve applicare il WAL al database.
+  // Finché la versione non è nota, la chiusura non deve applicare il WAL al database.
   sqlite3_db_config(db_, SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, 1, nullptr);
   exec(db_, "PRAGMA synchronous = FULL");
   exec(db_, "PRAGMA foreign_keys = ON");
@@ -354,11 +354,11 @@ void sqlite_dag_store::migrate(std::uint32_t from_version, const open_options& o
     const std::string partial = "/proc/self/fd/" + std::to_string(backups.get()) + "/" + partial_name;
     check_fault("backup.after_create");
     {
-      // SQLITE_OPEN_NOFOLLOW rifiuta anche /proc/self/fd: l'identita' del nome si controlla prima dell'apertura.
+      // SQLITE_OPEN_NOFOLLOW rifiuta anche /proc/self/fd: l'identità del nome si controlla prima dell'apertura.
       struct stat now {};
       if (::fstatat(backups.get(), partial_name.c_str(), &now, AT_SYMLINK_NOFOLLOW) != 0 || now.st_dev != created.st_dev ||
           now.st_ino != created.st_ino) {
-        throw stop_error(error_category::integrity, "store.backup_identity", "il temporaneo del backup e' stato sostituito",
+        throw stop_error(error_category::integrity, "store.backup_identity", "il temporaneo del backup è stato sostituito",
                          {{"nome", partial_name}});
       }
     }
@@ -393,7 +393,7 @@ void sqlite_dag_store::migrate(std::uint32_t from_version, const open_options& o
              (!with_ctime || (st.st_ctim.tv_sec == created.st_ctim.tv_sec && st.st_ctim.tv_nsec == created.st_ctim.tv_nsec));
     };
     const auto changed = [&] {
-      return stop_error(error_category::integrity, "store.backup_identity", "il backup non e' piu' il file creato", {{"nome", partial_name}});
+      return stop_error(error_category::integrity, "store.backup_identity", "il backup non è più il file creato", {{"nome", partial_name}});
     };
     if (!same_file(partial_name, true)) throw changed();
     if (::renameat(backups.get(), partial_name.c_str(), backups.get(), final_name.c_str()) != 0) {

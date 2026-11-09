@@ -2,7 +2,7 @@
 
 Uso: test_u12_docs.py 10|11 | 12 <directory di build del preset release>. T-U12-12 legge gli eseguibili del preset
 release: gli eseguibili che collegano libastrocore.a (prodotto, o in sua assenza i binari che la collegano: l'unico modo in cui i
-NEEDED di libastrocore sono osservabili). Un eseguibile che non collega libastrocore non e' nel perimetro; i runtime dei
+NEEDED di libastrocore sono osservabili). Un eseguibile che non collega libastrocore non è nel perimetro; i runtime dei
 sanitizer del preset dev non si distribuiscono.
 
 Formato richiesto dalla cella «Licenza (...)» di ogni riga di «Librerie caricate dai binari»: l'URL del file di licenza

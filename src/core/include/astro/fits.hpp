@@ -36,7 +36,7 @@ constexpr std::uint32_t max_planes = 16;
 constexpr std::uint64_t max_samples = std::uint64_t{1} << 28;
 constexpr std::uint32_t max_hdus = 8;
 constexpr std::uint32_t max_header_cards = 10000;
-// campioni f64 + INVALID (2 byte) + VARIANCE f64 (8 byte) = 18 byte per campione, piu' 16 MiB di header.
+// campioni f64 + INVALID (2 byte) + VARIANCE f64 (8 byte) = 18 byte per campione, più 16 MiB di header.
 constexpr std::uint64_t max_file_bytes = max_samples * 18 + (std::uint64_t{16} << 20);
 }  // namespace fits_limits
 
@@ -67,11 +67,11 @@ class fits_input {
   std::uint64_t size_bytes() const noexcept { return size_; }
   const input_format& format() const noexcept { return *format_; }
 
-  // Solo test: il punto "input.pread" e' chiamato prima di ogni pread; un valore diverso da zero fa restituire 0 byte
+  // Solo test: il punto "input.pread" è chiamato prima di ogni pread; un valore diverso da zero fa restituire 0 byte
   // (fine file) alla lettura, con la dimensione del file invariata.
   void set_fault_injector(fault_injector injector) { fault_ = std::move(injector); }
 
-  // Solo test: chiamato con offset e lunghezza di ogni lettura prima del pread; un valore diverso da zero e' l'errno
+  // Solo test: chiamato con offset e lunghezza di ogni lettura prima del pread; un valore diverso da zero è l'errno
   // dell'errore di I/O che la lettura produce (io, <prefisso>.read), senza eseguire il pread.
   using pread_observer = std::function<int(std::uint64_t offset, std::size_t length)>;
   void set_pread_observer(pread_observer observer) { observer_ = std::move(observer); }
@@ -125,12 +125,12 @@ std::vector<std::uint8_t> read_fits_bytes(const fits_input& input, std::uint64_t
 struct fits_read_options {
   std::optional<std::uint8_t> declared_bayer_x_offset;
   std::optional<std::uint8_t> declared_bayer_y_offset;
-  // Fase e linearita' dichiarate all'import (ADR-03, R1): in conflitto con l'header = stop.
+  // Fase e linearità dichiarate all'import (ADR-03, R1): in conflitto con l'header = stop.
   std::optional<process_phase> declared_phase;
   std::optional<linearity_class> declared_linearity;
 };
 
-// Fase e linearita' dai soli header (`ASTRPHAS`, `LINEAR` o `options`), con gli stessi limiti e senza leggere campioni.
+// Fase e linearità dai soli header (`ASTRPHAS`, `LINEAR` o `options`), con gli stessi limiti e senza leggere campioni.
 // Assenti: nullopt. Conflitto con le dichiarazioni: incompatible metadata.declared_conflict.
 struct header_peek {
   std::optional<metadata_value<process_phase>> phase;
@@ -138,7 +138,7 @@ struct header_peek {
 };
 header_peek peek_header(const fits_input& input, const fits_read_options& options);
 
-// Decode da buffer in memoria (CFITSIO fits_open_memfile). Rifa' l'analisi sul buffer e controlla il picco
+// Decode da buffer in memoria (CFITSIO fits_open_memfile). Rifà l'analisi sul buffer e controlla il picco
 // contro budget_bytes (budget: sched.job_exceeds_budget) prima di allocare i campioni.
 image decode_fits(std::span<const std::uint8_t> bytes, std::uint64_t budget_bytes,
                   const fits_read_options& options = {});
@@ -161,7 +161,7 @@ struct fits_row_layout {
   std::optional<std::uint64_t> invalid_offset;
 };
 
-// Solo header, con i limiti di plan_fits. Piu' di un piano: unsupported fits.row_planes.
+// Solo header, con i limiti di plan_fits. Più di un piano: unsupported fits.row_planes.
 fits_row_layout plan_fits_rows(const fits_input& input);
 
 // Byte di appoggio richiesti da read_fits_rows per `rows` righe.

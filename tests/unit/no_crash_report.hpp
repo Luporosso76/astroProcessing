@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 // Un abort voluto dentro un death test termina con _exit: nessun core dump, quindi nessun report di crash del
-// sistema. Il messaggio dell'asserzione e' gia' su stderr, dove il death test lo confronta.
+// sistema. Il messaggio dell'asserzione è già su stderr, dove il death test lo confronta.
 inline void exit_instead_of_core_dump() {
   struct sigaction action {};
   action.sa_handler = [](int) { _exit(134); };

@@ -13,7 +13,7 @@ struct BuildInfo {
   long cplusplus;
   // Identificatore del sorgente (commit git di 40 esadecimali o valore passato a -DASTRO_SOURCE_REVISION); mai vuoto.
   std::string revision;
-  // true se al build i percorsi sorgente avevano modifiche non committate; nullopt se la revisione e' stata
+  // true se al build i percorsi sorgente avevano modifiche non committate; nullopt se la revisione è stata
   // passata esplicitamente (stato non verificabile).
   std::optional<bool> dirty;
 };

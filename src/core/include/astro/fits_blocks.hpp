@@ -24,7 +24,7 @@ struct row_band {
   void* variance = nullptr;
 };
 
-// Ingresso FITS non compresso letto a blocchi di `tile_rows` righe (ADR-06, estensione R3.2). Ogni byte usato e'
+// Ingresso FITS non compresso letto a blocchi di `tile_rows` righe (ADR-06, estensione R3.2). Ogni byte usato è
 // verificato contro il digest del record prima dell'uso.
 class fits_block_source {
  public:
@@ -38,7 +38,7 @@ class fits_block_source {
   // Passata P0 sull'intero file in ordine, con `work` come buffer (almeno 8 byte): digest e dimensione
   // (integrity input.digest_mismatch), header analizzati (integrity input.modified), CHECKSUM/DATASUM (integrity
   // fits.checksum), validazione dei campioni come decode_fits; registra il digest di ogni blocco di ogni data unit letto.
-  // `check_cancel`, se presente, e' chiamato prima di ogni lettura e ferma la passata lanciando.
+  // `check_cancel`, se presente, è chiamato prima di ogni lettura e ferma la passata lanciando.
   void verify(std::span<std::byte> work, const std::function<void()>& check_cancel = {});
 
   // Immagine di soli header, come decode_fits senza campioni (samples, maschera e varianza vuoti).
@@ -60,7 +60,7 @@ class fits_block_source {
   // decodifica in `out` (row_begin/row_end impostati dal metodo). `raw` ha almeno righe·raw_bytes_per_row byte.
   void read_tile(std::uint64_t tile, std::span<std::byte> raw, row_band& out) const;
 
-  // Prima della pubblicazione: il percorso indica lo stesso file aperto e il file e' invariato (io input.missing,
+  // Prima della pubblicazione: il percorso indica lo stesso file aperto e il file è invariato (io input.missing,
   // integrity input.modified).
   void check_identity() const;
 
@@ -75,8 +75,8 @@ std::uint64_t primary_sample_bytes(const fits_input& input);
 
 // FITS di uscita scritto in streaming, byte per byte uguale a encode_fits della stessa immagine. `header_only` ha
 // geometria, tipo, metadati e card dell'uscita (campioni non usati); gli header sono quelli di encode_fits di un modello
-// di una riga, con NAXIS2 = altezza e INVALID presente se `with_invalid`. Solo l'encoding in virgola mobile identita' del
-// tipo dei campioni (o nessun encoding), perche' lo staging contiene float o double: altrimenti invalid_input fits.encoding.
+// di una riga, con NAXIS2 = altezza e INVALID presente se `with_invalid`. Solo l'encoding in virgola mobile identità del
+// tipo dei campioni (o nessun encoding), perché lo staging contiene float o double: altrimenti invalid_input fits.encoding.
 class fits_stream_writer {
  public:
   fits_stream_writer(const image& header_only, bool with_invalid);
@@ -99,7 +99,7 @@ class fits_stream_writer {
   std::uint64_t elem_ = 0;
   std::uint64_t file_bytes_ = 0;
   bool with_invalid_ = false;
-  std::vector<std::vector<std::uint8_t>> headers_;  // uno per HDU, gia' imbottiti
+  std::vector<std::vector<std::uint8_t>> headers_;  // uno per HDU, già imbottiti
 };
 
 }  // namespace astro

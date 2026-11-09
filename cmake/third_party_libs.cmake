@@ -8,8 +8,8 @@ set(ASTRO_TP_CC "${CMAKE_C_COMPILER}")
 set(ASTRO_TP_CXX "${CMAKE_CXX_COMPILER}")
 
 # DOWNLOAD_EXTRACT_TIMESTAMP TRUE: i file estratti mantengono le date del tarball. Con la data di estrazione i file generati
-# di autotools (configure, Makefile.in) risultano piu' vecchi dei sorgenti e `make` rilancia `./configure` senza le
-# opzioni del prodotto (prefisso e utilita' di WCSLIB diversi).
+# di autotools (configure, Makefile.in) risultano più vecchi dei sorgenti e `make` rilancia `./configure` senza le
+# opzioni del prodotto (prefisso e utilità di WCSLIB diversi).
 
 # libreria statica importata: header e archivio nel prefisso d'installazione sotto build/
 function(astro_tp_import target project dir archive include_dir)

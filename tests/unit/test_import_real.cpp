@@ -1,5 +1,5 @@
 // R1: campioni pubblici licenziati (PUB-LFC-01 mono, PUB-CFA-01 CFA) importati, inventariati e riscritti bit-esatti.
-// T-M2R1-09. I file non sono versionati (data/): il test fallisce se mancano o se l'hash non e' quello registrato.
+// T-M2R1-09. I file non sono versionati (data/): il test fallisce se mancano o se l'hash non è quello registrato.
 #include <gtest/gtest.h>
 
 #include "astro/hash.hpp"
@@ -33,7 +33,7 @@ TEST(ImportReal, T_M2R1_09_public_samples_are_imported_inventoried_and_roundtrip
     memory_pool pool(512 * MiB);
     fits_input input = open_fits_input(smp.path);
     const content_digest digest = digest_fits_input(input, pool);
-    ASSERT_EQ(digest.sha256, smp.sha256) << "il file non e' quello registrato";
+    ASSERT_EQ(digest.sha256, smp.sha256) << "il file non è quello registrato";
 
     fits_read_options options;
     options.declared_phase = process_phase::raw;

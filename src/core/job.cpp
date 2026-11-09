@@ -68,7 +68,7 @@ void persist_provenance(sqlite_dag_store& durable, const job_record& job, const 
   persist_provenance_text(durable, job, provenance_canonical(provenance));
 }
 
-// Chiude il job `running` con `cause`; restituisce lo stato durevole finale, che e' la fonte della provenance.
+// Chiude il job `running` con `cause`; restituisce lo stato durevole finale, che è la fonte della provenance.
 job_record settle(dag_store& store, const job_record& job, error_category category, const std::string& code) {
   job_record after = *store.get_job(job.id);
   if (after.state == job_state::running) {
@@ -104,8 +104,8 @@ job_outcome stopped(dag_store& store, sqlite_dag_store* durable, const job_recor
     std::rethrow_exception(original);
   }
   if (after.state == job_state::completed) std::rethrow_exception(original);
-  // Vincolo: costruire l'esito (diagnosi, provenance, not_persisted) puo' allocare. Se fallisce, qualunque eccezione
-  // secondaria (anche bad_alloc) e' diagnosticata su stderr senza allocazioni e si propaga l'arresto originale al
+  // Vincolo: costruire l'esito (diagnosi, provenance, not_persisted) può allocare. Se fallisce, qualunque eccezione
+  // secondaria (anche bad_alloc) è diagnosticata su stderr senza allocazioni e si propaga l'arresto originale al
   // posto dell'esito: mai un'eccezione secondaria al suo posto.
   try {
     std::fprintf(stderr, "job %llu su %s fermato: %s\n", static_cast<unsigned long long>(job.id),
@@ -141,7 +141,7 @@ job_outcome stopped(dag_store& store, sqlite_dag_store* durable, const job_recor
 
 // Eccezione estranea: il job si chiude `failed` job.unexpected_exception (categoria integrity), la provenance durevole
 // rispecchia lo stato registrato, poi l'eccezione originale si rilancia invariata. Una provenance non scrivibile non
-// la maschera: qualunque eccezione secondaria (chiusura del job, scrittura) e' diagnosticata su stderr (ADR-05) e non maschera mai l'originale.
+// la maschera: qualunque eccezione secondaria (chiusura del job, scrittura) è diagnosticata su stderr (ADR-05) e non maschera mai l'originale.
 [[noreturn]] void unexpected(dag_store& store, sqlite_dag_store* durable, const job_record& job, const node_spec& spec,
                              std::vector<std::string> warnings, const std::optional<budget_snapshot>& budget) {
   const std::exception_ptr original = std::current_exception();
@@ -173,8 +173,8 @@ stop_error stopint::cause_of(const std::exception_ptr& ep) {
   }
 }
 
-// Se il contesto non si puo' aggiungere (memoria esaurita) si rilancia lo stop originale invariato: la diagnosi
-// secondaria e' gia' su stderr.
+// Se il contesto non si può aggiungere (memoria esaurita) si rilancia lo stop originale invariato: la diagnosi
+// secondaria è già su stderr.
 [[noreturn]] void stopint::rethrow_with_record_failure(const std::exception_ptr& original, const char* secondary) {
   try {
     std::rethrow_exception(original);
@@ -194,7 +194,7 @@ stop_error stopint::cause_of(const std::exception_ptr& ep) {
 namespace {
 
 // Arresto al confine prima del lavoro del job (NFR-FBK-01.a, ADR-05): registra `original` e lo rilancia invariato. Lo
-// stop_error e' la causa; ogni altra eccezione si registra come integrity job.unexpected_exception. Senza `job` il job si
+// stop_error è la causa; ogni altra eccezione si registra come integrity job.unexpected_exception. Senza `job` il job si
 // avvia qui, solo per registrare l'arresto. Il job si chiude con la causa e, su store durevole, si scrive la provenance
 // dell'arresto senza il nodo (stop_before_work_record: stringhe e interi, nessun numero in virgola mobile analizzato o
 // serializzato). Registrazione fallita: diagnosi su stderr e rethrow_with_record_failure, mai l'errore secondario al
@@ -221,7 +221,7 @@ namespace {
   std::rethrow_exception(original);
 }
 
-// Nodo del job avviato; nodo assente: graph dag.missing_node. Ogni errore della lettura e' un arresto prima del lavoro.
+// Nodo del job avviato; nodo assente: graph dag.missing_node. Ogni errore della lettura è un arresto prima del lavoro.
 node_spec node_of(dag_store& store, sqlite_dag_store* durable, const job_record& job) {
   try {
     std::optional<node_spec> node = store.get_node(job.node_key);
@@ -335,7 +335,7 @@ job_outcome run_job_files(sqlite_dag_store& store, const std::string& slot_name,
   } catch (...) {
     unexpected(store, &store, job, spec, std::move(warnings), recorded);
   }
-  // Solo dopo commit_job riuscito (OB-19); fuori dal try: il job e' gia' completed, l'errore si propaga invariato.
+  // Solo dopo commit_job riuscito (OB-19); fuori dal try: il job è già completed, l'errore si propaga invariato.
   if (scratch) {
     remove_checkpoint(scratch->dir, scratch->checkpoint_name);
     remove_named_spill_file(scratch->dir, scratch->staging_name);

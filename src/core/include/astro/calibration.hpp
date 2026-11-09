@@ -82,7 +82,7 @@ struct master_descriptor {
   friend bool operator==(const master_descriptor&, const master_descriptor&) = default;
 };
 
-// Valori che il formato FITS di M2 non porta in frame_metadata e che la ricetta puo' dichiarare.
+// Valori che il formato FITS di M2 non porta in frame_metadata e che la ricetta può dichiarare.
 // Un valore dichiarato diverso da quello letto: incompatible, metadata.declared_conflict.
 struct declared_image_fields {
   std::optional<std::uint32_t> binning_x;
@@ -98,7 +98,7 @@ struct variance_spec {
 
 struct calibration_input_spec {
   std::string path;       // solo per il livello file
-  content_digest digest;  // identita' attesa del file
+  content_digest digest;  // identità attesa del file
   std::optional<master_descriptor> descriptor;  // assente per il light
   frame_metadata declared;                      // solo valori con origine `declared`
   declared_image_fields declared_fields;
@@ -141,7 +141,7 @@ struct calibration_result {
   std::vector<std::string> warnings;
 };
 
-// Parametri e immagini gia' verificati, con l'uscita da riempire per righe. Costruita solo da prepare_calibration.
+// Parametri e immagini già verificati, con l'uscita da riempire per righe. Costruita solo da prepare_calibration.
 class prepared_calibration {
  public:
   prepared_calibration(prepared_calibration&&) noexcept;
@@ -153,7 +153,7 @@ class prepared_calibration {
   const std::vector<channel_normalization>& normalization() const noexcept;
   const std::vector<std::string>& warnings() const noexcept;
 
-  // Elenco JSON dei quattro ingressi letti (digest, fase, linearita', keyword non interpretate) per la provenance.
+  // Elenco JSON dei quattro ingressi letti (digest, fase, linearità, keyword non interpretate) per la provenance.
   json observed_inputs() const;
 
   // Byte di scratch per riga richiesti da calibrate_rows (per task).
@@ -181,10 +181,10 @@ class prepared_calibration {
 void validate_calibration_recipe(const calibration_recipe& recipe);
 
 // Fase di un ingresso (ADR-03, R1): assente = metadata_missing calib.metadata.phase; non raw = incompatible
-// op.phase_blocked, con `input` nel contesto. Solo metadati: nessun campione e' stato letto.
+// op.phase_blocked, con `input` nel contesto. Solo metadati: nessun campione è stato letto.
 void require_calibration_phase(const char* input_name, const std::optional<metadata_value<process_phase>>& phase);
 
-// Linearita' di un ingresso dai metadati (header e dichiarazione della ricetta): conflitto = incompatible
+// Linearità di un ingresso dai metadati (header e dichiarazione della ricetta): conflitto = incompatible
 // metadata.declared_conflict; assente = metadata_missing calib.metadata.linearity; non lineare = unsupported
 // calib.linearity. Con `input` nel contesto.
 void require_calibration_linearity(const char* input_name, const std::optional<linearity>& header,

@@ -324,7 +324,7 @@ void classify_extensions(scan_result& r) {
     } else {
       if (e.bitpix != (r.plan.type == sample_type::f32 ? -32 : -64) || e.bscale != 1.0 || e.bzero != 0.0) {
         fail(error_category::invalid_input, "fits.extension_encoding",
-             "VARIANCE: BITPIX uguale al tipo dei campioni e scala identita'");
+             "VARIANCE: BITPIX uguale al tipo dei campioni e scala identità");
       }
       r.plan.has_variance = true;
     }
@@ -340,13 +340,13 @@ sample_type type_for_encoding(int bitpix, double bscale, double bzero) {
     case 32: return sample_type::f64;
     case 64:
       if (bscale != 1.0 || bzero != 0.0) {
-        fail(error_category::unsupported, "fits.int64_scaling", "BITPIX 64 con BSCALE/BZERO non identita'");
+        fail(error_category::unsupported, "fits.int64_scaling", "BITPIX 64 con BSCALE/BZERO non identità");
       }
       return sample_type::f64;
     case -32:
     case -64:
       if (bscale != 1.0 || bzero != 0.0) {
-        fail(error_category::unsupported, "fits.float_scaling", "BITPIX float con BSCALE/BZERO non identita'");
+        fail(error_category::unsupported, "fits.float_scaling", "BITPIX float con BSCALE/BZERO non identità");
       }
       return bitpix == -32 ? sample_type::f32 : sample_type::f64;
   }

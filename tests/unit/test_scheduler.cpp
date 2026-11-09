@@ -494,7 +494,7 @@ TEST(Scheduler, a_failure_stops_cooperative_tasks_that_are_still_running) {
   EXPECT_STOP(sched.run(plan_of(2), spec, cancel), error_category::io, "test.injected");
   EXPECT_FALSE(timed_out.load()) << "il task attivo non ha visto lo stop interno";
   EXPECT_TRUE(saw_stop.load());
-  EXPECT_FALSE(cancel.requested()) << "lo stop interno non e' il cancel dell'utente";
+  EXPECT_FALSE(cancel.requested()) << "lo stop interno non è il cancel dell'utente";
   EXPECT_EQ(pool.reserved_bytes(), 0u);
 }
 
@@ -1261,7 +1261,7 @@ TEST_F(Resume, T_M2R3_05_enospc_at_every_checkpoint_step_stops_io_and_leaves_a_c
   memory_pool pool(1 << 20);
   job_scheduler sched(pool, affinity_of(test_cpus));
   cancel_token cancel;
-  // Prima del rename resta il checkpoint precedente; dal rename riuscito in poi quello nuovo, gia' completo. In entrambi
+  // Prima del rename resta il checkpoint precedente; dal rename riuscito in poi quello nuovo, già completo. In entrambi
   // i casi descrive solo task completati, e il resume identico completa.
   const std::pair<const char*, std::vector<std::uint64_t>> steps[] = {
       {"checkpoint.create", {0, 1}}, {"checkpoint.write", {0, 1}}, {"checkpoint.fsync_file", {0, 1}},
@@ -1350,13 +1350,13 @@ TEST(Scheduler, T_M2R3_07_pressure_rising_while_waiting_for_memory_is_sampled_ag
   std::thread tb([&] { rb = sched.run(plan_of(1, 1000, 1000), b, cancel); });
   EXPECT_TRUE(wait_until([&] { return pool.waiting_count() == 1; })) << "B attende la memoria, non la pressione";
   EXPECT_EQ(g->waiting_jobs.load(), 0u);
-  psi.set(15.0);  // la pressione sale mentre B e' in coda nel pool
+  psi.set(15.0);  // la pressione sale mentre B è in coda nel pool
   release_a.open();
   ta.join();
   EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; })) << "ricampionata all'ammissione effettiva";
   std::this_thread::sleep_for(std::chrono::milliseconds(30));
   EXPECT_FALSE(b_prepared.load());
-  EXPECT_EQ(pool.reserved_bytes(), 0u) << "la prenotazione presa sopra soglia e' restituita";
+  EXPECT_EQ(pool.reserved_bytes(), 0u) << "la prenotazione presa sopra soglia è restituita";
   psi.set(4.0);
   tb.join();
   EXPECT_TRUE(b_prepared.load());
@@ -1392,8 +1392,8 @@ TEST(Scheduler, T_M2R3_07_cancel_interrupts_a_long_sampling_interval) {
 }
 
 TEST(Scheduler, T_M2R3_07_cancel_interrupts_the_largest_configurable_sampling_interval) {
-  // 2^53 - 1 ms e' il massimo di pressure_poll_ms; 9,3e12 ms supera 2^63 ns una volta convertito, quindi una scadenza
-  // assoluta now() + poll andrebbe in overflow anche dove l'overflow non e' rilevato (release).
+  // 2^53 - 1 ms è il massimo di pressure_poll_ms; 9,3e12 ms supera 2^63 ns una volta convertito, quindi una scadenza
+  // assoluta now() + poll andrebbe in overflow anche dove l'overflow non è rilevato (release).
   for (const std::int64_t poll_ms : {(std::int64_t{1} << 53) - 1, std::int64_t{9'300'000'000'000}}) {
     SCOPED_TRACE("poll " + std::to_string(poll_ms) + " ms");
     memory_pool pool(1 << 20);
@@ -1413,7 +1413,7 @@ TEST(Scheduler, T_M2R3_07_cancel_interrupts_the_largest_configurable_sampling_in
     job_spec spec{node, 1, [&](task_context& ctx) -> std::string { return digest_for(ctx.index); }};
     std::thread canceller([&] {
       EXPECT_TRUE(wait_until([&] { return g->waiting_jobs.load() == 1; }));
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));  // l'attesa e' dentro l'intervallo
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));  // l'attesa è dentro l'intervallo
       cancel.request();
     });
     const auto start = std::chrono::steady_clock::now();

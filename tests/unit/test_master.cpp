@@ -2,9 +2,9 @@
 // (T-M2E-11, 12, 16, 20 e T-M2C-11 sui master del prodotto, ADR-16 e ADR-17, aggiunte di R2).
 //
 // Tolleranze fissate prima della misura (C-02.a §6.3, §9):
-//  - T-M2R2-01: valori dyadic scelti perche' media, s^2 e s^2/n siano rappresentabili: scarto 0.
+//  - T-M2R2-01: valori dyadic scelti perché media, s^2 e s^2/n siano rappresentabili: scarto 0.
 //  - T-M2R2-02/03: media entro gamma_n sum|x|/n; piano entro gamma_(n+4) V + (1 + gamma_(n+4)) Delta^2/(n-1);
-//    piu' mezzo ulp f32 con uscita f32 (master_support.hpp).
+//    più mezzo ulp f32 con uscita f32 (master_support.hpp).
 //  - T-M2R2-07: 0 ulp fra blocchi e memoria (stessa sequenza di operazioni IEEE per pixel).
 #include <gtest/gtest.h>
 
@@ -76,7 +76,7 @@ TEST(Master, T_M2R2_01_dyadic_values_give_exact_mean_and_plane) {
   EXPECT_EQ(plane(m4.output, 2), 0.0);
   EXPECT_EQ(sample(m4.output, 5), 0.0);
 
-  // n = 2, uscita f64: (-1, +1) da' media 0 e piano 1.
+  // n = 2, uscita f64: (-1, +1) dà media 0 e piano 1.
   const std::vector<std::array<double, 2>> px2 = {{-1, 1}, {3, 3}, {0.25, 0.75}, {-2, 6}};
   group g2 = make_group(master_role::bias, 2, 2, 2);
   for (std::size_t i = 0; i < px2.size(); ++i) {
@@ -138,7 +138,7 @@ TEST(Master, T_M2R2_03_outliers_are_not_rejected_and_match_the_oracle) {
     EXPECT_TRUE(mean_close(o[i], sample(m.output, i), 7, false)) << i;
     EXPECT_TRUE(plane_close(o[i], plane(m.output, i), 7, false)) << i;
   }
-  // L'outlier sposta media e piano su quel pixel: il piano e' molto piu' grande di quello dei vicini.
+  // L'outlier sposta media e piano su quel pixel: il piano è molto più grande di quello dei vicini.
   EXPECT_GT(plane(m.output, 9), 1e6 * plane(m.output, 10));
   EXPECT_GT(plane(m.output, 14), 1e6 * plane(m.output, 15));
   EXPECT_EQ(cal::at(m.report, {"rejection"}).as_string(), "none");
@@ -147,7 +147,7 @@ TEST(Master, T_M2R2_03_outliers_are_not_rejected_and_match_the_oracle) {
   for (const json& f : cal::at(m.report, {"frames"}).items()) EXPECT_EQ(f.find("rejected_samples")->as_integer(), 0);
 }
 
-// ---------------------------------------------------------------- maschere e rappresentabilita' (C-02.a §6.3, §7)
+// ---------------------------------------------------------------- maschere e rappresentabilità (C-02.a §6.3, §7)
 
 TEST(Master, T_M2R2_01_masks_propagate_by_union_and_saturation_marks_the_pixel) {
   // Frame 0 float (NaN), frame 1 intero con INVALID (source_flagged), frame 2 intero (saturazione).
@@ -395,7 +395,7 @@ TEST(Master, T_M2R2_05_optional_field_checked_even_when_the_reference_lacks_it) 
   for (const field_case& fc : fields) {
     SCOPED_TRACE(fc.code);
     bool reference_lacks = false;
-    // I digest decidono l'ordine canonico: si cerca una variante in cui il frame senza campo e' il primo.
+    // I digest decidono l'ordine canonico: si cerca una variante in cui il frame senza campo è il primo.
     for (int shift = 0; shift < 40 && !reference_lacks; ++shift) {
       for (std::size_t lacking = 0; lacking < 3 && !reference_lacks; ++lacking) {
         group g = dark_group();
@@ -456,7 +456,7 @@ TEST(Master, T_M2R2_05_flat_rules_stop_before_combining) {
     c.mutate(g, r);
     EXPECT_STOP(combine_master(r, images_of(g)), c.category, c.code);
   }
-  // Livello esattamente al bordo della tolleranza: accettato (la regola e' `>`).
+  // Livello esattamente al bordo della tolleranza: accettato (la regola è `>`).
   group g = make_group(master_role::flat, 4, 4, 2);
   for (double& v : g.frames[0].v) v = 10 + 1024 - 64;
   for (double& v : g.frames[1].v) v = 10 + 1024 + 64;
@@ -814,7 +814,7 @@ TEST(MasterJob, T_M2R2_08_report_and_provenance_are_complete_and_coherent) {
     EXPECT_TRUE(hyp.count(h)) << h;
   }
 
-  // Provenance: un ingresso osservato per frame, con fase e linearita'.
+  // Provenance: un ingresso osservato per frame, con fase e linearità.
   const json provenance = provenance_json(out.provenance);
   const json& observed = cal::at(provenance, {"details", "observed_inputs"});
   ASSERT_EQ(observed.items().size(), 4u);
@@ -931,7 +931,7 @@ TEST(MasterJob, T_M2R2_07_unrepresentable_plan_memory_is_detected_before_any_res
 
 // ---------------------------------------------------------------- job con la configurazione delle risorse (R2.r)
 
-// Ingressi del pianificatore ricavati dal test: geometria e frame del gruppo, picco del frame piu' grande, limite
+// Ingressi del pianificatore ricavati dal test: geometria e frame del gruppo, picco del frame più grande, limite
 // dell'header di uscita di tre HDU (ADR-06, estensione R2.r).
 planner_input master_job_input(const job_case& c, std::uint64_t budget, std::size_t cpus) {
   planner_input in;
@@ -969,7 +969,7 @@ unsigned first_affinity_cpu() {
   for (unsigned cpu = 0; cpu < CPU_SETSIZE; ++cpu) {
     if (CPU_ISSET(cpu, &set)) return cpu;
   }
-  ADD_FAILURE() << "affinita' vuota";
+  ADD_FAILURE() << "affinità vuota";
   return 0;
 }
 
@@ -980,7 +980,7 @@ TEST(MasterJob, T_M2R2R_02_automatic_workers_and_tile_come_from_the_planner_and_
   const resource_config automatic;
   const resource_plan wide = plan_resources(master_job_input(c, 256 * MiB, cpus), automatic);
   const resource_plan tight = plan_resources(master_job_input(c, wide.minimum_feasible_bytes, cpus), automatic);
-  // I casi sono distinti: tile ampio contro tile 1, piu' worker contro uno.
+  // I casi sono distinti: tile ampio contro tile 1, più worker contro uno.
   ASSERT_GT(wide.tile_rows, 1u);
   ASSERT_GE(cpus, 2u) << "il caso dei worker automatici richiede almeno due CPU";
   ASSERT_GT(wide.worker_count, 1u);
@@ -1010,7 +1010,7 @@ TEST(MasterJob, T_M2R2R_02_automatic_workers_and_tile_come_from_the_planner_and_
     master_job_options o;
     o.resources = r.config;
     o.on_job_plan = [&](const job_plan& plan) { seen = plan; };
-    // Affinita' letta dentro ogni task del master, nel thread del worker (seam cpu.task_start).
+    // Affinità letta dentro ogni task del master, nel thread del worker (seam cpu.task_start).
     std::mutex affinity_mutex;
     std::vector<cpu_set_t> task_affinity;
     cpu_test::set_task_injector([&](std::string_view point) {
@@ -1061,7 +1061,7 @@ TEST(MasterJob, T_M2R2R_03_configured_task_queue_and_margin_reach_the_scheduler_
   EXPECT_EQ(seen->queue_capacity, 7u);
   const planner_input in = master_job_input(c, 256 * MiB, cpu_count());
   expect_job_plan(*seen, plan_resources(in, cfg));
-  // Il margine configurato e' nel piano: 1 MiB in piu' del default.
+  // Il margine configurato è nel piano: 1 MiB in più del default.
   EXPECT_EQ(seen->shared_bytes, plan_resources(in, resource_config{}).shared_bytes + MiB);
   const json prov = provenance_of(*p.store, p.node.key());
   // Confronto sul testo canonico: un campo assente vale null e non interrompe il processo.
@@ -1309,7 +1309,7 @@ TEST(MasterPipeline, T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibr
   const node_spec cal_node = make_calibration_node(r);
   p.store->put_node(cal_node);
   p.store->create_slot("cal", cal_node.key());
-  // La calibrazione e' discendente dei tre master nel DAG.
+  // La calibrazione è discendente dei tre master nel DAG.
   for (const char* slot : {"master_dark", "master_flat", "master_dark_flat"}) {
     const std::vector<std::string> desc = p.store->descendants(p.store->get_slot(slot)->target_node_key);
     EXPECT_NE(std::find(desc.begin(), desc.end(), cal_node.key()), desc.end()) << slot;
@@ -1349,7 +1349,7 @@ TEST(MasterPipeline, T_M2C_11_raw_frames_untouched_by_frames_to_master_to_calibr
   // T-M2C-11: i frame raw e il light restano identici (digest, inode, mtime, permessi).
   for (std::size_t k = 0; k < paths.size(); ++k) EXPECT_EQ(id_of(paths[k]), before[k]) << paths[k];
 
-  // Un master ricalcolato (ricetta diversa) rende la calibrazione non piu' corrente.
+  // Un master ricalcolato (ricetta diversa) rende la calibrazione non più corrente.
   master_recipe changed = p.rd;
   changed.output_type = sample_type::f64;
   const node_spec changed_node = make_master_node(changed);

@@ -48,7 +48,7 @@ bool normal_relative(const std::string& p) {
 
 const std::string top = "manifest", coverage_where = "coverage", builder_where = "builder";
 
-// Su un valore che non e' un oggetto `find` non trova nulla: anche quel caso e' un campo assente.
+// Su un valore che non è un oggetto `find` non trova nulla: anche quel caso è un campo assente.
 const json& member(const json& o, const std::string& where, const char* key) {
   const json* v = o.find(key);
   if (v == nullptr) invalid(where + "." + key, "campo obbligatorio assente");
@@ -127,7 +127,7 @@ void parse_columns(const json& m, pack_manifest& out) {
     if (pc.nullable) {
       if (pc.type != "f32" && pc.type != "f64") invalid(w + ".nullable", "colonna intera nullabile");
       const std::int64_t bit = integer(c, w, "null_bit", 0, 31);
-      if (!bits.insert(bit).second) invalid(w + ".null_bit", "bit gia' usato");
+      if (!bits.insert(bit).second) invalid(w + ".null_bit", "bit già usato");
       pc.null_bit = static_cast<std::uint32_t>(bit);
     } else if (c.find("null_bit") != nullptr) {
       invalid(w + ".null_bit", "null_bit su colonna non nullabile");
@@ -146,7 +146,7 @@ void parse_columns(const json& m, pack_manifest& out) {
     const std::string w = at("flag_bits", i);
     const json& f = flags[i];
     const std::int64_t bit = integer(f, w, "index", 0, 31);
-    if (!bits.insert(bit).second) invalid(w + ".index", "bit gia' usato");
+    if (!bits.insert(bit).second) invalid(w + ".index", "bit già usato");
     out.flag_bits.push_back(pack_flag_bit{static_cast<std::uint32_t>(bit), text(f, w, "meaning")});
   }
 }
@@ -342,7 +342,7 @@ constexpr std::uint64_t index_entry_bytes = 24;
   stop(error_category::integrity, "pack.index_invalid", why, std::move(context));
 }
 
-// Apre un file elencato in sola lettura: assente (o link, o percorso che attraversa un non-directory) e' `pack.file_missing`, ogni altro errore del sistema `pack.io`.
+// Apre un file elencato in sola lettura: assente (o link, o percorso che attraversa un non-directory) è `pack.file_missing`, ogni altro errore del sistema `pack.io`.
 unique_fd open_listed(int dirfd, const pack_file& f) {
   unique_fd fd(::openat(dirfd, f.path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
   if (!fd && (errno == ENOENT || errno == ENOTDIR || errno == ELOOP)) stop(error_category::integrity, "pack.file_missing", "file elencato assente", {{"file", f.path}});
@@ -409,7 +409,7 @@ verified_pack verify(const pack_recipe& recipe, const pack_use& use, const pack_
   if (!mf) throw_errno(error_category::io, io_code, "apertura di manifest.json fallita", errno);
   struct stat st {};
   if (::fstat(mf.get(), &st) != 0) throw_errno(error_category::io, io_code, "fstat fallita", errno);
-  if (!S_ISREG(st.st_mode)) stop(error_category::metadata_missing, "pack.missing", "manifest.json non e' un file regolare");
+  if (!S_ISREG(st.st_mode)) stop(error_category::metadata_missing, "pack.missing", "manifest.json non è un file regolare");
   if (static_cast<std::uint64_t>(st.st_size) > max_manifest_bytes) invalid("manifest", "manifest oltre il limite di lettura");
   const std::vector<std::uint8_t> bytes = sqlint::read_all(mf.get(), max_manifest_bytes, io_code, "manifest.json");
   const std::string text_bytes(bytes.begin(), bytes.end());
@@ -509,7 +509,7 @@ std::vector<pack_row> read_pack_cell(const pack_recipe& recipe, const verified_p
       const ssize_t got = ::pread(fd.get(), bytes.data() + done, bytes.size() - done, static_cast<off_t>(first * record + done));
       if (got < 0 && errno == EINTR) continue;
       if (got < 0) throw_errno(error_category::io, io_code, "lettura fallita", errno, {{"file", data.path}});
-      if (got == 0) stop(error_category::integrity, "pack.size_mismatch", "file dati piu' corto del manifest", {{"file", data.path}});
+      if (got == 0) stop(error_category::integrity, "pack.size_mismatch", "file dati più corto del manifest", {{"file", data.path}});
       done += static_cast<std::size_t>(got);
     }
 

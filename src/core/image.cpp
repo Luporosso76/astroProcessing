@@ -51,7 +51,7 @@ int cfa_site_channel(const cfa_layout& cfa, unsigned r, unsigned c) {
                    {{"campo", field}});
 }
 
-// Chiamata dopo il controllo del layout: con layout cfa, `cfa` e' presente.
+// Chiamata dopo il controllo del layout: con layout cfa, `cfa` è presente.
 void validate_decoder_state(const image& img) {
   if (!img.decoder_state) return;
   const decoder_state& s = *img.decoder_state;

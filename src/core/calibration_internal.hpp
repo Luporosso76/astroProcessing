@@ -23,7 +23,7 @@ namespace astro::calib_detail {
 constexpr double iid_cv_threshold = 0.01;
 constexpr std::size_t input_count = 4;
 
-// Criterio di rappresentabilita': un risultato non nullo da operandi non nulli deve essere normale; zero o subnormale
+// Criterio di rappresentabilità: un risultato non nullo da operandi non nulli deve essere normale; zero o subnormale
 // (underflow) o non finito non sono ammessi (fpclassify, nessun accesso all'ambiente in virgola mobile).
 inline bool is_normal(double r) noexcept { return std::fpclassify(r) == FP_NORMAL; }
 inline bool is_finite_ok(double r) noexcept { return std::isfinite(r); }
@@ -47,7 +47,7 @@ struct input_view {
     return f32 ? static_cast<double>(static_cast<const float*>(samples)[i])
                : static_cast<const double*>(samples)[i];
   }
-  // NaN se un passo del modello non e' rappresentabile in modo normale (underflow o overflow).
+  // NaN se un passo del modello non è rappresentabile in modo normale (underflow o overflow).
   double variance(std::size_t i, double x) const noexcept {
     if (plane) {
       return f32 ? static_cast<double>(static_cast<const float*>(variance_plane)[i])
@@ -65,7 +65,7 @@ struct input_view {
   }
 };
 
-// Nomi, metadati, rappresentabilita' e mediana condivisi da calibrazione e master (C-02.a, ADR-16).
+// Nomi, metadati, rappresentabilità e mediana condivisi da calibrazione e master (C-02.a, ADR-16).
 
 inline const char* role_name(master_role r) {
   switch (r) {
@@ -292,14 +292,14 @@ inline bool convert_finite(double v, T& out) {
 }
 
 // Valore di rango `rank` (0-based) secondo `<` fra double finiti, in passate ripetute sugli stessi valori (ADR-06,
-// estensione R3.2): chiave monotona a 64 bit, una cifra di 8 bit per passata dalla piu' significativa. -0 e +0 hanno
+// estensione R3.2): chiave monotona a 64 bit, una cifra di 8 bit per passata dalla più significativa. -0 e +0 hanno
 // la stessa chiave; un risultato nullo vale +0.
 class kth_selector {
  public:
   static constexpr int passes = 8;
   // Conta `v` se la sua chiave ha il prefisso scelto nelle passate precedenti.
   void add(double v) noexcept;
-  // Chiude la passata e sceglie la cifra; `rank` e' lo stesso a ogni passata e minore dei valori della prima.
+  // Chiude la passata e sceglie la cifra; `rank` è lo stesso a ogni passata e minore dei valori della prima.
   void end_pass(std::uint64_t rank);
   bool done() const noexcept { return pass_ == passes; }
   double result() const noexcept;
@@ -397,10 +397,10 @@ void for_valid_n(const prepared_calibration::impl& p, const input_view& F, const
   }
 }
 
-// var.plane_values sul primo pixel valido con varianza non finita o negativa; `first` e' l'indice globale del primo.
+// var.plane_values sul primo pixel valido con varianza non finita o negativa; `first` è l'indice globale del primo.
 void check_variance_rows(const input_view& v, const char* input, std::size_t first, std::size_t count);
 
-// Chiude N per canale (arresti e ordine della residenza intera); `median_fc(c)` e' chiamata solo per canali non vuoti.
+// Chiude N per canale (arresti e ordine della residenza intera); `median_fc(c)` è chiamata solo per canali non vuoti.
 void finish_normalization(prepared_calibration::impl& p, const std::vector<normalization_acc>& acc,
                           const std::function<double(std::size_t)>& median_fc);
 [[noreturn]] void stop_fc_variance_nonfinite(std::uint32_t x, std::uint32_t y);
@@ -409,7 +409,7 @@ void finish_variance(prepared_calibration::impl& p, const std::function<double(s
 // Preflight sui soli metadati (immagini di soli header): stessi controlli della residenza intera, senza campioni.
 std::unique_ptr<prepared_calibration::impl> prepare_headers(const calibration_recipe& recipe, calibration_images images);
 
-// Job della calibrazione con residenza a blocchi (piano gia' scelto da plan_resources): chiamato da run_calibration_job
+// Job della calibrazione con residenza a blocchi (piano già scelto da plan_resources): chiamato da run_calibration_job
 // dentro run_job_files.
 struct block_job_request {
   const calibration_recipe& recipe;

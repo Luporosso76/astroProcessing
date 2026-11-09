@@ -28,8 +28,8 @@ constexpr const char* cache_rebuild_cause_user = "user_request";
 
 struct import_request {
   std::string path;
-  content_digest digest;  // identita' attesa del file
-  // Fase obbligatoria (D1); linearita' e offset CFA solo se il file non li dichiara.
+  content_digest digest;  // identità attesa del file
+  // Fase obbligatoria (D1); linearità e offset CFA solo se il file non li dichiara.
   fits_read_options read_options;
   // Solo test: chiamato con "digest.done" dopo la verifica del digest e prima della lettura dell'header.
   std::function<void(std::string_view)> hook = nullptr;
@@ -46,9 +46,9 @@ node_spec make_cache_rebuild_node(const content_digest& source, const preview_re
 json import_report_json(const fits_inventory& inventory, const content_digest& digest);
 std::string import_report_text(const json& report);
 
-// I tre job di I/O passano da job_scheduler::run con un job_plan di un task: il picco (blocco del digest piu' memoria
-// del task) e' prenotato dal pool, in coda FIFO, prima del primo task; il digest si verifica nel `prepare`.
-// `resources`, se presente, va nella provenance (budget.resources) e da' allo scheduler cpu_set e coda dei job.
+// I tre job di I/O passano da job_scheduler::run con un job_plan di un task: il picco (blocco del digest più memoria
+// del task) è prenotato dal pool, in coda FIFO, prima del primo task; il digest si verifica nel `prepare`.
+// `resources`, se presente, va nella provenance (budget.resources) e dà allo scheduler cpu_set e coda dei job.
 
 // Ramo di `run_branches` per un import: stesso lavoro, stessa richiesta (nodo, risorse) di run_import_job. `store`, `request`,
 // `pool`, `cancel` e `resources` devono vivere fino al ritorno di run_branches.
@@ -63,7 +63,7 @@ job_outcome run_import_job(sqlite_dag_store& store, const std::string& slot_name
                            const std::optional<budget_snapshot>& budget = std::nullopt,
                            const resource_config* resources = nullptr);
 
-// Job `thumbnail`: riusa o calcola la voce e pubblica un riferimento; l'esito e' in provenance.details.cache.
+// Job `thumbnail`: riusa o calcola la voce e pubblica un riferimento; l'esito è in provenance.details.cache.
 job_outcome run_thumbnail_job(sqlite_dag_store& store, const std::string& slot_name, const std::string& path,
                               const content_digest& digest, const preview_request& request, thumbnail_cache& cache,
                               memory_pool& pool, const cancel_token& cancel,

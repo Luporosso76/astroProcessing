@@ -10,11 +10,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-04-persistenza.md` | `83861d7d5db28b2f45b7748a0af91044e2cd56565c3fa9295733c0561163401c` |
-| `src/core/project_export.cpp` | `6b67fa9bb3fdd89b747e55d0faec1106a503f79ff8ea9ad2d10c8906080c7d00` |
-| `tests/unit/test_export.cpp` | `704615f6b4142089bcf339a0dd2d7d0ee980b61185f1079aa5af941badac1c3e` |
+| `src/core/project_export.cpp` | `ef7dffd9853ee2ab4f5b3e1169f14a67ddcbef920d8b604768eb76c9e1602460` |
+| `tests/unit/test_export.cpp` | `d316710821e4ce6ab39f3eff764b53edca832a77962844d3b314261a37a7a334` |
 
-- Test release (`tmp/release-junit.xml`): totali 1212, fast 1190, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1190, fast 1190, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

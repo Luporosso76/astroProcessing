@@ -35,6 +35,19 @@ inline astro::dng_decoder_fields project_fields(std::uint32_t rows) {
   return d;
 }
 
+// Il binding strutturato richiede esattamente questi membri: un membro aggiunto o tolto da `dng_decoder_fields` non
+// compila, e obbliga ad aggiornare `dng_field_changes` insieme al conteggio dei test.
+inline void check_dng_decoder_fields_members(const astro::dng_decoder_fields& d) {
+  [[maybe_unused]] auto& [dng_version, dng_backward_version, tiles, rows_per_strip, tile_width, tile_length, segment_count,
+                          predictor, little_endian, zlib_runtime_version, orientation, default_crop_origin,
+                          default_crop_size, metadata_rejected, opcode_lists] = d;
+}
+
+// Come sopra per `dng_route_result`: il cambio di instradamento deve coprire tutti i suoi membri.
+inline void check_dng_route_result_members(const astro::dng_route_result& r) {
+  [[maybe_unused]] auto& [decoder, reason, compression, sample_format, bits_per_sample] = r;
+}
+
 // Un cambio per membro di `project_fields(rows)`, con `route` invariato; `rows` deve essere diverso da 2.
 inline std::vector<field_change> dng_field_changes(std::uint32_t width, std::uint32_t rows) {
   using astro::decoder_state;

@@ -48,12 +48,12 @@ constexpr std::size_t chunk_elements = std::size_t{1} << 16;
         {"cfitsio_messaggi", detail}});
 }
 
-// Lettura: un file che CFITSIO non accetta e' un input non valido.
+// Lettura: un file che CFITSIO non accetta è un input non valido.
 void check_read(int status, const char* operation) {
   if (status != 0) cfitsio_fail(status, operation, error_category::invalid_input);
 }
 
-// Scrittura: un errore CFITSIO su dati gia' validati e' un guasto di I/O, non un input errato.
+// Scrittura: un errore CFITSIO su dati già validati è un guasto di I/O, non un input errato.
 void check_write(int status, const char* operation) {
   if (status != 0) cfitsio_fail(status, operation, error_category::io);
 }
@@ -84,7 +84,7 @@ class fits_handle {
   fitsfile* f_ = nullptr;
 };
 
-// CFITSIO conserva gli indirizzi di buf_ e size_: l'oggetto non e' ne' copiabile ne' spostabile.
+// CFITSIO conserva gli indirizzi di buf_ e size_: l'oggetto non è né copiabile né spostabile.
 class memory_fits {
  public:
   explicit memory_fits(std::span<const std::uint8_t> bytes)
@@ -161,7 +161,7 @@ void read_chunks(fitsfile* f, int datatype, std::uint64_t n, Consume&& consume) 
 }
 
 // Ogni campione deve essere invertibile esattamente con la formula del writer, altrimenti il file non
-// si puo' riscrivere senza perdita.
+// si può riscrivere senza perdita.
 template <class Raw, class Out>
 void read_integers(fitsfile* f, int datatype, const hdu_scan& h, Out* out) {
   // bscale = 1 e bzero intero entro 2^31: somma di interi sotto 2^53, esatta e invertibile per costruzione.
@@ -346,7 +346,7 @@ source_encoding resolve_encoding(const image& img) {
   return enc;
 }
 
-// header_cards validate piu' le card dei campi interpretati che l'header non contiene ancora.
+// header_cards validate più le card dei campi interpretati che l'header non contiene ancora.
 std::vector<std::string> compose_cards(const image& img) {
   for (const std::string& card : img.header_cards) {
     if (card.size() != card_size) fail(error_category::invalid_input, "fits.card_length", "card diversa da 80 caratteri");
@@ -467,8 +467,8 @@ namespace {
   format_fail(input.format(), error_category::io, suffix, message, std::move(context));
 }
 
-// Fine file prima della dimensione aperta: un file cambiato dall'apertura (dimensione, mtime o ctime) e' integrity
-// (input.size_changed, input.modified); solo un file con identita' invariata resta io input.short_read.
+// Fine file prima della dimensione aperta: un file cambiato dall'apertura (dimensione, mtime o ctime) è integrity
+// (input.size_changed, input.modified); solo un file con identità invariata resta io input.short_read.
 [[noreturn]] void unexpected_eof(const fits_input& input) {
   fits_detail::check_unchanged(input);
   fail(error_category::io, "input.short_read", "lettura incompleta con dimensione invariata");
@@ -536,12 +536,12 @@ void check_unchanged(const fits_input& input) {
   struct stat sb {};
   if (::fstat(input.fd_, &sb) != 0) input_syscall_fail(input, ".fstat", "fstat non riuscita", errno);
   if (static_cast<std::uint64_t>(sb.st_size) != input.size_) {
-    fail(error_category::integrity, "input.size_changed", "la dimensione del file e' cambiata dopo fstat",
+    fail(error_category::integrity, "input.size_changed", "la dimensione del file è cambiata dopo fstat",
          {{"atteso", std::to_string(input.size_)}, {"trovata", std::to_string(sb.st_size)}});
   }
   const auto ns = [](const struct timespec& t) { return std::int64_t{t.tv_sec} * 1000000000 + t.tv_nsec; };
   if (ns(sb.st_mtim) != input.mtime_ns_ || ns(sb.st_ctim) != input.ctime_ns_) {
-    fail(error_category::integrity, "input.modified", "il file e' stato modificato dopo l'apertura");
+    fail(error_category::integrity, "input.modified", "il file è stato modificato dopo l'apertura");
   }
 }
 
@@ -589,7 +589,7 @@ fits_input open_input(const std::string& path, const input_format& format) {
   }
   if (!S_ISREG(sb.st_mode)) {
     ::close(fd);
-    format_fail(format, error_category::invalid_input, ".not_regular", "il file non e' regolare", {{"percorso", path}});
+    format_fail(format, error_category::invalid_input, ".not_regular", "il file non è regolare", {{"percorso", path}});
   }
   const auto size = static_cast<std::uint64_t>(sb.st_size);
   if (size > format.max_file_bytes) {
@@ -635,7 +635,7 @@ std::vector<std::uint8_t> read_input_bytes(const fits_input& input, std::uint64_
   } while (extra < 0 && errno == EINTR);
   if (extra < 0) input_syscall_fail(input, ".read", "pread non riuscita", errno);
   if (extra > 0) {
-    fail(error_category::integrity, "input.size_changed", "il file e' cresciuto dopo fstat",
+    fail(error_category::integrity, "input.size_changed", "il file è cresciuto dopo fstat",
          {{"atteso", std::to_string(buffer.size())}});
   }
   return buffer;
@@ -755,7 +755,7 @@ std::vector<std::uint8_t> encode_fits(const image& img) {
   }
   handle.close_checked();
 
-  if (buf_size < total) fail(error_category::io, "fits.write", "buffer CFITSIO piu' corto del file atteso");
+  if (buf_size < total) fail(error_category::io, "fits.write", "buffer CFITSIO più corto del file atteso");
   std::vector<std::uint8_t> out(static_cast<std::size_t>(total));
   std::memcpy(out.data(), mem.ptr, out.size());
   verify_written(img, out);

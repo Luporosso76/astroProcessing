@@ -5,8 +5,8 @@
 
 namespace astro::job_probe {
 
-// Solo test (suite di conformita', docs/contracts/BASE-confini.md §3.2): osservatore dei punti del confine dei job.
-// Si imposta prima del job e non cambia durante l'esecuzione; e' chiamato anche dai thread dei worker, quindi deve
+// Solo test (suite di conformità, docs/contracts/BASE-confini.md §3.2): osservatore dei punti del confine dei job.
+// Si imposta prima del job e non cambia durante l'esecuzione; è chiamato anche dai thread dei worker, quindi deve
 // essere thread-safe. Vuoto: nessun effetto. Punti e dettaglio:
 // - `node.build` (operator_id): costruzione di un node_spec;
 // - `input.open` (percorso) e `input.open_format` ("<prefisso del formato>\t<percorso>"): ingresso in open_input, il
@@ -19,7 +19,7 @@ namespace astro::job_probe {
 using observer = std::function<void(std::string_view point, std::string_view detail)>;
 
 void set_observer(observer o);
-// Vero se un osservatore e' impostato: i dettagli costosi da calcolare si calcolano solo allora.
+// Vero se un osservatore è impostato: i dettagli costosi da calcolare si calcolano solo allora.
 bool active();
 void notify(std::string_view point, std::string_view detail = {});
 

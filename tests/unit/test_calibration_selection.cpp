@@ -1871,12 +1871,12 @@ TEST(CalibSelection, T_M3A_C01_02_p_offset_admissibility_and_default) {
 const config thermal_config{false, dark_kind::absent, bias_kind::valid, flat_kind::raw, dark_flat_kind::absent,
                             thermal_kind::in_budget};
 
-// Controllo termico con le dichiarazioni termiche presenti (§b.5; ADR-16.a §2: `normalization` e `q_min` obbligatori, senza
-// default; assenti: `invalid_input`, `calib.param.<nome>`). `cfa_channel_median` su un flat mono: `invalid_input`,
-// `calib.normalization_requires_cfa` (ADR-16.a §6, T-M2E-07). Light, bias e flat mono (L–F e F–B confrontano il CFA per
-// uguaglianza esatta, quindi tutti e tre senza BAYERPAT). Controlli: tutte le dichiarazioni presenti; flat mono con
-// `global_median` (N = 1024, soglia 0,25 · 0,5 · 1024 = 128 ≥ bound 64: `flat.bias` ammesso).
-TEST(CalibSelection, T_M3A_CAL_02_thermal_check_requires_its_declarations) {
+// §b.9, `flat.bias` senza dichiarazioni: il controllo termico di `flat.bias` (§b.5) calcola `N_c` secondo `normalization` e
+// confronta con `q_min` (ADR-16.a §2: obbligatori, senza default; assenti: `invalid_input`, `calib.param.<nome>`).
+// `cfa_channel_median` su un flat mono: `invalid_input`, `calib.normalization_requires_cfa` (ADR-16.a §6, T-M2E-07).
+// Light, bias e flat mono (L–F e F–B confrontano il CFA per uguaglianza esatta, quindi tutti e tre senza BAYERPAT).
+// Controlli: tutte le dichiarazioni presenti; flat mono con `global_median`.
+TEST(CalibSelection, T_M3A_CAL_06_thermal_check_requires_its_declarations) {
   {
     SCOPED_TRACE("normalization assente");
     calibration_analysis_input in = input_of(thermal_config);
@@ -1906,14 +1906,24 @@ TEST(CalibSelection, T_M3A_CAL_02_thermal_check_requires_its_declarations) {
   t.normalization = normalization_mode::global_median;
   {
     SCOPED_TRACE("controllo: flat mono con global_median");
-    const calibration_analysis_input in = input_of(thermal_config, t);
-    ASSERT_TRUE(analysis_completes(in));
-    const calibration_analysis a = analyze_calibration(in);
-    const auto adm = admissible_of(a);
-    EXPECT_TRUE(std::binary_search(adm.begin(), adm.end(), pair_key{light_chain::bias, flat_chain::bias, false}))
-        << pairs_text(adm);
-    EXPECT_EQ(a.default_recipe.flat, flat_chain::bias);
+    EXPECT_TRUE(analysis_completes(input_of(thermal_config, t)));
   }
+}
+
+// `flat.bias` di default solo con dichiarazioni nel budget (§b.13): flat mono con `global_median` e dichiarazioni termiche
+// presenti (N = 1024, soglia 0,25 · 0,5 · 1024 = 128 ≥ bound 64), `flat.bias` ammesso e scelto dal default.
+TEST(CalibSelection, T_M3A_CAL_02_flat_bias_default_on_mono_flat_with_global_median) {
+  tuning t;
+  t.mono = true;
+  t.normalization = normalization_mode::global_median;
+  const calibration_analysis_input in = input_of(thermal_config, t);
+  ASSERT_EQ(in.flat->img.layout, plane_layout::mono);
+  ASSERT_TRUE(analysis_completes(in));
+  const calibration_analysis a = analyze_calibration(in);
+  const auto adm = admissible_of(a);
+  EXPECT_TRUE(std::binary_search(adm.begin(), adm.end(), pair_key{light_chain::bias, flat_chain::bias, false}))
+      << pairs_text(adm);
+  EXPECT_EQ(a.default_recipe.flat, flat_chain::bias);
 }
 
 // Dominio delle dichiarazioni lette dall'analisi (ADR-16.a §2: `q_min` > 0, `q_rel_sigma_max` > 0, valore non finito

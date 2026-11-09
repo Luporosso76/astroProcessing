@@ -201,13 +201,13 @@ inline rat half_ulp_f32(const rat& value) {
   const long double a = std::fabs(exact::to_ld(value));
   if (a == 0) return exact::from_u(0);
   const int e = std::ilogb(a);
-  // Mezzo ulp = 2^(e-24); nei subnormali f32 (|v| < 2^-126) lo spacing e' 2^-149, quindi il minimo e' 2^-150.
+  // Mezzo ulp = 2^(e-24); nei subnormali f32 (|v| < 2^-126) lo spacing è 2^-149, quindi il minimo è 2^-150.
   const int k = std::max(e - 24, -150);
   if (k >= 0) return rat{exact::shl(exact::from_u64(1), static_cast<unsigned>(k)), exact::from_u64(1)};
   return rat{exact::from_u64(1), exact::shl(exact::from_u64(1), static_cast<unsigned>(-k))};
 }
 
-// Tolleranza derivata: zero se m == 0; altrimenti gamma_m * |esatto|, piu' mezzo ulp f32 per l'uscita f32.
+// Tolleranza derivata: zero se m == 0; altrimenti gamma_m * |esatto|, più mezzo ulp f32 per l'uscita f32.
 inline ::testing::AssertionResult close_to(const rat& exact_value, double got, unsigned m, bool f32) {
   const rat diff = exact::abs(exact::from_double(got) - exact_value);
   rat tol = exact::from_u(0);

@@ -46,7 +46,7 @@ const cancel_token& no_cancel() {
   return token;
 }
 
-// Il seam e' globale al processo: ogni test parte e finisce con capacita' reali, nessun iniettore, contatori a zero.
+// Il seam è globale al processo: ogni test parte e finisce con capacità reali, nessun iniettore, contatori a zero.
 struct seam_guard {
   seam_guard() { clear(); }
   ~seam_guard() { clear(); }
@@ -62,7 +62,7 @@ struct mxcsr_guard {
   ~mxcsr_guard() { _mm_setcsr(saved); }
 };
 
-// I due percorsi si confrontano sulla CPU reale: senza AVX2 il secondo percorso non e' eseguibile e il test fallisce.
+// I due percorsi si confrontano sulla CPU reale: senza AVX2 il secondo percorso non è eseguibile e il test fallisce.
 bool hardware_avx2() {
   __builtin_cpu_init();
   return __builtin_cpu_supports("avx2");
@@ -85,7 +85,7 @@ bool same_buffer(const aligned_buffer& a, const aligned_buffer& b) {
   return ::testing::AssertionSuccess();
 }
 
-// Campo di un oggetto JSON: assente o di tipo diverso e' un errore del test, mai una dereferenziazione nulla.
+// Campo di un oggetto JSON: assente o di tipo diverso è un errore del test, mai una dereferenziazione nulla.
 const json& field(const json& o, const char* key, json::kind kind) {
   const json* v = o.type() == json::kind::object ? o.find(key) : nullptr;
   if (v == nullptr || v->type() != kind) throw std::runtime_error(std::string("campo assente o di tipo diverso: ") + key);
@@ -125,7 +125,7 @@ stop_error expect_stop_of(const std::function<void()>& f, error_category categor
   return stop_error(error_category::invalid_input, "test.no_stop", "nessuno stop");
 }
 
-// Lo slot ha esattamente `jobs` job, tutti `failed` con `category` e `code` sul nodo `node_key`, e la generazione e'
+// Lo slot ha esattamente `jobs` job, tutti `failed` con `category` e `code` sul nodo `node_key`, e la generazione è
 // avanzata solo per loro.
 bool stop_jobs_recorded(const dag_store& store, const char* slot, const std::string& node_key, std::size_t jobs,
                            error_category category = error_category::numeric, const char* code = "cpu.fp_mode") {
@@ -210,7 +210,7 @@ set_def cal_set(std::uint32_t w, std::uint32_t h, int light_bp, int master_bp, b
   const double light_tiny = light_bp == -32 ? 0x1p-149 : 0x1p-1074 * 3;
   const double light_huge = light_bp == -32 ? 3e38 : 1e300;
   const double var_tiny = light_bp == -32 ? 0x1p-149 : 0x1p-1074;
-  // Varianze grandi ma finite nel tipo del piano: un piano non finito su un pixel valido e' un errore d'ingresso.
+  // Varianze grandi ma finite nel tipo del piano: un piano non finito su un pixel valido è un errore d'ingresso.
   const double var_huge_l = light_bp == -32 ? 3e38 : 1e300, var_huge_d = master_bp == -32 ? 3e38 : 1e300;
   const double nan = std::numeric_limits<double>::quiet_NaN();
   std::mt19937_64 g(seed);
@@ -323,7 +323,7 @@ exact::big magnitude(exact::big b) {
 exact::big u64(std::uint64_t v) { return exact::from_u64(v); }
 
 struct exact_sum {
-  exact::big s, abs_sum;  // in unita' di 2^-1074
+  exact::big s, abs_sum;  // in unità di 2^-1074
 };
 
 exact_sum exact_of(const std::vector<double>& x) {
@@ -339,7 +339,7 @@ exact_sum exact_of(const std::vector<double>& x) {
 std::uint64_t h_scalar(std::size_t n) { return n - 1; }
 std::uint64_t h_avx2(std::size_t n) { return (n + 3) / 4 + 1; }
 
-// |s_hat - s| <= gamma_k A + h (1 + gamma_k) eta/2, con gamma_k = k/D, D = 2^53 - k, eta/2 = 1/2 in unita' di
+// |s_hat - s| <= gamma_k A + h (1 + gamma_k) eta/2, con gamma_k = k/D, D = 2^53 - k, eta/2 = 1/2 in unità di
 // 2^-1074. Moltiplicato per 2D: 2D |S_hat - S| <= 2k A + h 2^53. Esatto.
 bool within_oracle(double got, const exact_sum& e, std::uint64_t k) {
   const exact::big d = u64((std::uint64_t{1} << 53) - k);
@@ -437,7 +437,7 @@ const json& cpu_details(const job_outcome& out) {
   return field(*out.provenance.details, "cpu", json::kind::object);
 }
 
-// details.cpu completo (ADR-07, aggiunte di R5): richiesta, percorso risolto, capacita' lette.
+// details.cpu completo (ADR-07, aggiunte di R5): richiesta, percorso risolto, capacità lette.
 void expect_cpu_details(const job_outcome& out, const char* simd, const char* backend, bool avx2) {
   const json& cpu = cpu_details(out);
   EXPECT_EQ(text(cpu, "simd"), simd);
@@ -568,7 +568,7 @@ TEST(Simd, T_M2R5_03_auto_without_avx2_is_the_declared_scalar_path) {
   expect_cpu_details(out, "auto", "cpu_scalar", false);
 }
 
-// Con `auto` il percorso risolto entra nella chiave: se le capacita' cambiano dopo la creazione dello slot, la
+// Con `auto` il percorso risolto entra nella chiave: se le capacità cambiano dopo la creazione dello slot, la
 // chiave ricostruita dal job differisce e il job si ferma senza eseguire alcun percorso (D19).
 TEST(Simd, T_M2R5_03_auto_resolved_differently_after_the_slot_is_node_mismatch) {
   seam_guard seam;
@@ -615,7 +615,7 @@ TEST(Simd, T_M2R5_04_path_is_in_backend_key_and_provenance) {
   EXPECT_EQ(oa.provenance.spec.backend(), "cpu_avx2");
   expect_cpu_details(os, "scalar", "cpu_scalar", true);
   expect_cpu_details(oa, "avx2", "cpu_avx2", true);
-  // Stesso calcolo elemento per elemento: l'immagine calibrata e' identica byte per byte (0 ulp, ADR-07 (a)).
+  // Stesso calcolo elemento per elemento: l'immagine calibrata è identica byte per byte (0 ulp, ADR-07 (a)).
   EXPECT_EQ(primary_of(*ps.store, ps.node.key()), primary_of(*pa.store, pa.node.key()));
 
   // Master: stesso percorso nel nodo, nella chiave e nella provenance, sui due percorsi.
@@ -657,7 +657,7 @@ TEST(Simd, T_M2R5_04_resume_with_a_different_path_is_resume_mismatch_and_runs_no
   other.simd = simd_request::avx2;
   workflow changed{"simd", {step(other)}, nullptr};
   changed.steps[0].run = []() -> job_outcome {
-    ADD_FAILURE() << "un passo e' stato eseguito da un resume rifiutato";
+    ADD_FAILURE() << "un passo è stato eseguito da un resume rifiutato";
     throw std::runtime_error("passo eseguito");
   };
   cpu_test::reset_kernel_calls();
@@ -771,7 +771,7 @@ TEST(Simd, T_M2R5_02_pixel_sum_follows_the_declared_schemes_within_the_joint_bou
     SCOPED_TRACE(testing::Message() << "n=" << n << " x0=" << x[0]);
     const double sc = pixel_sum(cpu_path::scalar, x.data(), n);
     const double av = pixel_sum(cpu_path::avx2, x.data(), n);
-    // Gli schemi sono quelli su cui e' derivato il bound: ricorsivo per indice, 4 corsie con riduzione a coppie.
+    // Gli schemi sono quelli su cui è derivato il bound: ricorsivo per indice, 4 corsie con riduzione a coppie.
     EXPECT_EQ(sc, reference_scalar(x));
     EXPECT_EQ(av, reference_lanes(x));
     const exact_sum e = exact_of(x);
@@ -793,7 +793,7 @@ TEST(Simd, T_M2R5_06_subnormal_inputs_results_and_conversions) {
   ASSERT_TRUE(hardware_avx2());
   seam_guard seam;
   constexpr double tiny32 = 0x1p-149, top32 = 0x1p-126 - 0x1p-149;
-  // Calibrazione f32: ingressi subnormali validi; Lc = 0 esatto valido; Lc subnormale da' C non normale.
+  // Calibrazione f32: ingressi subnormali validi; Lc = 0 esatto valido; Lc subnormale dà C non normale.
   set_def s = cal::synth_set(8, 4, -32);
   s.light.v[0] = tiny32;
   s.dark.v[0] = tiny32;  // Lc = 0
@@ -815,7 +815,7 @@ TEST(Simd, T_M2R5_06_subnormal_inputs_results_and_conversions) {
     EXPECT_EQ(res->output.invalid.bits[2], invalid_reason::result_nonfinite);
   }
 
-  // Master: somma con segno che da' zero (esatta, valida); media subnormale f64; media 2^-150 e 2^-150 + 2^-201
+  // Master: somma con segno che dà zero (esatta, valida); media subnormale f64; media 2^-150 e 2^-150 + 2^-201
   // convertite in f32 a 0 e 2^-149 (non nulle prima della conversione): result_nonfinite in entrambi i percorsi.
   group g = make_group(master_role::bias, 5, 1, 2);
   g.frames[0].v = {-1.0, 0x1p-1074, 0x1p-150, 0x1p-150 + 0x1p-201, 1000};
@@ -910,7 +910,7 @@ TEST(Simd, T_M2R5_07_ftz_daz_or_rounding_before_the_preflight_stop_without_kerne
     EXPECT_EQ(calls(cpu_path::scalar), 0u);
     EXPECT_EQ(calls(cpu_path::avx2), 0u);
     // Al primo modo non fermato si esce: con una maschera spenta e senza controllo il caso dopo terminerebbe il
-    // processo con un segnale, nascondendo il fallimento gia' registrato.
+    // processo con un segnale, nascondendo il fallimento già registrato.
     if (HasFailure()) return;
   }
   EXPECT_NO_THROW(require_fp_environment());
@@ -918,7 +918,7 @@ TEST(Simd, T_M2R5_07_ftz_daz_or_rounding_before_the_preflight_stop_without_kerne
 
 // Con DM spenta un confronto su un parametro valido ma subnormale genererebbe un segnale: il controllo di MXCSR viene
 // prima della validazione della ricetta nei punti d'ingresso. I confini dei job e l'avvio dei task hanno i loro test
-// (T_M2R5_07_denormal_mask_off_* piu' sotto).
+// (T_M2R5_07_denormal_mask_off_* più sotto).
 TEST(Simd, T_M2R5_07_denormal_mask_off_with_subnormal_parameters_stops_before_validation) {
   seam_guard seam;
   const set_def s = cal::synth_set(8, 4, -64);
@@ -1108,7 +1108,7 @@ TEST(Simd, T_M2R5_07_task_start_check_on_rows_and_bands_and_injected_errno) {
                                            "cpu.fp_mode");
     _mm_setcsr(restore.saved);
     EXPECT_EQ(fp_mode_bits(band), bad);
-    if (HasFailure()) return;  // come sopra: nessun segnale dopo un fallimento gia' registrato
+    if (HasFailure()) return;  // come sopra: nessun segnale dopo un fallimento già registrato
   }
   EXPECT_EQ(calls(cpu_path::scalar) + calls(cpu_path::avx2), before);
   cpu_test::set_task_injector([](std::string_view point) { return point == "cpu.task_start" ? 5 : 0; });
@@ -1131,7 +1131,7 @@ namespace {
 constexpr unsigned mxcsr_dm = 1u << 8;
 
 // `body` in un processo figlio, con SIGFPE e SIGABRT convertiti in uscite (136, 134, nessun core): senza il controllo
-// il segnale termina il figlio e il test fallisce senza abbattere il processo dei test. Uscita 0 se `body` da' true.
+// il segnale termina il figlio e il test fallisce senza abbattere il processo dei test. Uscita 0 se `body` dà true.
 [[noreturn]] void run_in_fp_child(const std::function<bool()>& body) {
   struct sigaction action {};
   action.sa_handler = [](int) { _exit(136); };
@@ -1158,7 +1158,7 @@ bool dm_off_stops(const char* what, const std::function<void()>& f) {
   } catch (const stop_error& e) {
     const unsigned seen = _mm_getcsr();
     _mm_setcsr(base);
-    // La registrazione dell'arresto riuscita non aggiunge contesto: lo stop propagato e' quello del controllo.
+    // La registrazione dell'arresto riuscita non aggiunge contesto: lo stop propagato è quello del controllo.
     const bool ok = e.category() == error_category::numeric && e.code() == "cpu.fp_mode" && fp_mode_bits(e) == mxcsr_dm &&
                     fp_violation(seen) == mxcsr_dm && context_of(e, "registrazione_arresto").empty();
     if (!ok) std::fprintf(stderr, "%s: stop diverso da cpu.fp_mode con DM spenta: %s\n", what, e.what());
@@ -1273,7 +1273,7 @@ TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_files_before_the_node_and_r
 
 // Stesso confine in memoria: run_job e run_branches si fermano prima di leggere il nodo e prima del lavoro, che con un
 // operando subnormale genererebbe SIGFPE, e registrano l'arresto nel job (R5.d). Lo store in memoria non persiste
-// provenance: il record e' il job `failed` con categoria, codice e chiave del nodo.
+// provenance: il record è il job `failed` con categoria, codice e chiave del nodo.
 TEST(Simd, T_M2R5_07_denormal_mask_off_stops_run_job_before_the_node_and_records_the_stop) {
   seam_guard seam;
   ASSERT_EQ(fp_violation(_mm_getcsr()), 0u);

@@ -183,7 +183,7 @@ TEST(Export, T_M2R0_03_enospc_at_every_export_write_point_stops_io_and_leaves_no
     dry.store->export_slots(dry.project.parent_path() / "r0b03_dry_export", {"sb", "sd"});
   });
   dry.store.reset();
-  // 5 file (2 artefatti, report di export, manifest, COMMIT) con 5 punti ciascuno, piu' mkdir.
+  // 5 file (2 artefatti, report di export, manifest, COMMIT) con 5 punti ciascuno, più mkdir.
   ASSERT_GE(points.size(), 21u);
   for (const char* p : {"export.report.create", "export.report.write", "export.report.fsync_file", "export.report.rename",
                         "export.report.fsync_dir"}) {
@@ -246,9 +246,9 @@ TEST(Export, T_M2C_21_altered_bundles_are_declared_incomplete) {
       {"COMMIT alterato", [](const fs::path& d) { write_text(d / "COMMIT", std::string(64, '0')); }},
       {"COMMIT rimosso", [](const fs::path& d) { fs::remove(d / "COMMIT"); }},
       {"manifest rimosso", [](const fs::path& d) { fs::remove(d / "manifest.json"); }},
-      {"file in piu'", [](const fs::path& d) { write_text(d / "extra.txt", "x"); }},
-      {"directory in piu'", [](const fs::path& d) { fs::create_directory(d / "extra_dir"); }},
-      {"symlink in piu'", [](const fs::path& d) { fs::create_symlink("sb.bin", d / "alias"); }},
+      {"file in più", [](const fs::path& d) { write_text(d / "extra.txt", "x"); }},
+      {"directory in più", [](const fs::path& d) { fs::create_directory(d / "extra_dir"); }},
+      {"symlink in più", [](const fs::path& d) { fs::create_symlink("sb.bin", d / "alias"); }},
       {"temporaneo residuo", [](const fs::path& d) { write_text(d / ".tmp-1234", "x"); }},
   };
   for (const auto& [name, mutate] : mutations) {

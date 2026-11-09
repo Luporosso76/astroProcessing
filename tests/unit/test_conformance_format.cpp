@@ -1,6 +1,6 @@
 // Casi T-M3BASE-20, 21, 22 (docs/contracts/BASE-confini.md §3.2, emendamento L1 di §2.5): lettura degli input
 // indipendente dal formato. 20 e 21 girano per formato dichiarato e non hanno un job; 22 gira per ogni voce del registro.
-// Il banco di prova e' quello di test_conformance.cpp, incluso senza modificarlo; il filtro di ctest seleziona solo i
+// Il banco di prova è quello di test_conformance.cpp, incluso senza modificarlo; il filtro di ctest seleziona solo i
 // casi di questo file.
 //
 // Interfaccia attesa (nomi scelti dall'autore dei test, da seguire nel codice):
@@ -141,7 +141,7 @@ meta_state meta_of(const fs::path& p) {
           static_cast<unsigned>(sb.st_mode & 07777)};
 }
 
-// Allocazione piu' grande richiesta a operator new dal processo dopo l'ultimo azzeramento (contatore globale nel
+// Allocazione più grande richiesta a operator new dal processo dopo l'ultimo azzeramento (contatore globale nel
 // binario di test). I buffer di un input al limite sono di almeno 1 GiB; le allocazioni dell'apertura (stringhe,
 // contesto dello stop) sono di pochi kB. Soglia 1 MiB = `sha256_chunk_bytes`, ordini di grandezza sotto il minimo
 // dei limiti dichiarati.
@@ -170,7 +170,7 @@ constexpr const char* arbitrary_70001_sha256 = "d22b60811275a4cec32b574f8c09c0a4
 
 }  // namespace
 
-// Misura delle allocazioni: sostituisce operator new nel binario di test (una sola unita' di traduzione).
+// Misura delle allocazioni: sostituisce operator new nel binario di test (una sola unità di traduzione).
 void* operator new(std::size_t size) {
   std::size_t seen = largest_allocation.load(std::memory_order_relaxed);
   while (size > seen && !largest_allocation.compare_exchange_weak(seen, size, std::memory_order_relaxed)) {
@@ -208,7 +208,7 @@ TEST(ConformanceFormat, T_M3BASE_20_open_protocol_per_declared_format) {
     EXPECT_EQ(f->header_plan, prefix == "fits");
     const fs::path dir = fresh("t20_" + prefix);
 
-    {  // limite piu' un byte: stop dall'apertura, nessuna lettura
+    {  // limite più un byte: stop dall'apertura, nessuna lettura
       const fs::path p = dir / "over.bin";
       make_sparse(p, limit + 1);
       const meta_state before = meta_of(p);
@@ -265,11 +265,11 @@ TEST(ConformanceFormat, T_M3BASE_20_open_protocol_per_declared_format) {
     {  // percorso assente
       const fs::path p = dir / "absent.bin";
       expect_stop_of(stop_from([&] { (void)open_input(p.string(), *f); }), error_category::io, "input.missing");
-      EXPECT_FALSE(fs::exists(p)) << "il percorso assente e' stato creato";
+      EXPECT_FALSE(fs::exists(p)) << "il percorso assente è stato creato";
     }
   }
 
-  {  // il formato e' dichiarato, non dedotto dall'estensione
+  {  // il formato è dichiarato, non dedotto dall'estensione
     const fs::path dir = fresh("t20_declared");
     const fs::path fits_named = dir / "x.fits";
     make_sparse(fits_named, raw_limit_ref + 1);
@@ -295,7 +295,7 @@ TEST(ConformanceFormat, T_M3BASE_20_single_owner_of_the_open_protocol) {
   const std::string owner = read_text(fs::path(ASTRO_SOURCE_DIR) / "src" / "core" / files.front());
   std::size_t opens = 0;
   for (std::size_t at = 0; (at = owner.find("::open(", at)) != std::string::npos; at += 7) ++opens;
-  EXPECT_EQ(opens, 1u) << "piu' di una open nel file del protocollo di apertura";
+  EXPECT_EQ(opens, 1u) << "più di una open nel file del protocollo di apertura";
 }
 
 // ---------------------------------------------------------------- T-M3BASE-21: lettura verificata senza piano degli header
@@ -311,7 +311,7 @@ TEST(ConformanceFormat, T_M3BASE_21_verified_read_without_header_plan) {
     const std::string path = (dir / "in.bin").string();
     const std::vector<std::uint8_t> bytes = arbitrary_bytes(70001, 7);
     ASSERT_ANY_THROW((void)plan_fits(bytes)) << "i byte della prova sono un FITS valido";
-    // Identita' attesa: digest fissato fuori dal prodotto, dimensione 70001.
+    // Identità attesa: digest fissato fuori dal prodotto, dimensione 70001.
     const content_digest expected{arbitrary_70001_sha256, 70001};
     ASSERT_EQ(bytes.size(), 70001u);
     constexpr std::uint64_t budget = std::uint64_t{64} << 20;
@@ -334,15 +334,15 @@ TEST(ConformanceFormat, T_M3BASE_21_verified_read_without_header_plan) {
       EXPECT_EQ(got, bytes);
       EXPECT_EQ(sha256_hex(got), arbitrary_70001_sha256);
       EXPECT_EQ(got.size(), 70001u);
-      EXPECT_EQ(pr.count("input.read"), 1u) << "il file e' stato letto piu' di una volta o in parti";
+      EXPECT_EQ(pr.count("input.read"), 1u) << "il file è stato letto più di una volta o in parti";
       ASSERT_EQ(log.calls.size(), 1u);
       EXPECT_EQ(log.calls.front(), (std::pair<std::uint64_t, std::size_t>{0, 70001}))
-          << "il file e' stato letto in altro modo prima della lettura intera";
+          << "il file è stato letto in altro modo prima della lettura intera";
       EXPECT_NO_THROW(reverify_input(path, *f, &input, expected, work, nullptr));
       EXPECT_NO_THROW(reverify_input(path, *f, nullptr, expected, work, nullptr));
       EXPECT_EQ(state_of(path), before);
     }
-    {  // identita' attesa sbagliata con il file invariato: dimensione dichiarata diversa, digest dichiarato diverso
+    {  // identità attesa sbagliata con il file invariato: dimensione dichiarata diversa, digest dichiarato diverso
       const file_state ref = state_of(path);
       fits_input input = open_input(path, *f);
       expect_stop_of(
@@ -359,7 +359,7 @@ TEST(ConformanceFormat, T_M3BASE_21_verified_read_without_header_plan) {
                      error_category::integrity, "input.digest_mismatch");
       EXPECT_EQ(state_of(path), ref);
     }
-    {  // il formato e' quello dichiarato anche se i byte hanno la firma di un FITS valido o di un FITS corrotto
+    {  // il formato è quello dichiarato anche se i byte hanno la firma di un FITS valido o di un FITS corrotto
       const std::vector<std::uint8_t> valid = cf::frame_for_role("file");
       std::vector<std::uint8_t> signed_garbage = {'S', 'I', 'M', 'P', 'L', 'E', ' ', ' ', '=', ' ', 'T'};
       const std::vector<std::uint8_t> tail = arbitrary_bytes(5000, 3);
@@ -433,7 +433,7 @@ TEST(ConformanceFormat, T_M3BASE_21_verified_read_without_header_plan) {
       EXPECT_FALSE(ref.exists);
       expect_stop_of(stop_from([&] { reverify_input(path, *f, &input, expected, work, nullptr); }),
                      error_category::io, "input.missing");
-      EXPECT_EQ(state_of(path), ref) << "il percorso assente e' stato creato";
+      EXPECT_EQ(state_of(path), ref) << "il percorso assente è stato creato";
       write_file(path, bytes);
     }
     {  // file cambiato fra la lettura verificata e la riverifica

@@ -90,6 +90,7 @@
 #include "astro/hash.hpp"
 #include "astro/image.hpp"
 #include "astro/json.hpp"
+#include "astro/master.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/raw_decode.hpp"
 #include "astro/scheduler.hpp"
@@ -97,6 +98,7 @@
 #include "dng_state_changes.hpp"
 #include "expect_stop.hpp"
 #include "import_support.hpp"
+#include "master_support.hpp"
 #include "pub_raw_01.hpp"
 #include "record_roundtrip.hpp"
 #include "store_test_support.hpp"
@@ -1370,7 +1372,7 @@ TEST(BatchAnalysis, T_M3A_04f_missing_analysis_parameters_one_at_a_time) {
   }
 }
 
-// ADR-16 §b.9: `temperature_abs_tol_c` e' obbligatorio con entrambe le `temperature_policy`.
+// ADR-16 §b.9: `temperature_abs_tol_c` è obbligatorio con entrambe le `temperature_policy`.
 TEST(BatchAnalysis, T_M3A_04f_temperature_tolerance_is_required_with_not_applicable_declared) {
   const baseline b;
   {
@@ -2324,5 +2326,301 @@ TEST(BatchAnalysis, T_M3A_11_project_dng_light_on_the_store_carries_the_decoded_
     EXPECT_EQ(ctx.count("field") ? ctx.at("field") : std::string("<assente>"), "dng") << e.what();
   }
 }
+
+// ---------------------------------------------------------------- store: slot `master.combine` pubblicati (CL-06 b, CL-12)
+
+// Progetto con un light FITS e master prodotti da `run_master_job` nei slot `master_<ruolo>`: i nodi e gli artefatti sono
+// quelli del prodotto, non descrizioni scritte a mano. Flat e bias danno la catena `flat.bias` del controllo termico.
+struct master_slots {
+  fs::path project;
+  std::map<master_role, std::string> node_key;
+  std::map<master_role, artifact_record> image;
+};
+
+std::string master_slot_name(master_role role) { return std::string("master_") + role_name(role); }
+
+master_slots store_with_light_and_masters(const std::string& name, const std::vector<master_role>& roles, double flat_level,
+                                          json params = params_doc()) {
+  const fs::path dir = fresh(name);
+  master_slots out;
+  out.project = dir / "project";
+  auto store = sqlite_dag_store::create(out.project);
+  store->put_setting("batch.analysis_params", canonical_json(params));
+  memory_pool pool(64 * imp::MiB);
+  const auto res = import_batch(*store, {write_light(dir / "l.fits", 60)}, pool, never());
+  EXPECT_EQ(res.size(), 1u);
+  store->append_classifications({light_by_user(res.at(0).input.id)});
+  for (const master_role role : roles) {
+    mst::group g = mst::make_group(role, 8, 8, 3);
+    const double level = role == master_role::flat ? flat_level : role == master_role::bias ? 100.0 : 20.0;
+    for (mst::mframe& f : g.frames) {
+      f.v.assign(f.v.size(), level);
+      if (role == master_role::bias) f.hdr.exposure = 0.001;
+    }
+    master_recipe r = mst::recipe_of(g);
+    mst::write_frames(g, r, dir, master_slot_name(role));
+    const node_spec node = make_master_node(r);
+    store->put_node(node);
+    store->create_slot(master_slot_name(role), node.key());
+    const job_outcome job = mst::run_master_quiet(*store, master_slot_name(role), r, pool);
+    EXPECT_EQ(job.exit_code, 0) << role_name(role);
+    out.node_key[role] = node.key();
+    out.image[role] = mst::by_role(*store, node.key()).at("primary");
+  }
+  return out;
+}
+
+json thermal_params() {
+  json doc = params_doc();
+  doc.set("flat_thermal_bound_adu", json::number(64.0));
+  doc.set("flat_thermal_rel_budget", json::number(0.25));
+  return doc;
+}
+
+// T-M3A-04d (CL-06 b): lo slot `current` il cui nodo è `master.combine` è un candidato col descrittore derivato dal nodo e
+// la chiave del nodo; la selezione congelata porta la chiave del nodo e nessun digest di input.
+TEST(BatchAnalysis, T_M3A_04d_published_master_combine_slot_is_a_candidate_resolved_from_the_store) {
+  const master_slots m = store_with_light_and_masters("t04d_store_slot", {master_role::dark}, 0);
+  auto store = sqlite_dag_store::open(m.project, open_intent::read_only);
+  memory_pool pool(64 * imp::MiB);
+  const batch_proposal p = analyze_batch(*store, {}, pool, never());
+  ASSERT_TRUE(p.excluded.empty()) << p.excluded.front().reason;
+  const group_proposal g = only_group(p);
+  ASSERT_EQ(g.outcome, group_outcome::ready);
+  const role_choice* c = choice_of(g, master_role::dark);
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->kind, choice_kind::only_compatible);
+  EXPECT_EQ(c->eligible, std::vector<std::string>{m.node_key.at(master_role::dark)});
+  EXPECT_EQ(must_report(g, master_role::dark).status, candidate_status::usable);
+  ASSERT_TRUE(g.analysis.has_value());
+  EXPECT_EQ(must(g.analysis).default_recipe.light, L::dark);
+
+  bool used = false;
+  for (const chain_recipe& r : g.recipes) {
+    if (r.light != L::dark) continue;
+    const calibration_selection sel = select_recipe(g, r);
+    for (const selected_candidate& cand : sel.candidates) {
+      if (cand.role != master_role::dark) continue;
+      used = true;
+      EXPECT_EQ(cand.node_key, std::optional<std::string>(m.node_key.at(master_role::dark)));
+      EXPECT_FALSE(cand.input.has_value());
+    }
+  }
+  EXPECT_TRUE(used) << "controllo positivo: una ricetta usa il master in slot";
+}
+
+TEST(BatchAnalysis, T_M3A_04d_slot_candidate_follows_the_slot_state_and_the_user_choice_between_slot_and_external_master) {
+  const master_slots m = store_with_light_and_masters("t04d_store_slot_vs_external", {master_role::dark}, 0);
+  auto store = sqlite_dag_store::open(m.project, open_intent::read_write);
+  memory_pool pool(64 * imp::MiB);
+  const fs::path ext = fresh("t04d_store_slot_vs_external_file") / "d.fits";
+  const auto res = import_batch(*store, {write_dark(ext, 60, 3)}, pool, never());
+  ASSERT_EQ(res.size(), 1u);
+  ASSERT_FALSE(res[0].stop.has_value()) << res[0].stop->what();
+  store->append_classifications({dark_master_by_user(res[0].input.id)});
+  const std::string& node = m.node_key.at(master_role::dark);
+  const batch_proposal ambiguous = analyze_batch(*store, {}, pool, never());
+  const group_proposal g = only_group(ambiguous);
+  EXPECT_EQ(g.outcome, group_outcome::candidate_choice_required);
+  const role_choice* c = choice_of(g, master_role::dark);
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->kind, choice_kind::required);
+  EXPECT_EQ(c->eligible.size(), 2u);
+  EXPECT_NE(std::find(c->eligible.begin(), c->eligible.end(), node), c->eligible.end());
+  const group_proposal chosen = only_group(analyze_batch(*store, {{master_role::dark, node}}, pool, never()));
+  ASSERT_EQ(chosen.outcome, group_outcome::ready);
+  EXPECT_EQ(must_choice(chosen, master_role::dark).chosen, std::optional<std::string>(node));
+}
+
+// Secondo slot `master.combine` di ruolo dark, con un nodo diverso da quello del fixture (altro numero di frame). Il nodo è
+// registrato e lo slot creato; il job gira solo se `run`.
+struct extra_dark_slot {
+  std::string slot;
+  std::string node_key;
+};
+
+master_recipe extra_dark_recipe(const fs::path& dir, std::size_t frames) {
+  mst::group g = mst::make_group(master_role::dark, 8, 8, frames);
+  for (mst::mframe& f : g.frames) f.v.assign(f.v.size(), 20.0);
+  master_recipe r = mst::recipe_of(g);
+  mst::write_frames(g, r, dir, "extra_dark_" + std::to_string(frames));
+  return r;
+}
+
+extra_dark_slot add_extra_dark_slot(sqlite_dag_store& store, memory_pool& pool, const fs::path& dir, bool run) {
+  const master_recipe r = extra_dark_recipe(dir, 4);
+  const node_spec node = make_master_node(r);
+  store.put_node(node);
+  store.create_slot("master_dark_extra", node.key());
+  if (run) {
+    EXPECT_EQ(mst::run_master_quiet(store, "master_dark_extra", r, pool).exit_code, 0);
+  }
+  return {"master_dark_extra", node.key()};
+}
+
+std::vector<std::string> dark_eligible(const sqlite_dag_store& store, memory_pool& pool) {
+  const group_proposal g = only_group(analyze_batch(store, {}, pool, never()));
+  const role_choice* c = choice_of(g, master_role::dark);
+  EXPECT_NE(c, nullptr);
+  return c ? c->eligible : std::vector<std::string>{};
+}
+
+std::vector<std::string> sorted_keys(std::vector<std::string> keys) {
+  std::sort(keys.begin(), keys.end());
+  return keys;
+}
+
+// T-M3A-04d (CL-06 b): uno slot `master.combine` il cui artefatto appartiene a un nodo che non è più il suo bersaglio (stale)
+// non è un candidato; il controllo positivo è lo stesso slot prima del cambio di bersaglio.
+TEST(BatchAnalysis, T_M3A_04d_stale_master_combine_slot_is_not_a_candidate) {
+  const master_slots m = store_with_light_and_masters("t04d_slot_stale", {master_role::dark}, 0);
+  auto store = sqlite_dag_store::open(m.project, open_intent::read_write);
+  memory_pool pool(64 * imp::MiB);
+  const fs::path dir = fresh("t04d_slot_stale_frames");
+  const extra_dark_slot extra = add_extra_dark_slot(*store, pool, dir, true);
+  const std::string& original = m.node_key.at(master_role::dark);
+  EXPECT_EQ(sorted_keys(dark_eligible(*store, pool)), sorted_keys({original, extra.node_key})) << "controllo positivo";
+
+  const master_recipe other = extra_dark_recipe(dir, 5);
+  const node_spec other_node = make_master_node(other);
+  store->put_node(other_node);
+  store->retarget_slot(extra.slot, other_node.key());
+  ASSERT_EQ(store->read_slot(extra.slot).state, freshness::stale);
+  EXPECT_EQ(dark_eligible(*store, pool), std::vector<std::string>{original});
+}
+
+// T-M3A-04d (CL-06 b): uno slot `master.combine` senza artefatto pubblicato non è un candidato; dopo il job lo diventa.
+TEST(BatchAnalysis, T_M3A_04d_master_combine_slot_without_artifact_is_not_a_candidate) {
+  const master_slots m = store_with_light_and_masters("t04d_slot_no_artifact", {master_role::dark}, 0);
+  auto store = sqlite_dag_store::open(m.project, open_intent::read_write);
+  memory_pool pool(64 * imp::MiB);
+  const fs::path dir = fresh("t04d_slot_no_artifact_frames");
+  const master_recipe r = extra_dark_recipe(dir, 4);
+  const node_spec node = make_master_node(r);
+  store->put_node(node);
+  store->create_slot("master_dark_extra", node.key());
+  ASSERT_FALSE(store->read_slot("master_dark_extra").artifact.has_value());
+  const std::string& original = m.node_key.at(master_role::dark);
+  EXPECT_EQ(dark_eligible(*store, pool), std::vector<std::string>{original});
+
+  ASSERT_EQ(mst::run_master_quiet(*store, "master_dark_extra", r, pool).exit_code, 0);
+  EXPECT_EQ(sorted_keys(dark_eligible(*store, pool)), sorted_keys({original, node.key()})) << "controllo positivo";
+}
+
+// T-M3A-04d (CL-06 b): uno slot `master.combine` escluso dalla ricetta (`detached`, undo oltre la sua creazione) non è un
+// candidato; il controllo positivo è lo stesso slot prima dell'undo.
+TEST(BatchAnalysis, T_M3A_04d_detached_master_combine_slot_is_not_a_candidate) {
+  const master_slots m = store_with_light_and_masters("t04d_slot_detached", {master_role::dark}, 0);
+  auto store = sqlite_dag_store::open(m.project, open_intent::read_write);
+  memory_pool pool(64 * imp::MiB);
+  const extra_dark_slot extra = add_extra_dark_slot(*store, pool, fresh("t04d_slot_detached_frames"), true);
+  const std::string& original = m.node_key.at(master_role::dark);
+  EXPECT_EQ(sorted_keys(dark_eligible(*store, pool)), sorted_keys({original, extra.node_key})) << "controllo positivo";
+
+  store->undo();
+  ASSERT_TRUE(store->get_slot(extra.slot)->detached);
+  EXPECT_EQ(dark_eligible(*store, pool), std::vector<std::string>{original});
+}
+
+std::uint64_t data_offset_of(const std::string& path) {
+  const fx::bytes raw = imp::read_file(path);
+  const std::string text(raw.begin(), raw.end());
+  const std::size_t end = text.find("END     ");
+  EXPECT_NE(end, std::string::npos);
+  return ((end + 80 + 2879) / 2880) * 2880;
+}
+
+void flip_sample_byte(const std::string& path) {
+  const std::uint64_t at = data_offset_of(path);
+  fs::permissions(path, fs::perms::owner_write, fs::perm_options::add);
+  std::fstream f(path, std::ios::in | std::ios::out | std::ios::binary);
+  f.seekg(static_cast<std::streamoff>(at));
+  char b = 0;
+  f.get(b);
+  f.seekp(static_cast<std::streamoff>(at));
+  f.put(static_cast<char>(b ^ 0x40));
+}
+
+// T-M3A-04f (CL-12): i campioni di un master in slot si leggono solo per il controllo termico di `flat.bias`, e solo per
+// il flat e il bias valutati. Prova: nei campioni del master flat pubblicato si altera un byte, l'intestazione e il digest
+// registrato restano; senza dichiarazioni termiche l'analisi non li tocca, con le dichiarazioni la lettura verificata ferma.
+TEST(BatchAnalysis, T_M3A_04f_slot_master_samples_are_read_only_for_the_thermal_check_and_are_verified_against_the_digest) {
+  const master_slots m = store_with_light_and_masters("t04f_store_lazy", {master_role::flat, master_role::bias}, 1124.0);
+  flip_sample_byte(sqlite_dag_store::open(m.project, open_intent::read_only)->artifact_path(m.image.at(master_role::flat).rel_path).string());
+  int probes = 0;
+  const fault_injector counter = [&](std::string_view point) {
+    if (point == "calib.analysis.samples") ++probes;
+    return 0;
+  };
+  memory_pool pool(64 * imp::MiB);
+  {  // senza dichiarazioni termiche: nessuna lettura dei campioni, il byte alterato non si vede
+    auto store = sqlite_dag_store::open(m.project, open_intent::read_only);
+    const batch_proposal p = analyze_batch(*store, {}, pool, never(), counter);
+    EXPECT_EQ(probes, 0);
+    EXPECT_EQ(only_group(p).outcome, group_outcome::ready);
+  }
+  {  // con le dichiarazioni termiche i campioni servono: la lettura è verificata contro il digest dell'artefatto
+    auto store = sqlite_dag_store::open(m.project, open_intent::read_write);
+    store->put_setting("batch.analysis_params", canonical_json(thermal_params()));
+    store.reset();
+    store = sqlite_dag_store::open(m.project, open_intent::read_only);
+    probes = 0;
+    try {
+      (void)analyze_batch(*store, {}, pool, never(), counter);
+      ADD_FAILURE() << "campioni alterati letti senza fermarsi";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(probes, 1) << "la lettura è quella del controllo termico";
+      EXPECT_EQ(e.category(), error_category::integrity) << e.what();
+      EXPECT_FALSE(e.context().empty()) << "lo stop porta la provenance";
+    }
+  }
+}
+
+// I campioni letti sono quelli dell'artefatto pubblicato: stessi metadati, livello del flat diverso, esito termico diverso.
+TEST(BatchAnalysis, T_M3A_04f_thermal_check_uses_the_samples_of_the_published_slot_masters) {
+  const auto thermal_of = [](const std::string& name, double flat_level, int& probes) {
+    const master_slots m = store_with_light_and_masters(name, {master_role::flat, master_role::bias}, flat_level, thermal_params());
+    auto store = sqlite_dag_store::open(m.project, open_intent::read_only);
+    memory_pool pool(64 * imp::MiB);
+    probes = 0;
+    const fault_injector counter = [&](std::string_view point) {
+      if (point == "calib.analysis.samples") ++probes;
+      return 0;
+    };
+    const group_proposal g = only_group(analyze_batch(*store, {}, pool, never(), counter));
+    EXPECT_EQ(g.outcome, group_outcome::ready);
+    EXPECT_TRUE(g.analysis.has_value());
+    return must(g.analysis).flat_thermal_within_budget;
+  };
+  int probes_in = 0, probes_out = 0;
+  // F - B = 1024: soglia 64 ADU dentro il budget. F - B = 40: 64 > 0,25 · 0,5 · 40, fuori budget.
+  EXPECT_TRUE(thermal_of("t04f_store_thermal_in", 1124.0, probes_in));
+  EXPECT_FALSE(thermal_of("t04f_store_thermal_out", 140.0, probes_out));
+  EXPECT_EQ(probes_in, 1);
+  EXPECT_EQ(probes_out, 1);
+}
+
+// Slot master il cui nodo non è nello store: stop di integrità con lo slot, nessun candidato silenziosamente scartato.
+TEST(BatchAnalysis, T_M3A_04f_master_slot_whose_node_is_missing_stops_with_slot_node_missing_and_the_slot_name) {
+  const master_slots m = store_with_light_and_masters("t04f_store_master_node_missing", {master_role::dark}, 0);
+  {
+    store_test::raw_db db(m.project);
+    ASSERT_EQ(db.exec("DROP TRIGGER nodes_immutable_delete"), SQLITE_OK);
+    ASSERT_EQ(db.exec("DELETE FROM nodes WHERE node_key = '" + m.node_key.at(master_role::dark) + "'"), SQLITE_OK);
+  }
+  auto store = sqlite_dag_store::open(m.project, open_intent::read_only);
+  memory_pool pool(64 * imp::MiB);
+  try {
+    (void)analyze_batch(*store, {}, pool, never());
+    ADD_FAILURE() << "slot master senza nodo accettato";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::integrity) << e.what();
+    EXPECT_EQ(e.code(), std::string("batch.slot_node_missing")) << e.what();
+    const std::map<std::string, std::string> ctx(e.context().begin(), e.context().end());
+    ASSERT_EQ(ctx.count("slot"), 1u);
+    EXPECT_EQ(ctx.at("slot"), master_slot_name(master_role::dark));
+  }
+}
+
 
 }  // namespace

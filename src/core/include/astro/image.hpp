@@ -16,7 +16,7 @@ namespace astro {
 enum class sample_type { f32, f64 };
 enum class pixel_unit { adu, electron, dimensionless };
 enum class linearity { linear, nonlinear };
-// Classe di linearita' di un'immagine: `unknown` e' un valore esplicito e non e' mai trattato come `linear` (ADR-03).
+// Classe di linearità di un'immagine: `unknown` è un valore esplicito e non è mai trattato come `linear` (ADR-03).
 enum class linearity_class { linear, nonlinear, unknown };
 enum class process_phase { raw, calibrated, prestacked };
 enum class cfa_pattern { rggb, bggr, grbg, gbrg };
@@ -136,7 +136,7 @@ struct coverage_plane {
   friend bool operator==(const coverage_plane&, const coverage_plane&) = default;
 };
 
-// `decoder`: valore del decoder RAW; `metadata_source.keyword` e' il nome del campo di LibRaw (ADR-03.b §b.1).
+// `decoder`: valore del decoder RAW; `metadata_source.keyword` è il nome del campo di LibRaw (ADR-03.b §b.1).
 enum class metadata_origin { header, declared, decoder };
 
 const char* to_string(metadata_origin origin) noexcept;
@@ -151,7 +151,7 @@ template <class T>
 struct metadata_value {
   T value;
   metadata_source source;
-  // L'origine e' provenienza (ADR-05), non contenuto: l'uguaglianza confronta i valori.
+  // L'origine è provenienza (ADR-05), non contenuto: l'uguaglianza confronta i valori.
   friend bool operator==(const metadata_value& a, const metadata_value& b) { return a.value == b.value; }
 };
 
@@ -170,12 +170,12 @@ struct frame_metadata {
   std::optional<metadata_value<std::int64_t>> roi_y;
   std::optional<metadata_value<std::string>> readout_mode;
   std::optional<metadata_value<std::string>> row_order;
-  // `other.timestamp` di LibRaw: fuso orario non dichiarato, non e' un istante UTC e non va in DATE-OBS (ADR-03.b §b.1).
+  // `other.timestamp` di LibRaw: fuso orario non dichiarato, non è un istante UTC e non va in DATE-OBS (ADR-03.b §b.1).
   std::optional<metadata_value<std::int64_t>> capture_time_libraw;
   friend bool operator==(const frame_metadata&, const frame_metadata&) = default;
 };
 
-// Un valore dichiarato dalla ricetta non sostituisce mai un valore diverso gia' presente.
+// Un valore dichiarato dalla ricetta non sostituisce mai un valore diverso già presente.
 template <class T>
 void declare_metadata(std::optional<metadata_value<T>>& field, const T& value,
                       const std::string& name) {
@@ -274,7 +274,7 @@ struct decoder_state {
   dng_route_result route;
   std::optional<dng_decoder_fields> dng;
   metadata_source source;
-  // `source` e' provenienza (origine e keyword): l'uguaglianza non la confronta.
+  // `source` è provenienza (origine e keyword): l'uguaglianza non la confronta.
   friend bool operator==(const decoder_state& a, const decoder_state& b) {
     const auto content = [](const decoder_state& s) {
       return std::tie(s.raw_width, s.raw_height, s.window, s.black, s.cfa_color_index, s.black_per_color,
@@ -328,7 +328,7 @@ struct image {
   sample_type type = sample_type::f32;
   std::optional<pixel_unit> unit;
   std::optional<linearity> lin;
-  // Origine di `lin` (header, dichiarata o decoder); vuota se `lin` e' assente.
+  // Origine di `lin` (header, dichiarata o decoder); vuota se `lin` è assente.
   origin_note lin_origin;
   // Fase di processo dichiarata (header `ASTRPHAS`, dichiarazione o decoder); assente = non dichiarata, mai indovinata.
   std::optional<metadata_value<process_phase>> phase;
@@ -378,7 +378,7 @@ struct image {
   }
 };
 
-// Contenuto scientifico: geometria, layout, tipo, unita', linearita', fase (valore, senza origine), cfa, decoder_state (senza
+// Contenuto scientifico: geometria, layout, tipo, unità, linearità, fase (valore, senza origine), cfa, decoder_state (senza
 // `source`), measure, campioni, maschera, varianza, coverage e valori dei metadati. Esclusi header_cards, uninterpreted_keywords, encoding e origine
 // dei metadati.
 bool equivalent_content(const image& a, const image& b);

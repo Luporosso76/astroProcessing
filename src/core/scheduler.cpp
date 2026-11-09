@@ -79,7 +79,7 @@ std::uint64_t job_peak(const job_plan& plan, std::uint64_t budget) {
   std::uint64_t tasks = 0, peak = 0;
   if (__builtin_mul_overflow(static_cast<std::uint64_t>(plan.worker_count), plan.per_task_bytes, &tasks) ||
       __builtin_add_overflow(plan.shared_bytes, tasks, &peak)) {
-    throw stop_error(error_category::budget, "sched.job_exceeds_budget", "il picco del job non e' rappresentabile",
+    throw stop_error(error_category::budget, "sched.job_exceeds_budget", "il picco del job non è rappresentabile",
                      {{"budget", std::to_string(budget)}});
   }
   return peak;
@@ -215,7 +215,7 @@ void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job
     const int err = ::pthread_setaffinity_np(::pthread_self(), sizeof(cpu_set_t), pin);
     if (err != 0) {
       try {
-        sqlint::throw_errno(error_category::io, "sched.cpu_set_apply", "affinita' dei worker non applicabile", err);
+        sqlint::throw_errno(error_category::io, "sched.cpu_set_apply", "affinità dei worker non applicabile", err);
       } catch (...) {
         st.fail(std::current_exception());
       }
@@ -250,7 +250,7 @@ void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job
         job_probe::notify("sched.task_done", task);
       }
       if (plan.checkpoint_every > 0 && !is_sha256_hex(digest)) {
-        invalid("sched.task_digest", "il digest del risultato parziale non e' SHA-256 esadecimale",
+        invalid("sched.task_digest", "il digest del risultato parziale non è SHA-256 esadecimale",
                 {{"task", std::to_string(index)}});
       }
       std::lock_guard lock(st.m);
@@ -268,7 +268,7 @@ void worker_loop(run_state& st, job_context& jc, reservation& job_res, const job
   }
 }
 
-// Ammissione sotto pressione (D11, D12): attende senza timeout finche' la PSI e' sotto soglia o arriva un annullamento.
+// Ammissione sotto pressione (D11, D12): attende senza timeout finché la PSI è sotto soglia o arriva un annullamento.
 // Conserva la prima lettura e quella dell'ammissione; le letture intermedie sopra soglia sono solo contate.
 class pressure_admission {
  public:
@@ -292,7 +292,7 @@ class pressure_admission {
     while (!sample_below()) sleep_one_poll();
   }
   // Un intervallo di campionamento, interrotto dall'annullamento: il controllo avviene almeno ogni 10 ms. Il tempo si
-  // conta a tratti di al piu' 10 ms sottratti da `poll` (sleep_for dorme almeno il tratto): nessuna scadenza assoluta,
+  // conta a tratti di al più 10 ms sottratti da `poll` (sleep_for dorme almeno il tratto): nessuna scadenza assoluta,
   // quindi nessun overflow anche con `poll` vicino al massimo configurabile.
   void sleep_one_poll() {
     constexpr std::chrono::milliseconds slice{10};
@@ -378,7 +378,7 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
     }
     for (const unsigned cpu : tuning_.cpu_set) {
       if (cpu >= CPU_SETSIZE || !CPU_ISSET(cpu, &allowed)) {
-        invalid("sched.cpu_set", "CPU fuori dall'affinita' del processo", {{"cpu", std::to_string(cpu)}});
+        invalid("sched.cpu_set", "CPU fuori dall'affinità del processo", {{"cpu", std::to_string(cpu)}});
       }
       CPU_SET(cpu, &worker_set);
     }
@@ -401,7 +401,7 @@ job_report job_scheduler::run(const job_plan& plan, const job_spec& spec, const 
   std::optional<checkpoint_record> resume;
   if (spec.resume) resume = load_resume(plan, spec);
 
-  // La pressione si campiona prima della coda del pool e di nuovo all'ammissione effettiva: se e' salita durante
+  // La pressione si campiona prima della coda del pool e di nuovo all'ammissione effettiva: se è salita durante
   // l'attesa della memoria, la prenotazione si restituisce e l'attesa riprende.
   std::optional<pressure_admission> pressure;
   if (tuning_.pressure) pressure.emplace(*tuning_.pressure, cancel);

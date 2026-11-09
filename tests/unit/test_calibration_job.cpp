@@ -80,7 +80,7 @@ std::map<std::string, artifact_record> by_role(const project& p) {
   return out;
 }
 
-// Un job fermato non pubblica output: l'unico artefatto del nodo e' la provenance dell'arresto.
+// Un job fermato non pubblica output: l'unico artefatto del nodo è la provenance dell'arresto.
 void expect_only_stop_provenance(const project& p) {
   const std::vector<artifact_record> all = p.store->artifacts_for(p.node.key());
   ASSERT_EQ(all.size(), 1u);
@@ -254,7 +254,7 @@ TEST(CalibJob, input_changed_before_the_first_read_stops_without_decoding) {
 }
 
 // Il file riletto deve avere la geometria del piano: un light corto pianificato e poi sostituito con quello atteso
-// non puo' lasciare righe non calcolate pubblicate come valide.
+// non può lasciare righe non calcolate pubblicate come valide.
 TEST(CalibJob, T_M2E_31_geometry_changed_after_planning_stops) {
   const disk_case c = make_case("t31", job_set());
   frame_def shorter = c.s.light;
@@ -435,7 +435,7 @@ TEST(CalibJob, T_M2C_11_the_four_inputs_are_untouched_by_the_whole_calibration_w
 TEST(CalibJob, T_FBK_01_failing_decoder_stops_without_alternative_path) {
   const disk_case c0 = make_case("fbk_decoder", job_set());
   disk_case c = c0;
-  // Header valido, data unit troncata: il digest e' quello del file effettivo, quindi la verifica passa e il decode fallisce.
+  // Header valido, data unit troncata: il digest è quello del file effettivo, quindi la verifica passa e il decode fallisce.
   fx::bytes broken = file_of(c.s.flat, c.s.w, c.s.h);
   broken.resize(broken.size() - 2880 - 100);
   write_bytes(c.dir / "flat.fits", broken);
@@ -595,7 +595,7 @@ TEST(CalibJob, T_M2R3_08_configured_queue_capacity_tile_and_workers_reach_the_sc
   EXPECT_EQ(seen->tile_rows, 5u);
   EXPECT_EQ(seen->worker_count, 2u);
   EXPECT_EQ(seen->shared_bytes, compute_plan_bounds(job_planner_input(c, 256 * MiB), cfg).shared_bytes);
-  // Il margine configurato e' nel piano: 1 MiB in piu' del default.
+  // Il margine configurato è nel piano: 1 MiB in più del default.
   EXPECT_EQ(seen->shared_bytes, compute_plan_bounds(job_planner_input(c, 256 * MiB), resource_config{}).shared_bytes + MiB);
 }
 
@@ -631,7 +631,7 @@ TEST(CalibJob, T_M2R3_08_defaults_and_origins_reach_the_provenance_and_the_outpu
   EXPECT_EQ(res.find("job_queue_capacity")->find("value")->as_integer(), 16);
   EXPECT_EQ(res.find("psi_threshold")->find("origin")->as_string(), resource_config{}.psi_threshold.origin);
   EXPECT_EQ(res.find("vram")->find("value")->type(), json::kind::null);
-  // L'uscita calibrata e' identica a quella del percorso senza pianificatore (T-M2E-16: indipendente da tile e worker).
+  // L'uscita calibrata è identica a quella del percorso senza pianificatore (T-M2E-16: indipendente da tile e worker).
   project q = make_project(c, "legacy");
   memory_pool pool2(256 * MiB);
   ASSERT_EQ(run_quiet(q, c, pool2).exit_code, 0);

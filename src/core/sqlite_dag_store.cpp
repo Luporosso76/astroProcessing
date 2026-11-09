@@ -206,7 +206,7 @@ void sqlite_dag_store::create_slot(const std::string& slot_name, const std::stri
   require_node_locked(target_node_key);
   statement exists(db_, "SELECT 1 FROM slots WHERE slot_name=?1");
   if (exists.bind(1, slot_name).step()) {
-    throw stop_error(error_category::invalid_input, "dag.duplicate_slot", "slot gia' esistente", {{"slot", slot_name}});
+    throw stop_error(error_category::invalid_input, "dag.duplicate_slot", "slot già esistente", {{"slot", slot_name}});
   }
   statement ins(db_, "INSERT INTO slots(slot_name, current_generation, target_node_key, artifact_id) VALUES(?1,0,?2,NULL)");
   ins.bind(1, slot_name).bind(2, target_node_key).run();
@@ -251,7 +251,7 @@ job_record sqlite_dag_store::start_job(const std::string& slot_name) {
   transaction tx(db_);
   const slot_record slot = require_slot_locked(slot_name);
   if (slot.detached) {
-    throw stop_error(error_category::invalid_input, "dag.slot_detached", "lo slot e' escluso dalla ricetta corrente",
+    throw stop_error(error_category::invalid_input, "dag.slot_detached", "lo slot è escluso dalla ricetta corrente",
                      {{"slot", slot_name}});
   }
   statement up(db_, "UPDATE slots SET current_generation=?2 WHERE slot_name=?1");
@@ -325,7 +325,7 @@ void sqlite_dag_store::set_publish_role(const std::string& slot_name, const std:
   transaction tx(db_);
   const slot_record slot = require_slot_locked(slot_name);
   if (slot.detached) {
-    throw stop_error(error_category::invalid_input, "dag.slot_detached", "lo slot e' escluso dalla ricetta corrente",
+    throw stop_error(error_category::invalid_input, "dag.slot_detached", "lo slot è escluso dalla ricetta corrente",
                      {{"slot", slot_name}});
   }
   statement cur(db_, "SELECT publish_role FROM slots WHERE slot_name=?1");
@@ -375,7 +375,7 @@ void sqlite_dag_store::publish(std::uint64_t job_id, std::uint64_t artifact_id) 
   const job_record job = job_from(js);
   const artifact_record artifact = artifact_from(as);
   if (job.state != job_state::running) {
-    throw stop_error(error_category::invalid_input, "dag.job_not_running", "il job non e' in esecuzione",
+    throw stop_error(error_category::invalid_input, "dag.job_not_running", "il job non è in esecuzione",
                      {{"job", std::to_string(job_id)}});
   }
   if (!artifact.present) {
@@ -390,7 +390,7 @@ void sqlite_dag_store::publish(std::uint64_t job_id, std::uint64_t artifact_id) 
   const slot_record slot = require_slot_locked(job.slot_name);
   if (slot.current_generation != job.generation) {
     throw stop_error(error_category::stale_generation, "dag.stale_publish",
-                     "la generazione dello slot e' cambiata durante il job",
+                     "la generazione dello slot è cambiata durante il job",
                      {{"slot", slot.slot_name},
                       {"generazione_job", std::to_string(job.generation)},
                       {"generazione_slot", std::to_string(slot.current_generation)}});
@@ -398,7 +398,7 @@ void sqlite_dag_store::publish(std::uint64_t job_id, std::uint64_t artifact_id) 
   statement role(db_, "SELECT publish_role FROM slots WHERE slot_name=?1");
   if (role.bind(1, slot.slot_name).step() && role.text(0) != artifact.output_role) {
     throw stop_error(error_category::invalid_input, "dag.artifact_role_mismatch",
-                     "il ruolo dell'artefatto non e' quello pubblicato dallo slot",
+                     "il ruolo dell'artefatto non è quello pubblicato dallo slot",
                      {{"slot", slot.slot_name}, {"ruolo_slot", role.text(0)}, {"ruolo_artefatto", artifact.output_role}});
   }
   statement up(db_, "UPDATE slots SET artifact_id=?2 WHERE slot_name=?1");
@@ -481,7 +481,7 @@ void sqlite_dag_store::write_setting(const std::string& key, const std::string& 
   }
   if (canonical_json(parse_json(value_canonical)) != value_canonical) {
     throw stop_error(error_category::invalid_input, "store.setting_not_canonical",
-                     "il valore non e' JSON canonico", {{"key", key}});
+                     "il valore non è JSON canonico", {{"key", key}});
   }
   std::lock_guard lock(mutex_);
   transaction tx(db_);
@@ -489,7 +489,7 @@ void sqlite_dag_store::write_setting(const std::string& key, const std::string& 
     statement present(db_, "SELECT 1 FROM settings WHERE key=?1");
     present.bind(1, key);
     if (present.step()) {
-      throw stop_error(error_category::invalid_input, "store.setting_exists", "impostazione gia' presente", {{"key", key}});
+      throw stop_error(error_category::invalid_input, "store.setting_exists", "impostazione già presente", {{"key", key}});
     }
   }
   statement st(db_, "INSERT INTO settings(key, value_canonical) VALUES(?1,?2) "
@@ -534,7 +534,7 @@ input_record sqlite_dag_store::add_input(input_record input) {
     throw_errno(error_category::io, "store.stat", "stat dell'originale fallita", errno, {{"path", input.path}});
   }
   if (!S_ISREG(st.st_mode)) {
-    throw stop_error(error_category::invalid_input, "store.bad_input", "l'originale non e' un file regolare", {{"path", input.path}});
+    throw stop_error(error_category::invalid_input, "store.bad_input", "l'originale non è un file regolare", {{"path", input.path}});
   }
   input.dev = static_cast<std::uint64_t>(st.st_dev);
   input.ino = static_cast<std::uint64_t>(st.st_ino);

@@ -16,7 +16,7 @@ namespace {
 constexpr unsigned mxcsr_daz = 1u << 6;
 constexpr unsigned mxcsr_ftz = 1u << 15;
 constexpr unsigned mxcsr_rc = 3u << 13;
-// Maschere delle sei eccezioni (IM, DM, ZM, OM, UM, PM, bit 7-12): tutte attive, cosi' nessuna operazione dei kernel,
+// Maschere delle sei eccezioni (IM, DM, ZM, OM, UM, PM, bit 7-12): tutte attive, così nessuna operazione dei kernel,
 // nemmeno sulle corsie scartate, genera un segnale.
 constexpr unsigned mxcsr_masks = 0x3fu << 7;
 
@@ -88,7 +88,7 @@ void require_fp_environment() {
   std::snprintf(hex, sizeof hex, "0x%x", csr);
   const unsigned rc = (csr & mxcsr_rc) >> 13;
   throw stop_error(error_category::numeric, "cpu.fp_mode",
-                   "ambiente in virgola mobile non ammesso: FZ, DAZ, arrotondamento diverso dal piu' vicino o eccezioni "
+                   "ambiente in virgola mobile non ammesso: FZ, DAZ, arrotondamento diverso dal più vicino o eccezioni "
                    "non mascherate",
                    {{"mxcsr", hex},
                     {"fz", (csr & mxcsr_ftz) ? "1" : "0"},

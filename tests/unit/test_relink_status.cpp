@@ -70,7 +70,7 @@ TEST(RelinkStatus, T_M3A_07a_moved_deleted_replaced_detected_project_untouched) 
   fs::create_directories(s.origs[1].path.parent_path() / "sub");
   fs::rename(s.origs[1].path, s.origs[1].path.parent_path() / "sub" / s.origs[1].path.filename());
   fs::remove(s.origs[2].path);
-  write_bytes(s.w.base / "sorella" / s.origs[2].path.filename(), s.origs[2].content);
+  write_new_file(s.w.base / "sorella" / s.origs[2].path.filename(), s.origs[2].content);
   replace_with_new_inode(s.origs[3].path, s.origs[3].content);
   const stat_of new_copy(s.origs[3].path);
   EXPECT_NE(new_copy.ino(), s.identity[3].second);

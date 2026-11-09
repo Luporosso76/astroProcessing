@@ -191,7 +191,7 @@ TEST(CalibBlocks, T_M2R3_01_dataset_eight_times_the_budget_is_bit_identical_to_t
     RecordProperty("pool_peak_bytes", std::to_string(pool.peak_reserved_bytes()));
     ASSERT_EQ(out.exit_code, 0) << (out.stop ? out.stop->what() : "");
     ASSERT_TRUE(seen);
-    ASSERT_TRUE(seen->spill) << "residenza a blocchi: lo spill e' dichiarato nel piano";
+    ASSERT_TRUE(seen->spill) << "residenza a blocchi: lo spill è dichiarato nel piano";
     EXPECT_EQ(seen->tile_rows, tile);
     EXPECT_EQ(seen->shared_bytes, f.blocks_shared);
     EXPECT_EQ(seen->per_task_bytes, f.blocks_per_task);
@@ -510,7 +510,7 @@ TEST(CalibBlocks, T_M2R3_05_enospc_on_scratch_checkpoint_and_artifacts_stops_io_
     EXPECT_EQ(m2d::entry_count(big.dir / "scratch"), 0u);
     EXPECT_EQ(tight.reserved_bytes(), 0u);
   }
-  {  // checkpoint: resta lo staging nominato, nessun checkpoint ne' temporaneo
+  {  // checkpoint: resta lo staging nominato, nessun checkpoint né temporaneo
     project p = make_project(c, "ckpt");
     memory_pool pool(big_budget);
     calibration_job_options o = options(true, "ckpt");
@@ -722,7 +722,7 @@ TEST(CalibBlocks, T_M2R3_07_job_waits_under_pressure_and_records_the_samples_in_
   std::thread job([&] { result.emplace(run_calibration_job(*p.store, "cal", c.recipe, pool, o, never_cancelled())); });
   const bool waited = wait_until([&] { return gate->waiting_jobs.load() == 1; });
   EXPECT_TRUE(waited);
-  EXPECT_EQ(pool.reserved_bytes(), 0u) << "sopra soglia il job non e' ammesso";
+  EXPECT_EQ(pool.reserved_bytes(), 0u) << "sopra soglia il job non è ammesso";
   psi("10.00");
   std::this_thread::sleep_for(std::chrono::milliseconds(30));
   EXPECT_EQ(gate->waiting_jobs.load(), 1u) << "soglia inclusa";

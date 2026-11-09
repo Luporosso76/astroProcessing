@@ -52,7 +52,7 @@ json descriptor_json(const std::optional<master_descriptor>& d) {
   o.set("combine_method", text(d->combine, [](combine_method m) {
           return m == combine_method::mean ? "mean" : m == combine_method::median ? "median" : "other";
         }));
-  // Campi dei master del prodotto: nei parametri solo se presenti, cosi' le chiavi dei nodi esistenti non cambiano.
+  // Campi dei master del prodotto: nei parametri solo se presenti, così le chiavi dei nodi esistenti non cambiano.
   if (d->rejection) o.set("rejection", json::string(*d->rejection == master_rejection::none ? "none" : "sigma_clip"));
   if (d->estimator) o.set("variance_estimator", json::string("empirical"));
   return o;
@@ -113,7 +113,7 @@ node_spec make_calibration_node(const calibration_recipe& recipe) {
   inputs.set("flat", input_params(recipe.flat));
   inputs.set("dark_flat", input_params(recipe.dark_flat));
   params.set("inputs", std::move(inputs));
-  // Un master del prodotto entra dal suo nodo (ADR-16, aggiunte di R2): la calibrazione e' sua discendente nel DAG.
+  // Un master del prodotto entra dal suo nodo (ADR-16, aggiunte di R2): la calibrazione è sua discendente nel DAG.
   const auto input_of = [](const char* name, const calibration_input_spec& s) {
     return s.master_node_key ? node_input::from_node(name, *s.master_node_key) : node_input::from_file(name, s.digest);
   };
@@ -130,7 +130,7 @@ node_spec make_calibration_node(const calibration_recipe& recipe) {
 namespace {
 
 constexpr std::uint64_t report_margin_bytes = std::uint64_t{1} << 20;
-// Header di uscita: al piu' tre HDU con max_header_cards card ciascuno, piu' il riempimento dei blocchi.
+// Header di uscita: al più tre HDU con max_header_cards card ciascuno, più il riempimento dei blocchi.
 constexpr std::uint64_t output_header_bound =
     3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
 
@@ -172,7 +172,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
       }
       if (!published) {
         fail(error_category::integrity, "calib.master_artifact_mismatch",
-             "il file dell'ingresso non e' un artefatto del nodo del master",
+             "il file dell'ingresso non è un artefatto del nodo del master",
              {{"input", names[i]}, {"nodo", *s.master_node_key}, {"sha256", s.digest.sha256}});
       }
     }
@@ -188,7 +188,7 @@ job_outcome run_calibration_job(sqlite_dag_store& store, const std::string& slot
     for (std::size_t i = 0; i < specs.size(); ++i) {
       const fits_input& input = opened[i].emplace(open_fits_input(specs[i]->path));
       largest_input = std::max(largest_input, input.size_bytes());
-      // Fase e linearita' dai soli header e dalla ricetta, prima di ogni lettura di campioni (ADR-03, R1).
+      // Fase e linearità dai soli header e dalla ricetta, prima di ogni lettura di campioni (ADR-03, R1).
       const header_peek peek = peek_header(input, specs[i]->read_options);
       require_calibration_phase(names[i], peek.phase);
       require_calibration_linearity(names[i], peek.lin, specs[i]->declared_fields.lin);

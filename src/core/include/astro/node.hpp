@@ -36,7 +36,7 @@ class node_input {
   std::string ref_;
 };
 
-// Nodo immutabile: la chiave e' calcolata alla costruzione da tutti i campi del contratto ADR-05.
+// Nodo immutabile: la chiave è calcolata alla costruzione da tutti i campi del contratto ADR-05.
 class node_spec {
  public:
   // params deve essere un oggetto. Nome operatore o backend vuoti, nomi di ingresso vuoti o duplicati:
@@ -74,7 +74,7 @@ class node_spec {
   std::string key_;
 };
 
-// Valori dichiarati come oggetto JSON canonico dei parametri; un valore con origine `header` e' un errore
+// Valori dichiarati come oggetto JSON canonico dei parametri; un valore con origine `header` è un errore
 // (invalid_input dag.metadata_not_declared).
 json declared_metadata_json(const frame_metadata& declared);
 
@@ -84,7 +84,7 @@ node_spec make_fits_decode_node(const content_digest& input, const fits_read_opt
                                 const frame_metadata& declared, sample_type precision, std::string backend);
 
 // Inverso di node_spec::to_json(): ricostruisce il nodo da un documento con esattamente i campi del contratto.
-// Documento malformato: invalid_input dag.bad_spec. La chiave non e' letta dal documento: la ricalcola il chiamante.
+// Documento malformato: invalid_input dag.bad_spec. La chiave non è letta dal documento: la ricalcola il chiamante.
 node_spec node_from_json(const json& doc);
 
 struct recipe_input {

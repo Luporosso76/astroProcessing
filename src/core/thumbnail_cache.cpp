@@ -18,7 +18,7 @@ namespace astro {
 
 using namespace sqlint;
 
-static_assert(std::endian::native == std::endian::little, "il formato delle voci di cache e' little-endian");
+static_assert(std::endian::native == std::endian::little, "il formato delle voci di cache è little-endian");
 
 namespace {
 
@@ -114,34 +114,34 @@ struct thumbnail_cache::impl {
       throw_errno(error_category::io, "cache.stat", "fstat della voce fallita", errno, {{"voce", name}});
     }
     if (S_ISLNK(st.st_mode)) {
-      throw stop_error(error_category::security, "cache.symlink", "la voce e' un symlink", {{"voce", name}});
+      throw stop_error(error_category::security, "cache.symlink", "la voce è un symlink", {{"voce", name}});
     }
     if (!S_ISREG(st.st_mode)) {
-      throw stop_error(error_category::security, "cache.not_regular", "la voce non e' un file regolare", {{"voce", name}});
+      throw stop_error(error_category::security, "cache.not_regular", "la voce non è un file regolare", {{"voce", name}});
     }
     if (st.st_nlink != 1) {
-      throw stop_error(error_category::security, "cache.hardlink", "la voce ha piu' di un nome",
+      throw stop_error(error_category::security, "cache.hardlink", "la voce ha più di un nome",
                        {{"voce", name}, {"link", std::to_string(st.st_nlink)}});
     }
     return st;
   }
 
-  // Prenota `factor` volte la dimensione della voce (buffer letto, piu' l'anteprima analizzata quando factor = 2).
+  // Prenota `factor` volte la dimensione della voce (buffer letto, più l'anteprima analizzata quando factor = 2).
   opened_entry read_entry(const std::string& name, io_memory memory, std::uint64_t factor) const {
     (void)check(name);
     opened_entry e;
     unique_fd fd(::openat(dir.get(), name.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
     if (!fd) {
-      if (errno == ELOOP) throw stop_error(error_category::security, "cache.symlink", "la voce e' un symlink", {{"voce", name}});
+      if (errno == ELOOP) throw stop_error(error_category::security, "cache.symlink", "la voce è un symlink", {{"voce", name}});
       throw_errno(error_category::io, "cache.open", "apertura della voce fallita", errno, {{"voce", name}});
     }
     struct stat st {};
     if (::fstat(fd.get(), &st) != 0) throw_errno(error_category::io, "cache.stat", "fstat della voce fallita", errno, {{"voce", name}});
     if (!S_ISREG(st.st_mode) || st.st_nlink != 1) {
       throw stop_error(error_category::security, st.st_nlink != 1 ? "cache.hardlink" : "cache.not_regular",
-                       "la voce non e' un file regolare con un solo nome", {{"voce", name}});
+                       "la voce non è un file regolare con un solo nome", {{"voce", name}});
     }
-    // La prenotazione e il limite di lettura sono la dimensione dello stesso fd: una crescita successiva e' uno stop.
+    // La prenotazione e il limite di lettura sono la dimensione dello stesso fd: una crescita successiva è uno stop.
     const auto size = static_cast<std::uint64_t>(st.st_size);
     if (size > options.quota_bytes) {
       throw stop_error(error_category::budget, "cache.quota_exceeded", "la voce supera la quota della cache",
@@ -163,7 +163,7 @@ struct thumbnail_cache::impl {
     return out;
   }
 
-  // Somma delle dimensioni delle voci, escluse `skip`. Una voce non regolare o con piu' nomi e' security.
+  // Somma delle dimensioni delle voci, escluse `skip`. Una voce non regolare o con più nomi è security.
   std::uint64_t total_size(const std::set<std::string>& skip) const {
     std::uint64_t total = 0;
     for (const std::string& n : read_directory(dir.get(), "cache.readdir", &options.fault)) {
@@ -198,7 +198,7 @@ struct thumbnail_cache::impl {
 thumbnail_cache::thumbnail_cache(const std::filesystem::path& project_root, const cache_options& options)
     : impl_(std::make_unique<impl>()) {
   if (options.quota_bytes == 0) {
-    throw stop_error(error_category::invalid_input, "cache.quota", "la quota della cache e' obbligatoria e positiva");
+    throw stop_error(error_category::invalid_input, "cache.quota", "la quota della cache è obbligatoria e positiva");
   }
   impl_->options = options;
   unique_fd root(::open(project_root.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));

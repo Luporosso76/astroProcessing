@@ -69,9 +69,9 @@ manual_budget parse_manual_budget(std::string_view text);
 std::string to_string(const manual_budget& budget);
 
 // Errori: io budget.meminfo / budget.cgroup_read; budget budget.cgroup_over_limit; invalid_input budget.cgroup_parse /
-// budget.psi_parse. Il cgroup effettivo e' il livello, dal proprio verso la radice, con meno margine.
+// budget.psi_parse. Il cgroup effettivo è il livello, dal proprio verso la radice, con meno margine.
 budget_snapshot compute_automatic_budget(const budget_sources& sources = {}, const budget_tuning& tuning = {});
-// Come sopra, piu': metadata_missing budget.no_cgroup_limit; invalid_input budget.out_of_range (zero o oltre mem_total).
+// Come sopra, più: metadata_missing budget.no_cgroup_limit; invalid_input budget.out_of_range (zero o oltre mem_total).
 budget_snapshot compute_manual_budget(const manual_budget& manual, const budget_sources& sources = {});
 
 json budget_json(const budget_snapshot& snapshot);
@@ -83,7 +83,7 @@ std::optional<double> read_memory_pressure(const budget_sources& sources = {});
 constexpr const char* manual_budget_setting_key = "budget.manual";
 // Convalida prima di scrivere in `settings` (JSON canonico).
 void save_manual_budget(sqlite_dag_store& store, const manual_budget& budget);
-// Rivalida a ogni lettura; `nullopt` se non e' mai stato salvato. Valore illeggibile: invalid_input
+// Rivalida a ogni lettura; `nullopt` se non è mai stato salvato. Valore illeggibile: invalid_input
 // budget.setting_malformed o gli errori della grammatica.
 std::optional<manual_budget> load_manual_budget(const sqlite_dag_store& store);
 

@@ -1,4 +1,4 @@
-// I kill simulano la morte del processo (SIGKILL); non provano la durabilita' contro perdita di corrente.
+// I kill simulano la morte del processo (SIGKILL); non provano la durabilità contro perdita di corrente.
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -392,7 +392,7 @@ TEST(Review, B5_undo_detaches_slots_created_after_the_snapshot_and_redo_restores
   const slot_record back = *store->get_slot("sb");
   EXPECT_FALSE(back.detached);
   EXPECT_EQ(back.target_node_key, keys_of(diamond(2).resolve()).at("b"));
-  // il risultato stale del job rifiutato resta in cache sotto il suo nodo: e' l'artefatto piu' recente
+  // il risultato stale del job rifiutato resta in cache sotto il suo nodo: è l'artefatto più recente
   EXPECT_EQ(back.artifact_id, store->artifacts_for(back.target_node_key).back().id);
   EXPECT_GT(*back.artifact_id, b_art.id);
   EXPECT_EQ(store->read_slot("sb").state, freshness::current);
@@ -663,7 +663,7 @@ TEST(Review, P1_stale_generation_during_publication_leaves_one_failed_provenance
 }
 
 // Passa anche senza la correzione per run_job_files; fallisce per il percorso run_job (provenance solo in memoria),
-// che ora e' vietato su store durevole.
+// che ora è vietato su store durevole.
 TEST(Review, P2_completed_and_stopped_jobs_on_a_durable_store_persist_the_returned_provenance) {
   fs::path dir;
   auto store = make_project("rvp2", &dir);
@@ -737,7 +737,7 @@ std::vector<std::string> provenance_texts(const sqlite_dag_store& reopened, cons
   return texts;
 }
 
-// Senza la correzione la provenance usava l'errore successivo (`store.injected_fault`) invece della causa gia'
+// Senza la correzione la provenance usava l'errore successivo (`store.injected_fault`) invece della causa già
 // registrata nel job (`dag.stale_publish`), discordando dallo stato durevole.
 TEST(Review, P5_error_after_a_stale_commit_does_not_replace_the_persisted_cause) {
   fs::path dir;
@@ -819,7 +819,7 @@ TEST(Review, P6_foreign_exception_persists_a_coherent_provenance_and_propagates_
     EXPECT_NE(texts[0].find("dag.stale_publish"), std::string::npos);
     EXPECT_EQ(texts[0].find("unexpected_exception"), std::string::npos);
   }
-  {  // provenance non scrivibile: l'eccezione originale non e' mascherata
+  {  // provenance non scrivibile: l'eccezione originale non è mascherata
     fs::path dir;
     auto store = make_project("rvp6c", &dir);
     store->apply_recipe(diamond(2).resolve(), {{"s", "a"}});

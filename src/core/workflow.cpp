@@ -53,7 +53,7 @@ std::string sha256_of(const std::string& text) {
 }
 
 // Arresto del workflow prima di ogni job (OB-03): registra `original` e lo rilancia invariato. Il record
-// e' l'impostazione `<workflow_stop_prefix><sha256 della definizione data>.<esecuzione>`, con l'esecuzione la prima
+// è l'impostazione `<workflow_stop_prefix><sha256 della definizione data>.<esecuzione>`, con l'esecuzione la prima
 // libera da 1, e contiene solo stringhe e interi. Registrazione fallita: diagnosi su stderr e arresto originale con
 // `registrazione_arresto`, mai l'errore secondario al suo posto.
 [[noreturn]] void stop_workflow(sqlite_dag_store& store, const workflow& wf, const char* operation,
@@ -91,7 +91,7 @@ std::string sha256_of(const std::string& text) {
   std::rethrow_exception(original);
 }
 
-// Target attuale dello slot del passo; nullopt se lo slot manca o e' staccato.
+// Target attuale dello slot del passo; nullopt se lo slot manca o è staccato.
 std::optional<std::string> target_of(const sqlite_dag_store& store, const workflow_step& step) {
   const std::optional<slot_record> slot = store.get_slot(step.slot_name);
   if (!slot || slot->detached) return std::nullopt;
@@ -145,7 +145,7 @@ void start_run(sqlite_dag_store& store, const workflow& wf) {
   for (const auto& s : wf.steps) {
     const std::optional<std::string> target = target_of(store, s);
     if (!target || *target != s.node.key()) {
-      throw stop_error(error_category::invalid_input, "workflow.slot_target", "il target dello slot non e' il nodo del passo",
+      throw stop_error(error_category::invalid_input, "workflow.slot_target", "il target dello slot non è il nodo del passo",
                        {{"slot", s.slot_name}, {"nodo_passo", s.node.key()}, {"target", target.value_or("")}});
     }
   }
@@ -168,13 +168,13 @@ resume_start plan_resume(sqlite_dag_store& store, const workflow& wf) {
   const std::string given = definition_canonical(wf);
   if (*stored != given) {
     throw stop_error(error_category::resume_mismatch, "resume.recipe",
-                     "la definizione del workflow differisce da quella registrata: non e' una prosecuzione",
+                     "la definizione del workflow differisce da quella registrata: non è una prosecuzione",
                      {{"workflow", wf.name}, {"registrata", *stored}, {"data", given}});
   }
   for (const auto& s : wf.steps) {
     const std::optional<std::string> target = target_of(store, s);
     if (!target || *target != s.node.key()) {
-      throw stop_error(error_category::resume_mismatch, "resume.recipe", "il target dello slot non e' il nodo del passo",
+      throw stop_error(error_category::resume_mismatch, "resume.recipe", "il target dello slot non è il nodo del passo",
                        {{"slot", s.slot_name}, {"atteso", s.node.key()}, {"trovato", target.value_or("")}});
     }
   }
@@ -187,7 +187,7 @@ resume_start plan_resume(sqlite_dag_store& store, const workflow& wf) {
       phase = store.check_phase(s.slot_name);
     } catch (const stop_error& e) {
       if (e.code() != "store.artifact_missing") throw;
-      sqlint::rethrow_as(e, error_category::io, "resume.artifact_missing", "un output della fase e' sparito dopo la recovery");
+      sqlint::rethrow_as(e, error_category::io, "resume.artifact_missing", "un output della fase è sparito dopo la recovery");
     }
     if (!phase) continue;
     for (const phase_defect& d : phase->defects) {

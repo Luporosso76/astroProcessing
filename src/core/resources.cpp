@@ -89,9 +89,9 @@ void validate_resource_config(const resource_config& c) {
   }
   if (c.worker_count && *c.worker_count < 1) invalid("resources.worker_count", "worker_count deve essere >= 1");
   if (c.tile_rows && *c.tile_rows < 1) invalid("resources.tile_rows", "tile_rows deve essere >= 1");
-  if (c.job_queue_capacity.value < 1) invalid("resources.job_queue_capacity", "capacita' >= 1");
+  if (c.job_queue_capacity.value < 1) invalid("resources.job_queue_capacity", "capacità >= 1");
   check_origin(c.job_queue_capacity.origin, "job_queue_capacity");
-  if (c.task_queue_capacity.value < 1) invalid("resources.task_queue_capacity", "capacita' >= 1");
+  if (c.task_queue_capacity.value < 1) invalid("resources.task_queue_capacity", "capacità >= 1");
   check_origin(c.task_queue_capacity.origin, "task_queue_capacity");
   if (c.report_margin_bytes.value < 1) invalid("resources.report_margin_bytes", "margine >= 1");
   check_origin(c.report_margin_bytes.origin, "report_margin_bytes");
@@ -118,7 +118,7 @@ void validate_cpu_set(const resource_config& c, const affinity_fn& affinity) {
   }
   for (const unsigned cpu : *c.cpu_set) {
     if (cpu >= CPU_SETSIZE || !CPU_ISSET(cpu, &allowed)) {
-      invalid("sched.cpu_set", "CPU fuori dall'affinita' del processo", {{"cpu", std::to_string(cpu)}});
+      invalid("sched.cpu_set", "CPU fuori dall'affinità del processo", {{"cpu", std::to_string(cpu)}});
     }
   }
   if (c.worker_count && *c.worker_count > c.cpu_set->size()) {
@@ -345,7 +345,7 @@ void check_planner_input(const planner_input& in, const resource_config& config)
 
 // ---- modello del master (ADR-06, estensione R2.r)
 
-// Una grandezza assente non e' rappresentabile in 64 bit.
+// Una grandezza assente non è rappresentabile in 64 bit.
 struct master_model {
   std::optional<std::uint64_t> shared, task_t0, task_min, minimum, working_set;
   std::uint32_t t0 = 1;
@@ -384,7 +384,7 @@ std::string bytes_text(const std::optional<std::uint64_t>& v) {
 master_model make_master_model(const planner_input& in, const resource_config& config) {
   if (in.checkpoint || in.block_raw_bytes_per_row != 0 || in.block_band_bytes_per_row != 0 || in.block_regions != 0 ||
       in.normalization_channels != 1) {
-    invalid("resources.planner_input", "il modello del master non usa checkpoint ne' residenza a blocchi");
+    invalid("resources.planner_input", "il modello del master non usa checkpoint né residenza a blocchi");
   }
   if (in.out_sample_bytes > 16) invalid("resources.planner_input", "byte per campione di uscita oltre 16");
   master_model m;
@@ -414,7 +414,7 @@ resource_plan plan_master(const planner_input& in, const resource_config& config
   if (config.tile_rows) {
     tile = *config.tile_rows;
   } else {
-    // Il tile piu' grande <= t0 per cui k task entrano: 16 n + t W (10 n + 8) <= floor(avail / k).
+    // Il tile più grande <= t0 per cui k task entrano: 16 n + t W (10 n + 8) <= floor(avail / k).
     const u128 per_worker = avail / k, fixed = 16 * static_cast<u128>(in.frame_count);
     const u128 per_row = static_cast<u128>(in.width) * (10 * static_cast<u128>(in.frame_count) + 8);
     const u128 fit = per_worker >= fixed ? (per_worker - fixed) / per_row : 0;
@@ -424,7 +424,7 @@ resource_plan plan_master(const planner_input& in, const resource_config& config
       master_exceeds(in, m, shared_plus(m.shared, k, one), one);
     }
   }
-  // tile <= t0: task(tile) <= task(t0), gia' rappresentabile nel modello; il controllo resta come guardia.
+  // tile <= t0: task(tile) <= task(t0), già rappresentabile nel modello; il controllo resta come guardia.
   const std::optional<std::uint64_t> task = master_task_bytes(in.frame_count, tile, in.width);
   if (!task) master_exceeds(in, m, std::nullopt, task);
   resource_plan p;

@@ -23,8 +23,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   set_tests_properties(T-U12-12.system_licenses PROPERTIES LABELS fast TIMEOUT 300)
 endif()
 
-# Death test e verified() (obblighi 5 e 6): il target non e' in `all`; lo costruisce il test T-U12-05.build_verify_test, cosi' un errore
-# di compilazione e' un test rosso e non blocca la build del resto.
+# Death test e verified() (obblighi 5 e 6): il target non è in `all`; lo costruisce il test T-U12-05.build_verify_test, così un errore
+# di compilazione è un test rosso e non blocca la build del resto.
 add_executable(test_third_party_verify EXCLUDE_FROM_ALL test_third_party_verify.cpp ${PROJECT_SOURCE_DIR}/tests/unit/main_utc0.cpp)
 target_link_libraries(test_third_party_verify PRIVATE astrocore GTest::gtest)
 target_include_directories(test_third_party_verify PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/tests/unit ${PROJECT_SOURCE_DIR}/src/core)

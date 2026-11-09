@@ -51,7 +51,7 @@ bool is_inside(const fs::path& path, const fs::path& base) {
   return !rel.empty() && *rel.begin() != "..";
 }
 
-// Il controllo opera sul fd del padre gia' aperto: la stessa directory serve poi a mkdirat.
+// Il controllo opera sul fd del padre già aperto: la stessa directory serve poi a mkdirat.
 void check_destination(int parent_fd, const std::string& name, const fs::path& dir, int root_fd,
                        const std::vector<input_record>& inputs) {
   const fs::path target = path_of_fd(parent_fd) / name;
@@ -70,11 +70,11 @@ void check_destination(int parent_fd, const std::string& name, const fs::path& d
   if (::fstatat(parent_fd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0) {
     for (const auto& in : inputs) {
       if (in.dev == static_cast<std::uint64_t>(st.st_dev) && in.ino == static_cast<std::uint64_t>(st.st_ino)) {
-        throw stop_error(error_category::security, "fs.original_inode", "la destinazione e' lo stesso inode di un originale",
+        throw stop_error(error_category::security, "fs.original_inode", "la destinazione è lo stesso inode di un originale",
                          {{"destinazione", dir.string()}, {"originale", in.path}});
       }
     }
-    throw stop_error(error_category::security, "export.target_exists", "la destinazione esiste gia'",
+    throw stop_error(error_category::security, "export.target_exists", "la destinazione esiste già",
                      {{"destinazione", dir.string()}});
   }
   if (errno != ENOENT) throw_errno(error_category::io, "export.write", "stat della destinazione fallita", errno);
@@ -115,7 +115,7 @@ json versions_object() {
   return o;
 }
 
-// Report di export (ADR-04, estensione R4): ogni file e' la copia byte per byte dell'artefatto, nessun metadato perso.
+// Report di export (ADR-04, estensione R4): ogni file è la copia byte per byte dell'artefatto, nessun metadato perso.
 std::string report_text(const std::vector<export_item>& items) {
   json files = json::array();
   for (const auto& it : items) {
@@ -187,7 +187,7 @@ void write_export_file(int dirfd, const std::string& prefix, const std::string& 
   }
 }
 
-// Copia in streaming l'artefatto nel bundle; il digest del record e' verificato mentre si scrive.
+// Copia in streaming l'artefatto nel bundle; il digest del record è verificato mentre si scrive.
 void copy_artifact(int artifacts_fd, int out_fd, const export_item& item, const inode_set& originals,
                    const fault_injector& injector) {
   unique_fd src(::openat(artifacts_fd, item.artifact.rel_path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY));
@@ -250,7 +250,7 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
   for (const auto& name : unique_names) {
     const slot_view view = read_slot(name);
     if (view.state != freshness::current) {
-      throw stop_error(error_category::stale_generation, "export.not_current", "lo slot non e' current",
+      throw stop_error(error_category::stale_generation, "export.not_current", "lo slot non è current",
                        {{"slot", name}, {"stato", view.state == freshness::stale ? "stale" : "missing"}});
     }
     export_item item{name, *view.artifact, name + view.artifact->rel_path.substr(64)};
@@ -283,7 +283,7 @@ void sqlite_dag_store::export_slots(const fs::path& dir, const std::vector<std::
   }
   if (::mkdirat(parent_fd.get(), leaf.c_str(), 0755) != 0) {
     if (errno == EEXIST) {
-      throw stop_error(error_category::security, "export.target_exists", "la destinazione esiste gia'", {{"destinazione", dir.string()}});
+      throw stop_error(error_category::security, "export.target_exists", "la destinazione esiste già", {{"destinazione", dir.string()}});
     }
     throw_errno(error_category::io, "export.write", "mkdir della destinazione fallita", errno, {{"destinazione", dir.string()}});
   }

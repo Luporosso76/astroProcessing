@@ -120,20 +120,20 @@ TEST(Relink, T_M3A_08a_accepted_relinks_update_only_position_and_append_history)
   // Stati precedenti (07a): 1, raw e 6 spostati o cancellati; 4 sostituito con inode nuovo; 5 presente.
   const fs::path f1_new = w.base / "nuovo" / "f1.fits";
   const fs::path raw_new = w.base / "nuovo" / "r.dng";
-  write_bytes(f1_new, f1.content);
-  write_bytes(raw_new, raw.content);
+  write_new_file(f1_new, f1.content);
+  write_new_file(raw_new, raw.content);
   fs::remove(f1.path);
   fs::remove(raw.path);
   replace_with_new_inode(f4.path, f4.content);
   const fs::path f5_copy = w.base / "copie" / "f5.fits";
-  write_bytes(f5_copy, f5.content);
+  write_new_file(f5_copy, f5.content);
   // Percorso con symlink seguito da `..`: base/a/link -> base/b/sub; base/b/f6.fits ha il contenuto di f6; base/a/f6.fits è
   // un altro file.
   fs::create_directories(w.base / "b" / "sub");
   fs::create_directories(w.base / "a");
   fs::create_symlink(w.base / "b" / "sub", w.base / "a" / "link");
-  write_bytes(w.base / "b" / "f6.fits", f6.content);
-  write_bytes(w.base / "a" / "f6.fits", light_bytes(9));
+  write_new_file(w.base / "b" / "f6.fits", f6.content);
+  write_new_file(w.base / "a" / "f6.fits", light_bytes(9));
   const std::string dotdot = (w.base / "a" / "link" / ".." / "f6.fits").string();
   fs::remove(f6.path);
   ASSERT_NE(stat_of(dotdot).ino(), stat_of(w.base / "a" / "f6.fits").ino());
@@ -190,7 +190,7 @@ TEST(Relink, T_M3A_08a_accepted_relinks_update_only_position_and_append_history)
 
   // Seconda revisione: l'input 1 si ricollega a un'altra copia; la storia aggiunge la riga 2 con il percorso della 1.
   const fs::path f1_again = w.base / "ancora" / "f1.fits";
-  write_bytes(f1_again, f1.content);
+  write_new_file(f1_again, f1.content);
   const stat_of before(f1_new);
   const outcome again = attempt(*store, r1.id, f1_again.string(), attempt_options{{f1_again, f1_new}, {}, default_work, no_cancel(), {}, nullptr, {}});
   ASSERT_FALSE(again.stop.has_value()) << (again.stop ? again.stop->what() : "");
@@ -256,20 +256,20 @@ TEST(Relink, T_M3A_08b_rejections_leave_everything_unchanged) {
   bytes flipped = x.content;
   flipped[3003] ^= 0x01;
   const fs::path c_flip = w.base / "c" / "flip.fits";
-  write_bytes(c_flip, flipped);
+  write_new_file(c_flip, flipped);
   const outcome digest_out = expect_rejected("digest diverso", c_flip.string(), error_category::integrity, "input.digest_mismatch", {{c_flip}, {}, default_work, no_cancel(), {}, nullptr, {}});
   EXPECT_FALSE(digest_out.flags.empty()) << "il candidato è stato letto: flag di apertura osservati";
 
   bytes longer = x.content;
   longer.push_back(0);
   const fs::path c_plus = w.base / "c" / "plus.fits";
-  write_bytes(c_plus, longer);
+  write_new_file(c_plus, longer);
   expect_rejected("un byte in più", c_plus.string(), error_category::integrity, "input.size_changed", {{c_plus}, {}, default_work, no_cancel(), {}, nullptr, {}}, 0, true);
 
   bytes shorter = x.content;
   shorter.pop_back();
   const fs::path c_minus = w.base / "c" / "minus.fits";
-  write_bytes(c_minus, shorter);
+  write_new_file(c_minus, shorter);
   expect_rejected("un byte in meno", c_minus.string(), error_category::integrity, "input.size_changed", {{c_minus}, {}, default_work, no_cancel(), {}, nullptr, {}}, 0, true);
 
   {
@@ -292,7 +292,7 @@ TEST(Relink, T_M3A_08b_rejections_leave_everything_unchanged) {
 
   // Dentro il progetto, direttamente e tramite un symlink esterno che punta dentro.
   const fs::path inside = w.proj / "copia.fits";
-  write_bytes(inside, x.content);
+  write_new_file(inside, x.content);
   expect_rejected("dentro il progetto", inside.string(), error_category::security, "relink.target_forbidden", {{inside}, {}, default_work, no_cancel(), {}, nullptr, {}}, 0, true);
   const fs::path ext_link = w.base / "c" / "verso_dentro.fits";
   fs::create_directories(ext_link.parent_path());
@@ -330,7 +330,7 @@ TEST(Relink, T_M3A_08b_rejections_leave_everything_unchanged) {
   // Candidato sostituito fra lo stat e la verifica: stessi byte, inode diverso (punto `input.open`).
   {
     const fs::path swap = w.base / "c" / "scambio.fits";
-    write_bytes(swap, x.content);
+    write_new_file(swap, x.content);
     const std::uint64_t ino_before = stat_of(swap).ino();
     bool done = false;
     attempt_options opt;
@@ -352,7 +352,7 @@ TEST(Relink, T_M3A_08b_rejections_leave_everything_unchanged) {
   // File allungato durante la lettura (punto `input.read`).
   {
     const fs::path grow = w.base / "c" / "cresce.fits";
-    write_bytes(grow, x.content);
+    write_new_file(grow, x.content);
     bool done = false;
     attempt_options opt;
     opt.watch = {grow, x.path};
@@ -379,7 +379,7 @@ TEST(Relink, T_M3A_08b_rejections_leave_everything_unchanged) {
   // Cancel durante il digest: il file coincide, il buffer è piccolo (molti pezzi), il cancel scatta al terzo controllo.
   {
     const fs::path cand = w.base / "c" / "annulla.fits";
-    write_bytes(cand, x.content);
+    write_new_file(cand, x.content);
     int calls = 0;
     attempt_options opt;
     opt.work_size = 1024;
@@ -439,7 +439,7 @@ TEST(Relink, T_M3A_08b_add_input_rejects_nul_in_path) {
 TEST(Relink, T_M3A_08b_read_only_store_rejects_relink) {
   const reject_env e = make_reject_env("08ro");
   const fs::path moved = e.w.base / "nuovo" / "x.fits";
-  write_bytes(moved, e.x.content);
+  write_new_file(moved, e.x.content);
   fs::remove(e.x.path);
   const std::string tables_before = dump_all(e.w.proj);
   {
@@ -462,7 +462,7 @@ TEST(Relink, T_M3A_08c_previous_location_and_candidate_untouched_on_success) {
   auto store = sqlite_dag_store::create(w.proj);
   const std::uint64_t id = register_input(*store, x).id;
   const fs::path copy = w.base / "copia" / "x.fits";
-  write_bytes(copy, x.content);
+  write_new_file(copy, x.content);
   watcher both;
   both.add_file(x.path);
   both.add_file(copy);
@@ -493,7 +493,7 @@ kill_project make_kill_project(const std::string& name) {
     auto store = sqlite_dag_store::create(p.w.proj);
     p.id = register_input(*store, p.x).id;
   }
-  write_bytes(p.moved, p.x.content);
+  write_new_file(p.moved, p.x.content);
   fs::remove(p.x.path);
   return p;
 }
@@ -576,7 +576,7 @@ TEST(Relink, T_M3A_08d_sql_triggers_abort_forbidden_updates_and_deletes) {
     ida = register_input(*store, a).id;
     idb = register_input(*store, b).id;
     const fs::path moved = w.base / "nuovo" / "a.fits";
-    write_bytes(moved, a.content);
+    write_new_file(moved, a.content);
     fs::remove(a.path);
     const outcome out = attempt(*store, ida, moved.string());
     ASSERT_FALSE(out.stop.has_value()) << (out.stop ? out.stop->what() : "");

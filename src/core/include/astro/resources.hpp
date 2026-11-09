@@ -57,7 +57,7 @@ struct resource_config {
 
 // invalid_input resources.<campo>.
 void validate_resource_config(const resource_config& config);
-// invalid_input sched.cpu_set (CPU fuori dall'affinita'), sched.worker_count (worker oltre l'insieme).
+// invalid_input sched.cpu_set (CPU fuori dall'affinità), sched.worker_count (worker oltre l'insieme).
 void validate_cpu_set(const resource_config& config, const affinity_fn& affinity = system_affinity);
 
 json resource_config_json(const resource_config& config);
@@ -81,7 +81,7 @@ struct planner_input {
   std::uint64_t out_sample_bytes = 0;
   std::uint64_t input_peak_bytes = 0;
   std::uint64_t header_bound_bytes = 0;
-  // Residenza a blocchi (R3.2): R_raw e R_band (byte per riga dei quattro ingressi, gia' moltiplicati per W), G
+  // Residenza a blocchi (R3.2): R_raw e R_band (byte per riga dei quattro ingressi, già moltiplicati per W), G
   // (data unit letti), Cn (canali di normalizzazione), checkpoint dichiarato.
   std::uint64_t block_raw_bytes_per_row = 0;
   std::uint64_t block_band_bytes_per_row = 0;
@@ -89,7 +89,7 @@ struct planner_input {
   std::uint32_t normalization_channels = 1;
   bool checkpoint = false;
   // Master (estensione R2.r): numero di frame del gruppo. > 0 seleziona il modello del master, con input_peak_bytes
-  // picco del frame piu' grande; 0 il modello della calibrazione.
+  // picco del frame più grande; 0 il modello della calibrazione.
   std::uint64_t frame_count = 0;
 };
 
@@ -115,7 +115,7 @@ struct resource_plan {
 
 // Grandezze del modello che non dipendono dal budget. invalid_input resources.planner_input per ingressi nulli o non
 // rappresentabili, sched.worker_count per un worker esplicito oltre le CPU. Modello del master: tile_rows e
-// per_task_bytes sono quelli del tile massimo t0, e una grandezza non rappresentabile in 64 bit e' lo stop budget
+// per_task_bytes sono quelli del tile massimo t0, e una grandezza non rappresentabile in 64 bit è lo stop budget
 // sched.job_exceeds_budget (piano oltre ogni budget), unico stop per budget di questa funzione.
 struct plan_bounds {
   std::uint32_t tile_rows = 1;
@@ -128,7 +128,7 @@ struct plan_bounds {
 plan_bounds compute_plan_bounds(const planner_input& input, const resource_config& config);
 
 // Stop budget sched.job_exceeds_budget (con minimum_feasible_bytes) se il minimo o il piano esplicito non entrano.
-// Residenza `blocks` se e' dichiarato un checkpoint o se il budget e' sotto il minimo della residenza intera (R3.2):
+// Residenza `blocks` se è dichiarato un checkpoint o se il budget è sotto il minimo della residenza intera (R3.2):
 // richiede `scratch` (altrimenti, con checkpoint, invalid_input calib.checkpoint_scratch) e staging entro la quota
 // (budget spill.quota_exceeded). Modello del master (frame_count > 0, estensione R2.r): tile automatico ridotto dal
 // budget prima dei worker, residenza frame `blocks` e master `whole`, nessuno spill; stessi stop con residenza `master`.
@@ -163,7 +163,7 @@ struct resource_sample {
   bool budget_below_minimum = false;
 };
 
-// io monitor.status se <proc_root>/self/status non e' leggibile o manca VmRSS / VmHWM.
+// io monitor.status se <proc_root>/self/status non è leggibile o manca VmRSS / VmHWM.
 resource_sample sample_resources(const monitor_inputs& inputs);
 
 }  // namespace astro

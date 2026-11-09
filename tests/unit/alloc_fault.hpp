@@ -1,6 +1,6 @@
 #pragma once
 
-// Sostituisce operator new nel binario di test che include questo header (una sola unita' di traduzione):
+// Sostituisce operator new nel binario di test che include questo header (una sola unità di traduzione):
 // `arm()` fa fallire con bad_alloc la prossima allocazione del thread corrente.
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
 

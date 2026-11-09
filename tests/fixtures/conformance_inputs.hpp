@@ -2,7 +2,7 @@
 
 // Input sintetici della suite di conformità (docs/contracts/BASE-confini.md §3.1, punto 2): un file FITS per ruolo
 // dichiarato dal registro dei tipi di job, con il digest del file scritto. Frame f32 13x6 del modello FIX-SYN-FITS-01
-// (header di calibrazione completi, fase raw, linearita' dichiarata): 6 righe, quindi 6 blocchi con tile_rows = 1.
+// (header di calibrazione completi, fase raw, linearità dichiarata): 6 righe, quindi 6 blocchi con tile_rows = 1.
 
 #include <cstdint>
 #include <filesystem>

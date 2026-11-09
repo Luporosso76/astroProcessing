@@ -1,7 +1,7 @@
 #pragma once
 // VFS SQLite di test per la perdita di energia (ADR-04, D17): delega a `unix` e ricorda, per ogni file del database,
-// il contenuto all'ultimo xSync. Le scritture non sincronizzate non entrano nello stato durevole; xDelete e' durevole
-// subito; il file -shm non e' mai durevole (SQLite lo ricostruisce dal WAL).
+// il contenuto all'ultimo xSync. Le scritture non sincronizzate non entrano nello stato durevole; xDelete è durevole
+// subito; il file -shm non è mai durevole (SQLite lo ricostruisce dal WAL).
 #include <sqlite3.h>
 
 #include <cstring>
