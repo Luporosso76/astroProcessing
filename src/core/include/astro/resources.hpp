@@ -91,6 +91,10 @@ struct planner_input {
   // Master (estensione R2.r): numero di frame del gruppo. > 0 seleziona il modello del master, con input_peak_bytes
   // picco del frame più grande; 0 il modello della calibrazione.
   std::uint64_t frame_count = 0;
+  // Master (estensione M3.b di R2.r): canali presenti in una riga del frame, 1 (mono) o 2 (CFA) con frame_count > 0,
+  // 0 altrimenti; frame RAW (quota di spill Z = n S 6 richiesta), solo con frame_count > 0.
+  std::uint32_t master_row_channels = 0;
+  bool master_raw_frames = false;
 };
 
 struct resource_plan {
@@ -131,7 +135,9 @@ plan_bounds compute_plan_bounds(const planner_input& input, const resource_confi
 // Residenza `blocks` se è dichiarato un checkpoint o se il budget è sotto il minimo della residenza intera (R3.2):
 // richiede `scratch` (altrimenti, con checkpoint, invalid_input calib.checkpoint_scratch) e staging entro la quota
 // (budget spill.quota_exceeded). Modello del master (frame_count > 0, estensione R2.r): tile automatico ridotto dal
-// budget prima dei worker, residenza frame `blocks` e master `whole`, nessuno spill; stessi stop con residenza `master`.
+// budget prima dei worker, residenza frame `blocks` e master `whole`, spill assente salvo con `master_raw_frames`, che lo valorizza da
+// `config.scratch` con la quota Z = n S 6 (budget spill.quota_exceeded se non basta; senza scratch invalid_input
+// resources.planner_input, prima degli stop di memoria); stessi stop con residenza `master`.
 resource_plan plan_resources(const planner_input& input, const resource_config& config);
 json resource_plan_json(const resource_plan& plan);
 

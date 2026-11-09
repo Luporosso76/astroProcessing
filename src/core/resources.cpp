@@ -337,6 +337,17 @@ void check_planner_input(const planner_input& in, const resource_config& config)
   if (in.width == 0 || in.height == 0 || in.cpus == 0 || in.out_sample_bytes == 0) {
     invalid("resources.planner_input", "larghezza, altezza, CPU e byte per campione devono essere > 0");
   }
+  if (in.frame_count > 0) {
+    if (in.master_row_channels != 1 && in.master_row_channels != 2) {
+      invalid("resources.planner_input", "i canali per riga del master devono essere 1 (mono) o 2 (CFA)",
+              {{"master_row_channels", std::to_string(in.master_row_channels)}});
+    }
+  } else if (in.master_row_channels != 0 || in.master_raw_frames) {
+    invalid("resources.planner_input", "i campi del master richiedono frame_count > 0");
+  }
+  if (in.master_raw_frames && !config.scratch) {
+    invalid("resources.planner_input", "i frame RAW del master richiedono lo scratch dichiarato");
+  }
   if (config.worker_count && *config.worker_count > in.cpus) {
     invalid("sched.worker_count", "worker_count oltre le CPU utilizzabili",
             {{"worker_count", std::to_string(*config.worker_count)}, {"cpu_count", std::to_string(in.cpus)}});
@@ -362,6 +373,18 @@ std::optional<std::uint64_t> shared_plus(const std::optional<std::uint64_t>& sha
                                          const std::optional<std::uint64_t>& task) {
   if (!shared || !task) return std::nullopt;
   return fit64(static_cast<u128>(*shared) + static_cast<u128>(k) * *task);
+}
+
+// F(n) = 56 n + q(n) + 544, q(n) = 8 ceil(n / 8): puntatori, ordinamento, indicatori e contatori parziali di un task.
+u128 master_task_fixed(std::uint64_t frames) {
+  return 56 * static_cast<u128>(frames) + 8 * static_cast<u128>(ceil_div(frames, 8)) + 544;
+}
+
+// task(t) = F(n) + t W (10 n + 8), controllato; master_task_bytes conta puntatori e tile (16 n + t W (10 n + 8)).
+std::optional<std::uint64_t> master_task(std::uint64_t frames, std::uint64_t rows, std::uint64_t width) {
+  const std::optional<std::uint64_t> tile = master_task_bytes(frames, rows, width);
+  if (!tile) return std::nullopt;
+  return fit64(static_cast<u128>(*tile) + master_task_fixed(frames) - 16 * static_cast<u128>(frames));
 }
 
 std::string bytes_text(const std::optional<std::uint64_t>& v) {
@@ -390,15 +413,19 @@ master_model make_master_model(const planner_input& in, const resource_config& c
   master_model m;
   const u128 samples = static_cast<u128>(in.width) * in.height;
   const u128 out = samples * (2 * static_cast<u128>(in.out_sample_bytes) + sizeof(std::uint16_t));
+  // R: somme di riga del report, CS: costanti dei metodi e delle scale, Cn: contatori persistenti (ADR-06, M3.b).
+  const u128 n = in.frame_count;
+  const u128 rows_report = 16 * static_cast<u128>(in.master_row_channels) * in.height * n;
+  const u128 constants = 120 * n + 168, counters = 24 * n + 544;
   m.shared = fit64(static_cast<u128>(in.input_peak_bytes) + samples * sizeof(double) + out +
                    samples * master_stats_bytes_per_pixel + (out + in.header_bound_bytes) + master_digest_chunk_bytes +
-                   config.report_margin_bytes.value);
+                   config.report_margin_bytes.value + rows_report + constants + counters);
   m.t0 = config.tile_rows ? *config.tile_rows
                           : static_cast<std::uint32_t>(std::min<std::uint64_t>(
                                 64, std::max<std::uint64_t>(1, ceil_div(ceil_div(in.height, in.cpus), 4))));
   m.tasks_t0 = ceil_div(in.height, m.t0);
-  m.task_t0 = master_task_bytes(in.frame_count, m.t0, in.width);
-  m.task_min = master_task_bytes(in.frame_count, config.tile_rows ? *config.tile_rows : 1, in.width);
+  m.task_t0 = master_task(in.frame_count, m.t0, in.width);
+  m.task_min = master_task(in.frame_count, config.tile_rows ? *config.tile_rows : 1, in.width);
   m.minimum = shared_plus(m.shared, 1, m.task_min);
   m.working_set = shared_plus(m.shared, std::min<std::uint64_t>(in.cpus, m.tasks_t0), m.task_t0);
   if (!m.minimum || !m.working_set) master_exceeds(in, m, m.minimum, m.task_min);
@@ -414,18 +441,18 @@ resource_plan plan_master(const planner_input& in, const resource_config& config
   if (config.tile_rows) {
     tile = *config.tile_rows;
   } else {
-    // Il tile più grande <= t0 per cui k task entrano: 16 n + t W (10 n + 8) <= floor(avail / k).
-    const u128 per_worker = avail / k, fixed = 16 * static_cast<u128>(in.frame_count);
+    // Il tile più grande <= t0 per cui k task entrano: F(n) + t W (10 n + 8) <= floor(avail / k).
+    const u128 per_worker = avail / k, fixed = master_task_fixed(in.frame_count);
     const u128 per_row = static_cast<u128>(in.width) * (10 * static_cast<u128>(in.frame_count) + 8);
     const u128 fit = per_worker >= fixed ? (per_worker - fixed) / per_row : 0;
     tile = static_cast<std::uint32_t>(std::min<u128>(m.t0, fit));
     if (tile == 0) {
-      const std::optional<std::uint64_t> one = master_task_bytes(in.frame_count, 1, in.width);
+      const std::optional<std::uint64_t> one = master_task(in.frame_count, 1, in.width);
       master_exceeds(in, m, shared_plus(m.shared, k, one), one);
     }
   }
   // tile <= t0: task(tile) <= task(t0), già rappresentabile nel modello; il controllo resta come guardia.
-  const std::optional<std::uint64_t> task = master_task_bytes(in.frame_count, tile, in.width);
+  const std::optional<std::uint64_t> task = master_task(in.frame_count, tile, in.width);
   if (!task) master_exceeds(in, m, std::nullopt, task);
   resource_plan p;
   p.tile_rows = tile;
@@ -451,6 +478,18 @@ resource_plan plan_master(const planner_input& in, const resource_config& config
   p.frame_residency = "blocks";
   p.master_residency = "whole";
   p.staging_bytes = 0;
+  if (in.master_raw_frames) {
+    // Z = n S 6 non è memoria del pool: la quota si controlla dopo ogni stop di memoria, prima di ogni prenotazione.
+    const u128 frame_samples = static_cast<u128>(in.width) * in.height;
+    const u128 per_frame = frame_samples * in.frame_count;
+    const std::optional<std::uint64_t> spill_needed =
+        per_frame > ~std::uint64_t{0} / 6 ? std::nullopt : fit64(per_frame * 6);
+    if (!spill_needed || *spill_needed > config.scratch->quota_bytes) {
+      throw stop_error(error_category::budget, "spill.quota_exceeded", "la quota di spill dei frame RAW non basta",
+                       {{"richiesti", bytes_text(spill_needed)}, {"quota", std::to_string(config.scratch->quota_bytes)}});
+    }
+    p.spill = spill_config{config.scratch->dir, config.scratch->quota_bytes};
+  }
   return p;
 }
 

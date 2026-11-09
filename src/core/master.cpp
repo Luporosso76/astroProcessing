@@ -1240,6 +1240,8 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     planner_input in{pool.budget_bytes(), cpus, plans[0].width, plans[0].height, sample_size(recipe.output_type),
                      frame_peak, output_header_bound};
     in.frame_count = p.n;
+    in.master_row_channels = p.per_channel ? 2 : 1;
+    in.master_raw_frames = false;
     const resource_plan chosen = plan_resources(in, config);
     job_plan plan;
     plan.shared_bytes = chosen.shared_bytes;

@@ -925,37 +925,111 @@ TEST(Resources, T_M2R3_07_monitor_exposes_the_jobs_waiting_for_pressure) {
 
 // ---------------------------------------------------------------- T-M2R2R-01: modello del master (estensione R2.r)
 
-// Tabella del contratto: n = 10, W = H = 1000, E = 4, P = 4 000 000, HB = 100 000, M = D = 1 048 576, K = 32.
-// shared = 66 197 152, task(t) = 160 + 108 000 t, minimo automatico 66 305 312 (calcolati a mano nel contratto).
-constexpr std::uint64_t master_shared_hand = 66'197'152, master_min_hand = 66'305'312;
+// Modello del master con i termini di M3.b (ADR-06, estensione R2.r e «Estensione M3.b del piano del master»).
+// Tabella di riferimento: W = H = 1000, E = 4, P = 4 000 000, HB = 100 000, M = D = 1 048 576, K = 32.
+// Parte invariata di shared: P + 8 S + out + K S + (out + HB) + D + M = 4 000 000 + 8 000 000 + 10 000 000 + 32 000 000
+// + 10 100 000 + 1 048 576 + 1 048 576 = 66 197 152, indipendente da n e da Cr.
+// Termini nuovi: R = 16 Cr H n, CS = 120 n + 168, Cn = 24 n + 544, F(n) = 56 n + q(n) + 544, q(n) = 8 ceil(n / 8);
+// shared' = 66 197 152 + R + CS + Cn; task(t) = F(n) + t W (10 n + 8); minimo = shared' + task(t_min).
+constexpr std::uint64_t master_base_shared = 66'197'152;
 
-planner_input master_input(std::uint64_t budget, std::size_t cpus) {
+planner_input master_input(std::uint64_t budget, std::size_t cpus, std::uint64_t frames = 10, std::uint32_t channels = 1) {
   planner_input in = table_input(budget, cpus);
-  in.frame_count = 10;
+  in.frame_count = frames;
+  in.master_row_channels = channels;
   return in;
 }
 
-struct master_expect {
-  std::uint32_t tile;
-  std::uint64_t tasks;
+// Una riga per caso: nome, budget, CPU, worker espliciti (0 = automatico), tile esplicito (0 = automatico), stop, tile,
+// task, worker, picco (del piano o dichiarato dallo stop), sotto il working set, minimo, working set.
+struct ref_row {
+  const char* name;
+  std::uint64_t budget;
+  std::size_t cpus;
   unsigned workers;
+  std::uint32_t tile;
+  bool stop;
+  std::uint32_t plan_tile;
+  std::uint64_t tasks;
+  unsigned plan_workers;
   std::uint64_t peak;
   bool below_working_set;
+  std::uint64_t minimum;
+  std::uint64_t working_set;
 };
 
-void expect_master_plan(const resource_plan& p, const master_expect& x) {
-  EXPECT_EQ(p.tile_rows, x.tile);
-  EXPECT_EQ(p.task_count, x.tasks);
-  EXPECT_EQ(p.worker_count, x.workers);
-  EXPECT_EQ(p.peak_bytes, x.peak);
-  EXPECT_EQ(p.shared_bytes, master_shared_hand);
-  EXPECT_EQ(p.per_task_bytes, 160 + 108'000 * std::uint64_t{x.tile});
-  EXPECT_EQ(p.budget_below_working_set, x.below_working_set);
-  EXPECT_EQ(p.frame_residency, "blocks");
-  EXPECT_EQ(p.master_residency, "whole");
-  EXPECT_FALSE(p.spill);
-  EXPECT_EQ(p.staging_bytes, 0u);
-  EXPECT_EQ(p.whole_minimum_bytes, p.minimum_feasible_bytes);
+struct ref_set {
+  std::uint64_t frames;
+  std::uint32_t channels;
+  std::uint64_t shared;  // shared'
+  std::uint64_t fixed;   // F(n)
+  std::uint64_t row;     // W (10 n + 8)
+  std::vector<ref_row> rows;
+};
+
+// Casi p-y di R2.r ricalcolati a mano. t (B = minimo - 1) è uno stop con picco = minimo; w (worker 2, B = minimo) è
+// uno stop con picco = shared' + 2 task(1) perché a tile automatico nessun t >= 1 entra; y è uno stop per n = 10 (tile
+// esplicito 400) e un piano per n = 3.
+const std::vector<ref_set>& reference_sets() {
+  static const std::vector<ref_set> sets = {
+  // n = 10, Cr = 1: R = 160 000, CS = 1 368, Cn = 784, shared' = 66 197 152 + 162 152; F = 560 + 16 + 544;
+  // task(1) = 109 120, minimo 66 468 424; working set (C = 4, t0 = 63) = 66 359 304 + 4 * 6 805 120.
+  // r: (70 000 000 - 66 359 304 - 1 120) / 108 000 = 33,7 -> 33.
+  {10, 1, 66'359'304, 1'120, 108'000, {
+      {"p", 104'857'600, 4, 0, 0, false, 63, 16, 4, 93'579'784, false, 66'468'424, 93'579'784},
+      {"q", 93'579'783, 4, 0, 0, false, 63, 16, 3, 86'774'664, true, 66'468'424, 93'579'784},
+      {"r", 70'000'000, 4, 0, 0, false, 33, 31, 1, 69'924'424, true, 66'468'424, 93'579'784},
+      {"s", 66'468'424, 4, 0, 0, false, 1, 1000, 1, 66'468'424, true, 66'468'424, 93'579'784},
+      {"t", 66'468'423, 4, 0, 0, true, 0, 0, 0, 66'468'424, false, 66'468'424, 93'579'784},
+      {"u", 104'857'600, 4, 2, 0, false, 63, 16, 2, 79'969'544, false, 66'468'424, 93'579'784},
+      {"v", 70'000'000, 4, 2, 0, false, 16, 63, 2, 69'817'544, true, 66'468'424, 93'579'784},
+      {"w", 66'468'424, 4, 2, 0, true, 0, 0, 0, 66'577'544, false, 66'468'424, 93'579'784},
+      {"x", 104'857'600, 2, 0, 10, false, 10, 100, 2, 68'521'544, false, 67'440'424, 68'521'544},
+      {"y", 104'857'600, 4, 0, 400, true, 0, 0, 0, 109'560'424, false, 109'560'424, 195'962'664},
+  }},
+  // n = 10, Cr = 2: R = 320 000, shared' = 66 197 152 + 322 152; minimo 66 628 424; working set 93 739 784.
+  // r: (70 000 000 - 66 519 304 - 1 120) / 108 000 = 32,2 -> 32.
+  {10, 2, 66'519'304, 1'120, 108'000, {
+      {"p", 104'857'600, 4, 0, 0, false, 63, 16, 4, 93'739'784, false, 66'628'424, 93'739'784},
+      {"q", 93'739'783, 4, 0, 0, false, 63, 16, 3, 86'934'664, true, 66'628'424, 93'739'784},
+      {"r", 70'000'000, 4, 0, 0, false, 32, 32, 1, 69'976'424, true, 66'628'424, 93'739'784},
+      {"s", 66'628'424, 4, 0, 0, false, 1, 1000, 1, 66'628'424, true, 66'628'424, 93'739'784},
+      {"t", 66'628'423, 4, 0, 0, true, 0, 0, 0, 66'628'424, false, 66'628'424, 93'739'784},
+      {"u", 104'857'600, 4, 2, 0, false, 63, 16, 2, 80'129'544, false, 66'628'424, 93'739'784},
+      {"v", 70'000'000, 4, 2, 0, false, 16, 63, 2, 69'977'544, true, 66'628'424, 93'739'784},
+      {"w", 66'628'424, 4, 2, 0, true, 0, 0, 0, 66'737'544, false, 66'628'424, 93'739'784},
+      {"x", 104'857'600, 2, 0, 10, false, 10, 100, 2, 68'681'544, false, 67'600'424, 68'681'544},
+      {"y", 104'857'600, 4, 0, 400, true, 0, 0, 0, 109'720'424, false, 109'720'424, 196'122'664},
+  }},
+  // n = 3, Cr = 1: q = 8, F = 168 + 8 + 544, W (10 n + 8) = 38 000, R = 48 000, CS = 528, Cn = 616,
+  // shared' = 66 197 152 + 49 144; task(1) = 38 720, minimo 66 285 016; task(63) = 2 394 720; working set 75 825 176.
+  {3, 1, 66'246'296, 720, 38'000, {
+      {"p", 104'857'600, 4, 0, 0, false, 63, 16, 4, 75'825'176, false, 66'285'016, 75'825'176},
+      {"q", 75'825'175, 4, 0, 0, false, 63, 16, 3, 73'430'456, true, 66'285'016, 75'825'176},
+      {"r", 70'000'000, 4, 0, 0, false, 63, 16, 1, 68'641'016, true, 66'285'016, 75'825'176},
+      {"s", 66'285'016, 4, 0, 0, false, 1, 1000, 1, 66'285'016, true, 66'285'016, 75'825'176},
+      {"t", 66'285'015, 4, 0, 0, true, 0, 0, 0, 66'285'016, false, 66'285'016, 75'825'176},
+      {"u", 104'857'600, 4, 2, 0, false, 63, 16, 2, 71'035'736, false, 66'285'016, 75'825'176},
+      {"v", 70'000'000, 4, 2, 0, false, 49, 21, 2, 69'971'736, true, 66'285'016, 75'825'176},
+      {"w", 66'285'016, 4, 2, 0, true, 0, 0, 0, 66'323'736, false, 66'285'016, 75'825'176},
+      {"x", 104'857'600, 2, 0, 10, false, 10, 100, 2, 67'007'736, false, 66'627'016, 67'007'736},
+      {"y", 104'857'600, 4, 0, 400, false, 400, 3, 2, 96'647'736, true, 81'447'016, 111'848'456},
+  }},
+  // n = 3, Cr = 2: R = 96 000, shared' = 66 197 152 + 97 144; minimo 66 333 016; working set 75 873 176.
+  {3, 2, 66'294'296, 720, 38'000, {
+      {"p", 104'857'600, 4, 0, 0, false, 63, 16, 4, 75'873'176, false, 66'333'016, 75'873'176},
+      {"q", 75'873'175, 4, 0, 0, false, 63, 16, 3, 73'478'456, true, 66'333'016, 75'873'176},
+      {"r", 70'000'000, 4, 0, 0, false, 63, 16, 1, 68'689'016, true, 66'333'016, 75'873'176},
+      {"s", 66'333'016, 4, 0, 0, false, 1, 1000, 1, 66'333'016, true, 66'333'016, 75'873'176},
+      {"t", 66'333'015, 4, 0, 0, true, 0, 0, 0, 66'333'016, false, 66'333'016, 75'873'176},
+      {"u", 104'857'600, 4, 2, 0, false, 63, 16, 2, 71'083'736, false, 66'333'016, 75'873'176},
+      {"v", 70'000'000, 4, 2, 0, false, 48, 21, 2, 69'943'736, true, 66'333'016, 75'873'176},
+      {"w", 66'333'016, 4, 2, 0, true, 0, 0, 0, 66'371'736, false, 66'333'016, 75'873'176},
+      {"x", 104'857'600, 2, 0, 10, false, 10, 100, 2, 67'055'736, false, 66'675'016, 67'055'736},
+      {"y", 104'857'600, 4, 0, 400, false, 400, 3, 2, 96'695'736, true, 81'495'016, 111'896'456},
+  }},
+  };
+  return sets;
 }
 
 void expect_master_stop(const planner_input& in, const resource_config& c, const std::string& peak,
@@ -973,40 +1047,43 @@ void expect_master_stop(const planner_input& in, const resource_config& c, const
   }
 }
 
-TEST(Resources, T_M2R2R_01_master_planner_matches_the_hand_computed_table) {
-  const resource_config cfg;
-  {  // p
-    const resource_plan p = plan_resources(master_input(104'857'600, 4), cfg);
-    expect_master_plan(p, {63, 16, 4, 93'413'792, false});
-    EXPECT_EQ(p.working_set_bytes, 93'413'792u);
-    EXPECT_EQ(p.minimum_feasible_bytes, master_min_hand);
-    EXPECT_TRUE(p.user_fixed.empty());
+void expect_ref_set(const ref_set& set) {
+  for (const ref_row& r : set.rows) {
+    SCOPED_TRACE("n=" + std::to_string(set.frames) + " Cr=" + std::to_string(set.channels) + " caso " + r.name);
+    resource_config c;
+    if (r.workers) c.worker_count = r.workers;
+    if (r.tile) c.tile_rows = r.tile;
+    const planner_input in = master_input(r.budget, r.cpus, set.frames, set.channels);
+    if (r.stop) {
+      expect_master_stop(in, c, std::to_string(r.peak), std::to_string(r.minimum));
+      continue;
+    }
+    const resource_plan p = plan_resources(in, c);
+    EXPECT_EQ(p.tile_rows, r.plan_tile);
+    EXPECT_EQ(p.task_count, r.tasks);
+    EXPECT_EQ(p.worker_count, r.plan_workers);
+    EXPECT_EQ(p.peak_bytes, r.peak);
+    EXPECT_EQ(p.shared_bytes, set.shared);
+    EXPECT_EQ(p.per_task_bytes, set.fixed + set.row * r.plan_tile);
+    EXPECT_EQ(p.minimum_feasible_bytes, r.minimum);
+    EXPECT_EQ(p.working_set_bytes, r.working_set);
+    EXPECT_EQ(p.budget_below_working_set, r.below_working_set);
+    EXPECT_EQ(p.frame_residency, "blocks");
+    EXPECT_EQ(p.master_residency, "whole");
+    EXPECT_FALSE(p.spill);
+    EXPECT_EQ(p.staging_bytes, 0u);
+    EXPECT_EQ(p.whole_minimum_bytes, p.minimum_feasible_bytes);
     EXPECT_EQ(p.task_queue_capacity, 4u);
+    std::vector<std::string> fixed;
+    if (r.workers) fixed.push_back("worker_count");
+    if (r.tile) fixed.push_back("tile_rows");
+    EXPECT_EQ(p.user_fixed, fixed);
   }
-  expect_master_plan(plan_resources(master_input(93'413'791, 4), cfg), {63, 16, 3, 86'609'632, true});  // q
-  expect_master_plan(plan_resources(master_input(70'000'000, 4), cfg), {35, 29, 1, 69'977'312, true});  // r
-  expect_master_plan(plan_resources(master_input(master_min_hand, 4), cfg), {1, 1000, 1, master_min_hand, true});  // s
-  expect_master_stop(master_input(master_min_hand - 1, 4), cfg, "66305312", "66305312");  // t
-  resource_config two = cfg;
-  two.worker_count = 2;
-  {  // u
-    const resource_plan p = plan_resources(master_input(104'857'600, 4), two);
-    expect_master_plan(p, {63, 16, 2, 79'805'472, false});
-    EXPECT_EQ(p.user_fixed, std::vector<std::string>{"worker_count"});
-  }
-  expect_master_plan(plan_resources(master_input(70'000'000, 4), two), {17, 59, 2, 69'869'472, true});  // v
-  expect_master_stop(master_input(master_min_hand, 4), two, "66413472", "66305312");  // w
-  resource_config tile10 = cfg;
-  tile10.tile_rows = 10;
-  {  // x
-    const resource_plan p = plan_resources(master_input(104'857'600, 2), tile10);
-    expect_master_plan(p, {10, 100, 2, 68'357'472, false});
-    EXPECT_EQ(p.minimum_feasible_bytes, 67'277'312u);
-    EXPECT_EQ(p.user_fixed, std::vector<std::string>{"tile_rows"});
-  }
-  resource_config tile400 = cfg;
-  tile400.tile_rows = 400;
-  expect_master_stop(master_input(104'857'600, 4), tile400, "109397312", "109397312");  // y
+}
+
+TEST(Resources, T_M2R2R_01_master_planner_matches_the_hand_computed_table) {
+  // Tabella di R2.r con i termini di M3.b, mono (Cr = 1) e n = 10.
+  expect_ref_set(reference_sets().front());
 }
 
 TEST(Resources, T_M2R2R_01_unrepresentable_master_plan_is_a_budget_stop_with_the_value_declared) {
@@ -1038,14 +1115,15 @@ TEST(Resources, T_M2R2R_01_master_bounds_match_the_plan_and_unused_inputs_are_re
   const plan_bounds b = compute_plan_bounds(master_input(104'857'600, 4), cfg);
   EXPECT_EQ(b.tile_rows, 63u);
   EXPECT_EQ(b.task_count, 16u);
-  EXPECT_EQ(b.shared_bytes, master_shared_hand);
-  EXPECT_EQ(b.per_task_bytes, 6'804'160u);
-  EXPECT_EQ(b.minimum_feasible_bytes, master_min_hand);
-  EXPECT_EQ(b.working_set_bytes, 93'413'792u);
+  // shared' = 66 197 152 + 160 000 + 1 368 + 784; task(63) = 1 120 + 63 * 108 000; minimo = shared' + task(1).
+  EXPECT_EQ(b.shared_bytes, 66'359'304u);
+  EXPECT_EQ(b.per_task_bytes, 6'805'120u);
+  EXPECT_EQ(b.minimum_feasible_bytes, 66'468'424u);
+  EXPECT_EQ(b.working_set_bytes, 93'579'784u);
   // Margine configurato: shared cresce della differenza.
   resource_config margin = cfg;
   margin.report_margin_bytes = {3 * 1'048'576, "configurato"};
-  EXPECT_EQ(compute_plan_bounds(master_input(104'857'600, 4), margin).shared_bytes, master_shared_hand + 2 * 1'048'576);
+  EXPECT_EQ(compute_plan_bounds(master_input(104'857'600, 4), margin).shared_bytes, 66'359'304u + 2 * 1'048'576);
   planner_input in = master_input(104'857'600, 4);
   in.checkpoint = true;
   EXPECT_STOP(plan_resources(in, cfg), error_category::invalid_input, "resources.planner_input");
@@ -1070,6 +1148,220 @@ TEST(Resources, T_M2R2R_01_master_bounds_match_the_plan_and_unused_inputs_are_re
   EXPECT_EQ(compute_plan_bounds(table_input(104'857'600, std::size_t{1} << 62), cfg).tile_rows, 1u);
   // Con frame_count = 0 il modello della calibrazione resta quello della tabella di R3.1.
   EXPECT_EQ(plan_resources(table_input(104'857'600, 4), cfg).shared_bytes, shared_hand);
+}
+
+// ---------------------------------------------------------------- T-M3B-MEM-01: pianificatore con i buffer di M3.b
+
+constexpr std::uint64_t max_u64 = ~std::uint64_t{0};
+// Limite dichiarato: una quota di scratch oltre 2^53 - 1 non è persistibile e la configurazione è rifiutata prima del
+// pianificatore (resources.scratch); la quota più alta usabile nei test del pianificatore è 2^53 - 1.
+constexpr std::uint64_t json_integer_max = (std::uint64_t{1} << 53) - 1;
+
+TEST(Resources, T_M3B_MEM_01_reference_case_with_the_new_terms_for_one_and_two_row_channels_and_ten_and_three_frames) {
+  ASSERT_EQ(reference_sets().size(), 4u);
+  for (const ref_set& set : reference_sets()) expect_ref_set(set);
+  // compute_plan_bounds coerente col piano (n = 3, Cr = 2): shared' = 66 197 152 + 96 000 + 528 + 616, task(63) =
+  // 720 + 63 * 38 000, minimo = shared' + 720 + 38 000, working set = shared' + 4 * task(63).
+  const plan_bounds b = compute_plan_bounds(master_input(104'857'600, 4, 3, 2), resource_config{});
+  EXPECT_EQ(b.tile_rows, 63u);
+  EXPECT_EQ(b.task_count, 16u);
+  EXPECT_EQ(b.shared_bytes, 66'294'296u);
+  EXPECT_EQ(b.per_task_bytes, 2'394'720u);
+  EXPECT_EQ(b.minimum_feasible_bytes, 66'333'016u);
+  EXPECT_EQ(b.working_set_bytes, 75'873'176u);
+}
+
+TEST(Resources, T_M3B_MEM_01_automatic_tile_at_the_boundary_one_against_zero_and_two_against_one) {
+  // n = 10, Cr = 1: shared' = 66 359 304, F = 1 120, W (10 n + 8) = 108 000.
+  // Due worker espliciti: tile 1 entra con B = shared' + 2 (F + 108 000) = 66 577 544; con un byte in meno nessun t >= 1
+  // entra, picco dichiarato = shared' + 2 task(1) = 66 577 544, sopra il minimo (66 468 424).
+  resource_config two;
+  two.worker_count = 2;
+  const resource_plan edge = plan_resources(master_input(66'577'544, 4), two);
+  EXPECT_EQ(edge.tile_rows, 1u);
+  EXPECT_EQ(edge.worker_count, 2u);
+  EXPECT_EQ(edge.peak_bytes, 66'577'544u);
+  expect_master_stop(master_input(66'577'543, 4), two, "66577544", "66468424");
+  // Un worker: tile 2 con B = shared' + F + 2 * 108 000 = 66 576 424 (picco = shared' + task(2) = 66 576 424);
+  // un byte in meno: tile 1 (task(1) = 109 120, picco = minimo = 66 468 424).
+  const resource_plan two_rows = plan_resources(master_input(66'576'424, 4), resource_config{});
+  EXPECT_EQ(two_rows.tile_rows, 2u);
+  EXPECT_EQ(two_rows.worker_count, 1u);
+  EXPECT_EQ(two_rows.peak_bytes, 66'576'424u);
+  const resource_plan one_row = plan_resources(master_input(66'576'423, 4), resource_config{});
+  EXPECT_EQ(one_row.tile_rows, 1u);
+  EXPECT_EQ(one_row.peak_bytes, 66'468'424u);
+}
+
+TEST(Resources, T_M3B_MEM_01_plan_beyond_2_pow_64_is_a_budget_stop_with_the_value_declared) {
+  // Solo R = 16 Cr H n supera 2^64 - 1: S, K S, out, task(t0) restano sotto 10^15.
+  // n = 2^30, H = 2^32 - 1, Cr = 2: R = 32 (2^32 - 1) 2^30 = 2^67 - 2^35.
+  planner_input many = master_input(max_u64, 4, std::uint64_t{1} << 30, 2);
+  many.height = 0xFFFFFFFFu;
+  // n = 2^40, W = 1, H = 2^20, Cr = 1: R = 16 * 2^20 * 2^40 = 2^64.
+  planner_input tall = master_input(max_u64, 4, std::uint64_t{1} << 40, 1);
+  tall.width = 1;
+  tall.height = 1u << 20;
+  for (const planner_input& in : {many, tall}) {
+    try {
+      (void)plan_resources(in, resource_config{});
+      ADD_FAILURE() << "stop atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::budget);
+      EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+      EXPECT_EQ(context_value(e, "minimum_feasible_bytes"), "non rappresentabile");
+      EXPECT_EQ(context_value(e, "picco"), "non rappresentabile");
+      EXPECT_EQ(context_value(e, "residenza"), "master");
+    }
+    EXPECT_STOP(compute_plan_bounds(in, resource_config{}), error_category::budget, "sched.job_exceeds_budget");
+  }
+}
+
+TEST(Resources, T_M3B_MEM_01_row_channels_outside_one_and_two_are_an_input_error) {
+  for (const std::uint32_t channels : {0u, 3u, 4u, 0xFFFFFFFFu}) {
+    SCOPED_TRACE(channels);
+    const planner_input in = master_input(104'857'600, 4, 10, channels);
+    EXPECT_STOP(plan_resources(in, resource_config{}), error_category::invalid_input, "resources.planner_input");
+    EXPECT_STOP(compute_plan_bounds(in, resource_config{}), error_category::invalid_input, "resources.planner_input");
+  }
+  // Canali non impostati (valore di default 0) con frame_count > 0.
+  planner_input unset = table_input(104'857'600, 4);
+  unset.frame_count = 10;
+  ASSERT_EQ(unset.master_row_channels, 0u);
+  EXPECT_STOP(plan_resources(unset, resource_config{}), error_category::invalid_input, "resources.planner_input");
+  EXPECT_STOP(compute_plan_bounds(unset, resource_config{}), error_category::invalid_input, "resources.planner_input");
+  // Anche per un master RAW.
+  planner_input raw = master_input(max_u64, 4, 10, 3);
+  raw.master_raw_frames = true;
+  resource_config c;
+  c.scratch = dir_quota{"/scratch/ente-a", json_integer_max};
+  EXPECT_STOP(plan_resources(raw, c), error_category::invalid_input, "resources.planner_input");
+}
+
+// Frame RAW: n = 10, Cr = 1, W = H = 1000, E = 4. File 24 000 000 byte più `needed` del decoder = raw_image_bytes +
+// 6 S = 2 000 000 + 6 000 000 = 8 000 000 (S * 6 una sola volta): P = 32 000 000.
+// shared' = 66 359 304 - 4 000 000 + 32 000 000 = 94 359 304; minimo = shared' + task(1) = 94 468 424;
+// B = 104 857 600, C = 4: t0 = 63, tile = min(63, floor((10 498 296 - 1 120) / 108 000)) = min(63, 97) = 63, T = 16,
+// task(63) = 6 805 120, worker = min(4, 16, floor(10 498 296 / 6 805 120)) = 1, picco = 94 359 304 + 6 805 120 =
+// 101 164 424; working set = 94 359 304 + 4 * 6 805 120 = 121 579 784, sopra il budget. Z = n S 6 = 60 000 000.
+constexpr std::uint64_t raw_peak = 32'000'000, raw_shared = 94'359'304, raw_minimum = 94'468'424, raw_quota_needed = 60'000'000;
+
+planner_input raw_input(std::uint64_t budget, std::size_t cpus = 4) {
+  planner_input in = master_input(budget, cpus);
+  in.input_peak_bytes = raw_peak;
+  in.master_raw_frames = true;
+  return in;
+}
+
+resource_config raw_config(std::uint64_t quota) {
+  resource_config c;
+  c.scratch = dir_quota{"/scratch/ente-a", quota};
+  return c;
+}
+
+TEST(Resources, T_M3B_MEM_01_raw_master_plan_declares_the_spill_and_counts_the_decoder_peak_in_the_pool) {
+  const resource_plan p = plan_resources(raw_input(104'857'600), raw_config(raw_quota_needed));
+  EXPECT_EQ(p.shared_bytes, raw_shared);
+  EXPECT_EQ(p.minimum_feasible_bytes, raw_minimum);
+  EXPECT_EQ(p.tile_rows, 63u);
+  EXPECT_EQ(p.task_count, 16u);
+  EXPECT_EQ(p.worker_count, 1u);
+  EXPECT_EQ(p.per_task_bytes, 6'805'120u);
+  EXPECT_EQ(p.peak_bytes, 101'164'424u);
+  EXPECT_EQ(p.working_set_bytes, 121'579'784u);
+  EXPECT_TRUE(p.budget_below_working_set);
+  EXPECT_EQ(p.frame_residency, "blocks");
+  EXPECT_EQ(p.master_residency, "whole");
+  ASSERT_TRUE(p.spill.has_value());
+  EXPECT_EQ(p.spill->scratch_dir, std::filesystem::path("/scratch/ente-a"));
+  EXPECT_EQ(p.spill->quota_bytes, raw_quota_needed);
+  // Con quota maggiore di Z lo spill è quello configurato; Z non entra nel pool (shared invariato).
+  const resource_plan roomy = plan_resources(raw_input(104'857'600), raw_config(raw_quota_needed + 1));
+  EXPECT_EQ(roomy.shared_bytes, raw_shared);
+  ASSERT_TRUE(roomy.spill.has_value());
+  EXPECT_EQ(roomy.spill->quota_bytes, raw_quota_needed + 1);
+  // Il minimo vale come per i FITS: B = minimo dà tile 1, un byte in meno è uno stop prima di ogni prenotazione.
+  const resource_plan at_minimum = plan_resources(raw_input(raw_minimum), raw_config(raw_quota_needed));
+  EXPECT_EQ(at_minimum.tile_rows, 1u);
+  EXPECT_EQ(at_minimum.peak_bytes, raw_minimum);
+  expect_master_stop(raw_input(raw_minimum - 1), raw_config(raw_quota_needed), "94468424", "94468424");
+}
+
+TEST(Resources, T_M3B_MEM_01_raw_master_stops_when_the_spill_quota_is_below_the_required_one) {
+  try {
+    (void)plan_resources(raw_input(104'857'600), raw_config(raw_quota_needed - 1));
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::budget);
+    EXPECT_EQ(e.code(), "spill.quota_exceeded");
+    EXPECT_EQ(context_value(e, "richiesti"), "60000000");
+    EXPECT_EQ(context_value(e, "quota"), "59999999");
+  }
+  // Z = n S 6 con n = 2^43, S = 10^6 vale 5,28 * 10^19 > 2^64 - 1; la memoria del pool resta rappresentabile
+  // (R = 1,4 * 10^17, task(64) = 5,6 * 10^18, un solo CPU perché 4 task superano 2^64): lo stop è quello della quota.
+  planner_input huge = raw_input(max_u64, 1);
+  huge.frame_count = std::uint64_t{1} << 43;
+  try {
+    (void)plan_resources(huge, raw_config(json_integer_max));
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::budget);
+    EXPECT_EQ(e.code(), "spill.quota_exceeded");
+    EXPECT_EQ(context_value(e, "richiesti"), "non rappresentabile");
+    EXPECT_EQ(context_value(e, "quota"), std::to_string(json_integer_max));
+  }
+}
+
+TEST(Resources, T_M3B_MEM_01_memory_stops_come_before_the_spill_quota_stop) {
+  // Memoria insufficiente e quota insufficiente: vale lo stop della memoria.
+  expect_master_stop(raw_input(raw_minimum - 1), raw_config(raw_quota_needed - 1), "94468424", "94468424");
+  // Memoria non rappresentabile (R = 2^64) e quota insufficiente: vale lo stop della memoria.
+  planner_input tall = master_input(max_u64, 4, std::uint64_t{1} << 40, 1);
+  tall.width = 1;
+  tall.height = 1u << 20;
+  tall.master_raw_frames = true;
+  try {
+    (void)plan_resources(tall, raw_config(1));
+    ADD_FAILURE() << "stop atteso";
+  } catch (const stop_error& e) {
+    EXPECT_EQ(e.category(), error_category::budget);
+    EXPECT_EQ(e.code(), "sched.job_exceeds_budget");
+    EXPECT_EQ(context_value(e, "minimum_feasible_bytes"), "non rappresentabile");
+  }
+  // Memoria sufficiente e quota insufficiente: vale lo stop della quota.
+  EXPECT_STOP(plan_resources(raw_input(104'857'600), raw_config(raw_quota_needed - 1)), error_category::budget,
+              "spill.quota_exceeded");
+}
+
+TEST(Resources, T_M3B_MEM_01_master_fields_on_a_job_that_is_not_a_master_are_an_input_error) {
+  planner_input raw = table_input(104'857'600, 4);
+  ASSERT_EQ(raw.frame_count, 0u);
+  raw.master_raw_frames = true;
+  EXPECT_STOP(plan_resources(raw, raw_config(raw_quota_needed)), error_category::invalid_input, "resources.planner_input");
+  EXPECT_STOP(compute_plan_bounds(raw, resource_config{}), error_category::invalid_input, "resources.planner_input");
+  for (const std::uint32_t channels : {1u, 2u}) {
+    planner_input in = table_input(104'857'600, 4);
+    in.master_row_channels = channels;
+    EXPECT_STOP(plan_resources(in, resource_config{}), error_category::invalid_input, "resources.planner_input");
+    EXPECT_STOP(compute_plan_bounds(in, resource_config{}), error_category::invalid_input, "resources.planner_input");
+  }
+}
+
+TEST(Resources, T_M3B_MEM_01_scratch_quota_beyond_2_pow_53_is_rejected_before_the_planner) {
+  resource_config c;
+  c.scratch = dir_quota{"/scratch/ente-a", json_integer_max + 1};
+  EXPECT_STOP(validate_resource_config(c), error_category::invalid_input, "resources.scratch");
+  EXPECT_STOP(plan_resources(raw_input(104'857'600), c), error_category::invalid_input, "resources.scratch");
+}
+
+TEST(Resources, T_M3B_MEM_01_raw_master_without_scratch_is_an_input_error_before_any_memory_stop) {
+  EXPECT_STOP(plan_resources(raw_input(104'857'600), resource_config{}), error_category::invalid_input,
+              "resources.planner_input");
+  // Budget sotto il minimo: il controllo dello scratch viene prima dello stop della memoria.
+  EXPECT_STOP(plan_resources(raw_input(raw_minimum - 1), resource_config{}), error_category::invalid_input,
+              "resources.planner_input");
+  EXPECT_STOP(compute_plan_bounds(raw_input(raw_minimum - 1), resource_config{}), error_category::invalid_input,
+              "resources.planner_input");
 }
 
 }  // namespace

@@ -955,6 +955,7 @@ planner_input master_job_input(const job_case& c, std::uint64_t budget, std::siz
   }
   in.header_bound_bytes = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
   in.frame_count = c.g.frames.size();
+  in.master_row_channels = c.g.frames.front().hdr.bayer.empty() ? 1 : 2;
   return in;
 }
 
