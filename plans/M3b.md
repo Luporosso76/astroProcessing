@@ -209,6 +209,8 @@ Test: T-M3B-C02-11 (parte master), T-M3B-FLAT-07 (descrittore, `measure` e repor
 
 ### B12. Analisi: esclusioni per frame — ~350 righe
 
+Stato: **CHIUSA** il 10 novembre 2026 (review `M3b-B12-round1` FAIL con 7 MED, `round2` PASS, LOW residui in `docs/decisions/M3b-lacune.md`; revisore Opus; test e codice da agenti Sonnet distinti; mutazioni 15/15). Emenda C-02.b §b.2 punto 1 (`declared_conflict`). Albero `68e7793`: suite fast 1427 verde in 4 shard, release compilata.
+
 ID: C-02.b §b.2 punto 1 (lista chiusa di motivi), `master.no_usable_frames`.
 
 Fa: funzione pura degli ingressi: `layout`, `metadata_missing.*`, `phase`, `linearity`, `unit`, `pedestal`, `input_variance`, `imagetyp_conflict`, `duplicate_digest`, `decode_failed`, `saturation_conflict`, `saturated_fraction`, `flat_low_signal`, ciascuno con i valori nel report. Nessuna correzione, nessuna sostituzione. `offset_adu` dei RAW come parametro d'analisi `master.offset_adu` (L9). Estende `read_analysis_params` con il membro `master` di `batch.analysis_params` e l'esito `params_missing` per ruolo, con lo stop `master.param.saturation_adu` (L4). Lettore di statistiche per frame (L2) per i FITS: lettura verificata OB-11, pool e cancel; per ogni frame esito di decodifica, saturi, totale dei pixel e `m_(f,c)` (assenti senza pixel validi); la parte RAW del lettore è in B15.
