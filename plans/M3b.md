@@ -47,7 +47,7 @@ Contratto letto; test scritti da un agente diverso dall'autore del codice e vist
 
 ## 5. Unità (ordine topologico)
 
-Ordine: **B0 → B1 → {B2, B3, B4} → B3b → B5 → B6 → B7 → B8 → B9 → B10 → B11**, ramo calcolo. Ramo analisi dopo B3 e B7: **B12 → B13**; **B15a** dopo B3 (nodo e preflight RAW); **B14** dopo B13, B4, B5 e B15a. Giunzione: **B15 → B16 → B17 → gate**; B16 dopo B10, B14, B15 e B15a. Al massimo due unità attive insieme.
+Ordine: **B0 → B1 → {B2, B3, B4} → B3b → B5 → B6 → B7 → B8 → B9 → B10 → B11**, ramo calcolo. Ramo analisi dopo B3 e B7: **B12 → B13**; **B15a** dopo B3 (nodo e preflight RAW); **B14** dopo B13, B4, B5 e B15a. Giunzione: **B15 → B16 → B17 → gate**; B16 dopo B10, B14, B15 e B15a. Al massimo quattro unità attive insieme, purché non tocchino gli stessi file sorgente (utente, 10/11/2026).
 
 ### Modelli per unità (si legge prima di ogni delega)
 
@@ -169,6 +169,8 @@ Fa: procedura per pixel con soglie strette, `clip_min_kept` → bit `support_inc
 Test: T-M3B-C02-01 (parte sigma), 02 (appartenenza esatta, casi inerti `n = 10, κ = 3` e `n = 4, κ = 1.5`, `n = 11, κ = 3` ammesso; casi con intervalli sovrapposti tolti prima della misura e contati), 06 (caratterizzazione); T-M3B-C02-15 (pixel `support_incomplete` senza cambio di metodo, a livello di combinazione).
 
 ### B7. Livelli e statistiche del flat per canale — ~250 righe
+
+Stato: **CHIUSA** il 10 novembre 2026 (review `M3b-B7-round1` PASS con 6 LOW corretti, `round2` PASS con 2 LOW residui in `docs/decisions/M3b-lacune.md`; revisore Opus; test e codice da agenti distinti; mutazioni 11/11). Corregge anche `master_row_channels` del job (difetto di B3b). Albero `4431098`: suite fast 1337 verde in 3 shard, release 1374/1374 (fast e slow).
 
 ID: C-02.b §b.2 («Canali CFA»), §b.6 «Flat», §b.13 punto 4; T-M3B-C02-14.
 

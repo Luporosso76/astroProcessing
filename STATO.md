@@ -9,12 +9,12 @@
 |---|---|
 | B0 decisioni ed emendamenti, B1 protocollo (SHA `83e30030…`), B2 fixture `syn_cal.hpp` | CHIUSE |
 | B3 tipi e domini (`e66a112`), B4 κ (`38c7cf1`), B3b pianificatore (`855d634`), B15a decoder e preflight RAW (`4ff7f4b`) | CHIUSE, review PASS |
-| B5 metodi `single`, `weighted_mean`, `median`, `winsorized` (`483b671`) | CHIUSA, review PASS; protocollo v3 SHA `e21760c7…` |
-| B6 `mean` + `sigma_clip`, bit `support_incomplete` (`b10be73`) | CHIUSA, review PASS; slow 39/39 |
-| B7…B14, B15, B16, B17 | da fare, ordine in `plans/M3b.md` §5 |
+| B5 metodi base (`483b671`), B6 `mean` + `sigma_clip` (`b10be73`), B7 livelli del flat per canale CFA (`4431098`) | CHIUSE, review PASS; protocollo v3 SHA `e21760c7…`; release 1374/1374 su B7 |
+| B8 `median_ratio` parte 1, B12 analisi: esclusioni | in corso (worktree `m3b-b8`, `m3b-b12`, base `4431098`) |
+| B9…B11, B13, B14, B15, B16, B17 | da fare, ordine in `plans/M3b.md` §5 |
 
 ## Prossimo passo
-0. FERMO su richiesta dell'utente (10/11 12:24): B6 chiusa e pubblicata; nessuna unità nuova senza il suo via. Prossima unità quando riparte: B7 (livelli e statistiche del flat per canale, opus).
+0. Fino a quattro unità insieme se non toccano gli stessi file (utente, 10/11 21:45). In corso B8 e B12; poi B9 (dopo B8), B13 (dopo B12), B15 (dopo B12: lettore RAW). Suite fast in 4 shard (3 sfiorano i 600 s col PC carico).
 1. Metodo per unità: test rossi → codice (agente diverso) → shard verdi + mutazioni → review (Argon; senza quota: Agent code-reviewer opus) → rebase, verifica dell'albero unito (slow compresi se il codice del master cambia), ff, push.
 2. Blocchi evidence dei record che citano `master.cpp` e C-02: da rigenerare al prossimo run completo (codice cambiato dopo l'ultimo junit completo).
 ## Debiti degli strumenti
