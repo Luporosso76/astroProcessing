@@ -161,6 +161,8 @@ Test: T-M3B-C02-01 (casi dyadic, pareggi `−0`/`+0`), 03, 04, 07 (caratterizzaz
 
 ### B6. `mean` + `sigma_clip` — ~300 righe
 
+Stato: **CHIUSA** il 10 novembre 2026 (review `M3b-B6-round1` FAIL con 1 BLOCCANTE, `round2` PASS, revisore Opus; test e codice da agenti distinti; mutazioni 7/7). Porta nel codice il bit 9 `support_incomplete` di ADR-03.b §b.6 e T-M3A-TYP-08 (anticipato da M3.d); decisioni in `docs/decisions/M3b-lacune.md`, «Decisioni successive (B6)». Albero `b10be73`: suite fast 1322 verde in 3 shard, slow 39/39, release compilata.
+
 ID: C-02.b §b.1 («`sigma_clip`», Samuelson), §b.6 (selezione congelata), §b.7.
 
 Fa: procedura per pixel con soglie strette, `clip_min_kept` → bit `support_incomplete`, campione e varianza NaN; rifiuto non acceso come invalidità; `master.param.sigma_clip_inert` con confronto esatto sui f64 di `(n − 1)²` contro `κ² n`; piano `frozen_selection`; capability `variance.fixed_weight_approximation`; avviso `frozen_selection_approximation`.
