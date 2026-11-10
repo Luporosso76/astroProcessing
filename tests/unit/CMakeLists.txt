@@ -261,6 +261,14 @@ foreach(b9_slow
     FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 endforeach()
 
+# B13 di M3.b: analisi dei master, gruppi e livelli del flat. T-M3B-C02-08 (parte gruppi: chiave esatta un campo alla
+# volta, tolleranze, RAW e FITS insieme, permutazioni, gruppi disgiunti, stato `flat_level`), T-M3B-C02-14 (stato
+# `flat_level` nell'analisi): `fast`.
+add_executable(test_master_b13 test_master_b13.cpp)
+target_link_libraries(test_master_b13 PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_master_b13 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_master_b13 PROPERTIES LABELS fast)
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -470,6 +478,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b12.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b8.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b9.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b13.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir

@@ -79,10 +79,23 @@ struct master_exclusion {
   json values;
 };
 
+// `flat_level`: un membro di un gruppo flat viola `flat_level_rel_tol` in un canale. Non esclude frame.
+enum class master_group_status { ok, flat_level };
+
+// Gruppo di C-02.b §b.2 punto 2: un nodo per gruppo.
+struct master_group {
+  std::uint64_t reference = 0;          // input_id del riferimento, `members[0]`
+  std::vector<std::uint64_t> members;   // input_id, ordine canonico
+  master_group_status status = master_group_status::ok;
+  // Solo per il flat: m_(f,c) per membro nell'ordine di `members`, canali nell'ordine dei siti. Vuoto per gli altri ruoli.
+  std::vector<std::vector<double>> flat_levels;
+};
+
 struct master_screening {
   std::vector<std::string> missing_params;  // `params_missing`: nessuna esclusione, nessun frame utilizzabile
   std::vector<master_exclusion> excluded;   // ordine canonico (digest, poi input_id)
   std::vector<std::uint64_t> usable;        // input_id, ordine canonico
+  std::vector<master_group> groups;         // disgiunti, coprono `usable`; ordine canonico del riferimento
 };
 
 // Funzione pura degli ingressi, indipendente dall'ordine dei frame. Parametri richiesti assenti: `missing_params`, senza
@@ -90,7 +103,12 @@ struct master_screening {
 // master.param.saturation_adu.
 // Parametro fuori dominio (dopo `params_missing`): invalid_input master.param.<nome>. Nessun frame utilizzabile:
 // invalid_input master.no_usable_frames. Altrimenti chiama `fault("master.analysis.groups")`
-// una volta, dopo le esclusioni.
+// una volta, dopo le esclusioni, e forma i gruppi sui frame utilizzabili.
+// Gruppi: chiave esatta di C-02.b §b.2 punto 2, poi tolleranze col riferimento (frame restante a digest minimo) con le
+// regole del preflight: esposizione |x − y| ≤ tol · max(|x|, |y|), temperatura entro `temperature_abs_tol_c` con
+// `compare`, nero effettivo RAW per sito in interi a 64 bit entro `decoder_black_abs_tol_adu`. Flat: m̄_c media dei
+// membri in ordine canonico, stato `flat_level` se |m_(f,c) / m̄_c − 1| > `flat_level_rel_tol`; m̄_c non finita:
+// numeric master.report_nonfinite.
 master_screening screen_master_frames(master_role role, const std::vector<master_analysis_frame>& frames,
                                       const master_analysis_params& params, const fault_injector& fault = {});
 

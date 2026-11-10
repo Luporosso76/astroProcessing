@@ -5,6 +5,7 @@
 #include <cmath>
 #include <string_view>
 
+#include "astro/calibration_analysis.hpp"
 #include "astro/error.hpp"
 #include "astro/fits.hpp"
 #include "astro/operations.hpp"
@@ -244,6 +245,104 @@ bool canonical_before(const master_analysis_frame* a, const master_analysis_fram
   return a->input_id < b->input_id;
 }
 
+// Chiave esatta di C-02.b §b.2 punto 2, senza i campi strutturali RAW (in `within_tolerance`). I campi opzionali si
+// confrontano per valore, con «assente» come valore: la chiave è più stretta del preflight.
+bool same_key(master_role role, const image& a, const image& b) {
+  const frame_metadata &ma = a.metadata, &mb = b.metadata;
+  if (a.geometry.width != b.geometry.width || a.geometry.height != b.geometry.height) return false;
+  if (a.geometry.binning_x != b.geometry.binning_x || a.geometry.binning_y != b.geometry.binning_y) return false;
+  if (!(a.cfa == b.cfa)) return false;
+  if (!(ma.camera == mb.camera) || !(ma.gain == mb.gain)) return false;
+  if (role == master_role::flat && !(ma.filter == mb.filter)) return false;
+  if (!(ma.roi_x == mb.roi_x) || !(ma.roi_y == mb.roi_y)) return false;
+  if (!(ma.readout_mode == mb.readout_mode) || !(ma.row_order == mb.row_order)) return false;
+  if (a.decoder_state.has_value() != b.decoder_state.has_value()) return false;
+  return a.decoder_state.has_value() || ma.offset_adu == mb.offset_adu;
+}
+
+// Frame utilizzabile con il periodo del nero effettivo, calcolato una volta per un RAW.
+struct group_candidate {
+  const master_analysis_frame* frame = nullptr;
+  std::optional<decoder_black_period> black;
+};
+
+// Tolleranze col riferimento, con le regole a coppie del preflight (compare_with_reference e validate_raw_frames di
+// master.cpp): esposizione relativa al massimo, temperatura assoluta con `compare`, stato del decoder di ADR-16.b §b.7
+// (campi strutturali uguali, nero per sito entro la tolleranza). Chiamata solo su frame con la stessa chiave.
+bool within_tolerance(const group_candidate& ref, const group_candidate& f, const master_analysis_params& p) {
+  const image& a = ref.frame->observation.observed_image();
+  const image& b = f.frame->observation.observed_image();
+  {
+    const double x = a.metadata.exposure_s->value, y = b.metadata.exposure_s->value, tol = *p.exposure_rel_tol;
+    if (!(std::fabs(x - y) <= tol * std::max(std::fabs(x), std::fabs(y)))) return false;
+  }
+  if (*p.temp_policy == temperature_policy::compare) {
+    const double x = a.metadata.temperature_c->value, y = b.metadata.temperature_c->value, tol = *p.temperature_abs_tol_c;
+    if (!(std::fabs(x - y) <= tol)) return false;
+  }
+  if (!a.decoder_state) return true;
+  return decoder_state_difference(*b.decoder_state, *f.black, *a.decoder_state, *ref.black, true, *p.decoder_black_abs_tol_adu) ==
+         nullptr;
+}
+
+// Livelli del flat del gruppo (C-02.b §b.2 punto 3) con la regola di finish_preflight di master.cpp: m̄_c in ordine
+// canonico, poi |m_(f,c) / m̄_c − 1| > tol per un membro e un canale dà `flat_level`, uguale ammesso.
+void set_flat_levels(master_group& g, const std::vector<const master_analysis_frame*>& members, const master_analysis_params& p) {
+  const std::size_t channels = members[0]->stats->levels.size();
+  for (const master_analysis_frame* f : members) {
+    std::vector<double> levels;
+    for (const std::optional<double>& level : f->stats->levels) levels.push_back(*level);  // presenti: flat_low_signal
+    g.flat_levels.push_back(std::move(levels));
+  }
+  for (std::size_t c = 0; c < channels; ++c) {
+    double sum = g.flat_levels[0][c];
+    for (std::size_t k = 1; k < members.size(); ++k) sum += g.flat_levels[k][c];
+    const double mean = sum / static_cast<double>(members.size());
+    if (!std::isfinite(mean)) {
+      // `canale` come `flat_context` del preflight: etichetta del sito del motivo CFA (R, G1, G2, B), assente nel mono.
+      stop_error::context_list context = {{"riferimento", std::to_string(g.reference)}};
+      if (const auto& cfa = members[0]->observation.observed_image().cfa) context.emplace_back("canale", channel_labels(cfa->pattern)[c]);
+      throw stop_error(error_category::numeric, "master.report_nonfinite", "media dei livelli del flat non finita", std::move(context));
+    }
+    for (const std::vector<double>& levels : g.flat_levels) {
+      if (std::fabs(levels[c] / mean - 1) > *p.flat_level_rel_tol) g.status = master_group_status::flat_level;
+    }
+  }
+}
+
+// Gruppi di C-02.b §b.2 punto 2 sui frame utilizzabili in ordine canonico: il riferimento è il primo restante, il gruppo
+// i restanti con la stessa chiave entro le tolleranze; i membri escono dai restanti e si ripete.
+std::vector<master_group> form_groups(master_role role, const std::vector<const master_analysis_frame*>& usable,
+                                      const master_analysis_params& p) {
+  std::vector<group_candidate> remaining;
+  for (const master_analysis_frame* f : usable) {
+    const auto& state = f->observation.observed_image().decoder_state;
+    remaining.push_back(group_candidate{f, state ? std::optional<decoder_black_period>(decoder_black_period_of(*state)) : std::nullopt});
+  }
+  std::vector<master_group> groups;
+  while (!remaining.empty()) {
+    const group_candidate ref = remaining.front();
+    const image& ref_image = ref.frame->observation.observed_image();
+    std::vector<const master_analysis_frame*> members{ref.frame};
+    std::vector<group_candidate> rest;
+    for (std::size_t k = 1; k < remaining.size(); ++k) {
+      const group_candidate& f = remaining[k];
+      if (same_key(role, ref_image, f.frame->observation.observed_image()) && within_tolerance(ref, f, p)) {
+        members.push_back(f.frame);
+      } else {
+        rest.push_back(f);
+      }
+    }
+    master_group g;
+    g.reference = ref.frame->input_id;
+    for (const master_analysis_frame* f : members) g.members.push_back(f->input_id);
+    if (role == master_role::flat) set_flat_levels(g, members, p);
+    groups.push_back(std::move(g));
+    remaining = std::move(rest);
+  }
+  return groups;
+}
+
 }  // namespace
 
 master_frame_stats read_master_frame_stats(const std::string& path, const content_digest& digest, const master_stats_request& request,
@@ -298,12 +397,14 @@ master_screening screen_master_frames(master_role role, const std::vector<master
   check_param_domains(role, any_raw, params);
 
   json exclusions = json::array();
+  std::vector<const master_analysis_frame*> usable;
   const master_analysis_frame* first_copy = nullptr;
   for (const master_analysis_frame* f : order) {
     if (first_copy == nullptr || first_copy->digest != f->digest) first_copy = f;
     std::optional<reason> why = first_reason(role, *f, params, first_copy);
     if (!why) {
       out.usable.push_back(f->input_id);
+      usable.push_back(f);
       continue;
     }
     exclusions.push(object_of({{"digest", json::string(f->digest.sha256)},
@@ -322,6 +423,7 @@ master_screening screen_master_frames(master_role role, const std::vector<master
                        {{"point", "master.analysis.groups"}, {"errno", std::to_string(err)}});
     }
   }
+  out.groups = form_groups(role, usable, params);
   return out;
 }
 
