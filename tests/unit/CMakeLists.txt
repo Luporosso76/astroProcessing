@@ -203,6 +203,17 @@ foreach(b6_cell n11_iter1 n11_iter5 n21_iter1 n21_iter5 n51_iter1 n51_iter5)
     FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 endforeach()
 
+# B7 di M3.b: livelli e statistiche del flat per canale. T-M3B-C02-14 (tolleranza per canale, level_bias_estimate per
+# canale, flat mono invariato), versione dell'algoritmo del nodo, riproducibilità del job; T-M3B-MEM-01 (Cr = 2 del
+# job CFA): `fast`.
+add_executable(test_master_b7 test_master_b7.cpp)
+target_link_libraries(test_master_b7 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b7 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b7 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b7 PROPERTIES LABELS fast)
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -408,6 +419,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_kappa.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b5.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b6.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b7.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
@@ -456,6 +468,10 @@ set_tests_properties(T-M2R5-01.avx2.test_master_b5 PROPERTIES LABELS fast TIMEOU
 # `mean` + `sigma_clip` (B6) sul secondo percorso: solo le suite fast.
 add_test(NAME T-M2R5-01.avx2.test_master_b6 COMMAND test_master_b6 --gtest_filter=-*Slow.*)
 set_tests_properties(T-M2R5-01.avx2.test_master_b6 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+# Livelli del flat per canale (B7) sul secondo percorso.
+add_test(NAME T-M2R5-01.avx2.test_master_b7 COMMAND test_master_b7)
+set_tests_properties(T-M2R5-01.avx2.test_master_b7 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
   FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 
 # T-M2R5-05 e T-M2R5-07 (parte binaria): istruzioni vietate nei kernel, crtfastmath e fast-math nella build.

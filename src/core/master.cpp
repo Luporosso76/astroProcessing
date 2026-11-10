@@ -416,7 +416,7 @@ struct frame_state {
   field_origins origins;
   std::uint64_t saturated = 0;
   double saturated_fraction = 0;
-  std::optional<double> level;  // m_f, solo flat
+  std::array<double, 4> level{};  // m_(f,c) nell'ordine dei canali, solo flat; il mono ha il solo canale 0
   std::uint64_t rejected = 0;   // campioni rifiutati da sigma_clip, somma dei parziali dei task
 };
 
@@ -443,7 +443,8 @@ struct master_plan {
   std::size_t n = 0;
   std::uint32_t w = 0, h = 0;
   bool flat = false, has_sat = false;
-  double sat = 0, offset = 0, eps = 0, level_mean = 0;
+  double sat = 0, offset = 0, eps = 0;
+  std::array<double, 4> level_mean{};  // m̄_c, solo flat
   std::uint8_t cfa_x = 0, cfa_y = 0;
   bool per_channel = false;
   std::array<const char*, 4> labels = {"all", "", "", ""};
@@ -464,6 +465,12 @@ struct master_plan {
 
   std::size_t channel_of(std::uint32_t x, std::uint32_t y) const noexcept {
     return per_channel ? static_cast<std::size_t>(((y + cfa_y) & 1u) * 2 + ((x + cfa_x) & 1u)) : 0;
+  }
+  std::size_t channel_count() const noexcept { return per_channel ? 4 : 1; }
+  // Contesto di uno stop del flat: le chiavi di `.a`, più `canale` per un frame CFA.
+  stop_error::context_list flat_context(stop_error::context_list context, std::size_t c) const {
+    if (per_channel) context.emplace_back("canale", labels[c]);
+    return context;
   }
 };
 
@@ -602,7 +609,14 @@ double value_at(const image& im, std::size_t i) {
   return im.type == sample_type::f32 ? static_cast<double>(im.data<float>()[i]) : im.data<double>()[i];
 }
 
-// Controlli del singolo frame, statistiche sull'intera immagine (frazione satura, m_f) e copia dei metadati.
+[[noreturn]] void mismatch(const std::string& pair, const char* field, const std::string& left, const std::string& right,
+                           const std::string& tolerance) {
+  stop(error_category::incompatible, std::string("master.mismatch.") + field, "frame del gruppo incompatibili",
+       {{"coppia", pair}, {"campo", field}, {"sinistra", left}, {"destra", right}, {"tolleranza", tolerance}});
+}
+
+// Controlli del singolo frame, statistiche sull'intera immagine (frazione satura, m_f) e copia dei metadati;
+// per il flat, motivo CFA confrontato col frame 0 prima dei livelli per canale.
 void inspect_frame(master_plan& p, std::size_t k, image& im) {
   frame_state& fs = p.frames[k];
   const std::string& name = fs.name;
@@ -668,6 +682,14 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
     }
   }
 
+  // Canali dal frame di riferimento canonico, prima dei livelli m_(f,c); un frame k > 0 con un altro motivo (o mono) si
+  // ferma con lo stop CFA del confronto col riferimento prima che i suoi livelli si calcolino col motivo del frame 0.
+  if (k == 0 && im.cfa) {
+    p.per_channel = true;
+    p.cfa_x = im.cfa->x_offset;
+    p.cfa_y = im.cfa->y_offset;
+    p.labels = channel_labels(im.cfa->pattern);
+  }
   const std::size_t px = static_cast<std::size_t>(im.geometry.width) * im.geometry.height;
   if (p.has_sat) {
     for (std::size_t i = 0; i < px; ++i) {
@@ -681,21 +703,32 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
     }
   }
   if (p.flat) {
-    std::vector<double> z;
-    z.reserve(px);
-    for (std::size_t i = 0; i < px; ++i) {
-      if (im.invalid.bits[i] == 0) z.push_back(value_at(im, i) - offset);
+    if (k > 0 && !(p.frames[0].header.cfa == im.cfa)) {
+      mismatch(p.frames[0].name + "-" + name, "cfa", cfa_text(p.frames[0].header.cfa), cfa_text(im.cfa), "esatta");
     }
-    if (z.empty()) {
-      stop(error_category::invalid_input, "master.flat_low_signal", "nessun pixel valido per il livello del flat",
-           {{"frame", name}});
+    // m_(f,c) per canale (C-02.b §b.6): mediana dei campioni validi del canale, nessuna somma.
+    const std::size_t channels = p.channel_count();
+    std::array<std::vector<double>, 4> z;
+    for (std::size_t c = 0; c < channels; ++c) z[c].reserve(px / channels + 1);
+    const std::uint32_t w = im.geometry.width;
+    for (std::uint32_t y = 0; y < im.geometry.height; ++y) {
+      for (std::uint32_t x = 0; x < w; ++x) {
+        const std::size_t i = static_cast<std::size_t>(y) * w + x;
+        if (im.invalid.bits[i] == 0) z[p.channel_of(x, y)].push_back(value_at(im, i) - offset);
+      }
     }
-    const double level = median_of(z);
-    if (!std::isfinite(level) || level < *r.flat_min_signal_adu) {
-      stop(error_category::invalid_input, "master.flat_low_signal", "livello del flat sotto flat_min_signal_adu o non finito",
-           {{"frame", name}, {"m_f", num_text(level)}, {"minimo", num_text(*r.flat_min_signal_adu)}});
+    for (std::size_t c = 0; c < channels; ++c) {
+      if (z[c].empty()) {
+        stop(error_category::invalid_input, "master.flat_low_signal", "nessun pixel valido per il livello del flat",
+             p.flat_context({{"frame", name}}, c));
+      }
+      const double level = median_of(z[c]);
+      if (!std::isfinite(level) || level < *r.flat_min_signal_adu) {
+        stop(error_category::invalid_input, "master.flat_low_signal", "livello del flat sotto flat_min_signal_adu o non finito",
+             p.flat_context({{"frame", name}, {"m_f", num_text(level)}, {"minimo", num_text(*r.flat_min_signal_adu)}}, c));
+      }
+      fs.level[c] = level;
     }
-    fs.level = level;
   }
   fs.header = header_of(im);
 }
@@ -711,12 +744,6 @@ json record_of(const std::string& pair, const char* field, json left, json right
   r.set("tolerance", std::move(tolerance));
   r.set("result", json::string(result));
   return r;
-}
-
-[[noreturn]] void mismatch(const std::string& pair, const char* field, const std::string& left, const std::string& right,
-                           const std::string& tolerance) {
-  stop(error_category::incompatible, std::string("master.mismatch.") + field, "frame del gruppo incompatibili",
-       {{"coppia", pair}, {"campo", field}, {"sinistra", left}, {"destra", right}, {"tolleranza", tolerance}});
 }
 
 // Compatibilità del frame k con il frame di riferimento canonico (C-02.a §2).
@@ -845,17 +872,27 @@ void finish_preflight(master_plan& p) {
   p.h = ref.geometry.height;
   p.offset = ref.metadata.offset_adu->value;
   if (p.flat) {
-    double sum = *p.frames[0].level;
-    for (std::size_t k = 1; k < p.n; ++k) sum += *p.frames[k].level;
-    p.level_mean = sum / static_cast<double>(p.n);
-    if (!std::isfinite(p.level_mean)) {
-      stop(error_category::numeric, "master.report_nonfinite", "media dei livelli del flat non finita");
+    // m̄_c in ordine canonico; poi la tolleranza per frame canonico e, nel frame, per canale: la prima violazione.
+    const std::size_t channels = p.channel_count();
+    for (std::size_t c = 0; c < channels; ++c) {
+      double sum = p.frames[0].level[c];
+      for (std::size_t k = 1; k < p.n; ++k) sum += p.frames[k].level[c];
+      p.level_mean[c] = sum / static_cast<double>(p.n);
+      if (!std::isfinite(p.level_mean[c])) {
+        stop(error_category::numeric, "master.report_nonfinite", "media dei livelli del flat non finita", p.flat_context({}, c));
+      }
     }
     for (const frame_state& f : p.frames) {
-      const double rel = *f.level / p.level_mean - 1;
-      if (std::fabs(rel) > p.eps) {
-        stop(error_category::unsupported, "master.variance_domain", "livello del flat oltre flat_level_rel_tol",
-             {{"frame", f.name}, {"m_f", num_text(*f.level)}, {"m_media", num_text(p.level_mean)}, {"tolleranza", num_text(p.eps)}});
+      for (std::size_t c = 0; c < channels; ++c) {
+        const double rel = f.level[c] / p.level_mean[c] - 1;
+        if (std::fabs(rel) > p.eps) {
+          stop(error_category::unsupported, "master.variance_domain", "livello del flat oltre flat_level_rel_tol",
+               p.flat_context({{"frame", f.name},
+                               {"m_f", num_text(f.level[c])},
+                               {"m_media", num_text(p.level_mean[c])},
+                               {"tolleranza", num_text(p.eps)}},
+                              c));
+        }
       }
     }
   }
@@ -885,12 +922,6 @@ void finish_preflight(master_plan& p) {
     p.lbe.assign(px, std::numeric_limits<double>::quiet_NaN());
     p.ratio.assign(px, std::numeric_limits<double>::quiet_NaN());
     p.nonpositive.assign(px, 0);
-  }
-  if (ref.cfa) {
-    p.per_channel = true;
-    p.cfa_x = ref.cfa->x_offset;
-    p.cfa_y = ref.cfa->y_offset;
-    p.labels = channel_labels(ref.cfa->pattern);
   }
 }
 
@@ -1255,9 +1286,19 @@ json frame_report(const master_plan& p, const frame_state& f) {
   o.set("rejected_samples", json::uinteger(f.rejected));
   o.set("saturated_samples", p.has_sat ? json::uinteger(f.saturated) : json::null());
   o.set("saturated_fraction", p.has_sat ? json::number(f.saturated_fraction) : json::null());
-  if (p.flat) {
-    o.set("flat_level", json::number(*f.level));
-    o.set("flat_level_rel_dev", json::number(*f.level / p.level_mean - 1));
+  if (p.flat && p.per_channel) {
+    json levels = json::array();
+    for (std::size_t c = 0; c < 4; ++c) {
+      json e = json::object();
+      e.set("label", json::string(p.labels[c]));
+      e.set("level", json::number(f.level[c]));
+      e.set("rel_dev", json::number(f.level[c] / p.level_mean[c] - 1));
+      levels.push(std::move(e));
+    }
+    o.set("flat_levels", std::move(levels));
+  } else if (p.flat) {
+    o.set("flat_level", json::number(f.level[0]));
+    o.set("flat_level_rel_dev", json::number(f.level[0] / p.level_mean[0] - 1));
   }
   const image& im = f.header;
   json fields = json::object();
@@ -1350,6 +1391,7 @@ json channel_report(const master_plan& p) {
   for (std::size_t c = 0; c < channels; ++c) {
     json o = json::object();
     o.set("label", json::string(p.labels[c]));
+    if (p.flat && p.per_channel) o.set("flat_level_mean", json::number(p.level_mean[c]));
     o.set("valid_pixels", json::uinteger(valid[c]));
     o.set("variance_plane_median", median_or_null(planes[c]));
     if (p.flat && p.method == method_kind::single) {
@@ -1386,7 +1428,7 @@ json build_report(master_plan& p) {
   report.set("rejection", json::string("none"));
   report.set("reference_frame", json::string(p.frames[0].spec->digest.sha256));
   report.set("compatibility", p.compat);
-  if (p.flat) report.set("flat_level_mean", json::number(p.level_mean));
+  if (p.flat && !p.per_channel) report.set("flat_level_mean", json::number(p.level_mean[0]));
   report.set("master_metadata", p.master_metadata);
   report.set("metadata_not_common", p.not_common);
   // Piano e coefficiente di variazione per metodo (C-02.b §b.6, §b.7): sqrt(2/(n − 1)) per `mean`, `median` e
@@ -1843,11 +1885,15 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     // Apertura, fase e linearità dai soli header, piano dei file: nessun campione letto.
     std::vector<fits_input> inputs;
     std::vector<fits_plan> plans;
+    // Canali per riga del modello di memoria (Cr): dal motivo dell'header del frame canonico 0, lo stesso da cui il
+    // preflight decide `per_channel`; il preflight lo riconferma prima di ogni task.
+    bool header_cfa = false;
     inputs.reserve(p.n);
     for (std::size_t k = 0; k < p.n; ++k) {
       const master_frame_spec& f = *p.frames[k].spec;
       inputs.push_back(open_fits_input(f.path));
       const header_peek peek = peek_header(inputs.back(), f.read_options);
+      if (k == 0) header_cfa = peek.cfa.has_value();
       require_phase(p.frames[k].name, p.recipe.role, peek.phase);
       require_linear(p.frames[k].name, p.recipe.role, merged_linearity(p.frames[k].name, peek.lin, f.declared_fields.lin));
       plans.push_back(plan_fits(inputs.back()));
@@ -1870,7 +1916,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     planner_input in{pool.budget_bytes(), cpus, plans[0].width, plans[0].height, sample_size(recipe.output_type),
                      frame_peak, output_header_bound};
     in.frame_count = p.n;
-    in.master_row_channels = p.per_channel ? 2 : 1;
+    in.master_row_channels = header_cfa ? 2 : 1;
     in.master_raw_frames = false;
     const resource_plan chosen = plan_resources(in, config);
     job_plan plan;
@@ -1940,6 +1986,9 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         compare_optional_fields(p, k);
       }
       finish_preflight(p);
+      // Invariante: peek e decode leggono gli stessi byte con le stesse read_options e la stessa interpretazione
+      // dell'header; un file modificato fra i due lo ferma già read_verified_input (integrity, input.modified).
+      ASTRO_ASSERT(p.per_channel == header_cfa);
       observed = observed_inputs(p);
       if (options.hook) options.hook("frames.read");
     };

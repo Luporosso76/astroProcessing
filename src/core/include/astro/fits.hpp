@@ -135,6 +135,7 @@ struct fits_read_options {
 struct header_peek {
   std::optional<metadata_value<process_phase>> phase;
   std::optional<linearity> lin;
+  std::optional<cfa_layout> cfa;  // lo stesso motivo che decode_fits darebbe all'immagine
 };
 header_peek peek_header(const fits_input& input, const fits_read_options& options);
 

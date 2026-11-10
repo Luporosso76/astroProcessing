@@ -614,7 +614,7 @@ header_peek peek_header(const fits_input& input, const fits_read_options& option
   const read_fn read = [&input](std::uint64_t offset, void* dst, std::size_t n) { read_exact(input, offset, dst, n); };
   const scan_result scan = analyse(input.size_bytes(), read);
   const header_info info = interpret_header(scan.hdus[0].cards, scan.hdus[0].planes(), options);
-  return header_peek{info.phase, info.lin};
+  return header_peek{info.phase, info.lin, info.cfa};
 }
 
 fits_plan plan_fits(std::span<const std::uint8_t> bytes) {

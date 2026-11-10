@@ -835,13 +835,15 @@ TEST(MasterJob, T_M2R2_08_report_and_provenance_are_complete_and_coherent) {
 }
 
 TEST(MasterJob, T_M2R2_08_channel_without_valid_pixels_and_nonfinite_statistic) {
-  // Flat CFA RGGB 4x4: i pixel R (x, y pari) sono NaN nel frame 0, quindi il canale R non ha pixel validi.
+  // Flat CFA RGGB 4x4: i pixel R (x, y pari) sono NaN, metà nel frame 0 e metà nel frame 1, quindi il master non ha
+  // pixel R validi mentre ogni frame ha pixel R validi per il suo livello m_(f,c) (C-02.b §b.6).
   group g = make_group(master_role::flat, 4, 4, 3);
   for (std::size_t k = 0; k < 3; ++k) {
     g.frames[k].hdr.bayer = "RGGB";
     for (std::size_t i = 0; i < 16; ++i) g.frames[k].v[i] = 10 + 2000 + static_cast<double>(i % 3) + static_cast<double>(k);
   }
-  for (const std::size_t i : {0, 2, 8, 10}) g.frames[0].v[i] = std::numeric_limits<double>::quiet_NaN();
+  for (const std::size_t i : {0, 2}) g.frames[0].v[i] = std::numeric_limits<double>::quiet_NaN();
+  for (const std::size_t i : {8, 10}) g.frames[1].v[i] = std::numeric_limits<double>::quiet_NaN();
   const master_result m = combine_master(recipe_of(g, 0.01), images_of(g));
   const json* red = nullptr;
   std::size_t seen = 0;
