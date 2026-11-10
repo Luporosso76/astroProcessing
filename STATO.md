@@ -18,7 +18,7 @@
 1. Metodo per unità: test rossi → codice (agente diverso) → shard verdi + mutazioni → review (Argon; senza quota: Agent code-reviewer opus) → rebase, verifica dell'albero unito (slow compresi se il codice del master cambia), ff, push.
 2. Blocchi evidence dei record che citano `master.cpp` e C-02: da rigenerare al prossimo run completo (codice cambiato dopo l'ultimo junit completo).
 ## Debiti degli strumenti
-- `tools/review.sh` fa `cd` alla radice del checkout principale: controllo dello stato di git, istantanea e delta del giro 2 riguardano il principale, non il worktree in revisione (visto il 9/11 su B15a). Correggere quando Argon torna (passare il percorso del worktree), con selftest. `tools/mutate.sh` senza `--test-output-size-failed`: il junit perde `[  FAILED  ]` e la mutazione esce con 2 anche se rilevata (B5).
+- `tools/review.sh` fa `cd` alla radice del checkout principale: controllo dello stato di git, istantanea e delta del giro 2 riguardano il principale, non il worktree in revisione (visto il 9/11 su B15a). Correggere quando Argon torna (passare il percorso del worktree), con selftest. `tools/mutate.sh`: troncamento del junit corretto il 10/11 (review PASS); 7 LOW residui in `.omc/artifacts/ask/review-tools-mutate-round2-*`.
 
 ## Non verificato
 - `tmp/` 15 GB (u12-build-offline 3,8 GB, ccache 5 GB), `build/` 12 GB: non rimossi.
