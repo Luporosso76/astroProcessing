@@ -187,6 +187,22 @@ foreach(b5_slow
     FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 endforeach()
 
+# B6 di M3.b: `mean` + `sigma_clip`. T-M3B-C02-01 (parte sigma), 02, 15 (`support_incomplete` a livello di
+# combinazione) e parte binaria di 06: `fast`. T-M3B-C02-06 (protocollo docs/evidence/M3b-protocollo.md §3.3): suite
+# *Slow, un test ctest per cella (n, clip_max_iter); esecuzione seriale: `ctest -L slow`.
+add_executable(test_master_b6 test_master_b6.cpp)
+target_link_libraries(test_master_b6 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b6 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b6 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b6 TEST_FILTER "-*Slow.*" PROPERTIES LABELS fast)
+foreach(b6_cell n11_iter1 n11_iter5 n21_iter1 n21_iter5 n51_iter1 n51_iter5)
+  add_test(NAME T-M3B-C02-06.${b6_cell} COMMAND test_master_b6 --gtest_filter=MasterB6Slow.T_M3B_C02_06_${b6_cell})
+  set_tests_properties(T-M3B-C02-06.${b6_cell} PROPERTIES LABELS slow RUN_SERIAL TRUE TIMEOUT 1800
+    FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+endforeach()
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -391,6 +407,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_raw_decode_b15a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_kappa.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b5.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b6.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
@@ -435,6 +452,10 @@ endforeach()
 # I metodi di B5 sul secondo percorso: solo le suite fast (le *Slow statistiche restano una volta, sul percorso scalare).
 add_test(NAME T-M2R5-01.avx2.test_master_b5 COMMAND test_master_b5 --gtest_filter=-*Slow.*)
 set_tests_properties(T-M2R5-01.avx2.test_master_b5 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+# `mean` + `sigma_clip` (B6) sul secondo percorso: solo le suite fast.
+add_test(NAME T-M2R5-01.avx2.test_master_b6 COMMAND test_master_b6 --gtest_filter=-*Slow.*)
+set_tests_properties(T-M2R5-01.avx2.test_master_b6 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
   FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 
 # T-M2R5-05 e T-M2R5-07 (parte binaria): istruzioni vietate nei kernel, crtfastmath e fast-math nella build.

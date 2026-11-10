@@ -364,7 +364,7 @@ job_files_result run_block_calibration(sqlite_dag_store& store, memory_pool& poo
     prepared_calibration::impl& p = *prepared;
     pool_buffer buffer(jc.shared, static_cast<std::size_t>(layout.inputs_bytes()));
     const std::uint64_t chunk = buffer.size() / 2 * 2;
-    std::array<std::uint64_t, 9> counts{};
+    invalid_reason::bit_counts counts{};
     std::uint64_t invalid_pixels = 0;
     for (std::uint64_t done = 0; done < samples * 2;) {
       const std::uint64_t n = std::min(chunk, samples * 2 - done);

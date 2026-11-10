@@ -9,10 +9,6 @@ namespace astro {
 
 namespace {
 
-constexpr std::array<const char*, 9> bit_names = {"source_nonfinite", "source_flagged", "saturated",
-                                                  "master_invalid",   "q_nonpositive",  "q_nonfinite",
-                                                  "q_below_min",      "q_unreliable",   "result_nonfinite"};
-
 void render(std::ostringstream& out, const json& value, int depth, const std::string& key) {
   const std::string pad(static_cast<std::size_t>(depth) * 2, ' ');
   switch (value.type()) {
@@ -51,13 +47,13 @@ std::string calibration_report_text(const json& report) {
   return out.str();
 }
 
-json calib_detail::calibration_report(const prepared_calibration::impl& p, const std::array<std::uint64_t, 9>& counts,
+json calib_detail::calibration_report(const prepared_calibration::impl& p, const invalid_reason::bit_counts& counts,
                                       std::uint64_t invalid_pixels) {
   const std::uint64_t total = static_cast<std::uint64_t>(p.w) * p.h;
 
   json mask = json::object();
   json by_bit = json::object();
-  for (std::size_t b = 0; b < counts.size(); ++b) by_bit.set(bit_names[b], json::uinteger(counts[b]));
+  for (std::size_t b = 0; b < counts.size(); ++b) by_bit.set(invalid_reason::bit_names[b], json::uinteger(counts[b]));
   mask.set("invalid_pixels", json::uinteger(invalid_pixels));
   mask.set("valid_pixels", json::uinteger(total - invalid_pixels));
   mask.set("pixels_with_bit", std::move(by_bit));
@@ -125,7 +121,7 @@ json calib_detail::calibration_report(const prepared_calibration::impl& p, const
 
 calibration_result finish_calibration(prepared_calibration&& prepared) {
   prepared_calibration::impl& p = *prepared.impl_;
-  std::array<std::uint64_t, 9> counts{};
+  invalid_reason::bit_counts counts{};
   std::uint64_t invalid_pixels = 0;
   for (const std::uint16_t bits : p.out.invalid.bits) {
     if (bits != 0) ++invalid_pixels;

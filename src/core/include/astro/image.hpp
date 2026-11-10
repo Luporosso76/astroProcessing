@@ -58,7 +58,16 @@ constexpr std::uint16_t q_nonfinite = 1u << 5;
 constexpr std::uint16_t q_below_min = 1u << 6;
 constexpr std::uint16_t q_unreliable = 1u << 7;
 constexpr std::uint16_t result_nonfinite = 1u << 8;
-constexpr std::uint16_t reserved_mask = 0xFE00;
+constexpr std::uint16_t support_incomplete = 1u << 9;  // ADR-03.b §b.6
+constexpr std::uint16_t reserved_mask = 0xFC00;      // bit 10-15
+// Nomi dei bit dichiarati, nell'ordine dei bit (bit k = bit_names[k]): i conteggi per bit dei report usano questa
+// tabella.
+inline constexpr std::array<const char*, 10> bit_names = {
+    "source_nonfinite", "source_flagged", "saturated",    "master_invalid",   "q_nonpositive",
+    "q_nonfinite",      "q_below_min",    "q_unreliable", "result_nonfinite", "support_incomplete"};
+static_assert(static_cast<std::uint16_t>(~reserved_mask) == (1u << bit_names.size()) - 1u,
+              "bit_names e reserved_mask devono coprire gli stessi bit");
+using bit_counts = std::array<std::uint64_t, bit_names.size()>;
 }  // namespace invalid_reason
 
 // Buffer contiguo allineato a 64 byte, posseduto, azzerato alla creazione.

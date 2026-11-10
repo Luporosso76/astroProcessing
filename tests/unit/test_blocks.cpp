@@ -302,7 +302,7 @@ TEST(Blocks, T_M2R3_01_reader_stops_like_decode_fits) {
     expect_same_stop(fx::build_fits({p}), dir / "int64.fits");
   }
   // Bit riservato in INVALID: fits.invalid_reserved_bits con lo stesso indice.
-  expect_same_stop(build({-32, 1.0, 0.0}, 6, 5, true, true, 9, 0x0200).file, dir / "reserved.fits");
+  expect_same_stop(build({-32, 1.0, 0.0}, 6, 5, true, true, 9, 0x0400).file, dir / "reserved.fits");
   // DATASUM errato e campioni non invertibili: prima il checksum, come decode_fits.
   {
     fx::bytes file = build({16, 1e-300, 1e10}, 5, 4, false, false, 11).file;
@@ -313,6 +313,26 @@ TEST(Blocks, T_M2R3_01_reader_stops_like_decode_fits) {
     const fx::raw_primary_view v = fx::parse_hdu(file);
     p.data = v.data;
     expect_same_stop(fx::build_fits({p}), dir / "datasum_first.fits");
+  }
+}
+
+// T-M3A-TYP-08 (ADR-03.b §b.6): il bit 9 in INVALID si legge a blocchi come con decode_fits; i bit 10–15 fermano
+// con lo stesso arresto di decode_fits.
+TEST(Blocks, T_M3A_TYP_08_bit_9_is_read_by_the_block_source_and_bits_10_to_15_stop) {
+  const fs::path dir = fresh_dir("typ08");
+  const built b = build({-32, 1.0, 0.0}, 6, 5, true, true, 21, invalid_reason::support_incomplete);
+  const fs::path path = dir / "bit9.fits";
+  write_file(path, b.file);
+  const image ref = decode_fits(b.file, big_budget);
+  EXPECT_EQ(ref.invalid.bits[15] & invalid_reason::support_incomplete, invalid_reason::support_incomplete);
+  fits_block_source src(path.string(), digest_of(b.file), {}, 2, true);
+  std::vector<std::byte> work(4096);
+  src.verify(work);
+  read_all_tiles(src, ref, true);
+  for (unsigned k = 10; k <= 15; ++k) {
+    SCOPED_TRACE("bit " + std::to_string(k));
+    expect_same_stop(build({-32, 1.0, 0.0}, 6, 5, true, true, 21, static_cast<std::uint16_t>(1u << k)).file,
+                     dir / ("bit" + std::to_string(k) + ".fits"));
   }
 }
 

@@ -448,4 +448,46 @@ Applicato in: `docs/evidence/M3b-protocollo.md` §1, §3.1, §3.2 (versione 2; l
 ### Rinvii a B11
 
 - `κ` dei metodi robusti e le costanti `a_f`, `c_f` di `weighted_mean`: oltre che nel report (§b.7, «Stato»), vanno nei `details` del job (§b.10). In B5 sono calcolati nel preflight ma non registrati né nel report né nei `details`.
-- Valori del campo `plane` nel blocco `variance` del report: `read_noise2_plus_signal_over_gain` (`single`), `weighted_residuals` (`weighted_mean`), `kappa_s2` (`median`, `winsorized`), accanto a `s2_over_n` di `mean`. Sono nomi provvisori, da fissare in C-02.b §b.7 in B11.
+- Valori del campo `plane` nel blocco `variance` del report: `read_noise2_plus_signal_over_gain` (`single`), `weighted_residuals` (`weighted_mean`), `kappa_s2` (`median`, `winsorized`), `kept_s2_over_m` (`mean` + `sigma_clip`), accanto a `s2_over_n` di `mean`. Sono nomi provvisori, da fissare in C-02.b §b.7 in B11.
+
+## Decisioni successive (B6)
+
+Decisioni del coordinatore, 10 novembre 2026, sui punti sollevati dall'autore dei test di B6.
+
+### Bit `support_incomplete` nel codice
+
+**Fatto.** [ADR-03.b](../contracts/ADR-03-pixel-maschere.md) §b.6 definisce il bit 9 `support_incomplete` e `reserved_mask = 0xFC00`; il codice ha ancora `0xFE00` (`src/core/include/astro/image.hpp`), quindi FITS rifiuta un piano con il bit 9 e un master `sigma_clip` con pixel `support_incomplete` non si potrebbe pubblicare. T-M3A-TYP-08 era assegnato a M3.d.
+
+**Decisione.** B6 porta nel codice ADR-03.b §b.6 così com'è scritto: costante del bit 9, `reserved_mask = 0xFC00`, lettura FITS del bit 9, bit 10–15 ancora `invalid_input`, `fits.invalid_reserved_bits`. Non è un confine rifatto: la regola è già normativa e tutti i controlli usano la stessa costante (`fits.cpp`, `fits_blocks.cpp`, `calibration_blocks.cpp`). T-M3A-TYP-08 si anticipa a M3.b (unità B6) in `docs/test-matrix.md`. Debayer e resampling, che in M3.d accenderanno lo stesso bit, non cambiano.
+
+### `rejected_samples` dei pixel `support_incomplete`
+
+C-02.b §b.1 punto 3 toglie `R` da `S` prima del controllo su `clip_min_kept`. Quindi i campioni di ogni `R` applicato, compreso l'ultimo che porta `|S|` sotto `clip_min_kept`, si contano in `rejected_samples` del loro frame. Il pixel conta anche fra i `support_incomplete` del canale; `pixels_with_rejection` lo comprende.
+
+### Contesto di `master.param.sigma_clip_inert`
+
+Chiavi: `n`, `clip_kappa_low`, `clip_kappa_high` (valori f64 dichiarati, in forma che rilegge lo stesso f64) e `limite` = `(n − 1)²`, intero esatto.
+
+### Appartenenza per pixel in T-M3B-C02-02
+
+Il prodotto espone per pixel solo `M`, `V` e i bit, e per frame i conteggi (§b.7, report). T-M3B-C02-02 verifica l'appartenenza attraverso `M` e `V` entro la regola I, i conteggi per frame e le rotazioni dei frame: un campione in più o in meno nell'insieme tenuto sposta `M` di un ordine di `σ/m`, molto sopra l'ampiezza dell'intervallo. **Limite dichiarato:** l'insieme rifiutato per pixel non si osserva direttamente; il record lo dice. Nessun canale di diagnosi nuovo nel prodotto.
+
+### Parametri di `sigma_clip` di C02-01 e C02-02
+
+`M3b-protocollo.md` §4 li vuole fissati prima della misura. Sono fissati nel codice del test (`c02_01_clip`, `c02_02_configs` in `tests/unit/test_master_b6.cpp`) e il record cita il commit che li introduce. Unico cambio prima di ogni misura del prodotto: `clip_min_kept` della configurazione E da `n − 3` a `⌈2n/3⌉`.
+
+### Stop `sigma_clip_inert` nella ricetta
+
+Lo stop sta in `validate_master_recipe`, quindi arriva prima del confronto della ricetta col nodo e prima di ogni lettura, anche nel job.
+
+### Conteggi del report per `sigma_clip`
+
+`rejected_samples` per frame è di B6. Il conteggio per bit comprende il bit 9 appena la costante esiste, perché i conteggi per bit si fanno sui bit dichiarati. `pixels_with_rejection` per canale va a B11 (report), con gli altri rinvii di «Rinvii a B11».
+
+### Correzioni della review di B6 (giro 1)
+
+- **`clip_max_iter` senza tetto.** Il contratto non fissa un massimo. Il codice usa `min(clip_max_iter, n)`, calcolato in f64 prima di convertirlo in intero. In aritmetica esatta è la stessa procedura: ogni iterazione che non chiude toglie almeno un campione, quindi dopo `n` iterazioni la procedura è finita. Un valore dichiarato grande (`1e20`, `2^64`) resta ammesso e dà lo stesso risultato di `n`. La stessa verifica vale per ogni parametro reale della ricetta convertito in intero.
+- **`rejected_samples` e `result_nonfinite`.** Gli `R` di un pixel si contano solo se la procedura dà un esito: valore valido oppure `support_incomplete`. Un pixel che diventa `result_nonfinite` non contribuisce, per una qualsiasi operazione di §b.6 compresa la conversione al tipo di uscita, perché il suo insieme `K` non è definito come risultato. Il conteggio si fa quindi dopo l'esito finale del pixel.
+- **Punto di somma dei conteggi.** C-02.b §b.11 somma i conteggi per frame in `finalize`. Il codice somma i parziali di ogni task con interi atomici. La somma di interi non dipende dall'ordine, quindi il risultato è identico. Il commento del codice lo dice; il contratto non cambia.
+- **Tabella dei nomi dei bit.** È una sola, accanto alle costanti di `invalid_reason`. La usano master e calibrazione (in memoria e a blocchi), quindi anche il report di calibrazione conta `support_incomplete`.
+- **Record di evidenza** di T-M3B-C02-01, 02 e 06 (commit dei parametri, stime di C02-06): con quelli di B5, nel record del gate di M3.b, dal run completo.

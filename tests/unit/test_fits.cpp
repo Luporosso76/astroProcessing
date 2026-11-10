@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -773,7 +774,7 @@ TEST(Fits, T_M2A_08_read_image_keeps_marked_samples_and_flags_nonfinite) {
 }
 
 TEST(Fits, T_M2A_08_reserved_bits_in_file_mask_stop) {
-  for (std::uint16_t bad : {std::uint16_t{1u << 9}, std::uint16_t{1u << 15}, std::uint16_t{0xFE00u}}) {
+  for (std::uint16_t bad : {std::uint16_t{1u << 10}, std::uint16_t{1u << 15}, std::uint16_t{0xFC00u}}) {
     fx::raw_hdu primary = raw_image(-32, {2, 2});
     fx::raw_hdu inv = extension("INVALID", 16, {2, 2});
     inv.cards.push_back(fx::card_real("BZERO", 32768.0));
@@ -786,6 +787,69 @@ TEST(Fits, T_M2A_08_reserved_bits_in_file_mask_stop) {
   img.encoding = source_encoding{-32, 0, 1};
   img.invalid.bits[1] = 1u << 10;
   EXPECT_STOP(encode_fits(img), error_category::invalid_input, "image.mask_reserved_bits");
+}
+
+// ---------------------------------------------------------------- T-M3A-TYP-08 (ADR-03.b §b.6)
+
+// File 4 × 2 f32 con INVALID: i bit dati per pixel, campioni finiti.
+fx::bytes file_with_mask(const std::vector<std::uint16_t>& bits) {
+  fx::raw_hdu primary = raw_image(-32, {4, 2});
+  primary.data.clear();
+  for (std::size_t i = 0; i < 8; ++i) fx::put_be(primary.data, std::bit_cast<std::uint32_t>(100.0f + static_cast<float>(i)), 4);
+  fx::raw_hdu inv = extension("INVALID", 16, {4, 2});
+  inv.cards.push_back(fx::card_real("BZERO", 32768.0));
+  inv.data.clear();
+  for (std::uint16_t b : bits) fx::put_be(inv.data, static_cast<std::uint16_t>(b ^ 0x8000u), 2);
+  return fx::build_fits({primary, inv});
+}
+
+std::vector<std::uint16_t> mask_with_bit_9() {
+  const std::uint16_t si = invalid_reason::support_incomplete;
+  return {si, 0, static_cast<std::uint16_t>(si | invalid_reason::source_flagged), 0, invalid_reason::source_flagged, si, 0, 0};
+}
+
+TEST(Fits, T_M3A_TYP_08_invalid_mask_with_bit_9_is_read_and_rewritten_identically) {
+  const std::vector<std::uint16_t> bits = mask_with_bit_9();
+  const image img = decode(file_with_mask(bits));
+  ASSERT_EQ(img.invalid.bits, bits);
+  const image again = decode(encode_fits(img));
+  EXPECT_TRUE(again == img);
+  EXPECT_EQ(again.invalid.bits, bits);
+}
+
+TEST(Fits, T_M3A_TYP_08_row_reader_reads_bit_9_like_decode_fits) {
+  const std::vector<std::uint16_t> bits = mask_with_bit_9();
+  const std::string path = tmp_file("typ08-bit9.fits");
+  write_file(path, file_with_mask(bits));
+  const fits_input in = open_fits_input(path);
+  const fits_row_layout layout = plan_fits_rows(in);
+  std::vector<std::byte> scratch(static_cast<std::size_t>(fits_row_scratch_bytes(layout, 2)));
+  std::vector<double> values(8);
+  std::vector<std::uint16_t> got(8);
+  read_fits_rows(in, layout, 0, 2, scratch.data(), values.data(), got.data());
+  EXPECT_EQ(got, bits);
+}
+
+TEST(Fits, T_M3A_TYP_08_bits_10_to_15_stay_reserved_in_decode_row_reader_and_encode) {
+  for (unsigned k = 10; k <= 15; ++k) {
+    SCOPED_TRACE("bit " + std::to_string(k));
+    std::vector<std::uint16_t> bits(8, 0);
+    bits[3] = static_cast<std::uint16_t>((1u << k) | invalid_reason::support_incomplete);
+    const fx::bytes file = file_with_mask(bits);
+    EXPECT_STOP(decode(file), error_category::invalid_input, "fits.invalid_reserved_bits");
+    const std::string path = tmp_file("typ08-bit" + std::to_string(k) + ".fits");
+    write_file(path, file);
+    const fits_input in = open_fits_input(path);
+    const fits_row_layout layout = plan_fits_rows(in);
+    std::vector<std::byte> scratch(static_cast<std::size_t>(fits_row_scratch_bytes(layout, 2)));
+    std::vector<double> values(8);
+    std::vector<std::uint16_t> got(8);
+    EXPECT_STOP(read_fits_rows(in, layout, 0, 2, scratch.data(), values.data(), got.data()), error_category::invalid_input,
+                "fits.invalid_reserved_bits");
+    image img = decode(file_with_mask(std::vector<std::uint16_t>(8, 0)));
+    img.invalid.bits[3] = static_cast<std::uint16_t>(1u << k);
+    EXPECT_STOP(encode_fits(img), error_category::invalid_input, "image.mask_reserved_bits");
+  }
 }
 
 TEST(Fits, T_M2A_09_invalid_and_variance_extensions_roundtrip_identically) {

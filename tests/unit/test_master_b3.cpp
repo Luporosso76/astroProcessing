@@ -938,33 +938,6 @@ TEST(MasterB3, T_M3B_C02_13_noise_model_parameters_are_forbidden_with_a_method_o
   }
 }
 
-// ---------------------------------------------------------------- calcolo non disponibile fino a B6
-
-// `single`, `weighted_mean`, `median` e `winsorized` si calcolano da B5 (test_master_b5.cpp). Resta `mean` +
-// `sigma_clip` (B6): una ricetta valida si ferma, mai calcolata come media senza rejection.
-TEST(MasterB3, T_M3B_C02_09_valid_recipes_of_methods_not_yet_computable_stop_with_method_not_computable) {
-  using R = master_recipe;
-  struct mc {
-    const char* name;
-    std::size_t n;
-    std::function<void(R&)> setup;
-  };
-  const std::vector<mc> cases = {
-      {"sigma_clip", 11, [](R& r) { use_sigma(r, 3, 3, 1, 2); }},
-  };
-  for (const mc& c : cases) {
-    SCOPED_TRACE(c.name);
-    group g = group_for_role(master_role::dark);
-    g = make_group(master_role::dark, 8, 4, c.n);
-    for (std::size_t k = 0; k < c.n; ++k)
-      for (std::size_t i = 0; i < g.frames[k].v.size(); ++i) g.frames[k].v[i] = 500 + static_cast<double>((i + k) % 7);
-    master_recipe r = recipe_of(g);
-    c.setup(r);
-    ASSERT_NO_THROW(validate_master_recipe(r));
-    EXPECT_STOP(combine_master(r, images_of(g)), error_category::unsupported, "master.method_not_computable");
-  }
-}
-
 // ---------------------------------------------------------------- master_descriptor_from_node: flat e normalizzazione
 
 json params_with(const node_spec& node, std::vector<std::pair<std::string, json>> changes) {

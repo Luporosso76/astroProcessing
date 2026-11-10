@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <optional>
 
 #include <sys/stat.h>
 
@@ -177,6 +178,54 @@ TEST(CalibJob, T_M2E_12_publishes_image_report_and_text_coherent_with_the_output
 }
 
 // ---------------------------------------------------------------- T-M2E-16
+
+// T-M3A-TYP-08 (ADR-03.b §b.6): un master con il bit 9 in INVALID si legge nel job; il pixel del light diventa
+// invalido con l'unione dei bit degli ingressi più `master_invalid` (come per ogni bit del master), e l'uscita a blocchi
+// è la stessa del calcolo in memoria.
+TEST(CalibJob, T_M3A_TYP_08_master_pixel_with_bit_9_marks_the_light_pixel_invalid_in_the_job) {
+  disk_case c = make_case("typ08", job_set());
+  calibration_images mem = images_of(c.s);
+  const std::size_t k = 12;
+  const std::uint16_t si = invalid_reason::support_incomplete;
+  image dark = mem.dark;
+  dark.invalid.bits[k] = si;
+  const std::vector<std::uint8_t> bytes = encode_fits(dark);
+  write_bytes(c.dir / "dark.fits", bytes);
+  c.recipe.dark.digest = digest_of(bytes);
+  mem.dark = decode_fits(bytes, big_budget);
+  ASSERT_EQ(mem.dark.invalid.bits[k], si);
+  const calibration_result memory = calibrate(c.recipe, std::move(mem));
+  const std::uint16_t want = static_cast<std::uint16_t>(si | invalid_reason::master_invalid);
+  EXPECT_EQ(memory.output.invalid.bits[k], want);
+  // Il report conta il bit 9 (tabella dei nomi condivisa, M3b-lacune «Correzioni della review di B6»).
+  const auto support_incomplete_pixels = [](const json& report) -> std::optional<std::int64_t> {
+    const json* mask = report.find("mask");
+    const json* by_bit = mask != nullptr ? mask->find("pixels_with_bit") : nullptr;
+    const json* v = by_bit != nullptr ? by_bit->find("support_incomplete") : nullptr;
+    if (v == nullptr || v->type() != json::kind::integer) return std::nullopt;
+    return v->as_integer();
+  };
+  EXPECT_EQ(support_incomplete_pixels(memory.report), std::optional<std::int64_t>(1)) << "in memoria";
+
+  project p = make_project(c, "store");
+  memory_pool pool(256 * MiB);
+  calibration_job_options o;
+  o.worker_count = 2;
+  o.tile_rows = 7;
+  const job_outcome out = run_quiet(p, c, pool, o);
+  ASSERT_EQ(out.exit_code, 0) << (out.stop ? out.stop->code() : std::string());
+  const auto roles = by_role(p);
+  ASSERT_TRUE(roles.count("primary"));
+  const std::string text = read_text(p.store->artifact_path(roles.at("primary").rel_path));
+  const image decoded = decode_fits(std::vector<std::uint8_t>(text.begin(), text.end()), big_budget);
+  EXPECT_EQ(decoded.invalid.bits[k], want);
+  EXPECT_TRUE(std::isnan(sample_at(decoded, k)) && std::isnan(variance_at(decoded, k)));
+  EXPECT_TRUE(equivalent_content(decoded, memory.output));
+  EXPECT_TRUE(operator_output_invariants_hold(decoded));
+  ASSERT_TRUE(roles.count("report"));
+  const json job_report = parse_json(read_text(p.store->artifact_path(roles.at("report").rel_path)));
+  EXPECT_EQ(support_incomplete_pixels(job_report), std::optional<std::int64_t>(1)) << "a blocchi";
+}
 
 TEST(CalibJob, T_M2E_16_output_is_bit_identical_for_workers_and_tile_rows) {
   const disk_case c = make_case("t16", job_set());

@@ -98,7 +98,14 @@ TEST(Image, InvalidReasonBitsMatchContract) {
   EXPECT_EQ(q_below_min, 1u << 6);
   EXPECT_EQ(q_unreliable, 1u << 7);
   EXPECT_EQ(result_nonfinite, 1u << 8);
-  EXPECT_EQ(reserved_mask, 0xFE00u);
+  EXPECT_EQ(reserved_mask, 0xFC00u);  // ADR-03.b §b.6: riservati i bit 10–15
+}
+
+// T-M3A-TYP-08 (ADR-03.b §b.6): `support_incomplete` è il bit 9, fuori dai bit riservati.
+TEST(Image, T_M3A_TYP_08_support_incomplete_is_bit_9_and_not_reserved) {
+  const std::uint16_t b = invalid_reason::support_incomplete;
+  EXPECT_EQ(b, 1u << 9);
+  EXPECT_EQ(b & invalid_reason::reserved_mask, 0u);
 }
 
 TEST(Image, T_M2A_08_operator_output_invariants) {

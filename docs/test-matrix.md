@@ -156,7 +156,7 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 | T-M3A-TYP-05 | F-CAL-08; ADR-03.b §b.3 (keyword `ASTRD*`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-06 | ADR-17; ADR-03.b §b.4 (`variance_scope`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-07 | F-REG-03, §8.6.2; ADR-03.b §b.5 (coverage) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
-| T-M3A-TYP-08 | ADR-03.b §b.6 (bit `support_incomplete`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
+| T-M3A-TYP-08 | ADR-03.b §b.6 (bit `support_incomplete`) | ADR-03.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3A-TYP-09 | C-11, F-POST-08.a.1; ADR-03.b §b.7 (tipi distinti) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-10 | C-11, §7.14; ADR-03.b §b.7 (`mask_info`) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |

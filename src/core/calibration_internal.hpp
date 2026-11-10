@@ -437,7 +437,7 @@ json admission_details(const job_report& report);
 json observed_inputs(const prepared_calibration::impl& p);
 
 // Report del job a partire dai conteggi dei bit della maschera di uscita.
-json calibration_report(const prepared_calibration::impl& p, const std::array<std::uint64_t, 9>& counts,
+json calibration_report(const prepared_calibration::impl& p, const invalid_reason::bit_counts& counts,
                         std::uint64_t invalid_pixels);
 
 }  // namespace astro::calib_detail

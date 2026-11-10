@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -57,10 +58,6 @@ const char* type_name(sample_type t) { return t == sample_type::f32 ? "f32" : "f
 const char* policy_name(temperature_policy p) {
   return p == temperature_policy::compare ? "compare" : "not_applicable_declared";
 }
-
-constexpr std::array<const char*, 9> bit_names = {"source_nonfinite", "source_flagged", "saturated",
-                                                  "master_invalid",   "q_nonpositive",  "q_nonfinite",
-                                                  "q_below_min",      "q_unreliable",   "result_nonfinite"};
 
 std::string frame_name(std::size_t k) {
   char b[32];
@@ -138,6 +135,97 @@ struct exact_sum {
   }
 };
 
+__extension__ typedef unsigned __int128 u128;
+
+// Intero senza segno a precisione arbitraria (cifre a 32 bit dalla meno significativa, senza zeri in testa): prodotti,
+// moltiplicazioni per potenze di 2 e confronto, per i confronti esatti sui valori f64 dichiarati.
+struct wide_uint {
+  std::vector<std::uint32_t> limbs;
+
+  static wide_uint of(u128 v) {
+    wide_uint r;
+    for (; v != 0; v >>= 32) r.limbs.push_back(static_cast<std::uint32_t>(v));
+    return r;
+  }
+
+  friend wide_uint operator*(const wide_uint& a, const wide_uint& b) {
+    wide_uint r;
+    if (a.limbs.empty() || b.limbs.empty()) return r;
+    r.limbs.assign(a.limbs.size() + b.limbs.size(), 0);
+    for (std::size_t i = 0; i < a.limbs.size(); ++i) {
+      std::uint64_t carry = 0;
+      for (std::size_t k = 0; k < b.limbs.size(); ++k) {
+        const std::uint64_t t = static_cast<std::uint64_t>(a.limbs[i]) * b.limbs[k] + r.limbs[i + k] + carry;
+        r.limbs[i + k] = static_cast<std::uint32_t>(t);
+        carry = t >> 32;
+      }
+      r.limbs[i + b.limbs.size()] = static_cast<std::uint32_t>(carry);
+    }
+    while (!r.limbs.empty() && r.limbs.back() == 0) r.limbs.pop_back();
+    return r;
+  }
+
+  // this · 2^bits
+  wide_uint shifted(std::size_t bits) const {
+    wide_uint r;
+    if (limbs.empty()) return r;
+    const std::size_t whole = bits / 32, part = bits % 32;
+    r.limbs.assign(whole, 0);
+    std::uint32_t carry = 0;
+    for (const std::uint32_t l : limbs) {
+      r.limbs.push_back(part == 0 ? l : (l << part) | carry);
+      carry = part == 0 ? 0 : l >> (32 - part);
+    }
+    if (carry != 0) r.limbs.push_back(carry);
+    return r;
+  }
+
+  friend int compare(const wide_uint& a, const wide_uint& b) {
+    if (a.limbs.size() != b.limbs.size()) return a.limbs.size() < b.limbs.size() ? -1 : 1;
+    for (std::size_t i = a.limbs.size(); i-- > 0;) {
+      if (a.limbs[i] != b.limbs[i]) return a.limbs[i] < b.limbs[i] ? -1 : 1;
+    }
+    return 0;
+  }
+};
+
+std::string u128_text(u128 v) {
+  std::string t;
+  do {
+    t.insert(t.begin(), static_cast<char>('0' + static_cast<int>(v % 10)));
+    v /= 10;
+  } while (v != 0);
+  return t;
+}
+
+// (n − 1)² > κ² · n in aritmetica esatta (C-02.b §b.1, Samuelson), con κ f64 finito > 0. κ = M · 2^e con M intero
+// (frexp, mantissa scalata di 2^53, esatta anche per i subnormali): κ² n = M² n · 2^(2e), confrontato con (n − 1)²
+// dopo aver portato entrambi i membri a interi con lo stesso fattore 2^|2e|. Nessun prodotto arrotondato.
+bool samuelson_admits(const wide_uint& limit, std::size_t n, double kappa) {
+  int exp2 = 0;
+  const double fraction = std::frexp(kappa, &exp2);
+  const auto mantissa = static_cast<std::uint64_t>(std::ldexp(fraction, 53));
+  const wide_uint m = wide_uint::of(mantissa);
+  const wide_uint rhs = m * m * wide_uint::of(n);
+  const long long shift = 2 * (static_cast<long long>(exp2) - 53);
+  if (shift >= 0) return compare(limit, rhs.shifted(static_cast<std::size_t>(shift))) > 0;
+  return compare(limit.shifted(static_cast<std::size_t>(-shift)), rhs) > 0;
+}
+
+// Ricetta inerte (C-02.b §b.1): nessuna delle due soglie può rifiutare alla prima iterazione. Contesto: n, i due κ in
+// forma che rilegge lo stesso f64, `limite` = (n − 1)² intero esatto (M3b-lacune, «Decisioni successive (B6)»).
+void require_sigma_clip_not_inert(std::size_t n, double kappa_low, double kappa_high) {
+  const u128 limit = static_cast<u128>(n - 1) * (n - 1);
+  const wide_uint wide_limit = wide_uint::of(limit);
+  if (samuelson_admits(wide_limit, n, kappa_low) || samuelson_admits(wide_limit, n, kappa_high)) return;
+  stop(error_category::invalid_input, "master.param.sigma_clip_inert",
+       "sigma_clip non può rifiutare nessun campione: (n - 1)^2 <= kappa^2 n per entrambe le soglie (Samuelson)",
+       {{"n", std::to_string(n)},
+        {"clip_kappa_low", num_text(kappa_low)},
+        {"clip_kappa_high", num_text(kappa_high)},
+        {"limite", u128_text(limit)}});
+}
+
 // Pesi di `weighted_mean` (C-02.b §b.1, §b.10): finiti e > 0, uno per frame; `2 max w < W` confrontato in aritmetica
 // esatta sui valori f64, cioè `max w < somma degli altri`.
 void validate_weights(const master_recipe& r) {
@@ -212,6 +300,7 @@ void validate_params(const master_recipe& r) {
     check_integer(r.clip_max_iter, "clip_max_iter", 1);
     check_integer(r.clip_min_kept, "clip_min_kept", 2);
     if (*r.clip_min_kept > static_cast<double>(n)) bad_param("clip_min_kept", "oltre n");
+    require_sigma_clip_not_inert(n, *r.clip_kappa_low, *r.clip_kappa_high);
   } else {
     forbid(r.clip_kappa_low, "clip_kappa_low");
     forbid(r.clip_kappa_high, "clip_kappa_high");
@@ -328,6 +417,7 @@ struct frame_state {
   std::uint64_t saturated = 0;
   double saturated_fraction = 0;
   std::optional<double> level;  // m_f, solo flat
+  std::uint64_t rejected = 0;   // campioni rifiutati da sigma_clip, somma dei parziali dei task
 };
 
 image header_of(const image& im) {
@@ -437,11 +527,6 @@ master_plan make_plan(const master_recipe& r, const std::function<void(kappa_res
   validate_master_recipe(r);
   const std::optional<kappa_result> kappa = preflight_kappa(r, on_kappa);
   const method_kind method = *method_of(*r.combine, *r.rejection);
-  // `mean` + `sigma_clip` non ha ancora un calcolo: la ricetta valida si ferma, mai calcolata con un altro metodo.
-  if (method == method_kind::sigma_clip) {
-    stop(error_category::unsupported, "master.method_not_computable", "calcolo del metodo non disponibile",
-         {{"combine", combine_name(*r.combine)}, {"rejection", rejection_name(*r.rejection)}});
-  }
   master_plan p;
   p.method = method;
   p.kappa = kappa;
@@ -778,6 +863,7 @@ void finish_preflight(master_plan& p) {
   if (*p.recipe.temp_policy == temperature_policy::not_applicable_declared && p.n > 1) {
     p.warnings.push_back("temperature_not_compared");
   }
+  if (p.method == method_kind::sigma_clip) p.warnings.push_back("frozen_selection_approximation");
   image_geometry g(p.w, p.h);
   g.binning_x = ref.geometry.binning_x;
   g.binning_y = ref.geometry.binning_y;
@@ -789,7 +875,10 @@ void finish_preflight(master_plan& p) {
   p.out.metadata = master_metadata_of(p);
   std::vector<const image*> frame_headers;
   for (const frame_state& f : p.frames) frame_headers.push_back(&f.header);
-  p.out.measure = merge_measure(frame_headers, {});
+  // C-02.b §b.7: con `sigma_clip` il piano a selezione congelata è la riga a pesi congelati di ADR-17.b §b.1.
+  std::vector<measure_limit> own;
+  if (p.method == method_kind::sigma_clip) own.push_back(measure_limit::variance_fixed_weight_approximation);
+  p.out.measure = merge_measure(frame_headers, own);
   p.out.variance = variance_plane{aligned_buffer(p.out.samples.size())};
   const std::size_t px = static_cast<std::size_t>(p.w) * p.h;
   if (p.flat) {
@@ -919,6 +1008,102 @@ pixel_value robust_value(const master_plan& p, const double* const* vals, std::s
   return out;
 }
 
+// `mean` + `sigma_clip` (C-02.b §b.1, §b.6): per t = 1 … clip_max_iter, μ e s sui frame tenuti S nell'ordine
+// canonico (Σ x, / m; Σ (x − μ)², / (m − 1), sqrt); R = frame di S con x − μ > κ_high · s oppure μ − x > κ_low · s,
+// disuguaglianze strette; R vuoto o s = 0 chiude; altrimenti S ← S \ R e |S| < clip_min_kept rende il pixel
+// support_incomplete. Master μ dell'insieme finale K, piano (Σ_K (x − μ)² / (m − 1)) / m. Ogni operazione segue la
+// regola di rappresentabilità di §b.6; il rifiuto non è un'invalidità. `kept[f]`: 1 tenuto, 0 rifiutato, 2 in R
+// durante il confronto.
+struct clip_outcome {
+  pixel_value pv;
+  bool incomplete = false;
+};
+
+clip_outcome clip_value(const master_plan& p, const double* const* vals, std::size_t j, std::uint8_t* kept) {
+  const std::size_t n = p.n;
+  const double kl = *p.recipe.clip_kappa_low, kh = *p.recipe.clip_kappa_high;
+  // clip_max_iter non ha un massimo (C-02.b §b.1): ogni iterazione che non chiude toglie almeno un campione, quindi
+  // min(clip_max_iter, n) dà la stessa procedura; il minimo è in f64, prima della conversione in intero.
+  const auto max_iter = static_cast<std::size_t>(std::min(*p.recipe.clip_max_iter, static_cast<double>(n)));
+  const auto min_kept = static_cast<std::size_t>(*p.recipe.clip_min_kept);
+  std::fill(kept, kept + n, std::uint8_t{1});
+  std::size_t m = n;
+  clip_outcome out;
+  pixel_value& pv = out.pv;
+  double s2 = 0;
+  const auto kept_stats = [&] {
+    double sum = 0;
+    bool first = true;
+    for (std::size_t f = 0; f < n; ++f) {
+      if (kept[f] == 0) continue;
+      sum = first ? vals[f][j] : sum + vals[f][j];
+      first = false;
+    }
+    pv.m = sum / static_cast<double>(m);
+    pv.ok = std::isfinite(sum) && div_ok(sum, pv.m);
+    double ss = 0;
+    first = true;
+    for (std::size_t f = 0; pv.ok && f < n; ++f) {
+      if (kept[f] == 0) continue;
+      const double d = vals[f][j] - pv.m;
+      const double q = d * d;
+      pv.ok = std::isfinite(d) && mul_ok(d, d, q);
+      if (!pv.ok) break;
+      if (first) {
+        ss = q;
+      } else {
+        const double t = ss + q;
+        pv.ok = add_ok(ss, q, t);
+        ss = t;
+      }
+      first = false;
+    }
+    s2 = ss / static_cast<double>(m - 1);
+    pv.ok = pv.ok && div_ok(ss, s2);
+  };
+  kept_stats();
+  for (std::size_t t = 1; pv.ok && t <= max_iter; ++t) {
+    const double s = std::sqrt(s2);
+    if (s == 0) break;
+    const double th = kh * s, tl = kl * s;
+    pv.ok = mul_ok(kh, s, th) && mul_ok(kl, s, tl);
+    if (!pv.ok) break;
+    std::size_t rejected = 0;
+    for (std::size_t f = 0; f < n; ++f) {
+      if (kept[f] == 0) continue;
+      const double x = vals[f][j];
+      if (x - pv.m > th || pv.m - x > tl) {
+        kept[f] = 2;
+        ++rejected;
+      }
+    }
+    if (rejected == 0) break;
+    for (std::size_t f = 0; f < n; ++f) {
+      if (kept[f] == 2) kept[f] = 0;
+    }
+    m -= rejected;
+    if (m < min_kept) {
+      out.incomplete = true;
+      pv.ok = false;
+      return out;
+    }
+    kept_stats();
+  }
+  if (pv.ok) {
+    pv.v = s2 / static_cast<double>(m);
+    pv.ok = div_ok(s2, pv.v);
+  }
+  return out;
+}
+
+// Buffer per task del modello di memoria (ADR-06, estensione R2.r): ordinamento (`median`, `winsorized`), indicatori
+// dei frame tenuti e parziali di `rejected_samples` per frame (`sigma_clip`), n elementi ciascuno.
+struct task_scratch {
+  sort_slot* sort;
+  std::uint8_t* kept;
+  std::uint64_t* rejected;
+};
+
 // Conversione al sample_type del master (C-02.a §6.3). Con uscita f64 è un'identità: un valore subnormale non vi
 // diventa subnormale, e arriva qui solo come campione d'ingresso scelto senza operazione (`single`, mediana dispari),
 // perché ogni prodotto, quoziente e somma di termini non negativi è già controllato; resta valido. Con uscita f32 vale
@@ -939,11 +1124,13 @@ bool to_output(double v, T& out) {
 // suo level_bias_estimate non è definito con n = 1 (§b.7, `single_frame`) e resta NaN.
 template <class T>
 void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
-                 const std::uint16_t* const* bits, sort_slot* sort) {
+                 const std::uint16_t* const* bits, const task_scratch& scratch) {
   T* out = reinterpret_cast<T*>(p.out.samples.data());
   T* outv = reinterpret_cast<T*>(p.out.variance->samples.data());
   constexpr T nan = std::numeric_limits<T>::quiet_NaN();
   const std::size_t g = p.method == method_kind::winsorized ? static_cast<std::size_t>(*p.recipe.winsor_g) : 0;
+  const bool clip = p.method == method_kind::sigma_clip;
+  if (clip) std::fill(scratch.rejected, scratch.rejected + p.n, std::uint64_t{0});
   for (std::uint32_t r = 0; r < rows; ++r) {
     for (std::uint32_t c = 0; c < p.w; ++c) {
       const std::size_t j = static_cast<std::size_t>(r) * p.w + c;
@@ -957,40 +1144,63 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
       if (saturated) m = static_cast<std::uint16_t>(m | invalid_reason::saturated);
       if (m == 0) {
         pixel_value pv;
+        std::uint16_t failure = invalid_reason::result_nonfinite;
         switch (p.method) {
           case method_kind::single: pv = single_value(p.recipe, vals[0][j]); break;
           case method_kind::weighted_mean: pv = weighted_value(p, vals, j); break;
           case method_kind::median:
-          case method_kind::winsorized: pv = robust_value(p, vals, j, sort, g); break;
-          case method_kind::mean:
-          case method_kind::sigma_clip: ASTRO_ASSERT(false); break;
+          case method_kind::winsorized: pv = robust_value(p, vals, j, scratch.sort, g); break;
+          case method_kind::sigma_clip: {
+            const clip_outcome co = clip_value(p, vals, j, scratch.kept);
+            pv = co.pv;
+            if (co.incomplete) failure = invalid_reason::support_incomplete;
+            break;
+          }
+          case method_kind::mean: ASTRO_ASSERT(false); break;
         }
+        // rejected_samples (M3b-lacune, «Correzioni della review di B6 (giro 1)»): gli R di un pixel si contano,
+        // compreso l'ultimo che lo porta a support_incomplete, solo dopo l'esito finale: valore valido, conversione al
+        // tipo d'uscita compresa, oppure support_incomplete. Un pixel result_nonfinite in qualunque punto non conta.
+        const auto count_rejected = [&] {
+          for (std::size_t f = 0; f < p.n; ++f) scratch.rejected[f] += scratch.kept[f] == 0 ? 1 : 0;
+        };
         T ms{}, vs{};
         if (pv.ok && to_output<T>(pv.m, ms) && to_output<T>(pv.v, vs)) {
           out[i] = ms;
           outv[i] = vs;
           p.out.invalid.bits[i] = 0;
           if (p.flat) p.nonpositive[i] = pv.m - p.offset <= 0 ? 1 : 0;
+          if (clip) count_rejected();
           continue;
         }
-        m = invalid_reason::result_nonfinite;
+        if (clip && failure == invalid_reason::support_incomplete) count_rejected();
+        m = failure;
       }
       out[i] = nan;
       outv[i] = nan;
       p.out.invalid.bits[i] = m;
     }
   }
+  // C-02.b §b.11 somma i conteggi per frame in `finalize`: qui i parziali del task si sommano ai totali con interi
+  // atomici, e una somma di interi non dipende dall'ordine, quindi il risultato è lo stesso.
+  if (clip) {
+    for (std::size_t f = 0; f < p.n; ++f) {
+      if (scratch.rejected[f] != 0) {
+        std::atomic_ref<std::uint64_t>(p.frames[f].rejected).fetch_add(scratch.rejected[f], std::memory_order_relaxed);
+      }
+    }
+  }
 }
 
-// `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f; `sort` ha n elementi (ordinamento per pixel di
-// `median` e `winsorized`). `mean` usa il kernel del percorso risolto nel preflight (ADR-07); ogni banda è l'avvio di
-// un task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
+// `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f; `scratch`: buffer del task, n elementi ciascuno.
+// `mean` usa il kernel del percorso risolto nel preflight (ADR-07); ogni banda è l'avvio di un task per il controllo
+// dell'ambiente FP. Righe disgiunte: thread-safe.
 void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
-                  const std::uint16_t* const* bits, sort_slot* sort) {
+                  const std::uint16_t* const* bits, const task_scratch& scratch) {
   if (p.method != method_kind::mean) {
     begin_kernel_task();
-    if (p.out.type == sample_type::f32) method_band<float>(p, y0, rows, vals, bits, sort);
-    else method_band<double>(p, y0, rows, vals, bits, sort);
+    if (p.out.type == sample_type::f32) method_band<float>(p, y0, rows, vals, bits, scratch);
+    else method_band<double>(p, y0, rows, vals, bits, scratch);
     return;
   }
   kernels::master_band b;
@@ -1042,7 +1252,7 @@ json frame_report(const master_plan& p, const frame_state& f) {
   o.set("size_bytes", json::uinteger(f.spec->digest.size_bytes));
   o.set("role", json::string(role_name(p.recipe.role)));
   o.set("used", json::boolean(true));
-  o.set("rejected_samples", json::uinteger(0));
+  o.set("rejected_samples", json::uinteger(f.rejected));
   o.set("saturated_samples", p.has_sat ? json::uinteger(f.saturated) : json::null());
   o.set("saturated_fraction", p.has_sat ? json::number(f.saturated_fraction) : json::null());
   if (p.flat) {
@@ -1180,7 +1390,7 @@ json build_report(master_plan& p) {
   report.set("master_metadata", p.master_metadata);
   report.set("metadata_not_common", p.not_common);
   // Piano e coefficiente di variazione per metodo (C-02.b §b.6, §b.7): sqrt(2/(n − 1)) per `mean`, `median` e
-  // `winsorized`; null con motivo per `single` (`single_frame`) e `weighted_mean` (`not_derived`).
+  // `winsorized`; null con motivo per `single` (`single_frame`), `weighted_mean` e `sigma_clip` (`not_derived`).
   json var = json::object();
   var.set("variance_estimator", json::string(estimator_name(*p.descriptor.estimator)));
   var.set("variance_source", json::string("plane"));
@@ -1191,8 +1401,8 @@ json build_report(master_plan& p) {
     case method_kind::weighted_mean: plane = "weighted_residuals"; cv_null = "not_derived"; break;
     case method_kind::median:
     case method_kind::winsorized: plane = "kappa_s2"; break;
-    case method_kind::mean:
-    case method_kind::sigma_clip: break;
+    case method_kind::sigma_clip: plane = "kept_s2_over_m"; cv_null = "not_derived"; break;
+    case method_kind::mean: break;
   }
   var.set("plane", json::string(plane));
   if (cv_null) {
@@ -1203,14 +1413,16 @@ json build_report(master_plan& p) {
   }
   report.set("variance", std::move(var));
   report.set("channels", channel_report(p));
-  std::array<std::uint64_t, 9> counts{};
+  invalid_reason::bit_counts counts{};
   std::uint64_t invalid = 0;
   for (const std::uint16_t b : p.out.invalid.bits) {
     if (b != 0) ++invalid;
     for (std::size_t k = 0; k < counts.size(); ++k) counts[k] += (b >> k) & 1u;
   }
   json bitcounts = json::object();
-  for (std::size_t k = 0; k < counts.size(); ++k) bitcounts.set(bit_names[k], json::uinteger(counts[k]));
+  for (std::size_t k = 0; k < counts.size(); ++k) {
+    bitcounts.set(invalid_reason::bit_names[k], json::uinteger(counts[k]));
+  }
   report.set("invalid_counts", std::move(bitcounts));
   report.set("invalid_pixels", json::uinteger(invalid));
   json hyp = json::array();
@@ -1553,6 +1765,9 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
   std::vector<const double*> vp(p.n);
   std::vector<const std::uint16_t*> bp(p.n);
   std::vector<sort_slot> sort(p.n);
+  std::vector<std::uint8_t> kept(p.n);
+  std::vector<std::uint64_t> rejected(p.n);
+  const task_scratch scratch{sort.data(), kept.data(), rejected.data()};
   for (std::size_t f = 0; f < p.n; ++f) {
     vp[f] = vals[f].data();
     bp[f] = bits[f].data();
@@ -1567,7 +1782,7 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
         bits[f][j] = im.invalid.bits[first + j];
       }
     }
-    combine_rows(p, y0, rows, vp.data(), bp.data(), sort.data());
+    combine_rows(p, y0, rows, vp.data(), bp.data(), scratch);
   }
   return finish_result(p);
 }
@@ -1683,11 +1898,18 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
       auto* vals = reinterpret_cast<double*>(bp + p.n);
       auto* bits = reinterpret_cast<std::uint16_t*>(vals + p.n * rows * w);
       auto* raw = reinterpret_cast<std::byte*>(bits + p.n * rows * w);
-      // Ordinamento per pixel dopo puntatori e blocchi: nei byte per task del modello (ADR-06 R2.r, termine 16·n).
+      // Dopo puntatori e blocchi, nei byte per task del modello (ADR-06 R2.r): ordinamento (16·n), indicatori (q(n)),
+      // parziali di rejected_samples (8·n, dentro il termine dei contatori).
       const std::size_t sort_at = (static_cast<std::size_t>(*tile_bytes) + alignof(sort_slot) - 1) / alignof(sort_slot) *
                                   alignof(sort_slot);
-      ASTRO_ASSERT(sort_at + p.n * sizeof(sort_slot) <= buffer.size());
-      auto* sort = reinterpret_cast<sort_slot*>(buffer.data() + sort_at);
+      const std::size_t kept_at = sort_at + p.n * sizeof(sort_slot);
+      const std::size_t rejected_at = kept_at + 8 * ((p.n + 7) / 8);
+      static_assert(alignof(sort_slot) % alignof(std::uint64_t) == 0 &&
+                    sizeof(sort_slot) % alignof(std::uint64_t) == 0);
+      ASTRO_ASSERT(rejected_at + p.n * sizeof(std::uint64_t) <= buffer.size());
+      const task_scratch scratch{reinterpret_cast<sort_slot*>(buffer.data() + sort_at),
+                                 reinterpret_cast<std::uint8_t*>(buffer.data() + kept_at),
+                                 reinterpret_cast<std::uint64_t*>(buffer.data() + rejected_at)};
       for (std::size_t f = 0; f < p.n; ++f) {
         ctx.check_cancel();
         double* v = vals + f * rows * w;
@@ -1696,7 +1918,7 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         vp[f] = v;
         bp[f] = b;
       }
-      combine_rows(p, y0, cnt, vp, bp, sort);
+      combine_rows(p, y0, cnt, vp, bp, scratch);
       return rows_digest(p.out, y0, y0 + cnt);
     });
 
