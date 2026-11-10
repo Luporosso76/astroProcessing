@@ -21,6 +21,7 @@
 #include "astro/input_format.hpp"
 #include "astro/inventory.hpp"
 #include "astro/master.hpp"
+#include "astro/master_analysis.hpp"
 #include "astro/node.hpp"
 #include "astro/operations.hpp"
 #include "astro/raw_decode.hpp"
@@ -1245,11 +1246,27 @@ double param_number(const json& v, const std::string& key) {
   return v.as_number();
 }
 
+// Membro `master` del documento: solo i parametri propri dei master (le tolleranze comuni stanno al livello superiore).
+void parse_master_member(const json& member, master_analysis_params& m) {
+  if (member.type() != json::kind::object) bad_params("master: oggetto atteso");
+  for (std::size_t i = 0; i < member.keys().size(); ++i) {
+    const std::string& name = member.keys()[i];
+    const std::string key = "master." + name;
+    const json& v = member.items()[i];
+    if (name == "saturation_adu") m.saturation_adu = param_number(v, key);
+    else if (name == "saturated_fraction_max") m.saturated_fraction_max = param_number(v, key);
+    else if (name == "flat_min_signal_adu") m.flat_min_signal_adu = param_number(v, key);
+    else if (name == "flat_level_rel_tol") m.flat_level_rel_tol = param_number(v, key);
+    else if (name == "offset_adu") m.offset_adu = param_number(v, key);
+    else bad_params(key + ": chiave sconosciuta");
+  }
+}
+
 // `settings` `batch.analysis_params`: assente = nessuna dichiarazione (i parametri richiesti risultano `params_missing`).
-calibration_declarations read_analysis_params(const sqlite_dag_store& store) {
-  calibration_declarations d;
+// Parser unico: le chiavi dei light vanno in `d`, il membro `master` in `m`.
+void parse_analysis_params(const sqlite_dag_store& store, calibration_declarations& d, master_analysis_params& m) {
   const std::optional<std::string> text = store.get_setting(analysis_params_key);
-  if (!text) return d;
+  if (!text) return;
   const json doc = parse_json(*text);
   const json* format = doc.type() == json::kind::object ? doc.find("format") : nullptr;
   if (format == nullptr || format->type() != json::kind::string || format->as_string() != analysis_params_format) {
@@ -1259,7 +1276,8 @@ calibration_declarations read_analysis_params(const sqlite_dag_store& store) {
     const std::string& key = doc.keys()[i];
     const json& v = doc.items()[i];
     if (key == "format") continue;
-    if (key == "exposure_rel_tol") d.exposure_rel_tol = param_number(v, key);
+    if (key == "master") parse_master_member(v, m);
+    else if (key == "exposure_rel_tol") d.exposure_rel_tol = param_number(v, key);
     else if (key == "temperature_abs_tol_c") d.temperature_abs_tol_c = param_number(v, key);
     else if (key == "q_min") d.q_min = param_number(v, key);
     else if (key == "q_rel_sigma_max") d.q_rel_sigma_max = param_number(v, key);
@@ -1282,6 +1300,12 @@ calibration_declarations read_analysis_params(const sqlite_dag_store& store) {
       bad_params(key + ": chiave sconosciuta");
     }
   }
+}
+
+calibration_declarations read_analysis_params(const sqlite_dag_store& store) {
+  calibration_declarations d;
+  master_analysis_params ignored;
+  parse_analysis_params(store, d, ignored);
   return d;
 }
 
@@ -1573,6 +1597,17 @@ batch_input input_from_store(const sqlite_dag_store& store, const input_record& 
 }
 
 }  // namespace
+
+master_analysis_params read_master_analysis_params(const sqlite_dag_store& store) {
+  calibration_declarations d;
+  master_analysis_params m;
+  parse_analysis_params(store, d, m);
+  m.exposure_rel_tol = d.exposure_rel_tol;
+  m.temperature_abs_tol_c = d.temperature_abs_tol_c;
+  m.temp_policy = d.temp_policy;
+  m.decoder_black_abs_tol_adu = d.decoder_black_abs_tol_adu;
+  return m;
+}
 
 batch_proposal analyze_batch(const sqlite_dag_store& store, const candidate_choices& choices, memory_pool& pool,
                              const cancel_token& cancel, const fault_injector& fault) {

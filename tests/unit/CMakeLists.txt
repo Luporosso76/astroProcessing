@@ -214,6 +214,17 @@ target_compile_definitions(test_master_b7 PRIVATE
   ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_master_b7 PROPERTIES LABELS fast)
 
+# B12 di M3.b: analisi dei master, esclusioni per frame. T-M3B-C02-08 (ogni motivo da solo), T-M3B-C02-12 (parte di
+# analisi), T-M3B-C02-15 (solo `master.no_usable_frames`), lettore FITS di statistiche per frame (L2) e parametri
+# d'analisi (L4): `fast`.
+add_executable(test_master_b12 test_master_b12.cpp)
+target_link_libraries(test_master_b12 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b12 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b12 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b12 PROPERTIES LABELS fast)
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -420,6 +431,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b5.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b6.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b7.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b12.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
