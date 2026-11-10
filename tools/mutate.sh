@@ -3,13 +3,66 @@
 # esegue i test indicati e si aspetta FALLIMENTO. Il file è sempre ripristinato e verificato con cmp; dopo il ripristino
 # il file ha un timestamp nuovo e la ricompilazione è obbligatoria e verificata, così nessun oggetto mutato sopravvive.
 # RILEVATA solo se il junit di ctest mostra almeno un test eseguito e fallito; test non eseguiti o junit assente = errore.
-# Uso: tools/mutate.sh <file> <patch> <ctest-regex> <log>
+# Uso: tools/mutate.sh <file> <patch> <ctest-regex> <log>   |   tools/mutate.sh --selftest
+# Il junit è classificato da tools/mutate_classify.py; un output troncato da ctest è errore, mai rilevamento.
 # Uscita: 0 mutazione rilevata (test falliti), 1 mutazione sopravvissuta (test passati),
 #         2 errore dello strumento (patch non applicabile, compilazione fallita, nessun test, ripristino).
+# --selftest: 0 ok; 2 prova fallita (come ogni errore dello strumento: 1 qui non esiste), cartella di lavoro
+#         conservata in tmp/ per diagnosi. Richiamato da tools/check.sh --selftest.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
+export TMPDIR="$root/tmp"
+mkdir -p "$TMPDIR"
+# Limiti d'output per test nel junit. Default di ctest: 307200 byte (falliti), 1024 (passati); oltre, ctest scarta la
+# coda dell'output e il marcatore gtest finale sparisce. 64 MiB: ben oltre qualunque output di un test del progetto;
+# se è superato lo stesso, mutate_classify.py riconosce il troncamento e dà errore.
+ctest_limit_args=(--test-output-size-failed 67108864 --test-output-size-passed 67108864)
+
+if [ "${1:-}" = "--selftest" ]; then
+  [ "$#" -eq 1 ] || { echo "uso: tools/mutate.sh --selftest (senza altri argomenti)" >&2; exit 2; }
+  d="$(mktemp -d "$root/tmp/mutate-selftest.XXXXXX")"
+  ok=0
+  trap '[ "$ok" -eq 1 ] && rm -rf -- "$d" || echo "cartella del selftest conservata per diagnosi: $d" >&2' EXIT
+  mkdir -p "$d/proj"
+  cat > "$d/proj/CMakeLists.txt" <<'EOF'
+cmake_minimum_required(VERSION 3.20)
+project(mutate_selftest NONE)
+enable_testing()
+add_test(NAME long_fail COMMAND sh -c "i=0; while [ $i -lt 20000 ]; do echo riga-di-riempimento-$i; i=$((i+1)); done; echo '[  FAILED  ] Suite.Caso'; exit 1")
+add_test(NAME early_fail COMMAND sh -c "echo '[  FAILED  ] Suite.Caso'; i=0; while [ $i -lt 20000 ]; do echo riga-di-riempimento-$i; i=$((i+1)); done; exit 1")
+add_test(NAME plain_fail COMMAND sh -c "echo 'timeout simulato senza marcatore'; exit 1")
+add_test(NAME pass COMMAND sh -c "echo ok")
+EOF
+  st_fail() { echo "mutate selftest fallito: $1" >&2; [ ! -f "$d/out.txt" ] || cat "$d/out.txt" >&2; exit 2; }
+  (cd "$d/proj" && cmake -S . -B ../b >/dev/null) || st_fail "configurazione del progetto di prova"
+  run() { # <regex> <n> <default|limite>: ctest nel progetto di prova e classificazione del junit
+    rm -f -- "$d/j.xml"
+    local cr=0
+    if [ "$3" = default ]; then
+      (cd "$d/b" && ctest -R "$1" --output-junit "$d/j.xml" >/dev/null 2>&1) || cr=$?
+    else
+      (cd "$d/b" && ctest -R "$1" --output-junit "$d/j.xml" "${ctest_limit_args[@]}" >/dev/null 2>&1) || cr=$?
+    fi
+    [ -s "$d/j.xml" ] || st_fail "junit assente per '$1' (ctest uscita $cr)"
+    rc=0; python3 -S "$root/tools/mutate_classify.py" "$d/j.xml" "$2" >"$d/out.txt" 2>&1 || rc=$?
+  }
+  expect() { # <uscita> <descrizione> [testo atteso nella diagnosi]
+    [ "$rc" -eq "$1" ] || st_fail "$2 (uscita $rc, atteso $1)"
+    [ -z "${3:-}" ] || grep -q -- "$3" "$d/out.txt" || st_fail "$2 (diagnosi senza «$3»)"
+  }
+  run '^long_fail$' 1 default;   expect 2 "output troncato (marcatore in coda) col default di ctest" "troncato"
+  run '^early_fail$' 1 default;  expect 2 "output troncato (marcatore in testa, quindi sopravvive) col default di ctest" "troncato"
+  run '^long_fail$' 1 limit;     expect 0 "fallimento gtest con output lungo deve essere rilevato"
+  run '^early_fail$' 1 limit;    expect 0 "fallimento gtest con marcatore in testa deve essere rilevato"
+  run '^plain_fail$' 1 limit;    expect 2 "fallimento senza marcatore resta errore d'infrastruttura" "senza marcatore"
+  run '^pass$' 1 limit;          expect 1 "test passato resta non rilevato"
+  run '^(pass|long_fail)$' 2 limit; expect 0 "un solo fallito su due basta a rilevare"
+  ok=1
+  echo "mutate selftest: ok"
+  exit 0
+fi
 
 if [ "$#" -ne 4 ]; then
   echo "uso: tools/mutate.sh <file> <patch> <ctest-regex> <log>" >&2
@@ -20,7 +73,6 @@ file="$1"; patch_file="$2"; regex="$3"; log="$4"
 [ -f "$patch_file" ] || { echo "patch assente: $patch_file" >&2; exit 2; }
 command -v patch >/dev/null || { echo "patch non trovato nel PATH" >&2; exit 2; }
 
-export TMPDIR="$root/tmp"
 export CCACHE_DIR="$root/tmp/cache/ccache"
 mkdir -p "$TMPDIR" "$CCACHE_DIR" "$(dirname "$log")"
 source "$root/tools/cpu_cap.sh"
@@ -93,38 +145,10 @@ fi
 junit="$root/tmp/mutate-junit.$$.xml"
 rm -f -- "$junit"
 status=0
-ctest --preset release -R "$regex" --output-junit "$junit" >> "$log" 2>&1 || status=$?
+ctest --preset release -R "$regex" --output-junit "$junit" "${ctest_limit_args[@]}" >> "$log" 2>&1 || status=$?
 [ -s "$junit" ] || { echo "junit di ctest assente: errore dell'infrastruttura (uscita $status)" | tee -a "$log" >&2; exit 2; }
 verdict=0
-python3 -S - "$junit" "$count" >> "$log" <<'PY' || verdict=$?
-import sys
-import xml.etree.ElementTree as ET
-try:
-    root = ET.parse(sys.argv[1]).getroot()
-except (OSError, ET.ParseError) as e:
-    print("INFRASTRUTTURA: junit illeggibile: %s" % e)
-    sys.exit(2)
-expected = int(sys.argv[2])
-cases = list(root.iter("testcase"))
-notrun = [c.get("name") for c in cases if c.get("status") == "notrun"]
-failed = [c for c in cases if c.get("status") == "fail" or c.find("failure") is not None or c.find("error") is not None]
-print("junit: %d casi, %d falliti, %d non eseguiti" % (len(cases), len(failed), len(notrun)))
-if len(cases) != expected or notrun:
-    print("INFRASTRUTTURA: casi %d attesi %d, non eseguiti %s" % (len(cases), expected, notrun))
-    sys.exit(2)
-detected = 0
-for c in failed:
-    out = "".join((c.findtext("system-out") or "", c.findtext("system-err") or ""))
-    if "CHECK-RESULT: tool-error" in out:
-        print("INFRASTRUTTURA: %s ha segnalato un errore dello strumento (CHECK-RESULT: tool-error)" % c.get("name"))
-        sys.exit(2)
-    if "CHECK-RESULT: defect" in out or "[  FAILED  ]" in out:
-        detected += 1
-    else:
-        print("INFRASTRUTTURA: %s fallito senza marcatore CHECK-RESULT né fallimento gtest" % c.get("name"))
-        sys.exit(2)
-sys.exit(0 if detected else 1)
-PY
+python3 -S "$root/tools/mutate_classify.py" "$junit" "$count" >> "$log" || verdict=$?
 rm -f -- "$junit"
 if [ "$verdict" -eq 0 ]; then
   echo "RILEVATA: la mutazione fa fallire almeno un test fra i $count selezionati (ctest uscita $status)" | tee -a "$log"

@@ -47,6 +47,7 @@ while [ $# -gt 0 ]; do
           || { echo "check selftest fallito: «$bad» senza elenco dei passi" >&2; exit 1; }
       done
       python3 -S tools/check_shards.py selftest
+      tools/mutate.sh --selftest
       echo "check selftest: ok"
       exit 0 ;;
     --step)
