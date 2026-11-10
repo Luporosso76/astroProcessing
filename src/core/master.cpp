@@ -33,14 +33,16 @@ namespace {
        {{"parametro", name}, {"motivo", why}});
 }
 
-[[noreturn]] void outside_variance_domain(const master_recipe& r, const char* motivo) {
+// `canale`: solo per un controllo per canale su un flat CFA.
+[[noreturn]] void outside_variance_domain(const master_recipe& r, const char* motivo, const char* canale = nullptr) {
+  stop_error::context_list context = {{"combine", r.combine ? combine_name(*r.combine) : "assente"},
+                                      {"rejection", r.rejection ? rejection_name(*r.rejection) : "assente"},
+                                      {"n", std::to_string(r.frames.size())},
+                                      {"role", role_name(r.role)},
+                                      {"motivo", motivo}};
+  if (canale != nullptr) context.emplace_back("canale", canale);
   stop(error_category::unsupported, "master.variance_domain",
-       "metodo, numero di frame o ruolo fuori dal dominio della varianza derivata (C-02.b §b.1, §b.2)",
-       {{"combine", r.combine ? combine_name(*r.combine) : "assente"},
-        {"rejection", r.rejection ? rejection_name(*r.rejection) : "assente"},
-        {"n", std::to_string(r.frames.size())},
-        {"role", role_name(r.role)},
-        {"motivo", motivo}});
+       "metodo, numero di frame o ruolo fuori dal dominio della varianza derivata (C-02.b §b.1, §b.2)", std::move(context));
 }
 
 const char* flat_norm_name(flat_normalization f) {
@@ -165,6 +167,20 @@ struct wide_uint {
     return r;
   }
 
+  friend wide_uint operator+(const wide_uint& a, const wide_uint& b) {
+    wide_uint r;
+    const std::size_t size = std::max(a.limbs.size(), b.limbs.size());
+    r.limbs.reserve(size + 1);
+    std::uint64_t carry = 0;
+    for (std::size_t i = 0; i < size; ++i) {
+      const std::uint64_t t = carry + (i < a.limbs.size() ? a.limbs[i] : 0u) + (i < b.limbs.size() ? b.limbs[i] : 0u);
+      r.limbs.push_back(static_cast<std::uint32_t>(t));
+      carry = t >> 32;
+    }
+    if (carry != 0) r.limbs.push_back(static_cast<std::uint32_t>(carry));
+    return r;
+  }
+
   // this · 2^bits
   wide_uint shifted(std::size_t bits) const {
     wide_uint r;
@@ -186,6 +202,37 @@ struct wide_uint {
       if (a.limbs[i] != b.limbs[i]) return a.limbs[i] < b.limbs[i] ? -1 : 1;
     }
     return 0;
+  }
+};
+
+// Valore diadico esatto `m · 2^e` di uno o più f64 finiti ≥ 0: somme e prodotti senza arrotondamento.
+struct dyadic {
+  wide_uint m;
+  long long e = 0;
+
+  // Mantissa scalata di 2^53 da frexp: intera ed esatta anche per i subnormali.
+  static dyadic of(double v) {
+    int exp2 = 0;
+    const double fraction = std::frexp(v, &exp2);
+    return {wide_uint::of(static_cast<std::uint64_t>(std::ldexp(fraction, 53))), static_cast<long long>(exp2) - 53};
+  }
+
+  friend dyadic operator*(const dyadic& a, const dyadic& b) { return {a.m * b.m, a.e + b.e}; }
+
+  // Mantisse portate all'esponente minore dei due.
+  static std::pair<wide_uint, wide_uint> aligned(const dyadic& a, const dyadic& b) {
+    if (a.e >= b.e) return {a.m.shifted(static_cast<std::size_t>(a.e - b.e)), b.m};
+    return {a.m, b.m.shifted(static_cast<std::size_t>(b.e - a.e))};
+  }
+
+  friend dyadic operator+(const dyadic& a, const dyadic& b) {
+    const auto [x, y] = aligned(a, b);
+    return {x + y, std::min(a.e, b.e)};
+  }
+
+  friend int compare(const dyadic& a, const dyadic& b) {
+    const auto [x, y] = aligned(a, b);
+    return compare(x, y);
   }
 };
 
@@ -276,16 +323,35 @@ void validate_params(const master_recipe& r) {
     if (*r.flat_norm != flat_normalization::none && *r.flat_norm != flat_normalization::median_ratio) {
       bad_param("flat_normalization", "fuori dominio");
     }
-    if (*r.flat_norm != flat_normalization::none) outside_variance_domain(r, "flat_normalization diversa da none");
-    if (!plain) outside_variance_domain(r, "metodo non ammesso per il flat");
-    check_finite(r.flat_level_rel_tol, "flat_level_rel_tol");
-    if (!(*r.flat_level_rel_tol > 0 && *r.flat_level_rel_tol < 1)) bad_param("flat_level_rel_tol", "deve stare in (0, 1)");
+    // C-02.b-flat §f.2: tabella dei metodi per `flat_normalization`, poi i parametri ammessi o vietati.
+    if (*r.flat_norm == flat_normalization::median_ratio) {
+      if (method == method_kind::single) outside_variance_domain(r, "median_ratio con single");
+      if (r.flat_level_rel_tol) bad_param("flat_level_rel_tol", "vietato con median_ratio");
+      check_finite(r.flat_additive_bound_adu, "flat_additive_bound_adu");
+      if (!(*r.flat_additive_bound_adu >= 0)) bad_param("flat_additive_bound_adu", "deve essere >= 0");
+      if (method == method_kind::mean) {
+        if (r.flat_norm_rel_budget) bad_param("flat_norm_rel_budget", "vietato con mean");
+      } else {
+        check_finite(r.flat_norm_rel_budget, "flat_norm_rel_budget");
+        if (!(*r.flat_norm_rel_budget > 0 && *r.flat_norm_rel_budget < 1)) {
+          bad_param("flat_norm_rel_budget", "deve stare in (0, 1)");
+        }
+      }
+    } else {
+      if (!plain) outside_variance_domain(r, "metodo non ammesso per il flat");
+      if (r.flat_additive_bound_adu) bad_param("flat_additive_bound_adu", "vietato con none");
+      if (r.flat_norm_rel_budget) bad_param("flat_norm_rel_budget", "vietato con none");
+      check_finite(r.flat_level_rel_tol, "flat_level_rel_tol");
+      if (!(*r.flat_level_rel_tol > 0 && *r.flat_level_rel_tol < 1)) bad_param("flat_level_rel_tol", "deve stare in (0, 1)");
+    }
     check_finite(r.flat_min_signal_adu, "flat_min_signal_adu");
     if (!(*r.flat_min_signal_adu > 0)) bad_param("flat_min_signal_adu", "deve essere > 0");
   } else {
     if (r.flat_norm) bad_param("flat_normalization", "solo per il ruolo flat");
     if (r.flat_level_rel_tol) bad_param("flat_level_rel_tol", "solo per il ruolo flat");
     if (r.flat_min_signal_adu) bad_param("flat_min_signal_adu", "solo per il ruolo flat");
+    if (r.flat_additive_bound_adu) bad_param("flat_additive_bound_adu", "solo per il ruolo flat");
+    if (r.flat_norm_rel_budget) bad_param("flat_norm_rel_budget", "solo per il ruolo flat");
   }
   if (method == method_kind::winsorized) {
     check_integer(r.winsor_g, "winsor_g", 1);
@@ -301,6 +367,10 @@ void validate_params(const master_recipe& r) {
     check_integer(r.clip_min_kept, "clip_min_kept", 2);
     if (*r.clip_min_kept > static_cast<double>(n)) bad_param("clip_min_kept", "oltre n");
     require_sigma_clip_not_inert(n, *r.clip_kappa_low, *r.clip_kappa_high);
+    // C-02.b-flat §f.2: sul flat (solo `median_ratio` arriva qui) la procedura deve essere dispari.
+    if (r.role == master_role::flat && *r.clip_kappa_low != *r.clip_kappa_high) {
+      outside_variance_domain(r, "sigma_clip sul flat con soglie diverse");
+    }
   } else {
     forbid(r.clip_kappa_low, "clip_kappa_low");
     forbid(r.clip_kappa_high, "clip_kappa_high");
@@ -417,7 +487,8 @@ struct frame_state {
   std::uint64_t saturated = 0;
   double saturated_fraction = 0;
   std::array<double, 4> level{};  // m_(f,c) nell'ordine dei canali, solo flat; il mono ha il solo canale 0
-  std::uint64_t rejected = 0;   // campioni rifiutati da sigma_clip, somma dei parziali dei task
+  std::array<double, 4> scale{};  // r_(f,c), solo flat con `median_ratio`
+  std::uint64_t rejected = 0;  // campioni rifiutati da sigma_clip, somma dei parziali dei task
 };
 
 image header_of(const image& im) {
@@ -444,7 +515,8 @@ struct master_plan {
   std::uint32_t w = 0, h = 0;
   bool flat = false, has_sat = false;
   double sat = 0, offset = 0, eps = 0;
-  std::array<double, 4> level_mean{};  // m̄_c, solo flat
+  std::array<double, 4> level_mean{};  // m̄_c, solo flat con `none`
+  std::array<double, 4> level_harmonic{};  // m_H,c, solo flat con `median_ratio`
   std::uint8_t cfa_x = 0, cfa_y = 0;
   bool per_channel = false;
   std::array<const char*, 4> labels = {"all", "", "", ""};
@@ -544,7 +616,7 @@ master_plan make_plan(const master_recipe& r, const std::function<void(kappa_res
   p.flat = r.role == master_role::flat;
   p.has_sat = r.saturation_adu.has_value();
   if (p.has_sat) p.sat = *r.saturation_adu;
-  if (p.flat) p.eps = *r.flat_level_rel_tol;
+  if (p.flat && *r.flat_norm == flat_normalization::none) p.eps = *r.flat_level_rel_tol;
   p.frames.resize(p.n);
   for (std::size_t k = 0; k < p.n; ++k) {
     p.frames[k].name = frame_name(k);
@@ -865,13 +937,82 @@ frame_metadata master_metadata_of(master_plan& p) {
   return m;
 }
 
+// `median_ratio` (C-02.b-flat §f.1 regola, §f.2 controlli 2-4), per canale e con i frame nell'ordine canonico:
+// 1/m_(f,c), la loro somma da sinistra, m_H,c = n / Σ, r_(f,c) = m_H,c / m_(f,c). Ogni controllo per tutti i canali
+// prima del successivo. Confronti dei controlli 3 e 4 in aritmetica esatta sui valori f64.
+void flat_scale_constants(master_plan& p) {
+  const master_recipe& r = p.recipe;
+  const std::size_t channels = p.channel_count();
+  const auto require_normal = [&](double v, stop_error::context_list context, std::size_t c) {
+    if (!std::isfinite(v) || !is_normal(v)) {
+      stop(error_category::numeric, "master.flat_scale_nonfinite", "costante delle scale del flat non finita o non normale",
+           p.flat_context(std::move(context), c));
+    }
+  };
+  for (std::size_t c = 0; c < channels; ++c) {
+    double sum = 0;
+    for (const frame_state& f : p.frames) {
+      const double inverse = 1 / f.level[c];
+      require_normal(inverse, {{"costante", "1/m_f"}, {"frame", f.name}, {"m_f", num_text(f.level[c])}}, c);
+      sum += inverse;
+    }
+    require_normal(sum, {{"costante", "somma"}, {"valore", num_text(sum)}}, c);
+    const double harmonic = static_cast<double>(p.n) / sum;
+    require_normal(harmonic, {{"costante", "m_H"}, {"valore", num_text(harmonic)}}, c);
+    p.level_harmonic[c] = harmonic;
+    for (frame_state& f : p.frames) {
+      f.scale[c] = harmonic / f.level[c];
+      require_normal(f.scale[c], {{"costante", "r_f"}, {"frame", f.name}, {"m_f", num_text(f.level[c])}}, c);
+    }
+  }
+  if (p.method == method_kind::median || p.method == method_kind::winsorized || p.method == method_kind::sigma_clip) {
+    // 4 · min m è esatto in f64 (potenza di 2; un overflow a +inf lascia invariato l'esito del confronto).
+    for (std::size_t c = 0; c < channels; ++c) {
+      double lo = p.frames[0].level[c], hi = lo;
+      for (const frame_state& f : p.frames) {
+        lo = std::min(lo, f.level[c]);
+        hi = std::max(hi, f.level[c]);
+      }
+      if (!(hi <= 4 * lo)) outside_variance_domain(r, "max m > 4 min m", p.per_channel ? p.labels[c] : nullptr);
+    }
+  }
+  if (p.method == method_kind::mean) return;
+  // A · |r − 1| ≤ budget · m_H per ogni frame, cioè A · ρ ≤ budget · m_H, senza sottrazione: con r ≥ 1
+  // A · r ≤ A + budget · m_H, con r < 1 A ≤ A · r + budget · m_H.
+  const double bound = *r.flat_additive_bound_adu, budget = *r.flat_norm_rel_budget;
+  const dyadic a = dyadic::of(bound), b = dyadic::of(budget);
+  for (std::size_t c = 0; c < channels; ++c) {
+    const dyadic allowed = b * dyadic::of(p.level_harmonic[c]);
+    double rho = 0;
+    bool over = false;
+    for (const frame_state& f : p.frames) {
+      const double s = f.scale[c];
+      rho = std::max(rho, std::fabs(s - 1));
+      const dyadic as = a * dyadic::of(s);
+      over = over || (s >= 1 ? compare(as, a + allowed) > 0 : compare(a, as + allowed) > 0);
+    }
+    if (over) {
+      stop(error_category::unsupported, "master.flat_norm_budget", "A · rho oltre flat_norm_rel_budget · m_H",
+           p.flat_context({{"A", num_text(bound)},
+                           {"rho", num_text(rho)},
+                           {"m_H", num_text(p.level_harmonic[c])},
+                           {"budget", num_text(budget)}},
+                          c));
+    }
+  }
+}
+
 // Dopo l'ispezione di tutti i frame: livelli del flat, uscita allocata, metadati del master.
 void finish_preflight(master_plan& p) {
   const image& ref = p.frames[0].header;
   p.w = ref.geometry.width;
   p.h = ref.geometry.height;
   p.offset = ref.metadata.offset_adu->value;
-  if (p.flat) {
+  const bool ratio = p.flat && *p.recipe.flat_norm == flat_normalization::median_ratio;
+  if (ratio) flat_scale_constants(p);
+  // m̄_c serve alla tolleranza dei livelli, che con `median_ratio` non esiste (C-02.b-flat §f.2), e ai campi dei
+  // livelli nel report; con `median_ratio` quei campi si decidono in B9/B11.
+  if (p.flat && !ratio) {
     // m̄_c in ordine canonico; poi la tolleranza per frame canonico e, nel frame, per canale: la prima violazione.
     const std::size_t channels = p.channel_count();
     for (std::size_t c = 0; c < channels; ++c) {
@@ -895,6 +1036,12 @@ void finish_preflight(master_plan& p) {
         }
       }
     }
+  }
+  // `median_ratio` ammesso ma non ancora calcolato: combinare gli x_f senza normalizzarli darebbe un master sbagliato.
+  // Stop dopo il preflight, prima dei blocchi e di ogni artefatto (M3b-lacune, «Decisioni successive (B8)»).
+  if (ratio) {
+    stop(error_category::unsupported, "master.method_not_computable", "flat_normalization median_ratio non ancora calcolata",
+         {{"flat_normalization", "median_ratio"}});
   }
   if (!p.has_sat) p.warnings.push_back("saturation_not_evaluated");
   if (*p.recipe.temp_policy == temperature_policy::not_applicable_declared && p.n > 1) {
@@ -1346,6 +1493,8 @@ json recipe_report(const master_recipe& r) {
   o.set("flat_normalization", r.flat_norm ? json::string(flat_norm_name(*r.flat_norm)) : json::null());
   o.set("flat_level_rel_tol", number_or_null(r.flat_level_rel_tol));
   o.set("flat_min_signal_adu", number_or_null(r.flat_min_signal_adu));
+  o.set("flat_additive_bound_adu", number_or_null(r.flat_additive_bound_adu));
+  o.set("flat_norm_rel_budget", number_or_null(r.flat_norm_rel_budget));
   o.set("saturation_adu", number_or_null(r.saturation_adu));
   o.set("saturated_fraction_max", number_or_null(r.saturated_fraction_max));
   o.set("exposure_rel_tol", json::number(*r.exposure_rel_tol));

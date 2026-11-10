@@ -434,8 +434,12 @@ TEST(Master, T_M2R2_05_flat_rules_stop_before_combining) {
          g.frames[2].hdr.filter = "R";
          refresh_digests(g, r);
        }},
-      {"median_ratio", error_category::unsupported, "master.variance_domain",
-       [](group&, master_recipe& r) { r.flat_norm = flat_normalization::median_ratio; }},
+      // C-02.b-flat §f.13 punti 1-2: `median_ratio` è ammesso, ma con la tolleranza dei livelli (vietata) si ferma.
+      {"median_ratio_with_level_tol", error_category::invalid_input, "master.param.flat_level_rel_tol",
+       [](group&, master_recipe& r) {
+         r.flat_norm = flat_normalization::median_ratio;
+         set_flat_additive_bound(r, 0.0);
+       }},
       {"flat_norm_missing", error_category::invalid_input, "master.param.flat_normalization",
        [](group&, master_recipe& r) { r.flat_norm.reset(); }},
       {"level_tol_out_of_domain", error_category::invalid_input, "master.param.flat_level_rel_tol",
@@ -465,6 +469,15 @@ TEST(Master, T_M2R2_05_flat_rules_stop_before_combining) {
     master_recipe r = recipe_of(g, 0.01);
     c.mutate(g, r);
     EXPECT_STOP(combine_master(r, images_of(g)), c.category, c.code);
+  }
+  // C-02.b-flat §f.13 punto 1: `median_ratio` con `mean`, A dichiarato e senza tolleranza è ammesso dalla validazione
+  // (i valori della combinazione sono di B9).
+  {
+    master_recipe r = recipe_of(flat_group(), 0.01);
+    r.flat_norm = flat_normalization::median_ratio;
+    r.flat_level_rel_tol.reset();
+    set_flat_additive_bound(r, 0.0);
+    EXPECT_NO_THROW(validate_master_recipe(r));
   }
   // Livello esattamente al bordo della tolleranza: accettato (la regola è `>`).
   group g = make_group(master_role::flat, 4, 4, 2);

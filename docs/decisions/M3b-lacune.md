@@ -540,3 +540,24 @@ FAIL con sette MED (`.omc/artifacts/ask/review-M3b-B12-round1-claude-20261110-22
 - **Forma dei `valori`**: {`campo`} anche per `metadata_missing.phase`, `.linearity`, `.unit`.
 - **Campioni non finiti senza bit**: il lettore si affida a `decode_fits`, che li marca (vincolo scritto nel commento).
 - **Review giro 2: PASS** (`.omc/artifacts/ask/review-M3b-B12-round2-claude-20261110-2330.md`). Corretti dal coordinatore testi della decisione, del contratto e un'intestazione dei test. Restano LOW per un'unità successiva: `saturated_fraction_max` senza `saturation_adu` accettato nell'analisi e fermo nella ricetta (si chiude in B14, che aggancia il preflight dei nodi proposti, con test); test del ramo `image.*` di `is_decode_error`, della precedenza di `params_missing` sullo stop di dominio e di quattro coppie adiacenti dell'ordine dei motivi; sul ramo d'errore di `plan_fits` manca `check_unchanged` dopo il digest (da aggiungere con la parte RAW del lettore in B15).
+
+## Decisioni successive (B8)
+
+- **Campi della ricetta**: `master_recipe::flat_additive_bound_adu` (A) e `master_recipe::flat_norm_rel_budget`, entrambi `std::optional<double>`; presenza e divieti per metodo e ruolo come C-02.b-flat §f.2.
+- **Contesti degli stop.** `master.flat_norm_budget`: {`A`, `rho`, `m_H`, `budget`} in `%.17g`, più `canale` solo per un CFA (come gli stop per canale di B7). Controllo 3 (`max m ≤ 4 min m`): contesto esistente di `master.variance_domain` più `canale` per un CFA. `master.flat_scale_nonfinite` su `1/m_f` o `r_f`: {`frame`, `m_f`}, più `canale` per un CFA.
+- **Ordine dei controlli**: la numerazione 1-4 di §f.2; i test hanno una sola violazione per caso.
+- **T-M3B-FLAT-01 in B8**: con i nomi di report e provenance non ancora fissati (B11), le costanti si leggono dal contesto dello stop del budget; livelli (1, 3, 3/2, 3/2), con `m_H = 3/2` esatto in ogni ordine canonico.
+- **`median_ratio` ammesso ma non ancora calcolato**: dopo validazione e preflight, prima dei blocchi, del nodo e dell'artefatto, stop `unsupported`, `master.method_not_computable`, contesto {`flat_normalization`: `median_ratio`}. Combinare senza normalizzare darebbe un master sbagliato senza segnalarlo. B9 sostituisce lo stop col calcolo.
+- **Chiave del nodo.** `flat_additive_bound_adu` e `flat_norm_rel_budget` entrano nei parametri del nodo (`recipe_report`), quindi la chiave cambia per ogni master, anche mono e senza `median_ratio` (due chiavi `null` in più), come in B5 e B6; `master_algorithm_version` resta 3. Effetto di `plans/M3b.md` §11: i nodi master già prodotti non si ritrovano più e diventano `stale`.
+- **Contesti non fissati dal contratto**: stop non finiti sulla somma `Σ 1/m_f` e su `m_H`: {`costante`, `valore`} (+ `canale` per un CFA). Nel contesto di `master.flat_norm_budget` `rho` è il valore f64 arrotondato; il confronto resta esatto.
+- **Confronti.** Controllo 3 in f64 (`hi ≤ 4·lo`): moltiplicare per una potenza di 2 è esatto e un overflow a `+inf` non cambia l'esito. Controllo 4 in aritmetica diadica esatta (`dyadic` su `wide_uint`), senza sottrazioni. `A = -0.0` è ammesso (uguale a 0).
+
+### Correzioni della review di B8 (giro 1)
+
+FAIL con due MED, tutti di prova (`.omc/artifacts/ask/review-M3b-B8-round1-claude-20261110-2307.md`). Decisioni:
+
+- **Contesto di `master.flat_scale_nonfinite`, uniforme**: chiave `costante` ∈ {`1/m_f`, `r_f`, `somma`, `m_H`} in ogni stop; per `1/m_f` e `r_f` anche {`frame`, `m_f`}, per `somma` e `m_H` anche {`valore`}; `canale` per un CFA. Sostituisce il contesto {`frame`, `m_f`} senza `costante` deciso sopra.
+- **`m̄_c` solo con `none`**: con `median_ratio` non si calcola, quindi un livello enorme ma ammesso non dà `master.report_nonfinite`. `m̄_c` serve alla tolleranza dei livelli e ai campi del report sui livelli (`rel_dev` per frame CFA, `flat_level_rel_dev` mono, `channels[c].flat_level_mean`, `flat_level_mean` mono): con `median_ratio` B9 o B11 decidono se calcolarli o dichiararli `null`; senza decisione `rel_dev` sarebbe infinito.
+- **`master.method_not_computable` è temporaneo**: non sta nei cataloghi di §f.10 e §b.10; B9 lo toglie insieme al test `T_M3B_FLAT_06_admitted_median_ratio_stops_with_method_not_computable_until_b9`.
+- Test: controllo 3 non applicato a `mean` e `weighted_mean` (rapporto oltre 4 ammesso); un test per costante del controllo 2; `A = -0.0` ammesso; commenti corretti.
+- **Review giro 2: PASS** (`.omc/artifacts/ask/review-M3b-B8-round2-claude-20261110-2355.md`). I tre LOW (commenti su `m̄_c` e sul contesto di `master.flat_low_signal`, decisione sopra) corretti dal coordinatore.

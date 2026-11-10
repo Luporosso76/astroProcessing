@@ -204,6 +204,7 @@ TEST(MasterB3, T_M3B_C02_09_flat_role_admits_only_single_and_mean_with_none) {
          use_single(r);
          r.flat_norm = flat_normalization::median_ratio;
          r.flat_level_rel_tol.reset();
+         set_flat_additive_bound(r, 0.0);  // parametri di §f.2 validi: l'unica violazione è la casella della tabella
        },
        false},
   };

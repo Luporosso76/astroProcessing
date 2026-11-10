@@ -147,6 +147,25 @@ inline master_recipe recipe_of(const group& g, double flat_tol = 0.25) {
   return r;
 }
 
+// Parametri di C-02.b-flat §f.2 attesi da B8 in `master_recipe` come `std::optional<double>`: `flat_additive_bound_adu`
+// e `flat_norm_rel_budget`. Senza il campo il test fallisce qui, in modo esplicito.
+template <class R>
+void set_flat_additive_bound(R& r, std::optional<double> v) {
+  if constexpr (requires { r.flat_additive_bound_adu = v; }) {
+    r.flat_additive_bound_adu = v;
+  } else {
+    ADD_FAILURE() << "API assente: master_recipe::flat_additive_bound_adu (C-02.b-flat §f.2, B8)";
+  }
+}
+template <class R>
+void set_flat_norm_budget(R& r, std::optional<double> v) {
+  if constexpr (requires { r.flat_norm_rel_budget = v; }) {
+    r.flat_norm_rel_budget = v;
+  } else {
+    ADD_FAILURE() << "API assente: master_recipe::flat_norm_rel_budget (C-02.b-flat §f.2, B8)";
+  }
+}
+
 // Valori memorizzati nel file (arrotondati al tipo del BITPIX).
 inline double stored(const mframe& f, std::size_t i) {
   return f.bitpix == -32 ? static_cast<double>(static_cast<float>(f.v[i])) : f.v[i];

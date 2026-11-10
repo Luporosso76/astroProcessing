@@ -40,8 +40,12 @@ struct master_recipe {
   std::optional<combine_method> combine;
   std::optional<master_rejection> rejection;
   std::optional<flat_normalization> flat_norm;     // solo flat
-  std::optional<double> flat_level_rel_tol;        // solo flat, in (0, 1)
+  std::optional<double> flat_level_rel_tol;        // solo flat con `none`, in (0, 1); vietato con `median_ratio`
   std::optional<double> flat_min_signal_adu;       // solo flat, > 0
+  // Solo flat con `median_ratio` (C-02.b-flat §f.2), vietati altrimenti: A >= 0 per ogni metodo; budget in (0, 1) per
+  // ogni metodo tranne `mean`, che lo vieta.
+  std::optional<double> flat_additive_bound_adu;
+  std::optional<double> flat_norm_rel_budget;
   std::optional<double> saturation_adu;            // assente: avviso saturation_not_evaluated
   std::optional<double> saturated_fraction_max;    // in [0, 1], obbligatorio con saturation_adu
   std::optional<double> exposure_rel_tol;
