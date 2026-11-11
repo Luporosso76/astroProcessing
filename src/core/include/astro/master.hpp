@@ -18,7 +18,7 @@ namespace astro {
 enum class flat_normalization { none, median_ratio };
 
 constexpr const char* master_operator_id = "master.combine";
-constexpr std::uint32_t master_algorithm_version = 3;
+constexpr std::uint32_t master_algorithm_version = 4;
 constexpr std::uint32_t master_serialization_version = 1;
 
 struct master_frame_spec {

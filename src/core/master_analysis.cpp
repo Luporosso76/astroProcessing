@@ -451,6 +451,30 @@ method_choice choose_method(const master_proposal_request& rq, const master_grou
   return {master_proposed_method{median ? combine_method::median : combine_method::mean, master_rejection::none}, ""};
 }
 
+// Chiave esatta del gruppo (C-02.b §b.2 punto 2), dal riferimento: i campi di same_key, con «assente» come null,
+// `filter` solo per il flat, la presenza dello stato del decoder e `offset_adu` solo per i FITS. I campi strutturali dei
+// RAW sono nello stato del decoder di ogni frame (`frame_decoder_states` del nodo).
+json group_key(master_role role, const image& im) {
+  const frame_metadata& m = im.metadata;
+  const auto text = [](const std::optional<metadata_value<std::string>>& v) { return v ? json::string(v->value) : json::null(); };
+  const auto integer = [](const std::optional<metadata_value<std::int64_t>>& v) { return v ? json::integer(v->value) : json::null(); };
+  const auto binning = [](const std::optional<std::uint32_t>& v) { return v ? json::uinteger(*v) : json::null(); };
+  return object_of({{"width", json::uinteger(im.geometry.width)},
+                    {"height", json::uinteger(im.geometry.height)},
+                    {"binning_x", binning(im.geometry.binning_x)},
+                    {"binning_y", binning(im.geometry.binning_y)},
+                    {"cfa", json::string(calib_detail::cfa_text(im.cfa))},
+                    {"camera", text(m.camera)},
+                    {"gain", m.gain ? json::number(m.gain->value) : json::null()},
+                    {"filter", role == master_role::flat ? text(m.filter) : json::null()},
+                    {"roi_x", integer(m.roi_x)},
+                    {"roi_y", integer(m.roi_y)},
+                    {"readout_mode", text(m.readout_mode)},
+                    {"row_order", text(m.row_order)},
+                    {"decoder_state", json::boolean(im.decoder_state.has_value())},
+                    {"offset_adu", !im.decoder_state && m.offset_adu ? json::number(m.offset_adu->value) : json::null()}});
+}
+
 json digest_array(const std::vector<content_digest>& digests) {
   json a = json::array();
   for (const content_digest& d : digests) a.push(json::string(d.sha256));
@@ -578,7 +602,8 @@ master_proposal propose_masters(const master_proposal_request& request, const fa
                                 {"members", digest_array(pm.frames)},
                                 {"status", json::string(g.status == master_group_status::flat_level ? "flat_level" : "ok")},
                                 {"proposal", method_json(pm.method)},
-                                {"proposal_absent_reason", pm.method ? json::null() : json::string(pm.absence)}});
+                                {"proposal_absent_reason", pm.method ? json::null() : json::string(pm.absence)},
+                                {"key", group_key(request.role, ref.analysis.observation.observed_image())}});
     json alternatives = json::array();
     for (const std::string& a : pm.alternatives) alternatives.push(json::string(a));
     group_doc.set("alternatives", alternatives);

@@ -477,6 +477,71 @@ json descriptor_json(const master_descriptor& d) {
   return o;
 }
 
+// ---------------------------------------------------------------- parametro `analysis` (C-02.b §b.2, §b.7; L8)
+
+// I membri del gruppo del parametro `analysis` sono, come insieme di digest, i frame della ricetta. Senza
+// `group.members` il controllo è di require_analysis_shape, all'esecuzione: il nodo ammette ogni oggetto (L8).
+void check_analysis_members(const master_recipe& r) {
+  if (r.analysis.type() != json::kind::object) return;
+  const json* group = r.analysis.find("group");
+  if (group == nullptr || group->type() != json::kind::object) return;
+  const json* members = group->find("members");
+  if (members == nullptr) return;
+  if (members->type() != json::kind::array) bad_param("analysis", "group.members non è un elenco");
+  std::vector<std::string> got, want;
+  for (const json& m : members->items()) {
+    if (m.type() != json::kind::string) bad_param("analysis", "group.members contiene un valore che non è un digest");
+    got.push_back(m.as_string());
+  }
+  for (const master_frame_spec& f : r.frames) want.push_back(f.digest.sha256);
+  std::sort(got.begin(), got.end());
+  std::sort(want.begin(), want.end());
+  if (got != want) bad_param("analysis", "membri del gruppo diversi dai frame del master");
+}
+
+// Forma di `propose_masters`, richiesta prima di ogni lettura: la sezione «Analisi» del report la copia.
+void require_analysis_shape(const master_recipe& r) {
+  if (r.analysis.type() == json::kind::null) return;
+  const auto need = [](const json* j, json::kind k, const char* why) {
+    if (j == nullptr || j->type() != k) bad_param("analysis", why);
+  };
+  const json* role = r.analysis.find("role");
+  need(role, json::kind::string, "role assente o non testo");
+  if (role->as_string() != role_name(r.role)) bad_param("analysis", "role diverso dal ruolo del master");
+  need(r.analysis.find("candidates"), json::kind::array, "candidates assente o non elenco");
+  const json* group = r.analysis.find("group");
+  need(group, json::kind::object, "group assente o non oggetto");
+  need(group->find("members"), json::kind::array, "group.members assente");
+  need(group->find("key"), json::kind::object, "group.key assente o non oggetto");
+  need(group->find("reference"), json::kind::string, "group.reference assente o non testo");
+  need(group->find("status"), json::kind::string, "group.status assente o non testo");
+  need(group->find("alternatives"), json::kind::array, "group.alternatives assente o non elenco");
+  const json* absent = group->find("proposal_absent_reason");
+  if (absent == nullptr || (absent->type() != json::kind::null && absent->type() != json::kind::string)) {
+    bad_param("analysis", "group.proposal_absent_reason assente, né testo né null");
+  }
+  const json* proposal = group->find("proposal");
+  if (proposal == nullptr || (proposal->type() != json::kind::null && proposal->type() != json::kind::object)) {
+    bad_param("analysis", "group.proposal assente, né oggetto né null");
+  }
+  if (proposal->type() == json::kind::object) {
+    need(proposal->find("combine"), json::kind::string, "group.proposal.combine assente");
+    need(proposal->find("rejection"), json::kind::string, "group.proposal.rejection assente");
+  }
+}
+
+// Metodo scelto contro la proposta del gruppo: `combine`, `rejection` e, per il flat, `flat_normalization`. La proposta
+// di un flat è sempre `none`, perché non inventa `flat_additive_bound_adu` (C-02.b-flat §f.2); un gruppo senza proposta
+// non è seguito. Vuoto per un nodo senza `analysis`. Richiede la forma di require_analysis_shape.
+std::optional<bool> proposal_followed(const master_recipe& r) {
+  if (r.analysis.type() == json::kind::null) return std::nullopt;
+  const json& proposal = *r.analysis.find("group")->find("proposal");
+  if (proposal.type() == json::kind::null) return false;
+  if (proposal.find("combine")->as_string() != combine_name(*r.combine)) return false;
+  if (proposal.find("rejection")->as_string() != rejection_name(*r.rejection)) return false;
+  return r.role != master_role::flat || *r.flat_norm == flat_normalization::none;
+}
+
 // ---------------------------------------------------------------- preflight (C-02.a §2)
 
 struct frame_state {
@@ -489,6 +554,7 @@ struct frame_state {
   std::array<double, 4> level{};  // m_(f,c) nell'ordine dei canali, solo flat; il mono ha il solo canale 0
   std::array<double, 4> scale{};  // r_(f,c), solo flat con `median_ratio`
   std::uint64_t rejected = 0;  // campioni rifiutati da sigma_clip, somma dei parziali dei task
+  std::uint64_t invalid = 0;   // campioni con bit di invalidità, su tutti i pixel (C-02.b §b.7)
 };
 
 image header_of(const image& im) {
@@ -536,12 +602,18 @@ struct master_plan {
   std::optional<kappa_result> kappa;  // metodi robusti: κ del preflight (C-02.b §b.6)
   // `weighted_mean`: costanti del nodo nell'ordine canonico, calcolate nel preflight (C-02.b §b.6).
   double weight_sum = 0;
-  std::vector<double> weights, residual_coeffs;  // w_f, c_f
+  std::vector<double> weights, fractions, residual_coeffs;  // w_f, a_f, c_f
+  std::array<double, 4> rho{};  // ρ_c = max_f |r_(f,c) − 1|, solo flat con `median_ratio`
+  // Somme di riga dei residui (C-02.b §b.7): Σr e Σr² per riga, frame canonico e canale di riga, all'indice
+  // ((y · n + f) · Cr + (x + cfa_x) mod Cr) · 2; ogni riga la scrive un solo task.
+  std::vector<double> row_sums;
+  std::array<std::uint64_t, 4> pixels_with_rejection{};  // per canale, somma dei parziali dei task
 
   std::size_t channel_of(std::uint32_t x, std::uint32_t y) const noexcept {
     return per_channel ? static_cast<std::size_t>(((y + cfa_y) & 1u) * 2 + ((x + cfa_x) & 1u)) : 0;
   }
   std::size_t channel_count() const noexcept { return per_channel ? 4 : 1; }
+  std::size_t row_channels() const noexcept { return per_channel ? 2 : 1; }
   // Contesto di uno stop del flat: le chiavi di `.a`, più `canale` per un frame CFA.
   stop_error::context_list flat_context(stop_error::context_list context, std::size_t c) const {
     if (per_channel) context.emplace_back("canale", labels[c]);
@@ -580,10 +652,12 @@ void weight_constants(master_plan& p) {
   double W = p.weights[0];
   for (std::size_t k = 1; k < p.n; ++k) W += p.weights[k];
   std::vector<double> sq(p.n), gap(p.n);
+  p.fractions.resize(p.n);
   double T = 0;
   for (std::size_t k = 0; k < p.n; ++k) {
     const double a = p.weights[k] / W;
     require_normal(a, "a_f", p.frames[k].name);
+    p.fractions[k] = a;
     sq[k] = a * a;
     gap[k] = 1 - 2 * a;
     if (!(gap[k] > 0)) {
@@ -607,6 +681,7 @@ master_plan make_plan(const master_recipe& r, const std::function<void(kappa_res
   // Prima della validazione: i confronti sui parametri sono già operazioni in virgola mobile (ADR-07, D23).
   require_fp_environment();
   validate_master_recipe(r);
+  require_analysis_shape(r);
   const std::optional<kappa_result> kappa = preflight_kappa(r, on_kappa);
   const method_kind method = *method_of(*r.combine, *r.rejection);
   master_plan p;
@@ -766,6 +841,7 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
     p.labels = channel_labels(im.cfa->pattern);
   }
   const std::size_t px = static_cast<std::size_t>(im.geometry.width) * im.geometry.height;
+  for (std::size_t i = 0; i < px; ++i) fs.invalid += im.invalid.bits[i] != 0 ? 1 : 0;
   if (p.has_sat) {
     for (std::size_t i = 0; i < px; ++i) {
       if (im.invalid.bits[i] == 0 && value_at(im, i) >= p.sat) ++fs.saturated;
@@ -966,6 +1042,9 @@ void flat_scale_constants(master_plan& p) {
     for (frame_state& f : p.frames) {
       f.scale[c] = harmonic / f.level[c];
       require_normal(f.scale[c], {{"costante", "r_f"}, {"frame", f.name}, {"m_f", num_text(f.level[c])}}, c);
+      // ρ_c per il report: r − 1 è esatto per r in [1/2, 2] (Sterbenz), altrove porta un arrotondamento. Il controllo
+      // del budget non lo usa: confronta i prodotti esatti.
+      p.rho[c] = std::max(p.rho[c], std::fabs(f.scale[c] - 1));
     }
   }
   if (p.method == method_kind::median || p.method == method_kind::winsorized || p.method == method_kind::sigma_clip) {
@@ -986,18 +1065,16 @@ void flat_scale_constants(master_plan& p) {
   const dyadic a = dyadic::of(bound), b = dyadic::of(budget);
   for (std::size_t c = 0; c < channels; ++c) {
     const dyadic allowed = b * dyadic::of(p.level_harmonic[c]);
-    double rho = 0;
     bool over = false;
     for (const frame_state& f : p.frames) {
       const double s = f.scale[c];
-      rho = std::max(rho, std::fabs(s - 1));
       const dyadic as = a * dyadic::of(s);
       over = over || (s >= 1 ? compare(as, a + allowed) > 0 : compare(a, as + allowed) > 0);
     }
     if (over) {
       stop(error_category::unsupported, "master.flat_norm_budget", "A · rho oltre flat_norm_rel_budget · m_H",
            p.flat_context({{"A", num_text(bound)},
-                           {"rho", num_text(rho)},
+                           {"rho", num_text(p.rho[c])},
                            {"m_H", num_text(p.level_harmonic[c])},
                            {"budget", num_text(budget)}},
                           c));
@@ -1052,6 +1129,15 @@ void finish_preflight(master_plan& p) {
     p.warnings.push_back("temperature_not_compared");
   }
   if (p.method == method_kind::sigma_clip) p.warnings.push_back("frozen_selection_approximation");
+  // C-02.b §b.10, C-02.b-flat §f.10.
+  if (p.method == method_kind::median || p.method == method_kind::winsorized) {
+    p.warnings.push_back("gaussian_reference_not_verified");
+  }
+  if (p.method == method_kind::single) p.warnings.push_back("noise_model_variance");
+  if (ratio) p.warnings.push_back("flat_norm_scales_estimated");
+  if (const std::optional<bool> followed = proposal_followed(p.recipe); followed && !*followed) {
+    p.warnings.push_back("proposal_not_followed");
+  }
   image_geometry g(p.w, p.h);
   g.binning_x = ref.geometry.binning_x;
   g.binning_y = ref.geometry.binning_y;
@@ -1070,6 +1156,7 @@ void finish_preflight(master_plan& p) {
   p.out.measure = merge_measure(frame_headers, own);
   p.out.variance = variance_plane{aligned_buffer(p.out.samples.size())};
   const std::size_t px = static_cast<std::size_t>(p.w) * p.h;
+  p.row_sums.assign(static_cast<std::size_t>(p.h) * p.n * p.row_channels() * 2, 0.0);
   if (p.flat) {
     p.lbe.assign(px, std::numeric_limits<double>::quiet_NaN());
     p.ratio.assign(px, std::numeric_limits<double>::quiet_NaN());
@@ -1293,11 +1380,13 @@ clip_outcome clip_value(const master_plan& p, const sort_slot* y, std::uint8_t* 
 }
 
 // Buffer per task del modello di memoria (ADR-06, estensione R2.r): ordinamento (`median`, `winsorized`), indicatori
-// dei frame tenuti e parziali di `rejected_samples` per frame (`sigma_clip`), n elementi ciascuno.
+// dei frame tenuti e parziali di `rejected_samples` per frame (`sigma_clip`), n elementi ciascuno; parziali di
+// `pixels_with_rejection`, 4 elementi (uno per canale).
 struct task_scratch {
   sort_slot* sort;
   std::uint8_t* kept;
   std::uint64_t* rejected;
+  std::uint64_t* rejected_pixels;
 };
 
 // Conversione al sample_type del master (C-02.a §6.3). Con uscita f64 è un'identità: un valore subnormale non vi
@@ -1330,7 +1419,10 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
   constexpr T nan = std::numeric_limits<T>::quiet_NaN();
   const std::size_t g = p.method == method_kind::winsorized ? static_cast<std::size_t>(*p.recipe.winsor_g) : 0;
   const bool clip = p.method == method_kind::sigma_clip;
-  if (clip) std::fill(scratch.rejected, scratch.rejected + p.n, std::uint64_t{0});
+  if (clip) {
+    std::fill(scratch.rejected, scratch.rejected + p.n, std::uint64_t{0});
+    std::fill(scratch.rejected_pixels, scratch.rejected_pixels + 4, std::uint64_t{0});
+  }
   for (std::uint32_t r = 0; r < rows; ++r) {
     for (std::uint32_t c = 0; c < p.w; ++c) {
       const std::size_t j = static_cast<std::size_t>(r) * p.w + c;
@@ -1379,7 +1471,12 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
         // compreso l'ultimo che lo porta a support_incomplete, solo dopo l'esito finale: valore valido, conversione al
         // tipo d'uscita compresa, oppure support_incomplete. Un pixel result_nonfinite in qualunque punto non conta.
         const auto count_rejected = [&] {
-          for (std::size_t f = 0; f < p.n; ++f) scratch.rejected[f] += scratch.kept[f] == 0 ? 1 : 0;
+          bool any = false;
+          for (std::size_t f = 0; f < p.n; ++f) {
+            scratch.rejected[f] += scratch.kept[f] == 0 ? 1 : 0;
+            any = any || scratch.kept[f] == 0;
+          }
+          if (any) ++scratch.rejected_pixels[p.channel_of(c, y0 + r)];
         };
         T ms{}, vs{};
         if (pv.ok && to_output<T>(pv.m, ms) && to_output<T>(pv.v, vs)) {
@@ -1406,6 +1503,46 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
         std::atomic_ref<std::uint64_t>(p.frames[f].rejected).fetch_add(scratch.rejected[f], std::memory_order_relaxed);
       }
     }
+    for (std::size_t ch = 0; ch < 4; ++ch) {
+      if (scratch.rejected_pixels[ch] != 0) {
+        std::atomic_ref<std::uint64_t>(p.pixels_with_rejection[ch])
+            .fetch_add(scratch.rejected_pixels[ch], std::memory_order_relaxed);
+      }
+    }
+  }
+}
+
+// Somme di riga dei residui (C-02.b §b.7) sulle righe [y0, y0 + rows) già combinate: per riga, frame canonico e canale
+// di riga, Σr e Σr² sui pixel validi del master in ordine di colonna, con r = x_f − M (con `median_ratio` r = y_f − M,
+// y_f con la sequenza di method_band) e M il campione pubblicato, nel tipo d'uscita. Le righe si sommano in ordine
+// crescente nel report (residuals_report): il risultato non dipende da blocchi, task o worker. Un valore non finito
+// resta nella somma e lo ferma il report.
+void residual_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals) {
+  const std::size_t cr = p.row_channels();
+  for (std::uint32_t r = 0; r < rows; ++r) {
+    const std::uint32_t y = y0 + r;
+    for (std::size_t f = 0; f < p.n; ++f) {
+      std::array<double, 2> s1{}, s2{};
+      for (std::uint32_t x = 0; x < p.w; ++x) {
+        const std::size_t i = static_cast<std::size_t>(y) * p.w + x;
+        if (p.out.invalid.bits[i] != 0) continue;
+        double v = vals[f][static_cast<std::size_t>(r) * p.w + x];
+        if (p.normalized) {
+          const double d = v - p.offset;
+          const double t = p.scales[p.channel_of(x, y) * p.n + f] * d;
+          v = p.offset + t;
+        }
+        const double e = v - value_at(p.out, i);
+        const std::size_t rc = p.per_channel ? (x + p.cfa_x) & 1u : 0;
+        s1[rc] += e;
+        s2[rc] += e * e;
+      }
+      double* row = p.row_sums.data() + (static_cast<std::size_t>(y) * p.n + f) * cr * 2;
+      for (std::size_t rc = 0; rc < cr; ++rc) {
+        row[rc * 2] = s1[rc];
+        row[rc * 2 + 1] = s2[rc];
+      }
+    }
   }
 }
 
@@ -1418,6 +1555,7 @@ void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const do
     begin_kernel_task();
     if (p.out.type == sample_type::f32) method_band<float>(p, y0, rows, vals, bits, scratch);
     else method_band<double>(p, y0, rows, vals, bits, scratch);
+    residual_rows(p, y0, rows, vals);
     return;
   }
   kernels::master_band b;
@@ -1442,6 +1580,7 @@ void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const do
   begin_kernel_task();
   if (p.path == cpu_path::avx2) kernels::master_band_avx2(b);
   else kernels::master_band_scalar(b);
+  residual_rows(p, y0, rows, vals);
 }
 
 std::string rows_digest(const image& out, std::uint32_t y0, std::uint32_t y1) {
@@ -1470,6 +1609,7 @@ json frame_report(const master_plan& p, const frame_state& f) {
   o.set("role", json::string(role_name(p.recipe.role)));
   o.set("used", json::boolean(true));
   o.set("rejected_samples", json::uinteger(f.rejected));
+  o.set("invalid_samples", json::uinteger(f.invalid));
   o.set("saturated_samples", p.has_sat ? json::uinteger(f.saturated) : json::null());
   o.set("saturated_fraction", p.has_sat ? json::number(f.saturated_fraction) : json::null());
   if (p.flat && p.per_channel) {
@@ -1555,22 +1695,139 @@ json max_or_null(const std::vector<double>& v) {
   return v.empty() ? json::null() : json::number(*std::max_element(v.begin(), v.end()));
 }
 
+[[noreturn]] void report_nonfinite(const char* what, stop_error::context_list context) {
+  stop(error_category::numeric, "master.report_nonfinite", what, std::move(context));
+}
+
+// Operazioni delle diagnostiche della normalizzazione con la regola di rappresentabilità di C-02.a §6.3, come le
+// statistiche di `.a` (mul_ok, div_ok, add_ok): un prodotto o quoziente di operandi non nulli che dà zero o un subnormale,
+// una somma di termini non negativi non normale e ogni risultato non finito fermano con `master.report_nonfinite`, coi
+// valori nel contesto. Un operando nullo dà 0, valido (per esempio A = 0).
+struct norm_report_ops {
+  const master_plan& p;
+  std::size_t c;
+  const char* statistic;
+  [[noreturn]] void fail(const char* op, double x, double y, double r) const {
+    report_nonfinite("diagnostica della normalizzazione del flat non rappresentabile",
+                     p.flat_context({{"statistica", statistic}, {"operazione", op}, {"primo", num_text(x)},
+                                     {"secondo", num_text(y)}, {"risultato", num_text(r)}},
+                                    c));
+  }
+  double mul(double x, double y) const {
+    const double r = x * y;
+    if (!mul_ok(x, y, r)) fail("prodotto", x, y, r);
+    return r;
+  }
+  double div(double x, double y) const {
+    const double r = x / y;
+    if (!div_ok(x, r)) fail("quoziente", x, y, r);
+    return r;
+  }
+  double add(double x, double y) const {
+    const double r = x + y;
+    if (!add_ok(x, y, r)) fail("somma", x, y, r);
+    return r;
+  }
+};
+
+// norm_level_bias_bound di C-02.b-flat §f.6 per il canale c, una formula per metodo, frame nell'ordine canonico e somme
+// da sinistra. Var_f(r) = Σ (r_f − 1)² / (n − 1) è la varianza attorno a 1, la media esatta degli r_f (Σ r_f = n), non
+// attorno alla media degli r̂_f arrotondati: lo scarto è entro l'arrotondamento delle scale (§f.6).
+double norm_level_bias_bound(const master_plan& p, std::size_t c) {
+  const norm_report_ops op{p, c, "norm_level_bias_bound"};
+  const double a = *p.recipe.flat_additive_bound_adu;
+  const double a2 = op.mul(a, a);
+  const auto var_r = [&] {
+    double ss = 0;
+    for (const frame_state& f : p.frames) {
+      const double d = f.scale[c] - 1;
+      ss = op.add(ss, op.mul(d, d));
+    }
+    return op.div(ss, static_cast<double>(p.n - 1));
+  };
+  switch (p.method) {
+    case method_kind::mean: return op.div(op.mul(a2, var_r()), static_cast<double>(p.n));
+    case method_kind::weighted_mean: {
+      double mean_r = 0;
+      for (std::size_t k = 0; k < p.n; ++k) mean_r = op.add(mean_r, op.mul(p.fractions[k], p.frames[k].scale[c]));
+      double s = 0;
+      for (std::size_t k = 0; k < p.n; ++k) {
+        const double d = p.frames[k].scale[c] - mean_r;
+        s = op.add(s, op.mul(p.residual_coeffs[k], op.mul(d, d)));
+      }
+      return op.mul(a2, s);
+    }
+    case method_kind::median:
+    case method_kind::winsorized: return op.mul(op.mul(p.kappa->value, a2), var_r());
+    case method_kind::sigma_clip: {
+      double lo = p.frames[0].scale[c], hi = lo;
+      for (const frame_state& f : p.frames) {
+        lo = std::min(lo, f.scale[c]);
+        hi = std::max(hi, f.scale[c]);
+      }
+      const double width = hi - lo;
+      return op.div(op.mul(a2, op.mul(width, width)), 4 * (*p.recipe.clip_min_kept - 1));
+    }
+    case method_kind::single: break;
+  }
+  ASTRO_ASSERT(false);  // `single` non ammette `median_ratio` (validate_params)
+  return 0;
+}
+
+// Diagnostiche della normalizzazione del canale (C-02.b-flat §f.7). `check_value` e `rel_budget` valgono null con
+// `mean`, che non ha il controllo del budget (C-02.b-flat §f.2 punto 4). I rapporti col piano sono normali o nulli
+// (q in channel_report), quindi la loro mediana e il loro massimo sono finiti.
+json flat_norm_report(const master_plan& p, std::size_t c, double bound, std::vector<double>& ratios, std::uint64_t ratio_null) {
+  double lo = p.frames[0].level[c], hi = lo;
+  for (const frame_state& f : p.frames) {
+    lo = std::min(lo, f.level[c]);
+    hi = std::max(hi, f.level[c]);
+  }
+  const bool budget = p.method != method_kind::mean;
+  const double a = *p.recipe.flat_additive_bound_adu;
+  const norm_report_ops level_op{p, c, "level_ratio"}, check_op{p, c, "check_value"};
+  json o = json::object();
+  o.set("level_ratio", json::number(level_op.div(hi, lo)));
+  o.set("additive_bound_adu", json::number(a));
+  o.set("rel_budget", budget ? json::number(*p.recipe.flat_norm_rel_budget) : json::null());
+  o.set("check_value", budget ? json::number(check_op.div(check_op.mul(a, p.rho[c]), p.level_harmonic[c])) : json::null());
+  o.set("norm_level_bias_bound", json::number(bound));
+  o.set("bound_ratio_median", median_or_null(ratios));
+  o.set("bound_ratio_max", max_or_null(ratios));
+  o.set("bound_ratio_null", json::uinteger(ratio_null));
+  o.set("bound_ratio_null_reason", json::string("variance_zero"));
+  return o;
+}
+
 json channel_report(const master_plan& p) {
   const std::size_t channels = p.per_channel ? 4 : 1;
   std::vector<std::vector<double>> planes(channels), lbe(channels), ratio(channels);
   std::vector<std::uint64_t> ratio_null(channels, 0), nonpositive(channels, 0), valid(channels, 0);
+  std::vector<invalid_reason::bit_counts> bit_counts(channels, invalid_reason::bit_counts{});
+  // Con `median_ratio` il rapporto di ogni pixel valido è norm_level_bias_bound / piano; un piano nullo lo rende null.
+  std::array<double, 4> bound{};
+  for (std::size_t c = 0; p.normalized && c < channels; ++c) bound[c] = norm_level_bias_bound(p, c);
   for (std::uint32_t y = 0; y < p.h; ++y) {
     for (std::uint32_t x = 0; x < p.w; ++x) {
       const std::size_t i = static_cast<std::size_t>(y) * p.w + x;
-      if (p.out.invalid.bits[i] != 0) continue;
       const std::size_t c = p.channel_of(x, y);
+      const std::uint16_t b = p.out.invalid.bits[i];
+      for (std::size_t k = 0; k < bit_counts[c].size(); ++k) bit_counts[c][k] += (b >> k) & 1u;
+      if (b != 0) continue;
       ++valid[c];
       const double v = p.out.type == sample_type::f32 ? static_cast<double>(p.out.variance_data<float>()[i])
                                                       : p.out.variance_data<double>()[i];
       planes[c].push_back(v);
       if (!p.flat) continue;
       nonpositive[c] += p.nonpositive[i];
-      if (p.normalized) continue;
+      if (p.normalized) {
+        if (v == 0) {
+          ++ratio_null[c];
+          continue;
+        }
+        ratio[c].push_back(norm_report_ops{p, c, "bound_ratio"}.div(bound[c], v));
+        continue;
+      }
       lbe[c].push_back(p.lbe[i]);
       if (std::isnan(p.ratio[i])) ++ratio_null[c];
       else ratio[c].push_back(p.ratio[i]);
@@ -1580,6 +1837,13 @@ json channel_report(const master_plan& p) {
   for (std::size_t c = 0; c < channels; ++c) {
     json o = json::object();
     o.set("label", json::string(p.labels[c]));
+    json counts = json::object();
+    for (std::size_t k = 0; k < bit_counts[c].size(); ++k) {
+      counts.set(invalid_reason::bit_names[k], json::uinteger(bit_counts[c][k]));
+    }
+    o.set("invalid_counts", std::move(counts));
+    o.set("pixels_with_rejection", json::uinteger(p.pixels_with_rejection[c]));
+    if (p.flat) o.set("flat_normalization", p.normalized ? flat_norm_report(p, c, bound[c], ratio[c], ratio_null[c]) : json::null());
     // Con `median_ratio` m̄_c non si calcola (C-02.b-flat §f.2): i campi della media dei livelli valgono null.
     if (p.flat && p.per_channel) o.set("flat_level_mean", p.normalized ? json::null() : json::number(p.level_mean[c]));
     o.set("valid_pixels", json::uinteger(valid[c]));
@@ -1608,11 +1872,106 @@ json channel_report(const master_plan& p) {
   return list;
 }
 
+// Residui del frame canonico k per canale (C-02.b §b.7): Σr e Σr² del canale sommano le somme di riga in ordine di riga
+// crescente, poi residual_mean_adu = Σr / P e residual_rms_adu = sqrt(Σr² / P), con P i pixel validi del canale; null
+// per un canale senza pixel validi.
+json residuals_report(const master_plan& p, std::size_t k, const std::array<std::uint64_t, 4>& valid) {
+  const std::size_t cr = p.row_channels();
+  json list = json::array();
+  for (std::size_t c = 0; c < p.channel_count(); ++c) {
+    double s1 = 0, s2 = 0;
+    for (std::uint32_t y = 0; y < p.h; ++y) {
+      if (p.per_channel && ((y + p.cfa_y) & 1u) != c / 2) continue;
+      const double* row = p.row_sums.data() + ((static_cast<std::size_t>(y) * p.n + k) * cr + (p.per_channel ? c % 2 : 0)) * 2;
+      s1 += row[0];
+      s2 += row[1];
+    }
+    json e = json::object();
+    e.set("label", json::string(p.labels[c]));
+    if (valid[c] == 0) {
+      e.set("residual_mean_adu", json::null());
+      e.set("residual_rms_adu", json::null());
+    } else {
+      for (const auto& [sum, name] : {std::pair{s1, "somma dei residui"}, std::pair{s2, "somma dei quadrati dei residui"}}) {
+        if (!std::isfinite(sum)) {
+          report_nonfinite("statistica di rumore del report non finita",
+                           p.flat_context({{"frame", p.frames[k].name}, {"statistica", name}, {"valore", num_text(sum)}}, c));
+        }
+      }
+      const double count = static_cast<double>(valid[c]);
+      e.set("residual_mean_adu", json::number(s1 / count));
+      e.set("residual_rms_adu", json::number(std::sqrt(s2 / count)));
+    }
+    list.push(std::move(e));
+  }
+  return list;
+}
+
+json numbers(const std::vector<double>& v) {
+  json a = json::array();
+  for (const double x : v) a.push(json::number(x));
+  return a;
+}
+
+// Costanti del preflight (C-02.b §b.7 «Stato», §b.10; C-02.b-flat §f.7, §f.10), frame nell'ordine di `frames`. Lo stesso
+// oggetto è `details.master_constants` della provenance del job.
+json constants_report(const master_plan& p) {
+  json o = json::object();
+  o.set("kappa", p.kappa ? json::number(p.kappa->value) : json::null());
+  const bool weighted = p.method == method_kind::weighted_mean;
+  o.set("a_f", weighted ? numbers(p.fractions) : json::null());
+  o.set("c_f", weighted ? numbers(p.residual_coeffs) : json::null());
+  if (p.normalized) {
+    json scales = json::array();
+    for (std::size_t c = 0; c < p.channel_count(); ++c) {
+      std::vector<double> m, r;
+      for (const frame_state& f : p.frames) {
+        m.push_back(f.level[c]);
+        r.push_back(f.scale[c]);
+      }
+      json e = json::object();
+      e.set("label", json::string(p.labels[c]));
+      e.set("m", numbers(m));
+      e.set("r", numbers(r));
+      e.set("m_H", json::number(p.level_harmonic[c]));
+      e.set("rho", json::number(p.rho[c]));
+      scales.push(std::move(e));
+    }
+    o.set("flat_scales", std::move(scales));
+  } else {
+    o.set("flat_scales", json::null());
+  }
+  return o;
+}
+
+// Sezione «Analisi» (C-02.b §b.7) dal parametro `analysis` del nodo, con la forma di require_analysis_shape; null per un
+// nodo non proposto.
+json analysis_report(const master_recipe& r) {
+  if (r.analysis.type() == json::kind::null) return json::null();
+  json chosen = json::object();
+  chosen.set("combine", json::string(combine_name(*r.combine)));
+  chosen.set("rejection", json::string(rejection_name(*r.rejection)));
+  chosen.set("flat_normalization", r.flat_norm ? json::string(flat_norm_name(*r.flat_norm)) : json::null());
+  json o = json::object();
+  for (const char* k : {"role", "candidates", "group"}) o.set(k, *r.analysis.find(k));
+  o.set("chosen", std::move(chosen));
+  o.set("proposal_followed", json::boolean(*proposal_followed(r)));
+  return o;
+}
+
 json build_report(master_plan& p) {
   json report = json::object();
   report.set("recipe", recipe_report(p.recipe));
+  std::array<std::uint64_t, 4> valid{};
+  for (std::uint32_t y = 0; y < p.h; ++y) {
+    for (std::uint32_t x = 0; x < p.w; ++x) valid[p.channel_of(x, y)] += p.out.invalid.bits[static_cast<std::size_t>(y) * p.w + x] == 0 ? 1 : 0;
+  }
   json frames = json::array();
-  for (const frame_state& f : p.frames) frames.push(frame_report(p, f));
+  for (std::size_t k = 0; k < p.n; ++k) {
+    json f = frame_report(p, p.frames[k]);
+    f.set("residuals", residuals_report(p, k, valid));
+    frames.push(std::move(f));
+  }
   report.set("frames", std::move(frames));
   report.set("frames_used", json::uinteger(p.n));
   report.set("frames_discarded", json::uinteger(0));
@@ -1660,9 +2019,21 @@ json build_report(master_plan& p) {
   }
   report.set("invalid_counts", std::move(bitcounts));
   report.set("invalid_pixels", json::uinteger(invalid));
+  // Ipotesi non verificate: C-02.a §3, poi C-02.b §b.3 per il metodo e, con `median_ratio`, C-02.b-flat §f.3 al posto
+  // delle ipotesi dei livelli di C-02.a §6.2.
+  const bool robust = p.method == method_kind::median || p.method == method_kind::winsorized;
   json hyp = json::array();
   for (const char* h : {"frames_independent", "outliers_sparse"}) hyp.push(json::string(h));
-  if (p.flat) {
+  if (p.normalized) {
+    for (const char* h : {"scale_fixed", "same_illumination_shape", "additive_common"}) hyp.push(json::string(h));
+    if (p.method != method_kind::mean) {
+      for (const char* h : {"level_proportional", "additive_bounded"}) hyp.push(json::string(h));
+    }
+    if (robust || p.method == method_kind::sigma_clip) {
+      for (const char* h : {"symmetric_noise", "gaussian_reference_heteroscedastic"}) hyp.push(json::string(h));
+    }
+    if (p.per_channel) hyp.push(json::string("same_illumination_color"));
+  } else if (p.flat) {
     for (const char* h : {"illumination_stable", "same_illumination_shape", "level_proportional", "additive_nonnegative",
                           "nonnegative_signal"}) {
       hyp.push(json::string(h));
@@ -1670,12 +2041,17 @@ json build_report(master_plan& p) {
   } else {
     hyp.push(json::string("stationary_mean"));
   }
+  if (robust) {
+    for (const char* h : {"iid_gaussian", "continuous_samples"}) hyp.push(json::string(h));
+  }
   for (const std::string& h : p.hypotheses) hyp.push(json::string(h));
   report.set("assumptions_not_verified", std::move(hyp));
   json warnings = json::array();
   for (const std::string& w : p.warnings) warnings.push(json::string(w));
   report.set("warnings", std::move(warnings));
   report.set("descriptor", descriptor_json(p.descriptor));
+  report.set("constants", constants_report(p));
+  report.set("analysis", analysis_report(p.recipe));
   return report;
 }
 
@@ -1890,6 +2266,7 @@ void validate_master_recipe(const master_recipe& r) {
     }
   }
   validate_raw_frames(r, order);
+  check_analysis_members(r);
 }
 
 node_spec make_master_node(const master_recipe& r) {
@@ -2001,8 +2378,8 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
   std::vector<const std::uint16_t*> bp(p.n);
   std::vector<sort_slot> sort(p.n);
   std::vector<std::uint8_t> kept(p.n);
-  std::vector<std::uint64_t> rejected(p.n);
-  const task_scratch scratch{sort.data(), kept.data(), rejected.data()};
+  std::vector<std::uint64_t> rejected(p.n), rejected_pixels(4);
+  const task_scratch scratch{sort.data(), kept.data(), rejected.data(), rejected_pixels.data()};
   for (std::size_t f = 0; f < p.n; ++f) {
     vp[f] = vals[f].data();
     bp[f] = bits[f].data();
@@ -2138,17 +2515,19 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
       auto* bits = reinterpret_cast<std::uint16_t*>(vals + p.n * rows * w);
       auto* raw = reinterpret_cast<std::byte*>(bits + p.n * rows * w);
       // Dopo puntatori e blocchi, nei byte per task del modello (ADR-06 R2.r): ordinamento (16·n), indicatori (q(n)),
-      // parziali di rejected_samples (8·n, dentro il termine dei contatori).
+      // parziali di rejected_samples (8·n) e di pixels_with_rejection (4·8), dentro il termine dei contatori.
       const std::size_t sort_at = (static_cast<std::size_t>(*tile_bytes) + alignof(sort_slot) - 1) / alignof(sort_slot) *
                                   alignof(sort_slot);
       const std::size_t kept_at = sort_at + p.n * sizeof(sort_slot);
       const std::size_t rejected_at = kept_at + 8 * ((p.n + 7) / 8);
       static_assert(alignof(sort_slot) % alignof(std::uint64_t) == 0 &&
                     sizeof(sort_slot) % alignof(std::uint64_t) == 0);
-      ASTRO_ASSERT(rejected_at + p.n * sizeof(std::uint64_t) <= buffer.size());
+      const std::size_t rejected_pixels_at = rejected_at + p.n * sizeof(std::uint64_t);
+      ASTRO_ASSERT(rejected_pixels_at + 4 * sizeof(std::uint64_t) <= buffer.size());
       const task_scratch scratch{reinterpret_cast<sort_slot*>(buffer.data() + sort_at),
                                  reinterpret_cast<std::uint8_t*>(buffer.data() + kept_at),
-                                 reinterpret_cast<std::uint64_t*>(buffer.data() + rejected_at)};
+                                 reinterpret_cast<std::uint64_t*>(buffer.data() + rejected_at),
+                                 reinterpret_cast<std::uint64_t*>(buffer.data() + rejected_pixels_at)};
       for (std::size_t f = 0; f < p.n; ++f) {
         ctx.check_cancel();
         double* v = vals + f * rows * w;
@@ -2226,6 +2605,9 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     scheduler.run(plan, spec, cancel);
     json details = json::object();
     details.set("observed_inputs", std::move(observed));
+    // C-02.b §b.10, C-02.b-flat §f.10: costanti del preflight nei `details`, lo stesso oggetto del report.
+    ASTRO_ASSERT(result.has_value());
+    details.set("master_constants", *result->report.find("constants"));
     job_files_result out{std::move(files), std::move(warnings), std::move(details)};
     out.plan = std::make_shared<const resource_plan>(chosen);
     return out;

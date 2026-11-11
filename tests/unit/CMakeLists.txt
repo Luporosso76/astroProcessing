@@ -284,6 +284,15 @@ target_compile_definitions(test_master_b10 PRIVATE
   ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
   ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_master_b10 PROPERTIES LABELS fast)
+# B11 di M3.b: report del master. T-M3B-C02-11, T-M3B-FLAT-07, T-M3B-C02-10 e T-M3B-FLAT-08 (parte report),
+# T-M3B-C02-15 (solo `master.report_nonfinite`): `fast`.
+add_executable(test_master_b11 test_master_b11.cpp)
+target_link_libraries(test_master_b11 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b11 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b11 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b11 PROPERTIES LABELS fast)
 
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
