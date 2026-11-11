@@ -51,17 +51,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/F-IO-03-classificazione.md` | `202fd1d1765a882599f1dd96eb93bd7530dc70ebdc532cf674119a5c9344a472` |
-| `src/core/batch_classification.cpp` | `c80e92738b657bdaf53bd3041ef2af89e533ca029b54f96283e6d290cfa5a446` |
+| `src/core/batch_classification.cpp` | `44f9f8392efcb476042bea439a8c965d850d3c4fe92e8f97b4680eb32a0ddccd` |
 | `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |
-| `src/core/include/astro/batch_classification.hpp` | `3ff40fc084e923fc70ad5c62dfcd60e72b9bada5eb3c928930233d1e8747c98d` |
+| `src/core/include/astro/batch_classification.hpp` | `a8def2100e723ee6192e151daa4f458835d612d950a8bf58fd1ad79dee5c86cf` |
 | `src/core/include/astro/scheduler.hpp` | `262fd9f4614f94446a2caf10af85e383a0da052d77f290a7e84619dc5affa722` |
-| `src/core/raw_import_job.cpp` | `fe515c94dbc5f278bd2c9d4e30d18e5ba495ca89a5344d1b909aa0758e79fa62` |
+| `src/core/raw_import_job.cpp` | `0b667bb77ac0d89b4002c0070bd78bfc31689ef498d80c494603316a3a888226` |
 | `src/core/scheduler.cpp` | `a69db97e6e8c66106cc15ad6490322658722ae1e32911f9e0882368e6404c446` |
 | `src/core/sqlite_classification.cpp` | `8cdca8a6d5a01e0b03244436038944d683b75d4ae66251d1a33f64ef40bcf6d4` |
 | `src/core/sqlite_dag_store.cpp` | `72d97ae8f15069d3c4bbdf0c46b2ef81a1b9a50b4bc3a6d7d80f7ac3c6b0bd72` |
 | `tests/unit/test_batch_classification.cpp` | `66545610b30f5ba3cd5397b0cd94e46e3ba16cf10c076048abf66fe8bd15ef64` |
 | `tests/unit/test_input_paths.cpp` | `b7264ab06b2e3f3493bb4fa8b96e323bce0ee0ff47861b021c5987a3bfbc6e09` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

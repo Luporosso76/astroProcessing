@@ -60,10 +60,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/datasets/M3-candidates.md` | `9a2f3dcd0e85b3fdca1b6b1dd98701d74ff64a3c3bb4751a2dfe117df3b15bb7` |
 | `docs/datasets/PUB-CFA-01.md` | `59e9b5c084a2938ef6487697e1bdbeb5ef8d3ec320c3a38c11d29a8625f31edd` |
-| `docs/datasets/PUB-LFC-01.md` | `50e2b701f428d5bfbc8d5a8fb3dd5500668f44d2d6c180416e87c3d62f28c5e3` |
+| `docs/datasets/PUB-LFC-01.md` | `c0d14b5040dfc87f110e572c3e37345a9e698d2843aaeffb975b3f830b1b2f6f` |
 | `docs/datasets/PUB-RAW-01.md` | `a0ff1c535ca37abee9fde2aaf7117a14af87bfcc5cc71e04ab95e876d7631000` |
 | `docs/datasets/PUB-REG-01.md` | `c9376dacca580a1fc47f6c67ab682f01661a704866a57634fe5044632133679f` |
 | `docs/decisions/D-08-dataset.md` | `9bfd000039b91e2ff363cc5ce5016ee49538dc293d3c940101c147885e3653d4` |
-| `docs/test-matrix.md` | `10e2a269e066f817d16594cad55fe64a7175a0ddea104dbea72155f4402aa543` |
+| `docs/test-matrix.md` | `85529dc78e0dd00ff0a296efc3cec7965e156f930affedd1d0961d51d80477f2` |
 
 <!-- evidence:end -->

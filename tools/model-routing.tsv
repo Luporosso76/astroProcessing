@@ -2,6 +2,7 @@
 # Colonne: unità, modello dei test, modello del codice. I ruoli arb-tests e arb-code seguono tests e code.
 # Ruoli senza unità: mech (passi meccanici: lanciare script, mutazioni, rinomine, record) = haiku;
 # infra (lavoro ordinario fuori dalle verità: strumenti, librerie, indagini) = sonnet; review = opus.
+# Review dei gate: opus; fable ammesso con parsimonia per i controlli maggiori (utente, 11/11/2026): review del gate M3.b = fable.
 U4	sonnet	sonnet
 U5	sonnet	sonnet
 U6	opus	opus

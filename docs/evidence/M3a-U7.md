@@ -45,10 +45,10 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-16-stati-master.md` | `0f42ff8697090990163c54147559f4f7435121acf91b42ff46a142f5f5ebbf58` |
 | `docs/decisions/D-16-calibrazione-incompleta.md` | `17d99880649e716815e5a57741c71362fee41710535c0e2b99662a392649abb7` |
-| `src/core/calibration_analysis.cpp` | `bf537426e1c7e07f3563f279b9d98504a4ef3f051aecaf18d8769494ff149966` |
-| `src/core/include/astro/calibration_analysis.hpp` | `479f19a944752ce2682e13c8010c1b60f68a534fff45202affe9bd3cce340eb2` |
+| `src/core/calibration_analysis.cpp` | `46f27826bf5ad1d8dd10ba5c07940c124c9957f7ad11db749652639cb731ffd1` |
+| `src/core/include/astro/calibration_analysis.hpp` | `61c4e9679844392ad6c6abaef1839856ae0a43d2cd23a7a33cbf004239c2ae14` |
 | `tests/unit/test_calibration_selection.cpp` | `7acdefc0db361d1a472165425ffecda398acace16d506f08d82a4c8fa1da0694` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

@@ -123,26 +123,26 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
-| `docs/evidence/M3-base-I2.md` | `ce21587eeefc46d8a444c5de441b593352e4d8de96c24796b9cc1fdef9d6ab79` |
-| `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
-| `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
+| `docs/evidence/M3-base-I2.md` | `0d896309ada7376b552dcb79fb01e3d922133341603b799651e260722e4f7d7d` |
+| `src/core/calibration_blocks.cpp` | `fab4c5b8bf9df5ae9a829ad583e8c0454c1a7e22b5805425555d1535331e9369` |
+| `src/core/calibration_job.cpp` | `f09ee09f8648ebe392144b2ec0699ae459fc9a426ac32bc58f4958344d472c42` |
 | `src/core/cpu_dispatch.cpp` | `bb5a54608c9379b13089c875157e8f9fb90b783336b68c713ad11babc95ae685` |
-| `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
+| `src/core/fits.cpp` | `4bac200de9a1d079570bc816003c8ff7b5ccf6f923963d31e018e5205b70a712` |
 | `src/core/fits_blocks.cpp` | `1866760822bf9c9a8759e00af3bd74b105c5cb05be80b18be7574df9b72eaac5` |
 | `src/core/fits_scan.cpp` | `fc6fad882580da4bba801d3a5d4cd94164a8b4dffdb6587c935ae6988a39fbd2` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |
 | `src/core/include/astro/cpu_dispatch.hpp` | `d7f719f9f11da1475b0553c5308e4137f5b71cfc69cd3d880f5df0c4b162c4ee` |
-| `src/core/include/astro/fits.hpp` | `4e82d0846dcd1423f402f9e127b9ab4dd10740cfab8b0277fc8abedf6f86ab3c` |
+| `src/core/include/astro/fits.hpp` | `5ae8d529da33131c577f62b928ccab974a108b6c639e3bcb2cf09d8d376ba8c4` |
 | `src/core/include/astro/fits_blocks.hpp` | `36b5aee98d4283789763f6433ae1b378ea0740eb32cef8197e116f19f3248a2f` |
 | `src/core/include/astro/hash.hpp` | `890e62d0d82bf0f9fdd154ccc83fae8e70f8543fe62f46a3fcaf5b2898b41613` |
 | `src/core/inventory.cpp` | `6b2fee4bf475ca554a8647c2418da24741465ac2f63d0cdd7fbae81b30e17ef1` |
-| `src/core/job_types.cpp` | `aff329b9a8a22739649ea5e080bfe84b53f6de4ed10b698e684071df2ff2e359` |
-| `src/core/master.cpp` | `9a2ec6568fcd55144cfc45df100c3e5b38ed7aec37b2a4ef623d271be49d5d8e` |
+| `src/core/job_types.cpp` | `7d8c86945c9b59460586a681c538f51d7aea199a563a9f5d311bc44e79150dcc` |
+| `src/core/master.cpp` | `f1a0151405fb79f44dbaa442e5db90d93e0eda8d0fe6fa5fec6508ee42c739c8` |
 | `src/core/scheduler.cpp` | `a69db97e6e8c66106cc15ad6490322658722ae1e32911f9e0882368e6404c446` |
-| `tests/unit/test_conformance.cpp` | `ec1c929815e7bfcc4f008873a9412356844953f3dadf097cb6a799621b7e3107` |
+| `tests/unit/test_conformance.cpp` | `86aefd797ca0c2985586f2f90f448f46057f27855de7a556e04fcf863269722a` |
 | `tests/unit/test_hash.cpp` | `406556aba73f96176520ca5019d23c3155b20b206677cb0fbadc20e5dbef2bc4` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

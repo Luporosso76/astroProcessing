@@ -103,18 +103,18 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
-| `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
+| `src/core/fits.cpp` | `4bac200de9a1d079570bc816003c8ff7b5ccf6f923963d31e018e5205b70a712` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
-| `src/core/include/astro/fits.hpp` | `4e82d0846dcd1423f402f9e127b9ab4dd10740cfab8b0277fc8abedf6f86ab3c` |
+| `src/core/include/astro/fits.hpp` | `5ae8d529da33131c577f62b928ccab974a108b6c639e3bcb2cf09d8d376ba8c4` |
 | `src/core/include/astro/hash.hpp` | `890e62d0d82bf0f9fdd154ccc83fae8e70f8543fe62f46a3fcaf5b2898b41613` |
 | `src/core/include/astro/input_format.hpp` | `4f916d0018988fcb99482d6e8458d28d50cda011d7d9c25fdcbd4e229d5ca4d4` |
 | `src/core/include/astro/job_types.hpp` | `7cd081f68443c4a5a3fcdfd3d1ad2138d212b46b12d68c2600d2e298052775b1` |
 | `src/core/input_format.cpp` | `343f626aebe72b9496007a01d144a40fd24613d94b58f814a9afcdd608570704` |
-| `src/core/job_types.cpp` | `aff329b9a8a22739649ea5e080bfe84b53f6de4ed10b698e684071df2ff2e359` |
+| `src/core/job_types.cpp` | `7d8c86945c9b59460586a681c538f51d7aea199a563a9f5d311bc44e79150dcc` |
 | `tests/unit/test_conformance_format.cpp` | `ef487a95fd34bdb51a7e60d1f5b03bfa070a7ef7bf09433b24700c0fa74dd002` |
 | `tests/unit/test_conformance_gaps.cpp` | `11a80df7e444932b2c2d6a4ce5b2fb3753f163c24e7ac098c2c86e8a05f643d3` |
 | `tests/unit/test_hash.cpp` | `406556aba73f96176520ca5019d23c3155b20b206677cb0fbadc20e5dbef2bc4` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

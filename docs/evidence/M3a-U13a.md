@@ -47,15 +47,15 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 |---|---|
 | `docs/contracts/ADR-08-decoder-pack.md` | `2356f8f7f730000b6e29b63b1e816c9be0000eaeb696569f3ecd09971ac5018b` |
 | `docs/contracts/U13-dng-decoder.md` | `396393dd3d01f44f7ab1042cbf1b17a15b2a2aba99fb8d04eed13ad89895ba61` |
-| `src/core/dng_decode.cpp` | `337735e3da8c1237796b971b7a27520a5c3674970e5b6363cacf2fab2ed008e1` |
-| `src/core/dng_internal.hpp` | `ac95b16fc39ffd6fd7668cbcaeba341f534b7f4af484811839705e1e8cb3685d` |
+| `src/core/dng_decode.cpp` | `8328331ca91c1a60c069d35de28fda9ca122076757de9fa3f20627365ac8832b` |
+| `src/core/dng_internal.hpp` | `42013374c6853e700560632c08de66e76a86c7567cf281ddef479b1859ec38ef` |
 | `src/core/include/astro/input_format.hpp` | `4f916d0018988fcb99482d6e8458d28d50cda011d7d9c25fdcbd4e229d5ca4d4` |
-| `src/core/include/astro/raw_decode.hpp` | `693013684e5512f4e08be7114f13facb5cddc41b00c11e24d43da49aacd22dba` |
-| `src/core/raw_decode.cpp` | `962885ee61bb61c8c72002f357367922909a1699d7e16fbdf48d5cb023d1513b` |
+| `src/core/include/astro/raw_decode.hpp` | `06f0e923e6462d599b83d59d06b9171e67648e4fd6b0bb3ecb6a76bad4e891e2` |
+| `src/core/raw_decode.cpp` | `f0dbed89885480f0f67b34fedc27f3e5a286ccdf4db1e2d742c69c365f31012d` |
 | `tests/fixtures/syn_dng.hpp` | `6262496fd537e5557b53140f492a2ddc96214508f0514e306ef12d0fc106025f` |
 | `tests/unit/test_dng_u13a.cpp` | `b1e8690671cae687c2d7036ef80d67c42de6053b504a7753b883dfdaa9bdf6db` |
 | `tests/unit/test_dng_u13a_alloc.cpp` | `d1008157600e5a1b0080364ddc67e0978cd8fe0706096fa2d8e6ce3d56929541` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

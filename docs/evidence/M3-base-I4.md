@@ -89,7 +89,7 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
-| `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
+| `src/core/calibration_job.cpp` | `f09ee09f8648ebe392144b2ec0699ae459fc9a426ac32bc58f4958344d472c42` |
 | `src/core/include/astro/job.hpp` | `0fee416857ca8512700e91b0550d9db9df20089369de792360a46b08a881f696` |
 | `src/core/include/astro/sqlite_dag_store.hpp` | `da0919b01c2c79fcd4778ba7bcd8ca57f60f60e7cce098fdb50f91d51732711b` |
 | `src/core/include/astro/workflow.hpp` | `9afee58d34b3b806c1183e6eefe236fd5c5d43b14a73377623f9b8713df94358` |
@@ -97,9 +97,9 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/sqlite_dag_store.cpp` | `72d97ae8f15069d3c4bbdf0c46b2ef81a1b9a50b4bc3a6d7d80f7ac3c6b0bd72` |
 | `src/core/stop_internal.hpp` | `d6971cf39d82c30fb98965f59abb392cf7797b745c7b6fe0136e2c9577c90878` |
 | `src/core/workflow.cpp` | `0a84c17a95ac15ad821c4ef210df6d24af7fad937840b26c7c531c619068c881` |
-| `tests/unit/test_conformance.cpp` | `ec1c929815e7bfcc4f008873a9412356844953f3dadf097cb6a799621b7e3107` |
+| `tests/unit/test_conformance.cpp` | `86aefd797ca0c2985586f2f90f448f46057f27855de7a556e04fcf863269722a` |
 | `tests/unit/test_store.cpp` | `6901f6e2b089f825076bfcff6b09a8b98d0286e2c3b580b8db929ce803c03fa8` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

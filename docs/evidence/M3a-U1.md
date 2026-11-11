@@ -108,17 +108,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-03-pixel-maschere.md` | `ebd000bd2f7ce1ca59fb85ff7cf7494d7379253495257fdd9955d9d440053ccb` |
-| `src/core/calibration_internal.hpp` | `2fe553cd10701f906dd64be0005386d5662a0848ded01fd32c5884557ace1808` |
-| `src/core/fits.cpp` | `598222977d4670cbd9fbe0709ac53e786392f61840eb56c4a20b439264c2cc5f` |
+| `src/core/calibration_internal.hpp` | `e92643b3d91defdcfd27f8298a9b0c934fa65d5671862436ebe1737eddb2cd3b` |
+| `src/core/fits.cpp` | `4bac200de9a1d079570bc816003c8ff7b5ccf6f923963d31e018e5205b70a712` |
 | `src/core/fits_blocks.cpp` | `1866760822bf9c9a8759e00af3bd74b105c5cb05be80b18be7574df9b72eaac5` |
 | `src/core/fits_header.cpp` | `ff80ce493bf7c58bef5952e60fbac5bfe1dfe2c65eaa0a785482a0f249dec22d` |
 | `src/core/fits_internal.hpp` | `12e42b7ff88eb36cb32625ff8703d860f31c93256f21f2e50e99853c2563d7b2` |
-| `src/core/image.cpp` | `ac289188bb822477092d8ec410becc65e1fa024290c598f75c9abe79b0e3a4fe` |
+| `src/core/image.cpp` | `8b66269d3cc920043f13ce9ab5107841cd982118323194a0a329ad2a2fadc9c3` |
 | `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |
-| `src/core/include/astro/image.hpp` | `10df60c894f27ecf61eb43cc8d4efc8d0013bce394bbb044c3711fcf5f327537` |
-| `tests/unit/CMakeLists.txt` | `245405ec419284a27b5c3fc4ef39a08c05684c6a925f5b32ce0a2d5edefdb3ed` |
+| `src/core/include/astro/image.hpp` | `3b8fee06e9e5cc7be11ac2e415b2750a79c19e649b194050d571383f5bbc2aa6` |
+| `tests/unit/CMakeLists.txt` | `814de53b3ce7b39a30e78f688ca025707511e350a4a1bc01466f070fc1bb7cb5` |
 | `tests/unit/test_decoder_types.cpp` | `494dc8f8865a8140fea8a25cb13c5be4d990377b272b1227c0f9e5690b9a2dc7` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

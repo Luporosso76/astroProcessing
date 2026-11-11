@@ -56,16 +56,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `src/core/calibration.cpp` | `afb96d94684d9752c001363a90557d2eed55a5ea6caa7faf87863985d9ad2e6b` |
 | `src/core/fits_header.cpp` | `ff80ce493bf7c58bef5952e60fbac5bfe1dfe2c65eaa0a785482a0f249dec22d` |
 | `src/core/fits_internal.hpp` | `12e42b7ff88eb36cb32625ff8703d860f31c93256f21f2e50e99853c2563d7b2` |
-| `src/core/image.cpp` | `ac289188bb822477092d8ec410becc65e1fa024290c598f75c9abe79b0e3a4fe` |
-| `src/core/include/astro/image.hpp` | `10df60c894f27ecf61eb43cc8d4efc8d0013bce394bbb044c3711fcf5f327537` |
-| `src/core/master.cpp` | `9a2ec6568fcd55144cfc45df100c3e5b38ed7aec37b2a4ef623d271be49d5d8e` |
+| `src/core/image.cpp` | `8b66269d3cc920043f13ce9ab5107841cd982118323194a0a329ad2a2fadc9c3` |
+| `src/core/include/astro/image.hpp` | `3b8fee06e9e5cc7be11ac2e415b2750a79c19e649b194050d571383f5bbc2aa6` |
+| `src/core/master.cpp` | `f1a0151405fb79f44dbaa442e5db90d93e0eda8d0fe6fa5fec6508ee42c739c8` |
 | `tests/unit/calib_support.hpp` | `f08abb31304517226f6a70c2d21c543dcd22108a036726304f595353856c8a8d` |
 | `tests/unit/test_calibration.cpp` | `407b69be394609bc9f01fe47740b3eeca59eb3c438d3a9c1b24b2aa8a4256958` |
 | `tests/unit/test_calibration_r32.cpp` | `e90314cc507880b7373f7c3e24e0d2179ce328e1947e306810d289927c10c62c` |
-| `tests/unit/test_conformance.cpp` | `ec1c929815e7bfcc4f008873a9412356844953f3dadf097cb6a799621b7e3107` |
-| `tests/unit/test_master.cpp` | `6d2a81dae59178c44f0f6a8ffcbffb6c1342522cc4417e9fd7af4e23be4d26bf` |
+| `tests/unit/test_conformance.cpp` | `86aefd797ca0c2985586f2f90f448f46057f27855de7a556e04fcf863269722a` |
+| `tests/unit/test_master.cpp` | `db316728a33440c4ee26d9702957dc8176a9eb655510ef3e72c94f10e0545985` |
 | `tests/unit/test_measure.cpp` | `358d003a21b6bd1b560f036bb390657de7c904416cdace9813a789bdb54d0419` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

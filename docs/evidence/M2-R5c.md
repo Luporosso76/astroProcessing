@@ -14,17 +14,17 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/ADR-07-cpu-simd.md` | `81e23c10617e9040edb643a05cb560ff154f1505ecd41d8492a2c8cce4264a74` |
-| `src/core/calibration_job.cpp` | `b5126d970c52a368283b9e385144c199e529e01507d4ff6cb608b860cc6bace9` |
+| `src/core/calibration_job.cpp` | `f09ee09f8648ebe392144b2ec0699ae459fc9a426ac32bc58f4958344d472c42` |
 | `src/core/include/astro/job.hpp` | `0fee416857ca8512700e91b0550d9db9df20089369de792360a46b08a881f696` |
 | `src/core/include/astro/scheduler.hpp` | `262fd9f4614f94446a2caf10af85e383a0da052d77f290a7e84619dc5affa722` |
 | `src/core/job.cpp` | `2a9e50d9c727188f495e7c929032e33ec507eb4f60aa5cf26751aa6d5dccb438` |
-| `src/core/master.cpp` | `9a2ec6568fcd55144cfc45df100c3e5b38ed7aec37b2a4ef623d271be49d5d8e` |
+| `src/core/master.cpp` | `f1a0151405fb79f44dbaa442e5db90d93e0eda8d0fe6fa5fec6508ee42c739c8` |
 | `src/core/scheduler.cpp` | `a69db97e6e8c66106cc15ad6490322658722ae1e32911f9e0882368e6404c446` |
 | `tests/trace/M2.tsv` | `f559fc60e9888c586cc4917d095f222ffd8fc5d25b0196a67becfa891025bdcc` |
 | `tests/unit/test_simd.cpp` | `e5293e4f1221df3f2ab90a15c247271bf8a81dec1cddea1e757fa232d613bbdd` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 - Tracciabilità (`tests/trace/M2.tsv`, build `build/release`, junit `tmp/release-junit.xml`): trace: 63 ID nello stadio M2, 0 non coperti
 <!-- evidence:end -->
 

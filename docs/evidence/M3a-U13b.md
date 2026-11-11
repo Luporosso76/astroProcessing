@@ -54,11 +54,11 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `docs/contracts/ADR-08-decoder-pack.md` | `2356f8f7f730000b6e29b63b1e816c9be0000eaeb696569f3ecd09971ac5018b` |
 | `docs/contracts/U13-dng-decoder.md` | `396393dd3d01f44f7ab1042cbf1b17a15b2a2aba99fb8d04eed13ad89895ba61` |
 | `docs/licenses.md` | `8f26eaa032e5d7c2352f3102542b08caf41880d32d602988c7007111cd8576b1` |
-| `src/core/dng_decode.cpp` | `337735e3da8c1237796b971b7a27520a5c3674970e5b6363cacf2fab2ed008e1` |
-| `src/core/dng_internal.hpp` | `ac95b16fc39ffd6fd7668cbcaeba341f534b7f4af484811839705e1e8cb3685d` |
-| `src/core/include/astro/image.hpp` | `10df60c894f27ecf61eb43cc8d4efc8d0013bce394bbb044c3711fcf5f327537` |
-| `src/core/include/astro/raw_decode.hpp` | `693013684e5512f4e08be7114f13facb5cddc41b00c11e24d43da49aacd22dba` |
-| `src/core/raw_decode.cpp` | `962885ee61bb61c8c72002f357367922909a1699d7e16fbdf48d5cb023d1513b` |
+| `src/core/dng_decode.cpp` | `8328331ca91c1a60c069d35de28fda9ca122076757de9fa3f20627365ac8832b` |
+| `src/core/dng_internal.hpp` | `42013374c6853e700560632c08de66e76a86c7567cf281ddef479b1859ec38ef` |
+| `src/core/include/astro/image.hpp` | `3b8fee06e9e5cc7be11ac2e415b2750a79c19e649b194050d571383f5bbc2aa6` |
+| `src/core/include/astro/raw_decode.hpp` | `06f0e923e6462d599b83d59d06b9171e67648e4fd6b0bb3ecb6a76bad4e891e2` |
+| `src/core/raw_decode.cpp` | `f0dbed89885480f0f67b34fedc27f3e5a286ccdf4db1e2d742c69c365f31012d` |
 | `tests/fixtures/syn_dng_deflate.hpp` | `c743a7edc04c127f74d3a45819eeca452d006e2816d4c0914aa3d494cc6ac8ba` |
 | `tests/unit/dng_u13b_support.hpp` | `304b89c048e4320aa2894ffd9671f72f9c40ca682d4acd927aeb764894b496ca` |
 | `tests/unit/raw_record_keys.hpp` | `ff32b3c8f5e0942397921048068e0cd13b0859bf11f5e81dae13c8f7e9169baf` |
@@ -66,6 +66,6 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | `tests/unit/test_dng_u13b_hooks.cpp` | `c0e3fd9f534c8ceff4ec33ac6863af23661f40f2f7b89c8d4524b832f5dbfa1d` |
 | `third_party/libtiff/SHA256SUMS` | `bc546ce0298da64f8a43a2a8662ccb0df3e0e9ef53312623cfb8474086655ab6` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->

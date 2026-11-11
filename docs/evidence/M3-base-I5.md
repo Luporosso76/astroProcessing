@@ -90,16 +90,16 @@ Blocco generato da `tools/evidence.py`; non modificare a mano.
 | File | SHA-256 |
 |---|---|
 | `docs/contracts/BASE-confini.md` | `2c9bf62e665e3368cfbd52522ae750191c5d6cca75507655f70a990034daa1bb` |
-| `docs/evidence/M3-base-I2.md` | `ce21587eeefc46d8a444c5de441b593352e4d8de96c24796b9cc1fdef9d6ab79` |
-| `docs/evidence/M3-base-I3.md` | `4af213f135448ba033e13749a09ec7b20335d87d462728651a5c7660880546ab` |
-| `src/core/calibration_blocks.cpp` | `4a87981915c214997d1864f602a53b51f636012efd08f97be7f217bb640f1e21` |
+| `docs/evidence/M3-base-I2.md` | `0d896309ada7376b552dcb79fb01e3d922133341603b799651e260722e4f7d7d` |
+| `docs/evidence/M3-base-I3.md` | `cbcc9e1c91c582075690ed25bec9203e517efe2fb0aee2db0cb568f17f71a7d6` |
+| `src/core/calibration_blocks.cpp` | `fab4c5b8bf9df5ae9a829ad583e8c0454c1a7e22b5805425555d1535331e9369` |
 | `src/core/hash.cpp` | `cafc181b8501db004dbe56c9f4ba10ea481dd025fce467b93e330610fcc2613f` |
 | `src/core/import_job.cpp` | `9eb47cef9ce9a8f69cab4f5dab0d8936cd1f802f88f369d2399eedef85ae5a85` |
-| `src/core/master.cpp` | `9a2ec6568fcd55144cfc45df100c3e5b38ed7aec37b2a4ef623d271be49d5d8e` |
-| `tests/unit/CMakeLists.txt` | `245405ec419284a27b5c3fc4ef39a08c05684c6a925f5b32ce0a2d5edefdb3ed` |
-| `tests/unit/test_conformance.cpp` | `ec1c929815e7bfcc4f008873a9412356844953f3dadf097cb6a799621b7e3107` |
+| `src/core/master.cpp` | `f1a0151405fb79f44dbaa442e5db90d93e0eda8d0fe6fa5fec6508ee42c739c8` |
+| `tests/unit/CMakeLists.txt` | `814de53b3ce7b39a30e78f688ca025707511e350a4a1bc01466f070fc1bb7cb5` |
+| `tests/unit/test_conformance.cpp` | `86aefd797ca0c2985586f2f90f448f46057f27855de7a556e04fcf863269722a` |
 | `tests/unit/test_conformance_gaps.cpp` | `11a80df7e444932b2c2d6a4ce5b2fb3753f163c24e7ac098c2c86e8a05f643d3` |
 
-- Test release (`tmp/release-junit.xml`): totali 1221, fast 1199, slow 22, falliti 0
-- Test dev (`tmp/dev-junit.xml`): totali 1199, fast 1199, slow 0, falliti 0
+- Test release (`tmp/release-junit.xml`): totali 1829, fast 1772, slow 57, falliti 0
+- Test dev (`tmp/dev-junit.xml`): totali 1772, fast 1772, slow 0, falliti 0
 <!-- evidence:end -->
