@@ -747,22 +747,6 @@ TEST(MasterB7, T_M3B_C02_14_cfa_flat_job_is_bit_identical_across_workers_and_til
 
 // ================================================================ T-M3B-MEM-01: righe del report per canale nel job
 
-// minimum_feasible_bytes del job del master (ADR-06, estensione R2.r ed «Estensione M3.b del piano del master»), tile
-// automatico (t_min = 1). Ingressi del modello presi dal test: P = picco di lettura del frame più grande
-// (`plan_fits`), HB = tre HDU di header, M = margine del report della configurazione di default; K = 32, D = 2^20.
-std::uint64_t expected_minimum(const group& g, const master_recipe& r, std::uint64_t cr) {
-  const std::uint64_t n = g.frames.size(), W = g.w, H = g.h, S = W * H, E = sample_size(r.output_type);
-  std::uint64_t P = 0;
-  for (const mframe& f : g.frames) P = std::max(P, plan_fits(file_of(f, g.w, g.h)).peak_bytes);
-  const std::uint64_t HB = 3 * (std::uint64_t{fits_limits::max_header_cards} * 80 + 2 * 2880);
-  const std::uint64_t M = resource_config{}.report_margin_bytes.value, D = std::uint64_t{1} << 20, K = 32;
-  const std::uint64_t out = S * (2 * E + 2);
-  const std::uint64_t shared = P + 8 * S + out + K * S + (out + HB) + D + M;
-  const std::uint64_t R = 16 * cr * H * n, CS = 120 * n + 168, Cn = 24 * n + 544;
-  const std::uint64_t F = 56 * n + 8 * ((n + 7) / 8) + 544;
-  return shared + R + CS + Cn + F + W * (10 * n + 8);
-}
-
 struct budget_run {
   std::optional<stop_error> stop;
   bool frames_read = false;
