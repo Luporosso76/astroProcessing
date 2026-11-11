@@ -746,3 +746,32 @@ foreach(seed strips tiles tiles256 jxl)
   list(APPEND ASTRO_U13_FUZZ_TESTS T-U13-11.fuzz_${seed})
 endforeach()
 set_tests_properties(${ASTRO_U13_FUZZ_TESTS} PROPERTIES LABELS slow TIMEOUT 600 ENVIRONMENT "OMP_NUM_THREADS=1")
+
+# B17 di M3.b: dato reale PUB-LFC-01 (non versionato: il test fallisce se manca). T-M3B-C02-16 (analisi dei quattro ruoli,
+# master proposti eseguiti in f64 contro la regola I) e T-M3B-FLAT-09 (flat g e i con `mean` + `median_ratio`). Lunghi,
+# in serie come T-M2R2-09: `ctest -L slow`.
+get_filename_component(b17_preset ${CMAKE_BINARY_DIR} NAME)
+add_executable(test_master_b17 test_master_b17.cpp)
+target_link_libraries(test_master_b17 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b17 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b17 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${PROJECT_SOURCE_DIR}/tmp/b17-real-${b17_preset}")
+foreach(b17_slow
+    "T-M3B-C02-16.analysis_bias:MasterB17Slow.T_M3B_C02_16_analysis_bias"
+    "T-M3B-C02-16.analysis_dark:MasterB17Slow.T_M3B_C02_16_analysis_dark"
+    "T-M3B-C02-16.analysis_dark_flat:MasterB17Slow.T_M3B_C02_16_analysis_dark_flat"
+    "T-M3B-C02-16.analysis_flat:MasterB17Slow.T_M3B_C02_16_analysis_flat"
+    "T-M3B-C02-16.masters_bias:MasterB17Slow.T_M3B_C02_16_masters_bias"
+    "T-M3B-C02-16.masters_dark:MasterB17Slow.T_M3B_C02_16_masters_dark"
+    "T-M3B-C02-16.masters_dark_flat:MasterB17Slow.T_M3B_C02_16_masters_dark_flat"
+    "T-M3B-C02-16.masters_flat:MasterB17Slow.T_M3B_C02_16_masters_flat"
+    "T-M3B-FLAT-09.band_g:MasterB17Slow.T_M3B_FLAT_09_band_g"
+    "T-M3B-FLAT-09.band_i:MasterB17Slow.T_M3B_FLAT_09_band_i")
+  string(REPLACE ":" ";" b17_pair "${b17_slow}")
+  list(GET b17_pair 0 b17_name)
+  list(GET b17_pair 1 b17_filter)
+  add_test(NAME ${b17_name} COMMAND test_master_b17 --gtest_filter=${b17_filter})
+  set_tests_properties(${b17_name} PROPERTIES LABELS slow RUN_SERIAL TRUE TIMEOUT 1800
+    FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+endforeach()

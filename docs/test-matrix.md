@@ -255,7 +255,7 @@ Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli stat
 | T-M3B-C02-13 | F-CAL-01.b; C-02.b §b.6 (`single`, modello di rumore) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-14 | F-CAL-01.b; C-02.b §b.6 (flat CFA per canale) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | ESEGUITO: ctest `T-M3B-C02-16.analysis_{bias,dark,dark_flat,flat}` e `T-M3B-C02-16.masters_{bias,dark,dark_flat,flat}` (slow, seriali), `test_master_b17`; gruppi, esclusioni, statistiche e proposta contro l'oracle dagli header e dai campioni; master proposti in f64 contro la regola I su 8 586 240 pixel. Parametri nel record `docs/datasets/PUB-LFC-01.md`; il dato non produce esclusioni (zero asserite: la prova dei motivi è nei test di B12). Limiti: N = 3 per ruolo (7 per i bias), mono, nessun test su n grande |
 | T-M3B-DSC-01 | F-CAL-01.b; C-02.b §b.7, §b.13 punto 3; C-02.b-flat §f.7 (descrittore, enum e chiave del nodo per ogni metodo, `frame_normalization`, `analysis`, versione dell'algoritmo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-DEC-01 | ADR-06 R2.r, L10; ADR-08.b §2.8 (modo con prenotazione del chiamante: `raw_decode_needed_bytes` dall'header uguale alla prenotazione del modo pool, decodifica bit a bit uguale con forniti = needed, forniti = needed − 1 → `budget`, `sched.job_exceeds_budget` prima di ogni allocazione, pool e forniti insieme → `invalid_input`, `held_bytes` senza pool → `invalid_input` `raw.decode_context`, `raw_decode_needed_bytes` con `max_pixels` sotto `w·h` → `limit_exceeded` `raw.max_pixels`) | ADR-08.b | M3.b | PIANIFICATO — non eseguito |
 
@@ -273,7 +273,7 @@ Definiti in `docs/contracts/C-02-master.md` §f.12, con classi, livelli statisti
 | T-M3B-FLAT-06 | F-CAL-01.b, NC-21; C-02.b-flat §f.2, §f.10 (domini e stop) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-FLAT-07 | F-CAL-01.b; C-02.b-flat §f.7 (descrittore, capability, report) | C-02.b | M3.b | PIANIFICATO — non eseguito |
 | T-M3B-FLAT-08 | F-CAL-01.b; C-02.b-flat §f.8 (determinismo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-09 | F-CAL-01.b, NFR-TEST-02; C-02.b-flat §f.9 (PUB-LFC-01) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-09 | F-CAL-01.b, NFR-TEST-02; C-02.b-flat §f.9 (PUB-LFC-01) | C-02.b | M3.b | ESEGUITO: ctest `T-M3B-FLAT-09.band_{g,i}` (slow, seriali), `test_master_b17`; livelli, `r_f`, `m_H`, `rho`, master, piano e diagnostiche di `A` (massimo per pixel dei dark-flat, 6956/3 ADU in g e 8390/3 in i, dal record del dato) entro la regola I. Limiti: N = 3, un solo filtro per flat, nessun CFA |
 
 ## M3.entry: ID di lavoro di ADR-09.b e D-09.b
 

@@ -46,3 +46,28 @@ cc6dfea9a17641065910bf6b4288e2d31fc3dc36e57b71c37c65d659ade45bb2  raw/example-cr
 7ce339d1aa9fce9409bb9fb2b2e8277946dcb7a4d72e7fdbc4ae93ff5e0def46  raw/example-cryo-LFC/darks/ccd.024.0.fits
 a253adca4a93ef09dd6b92a970f6881bca847f44b97ad21415cd1a39d64a84c7  raw/example-cryo-LFC/darks/ccd.025.0.fits
 ```
+
+## Parametri d'uso in M3.b (T-M3B-C02-16, T-M3B-FLAT-09)
+
+Decisione: `docs/decisions/M3b-lacune.md`, «Decisioni successive (B17)». I valori sono quelli già usati sullo stesso dato da T-M2E-13 e T-M2R2-09 (`tests/unit/test_calibration_real.cpp`); il test `tests/unit/test_master_b17.cpp` li cita.
+
+| Parametro | Valore |
+|---|---|
+| `exposure_rel_tol` | 1e-3 |
+| `temperature_abs_tol_c` / `temp_policy` | 1.0 / `not_applicable_declared` |
+| `saturation_adu` / `saturated_fraction_max` | 65535 / 0.05 |
+| `flat_min_signal_adu` | 1000 |
+| `flat_level_rel_tol` (solo `none`) | 0.2 |
+| `offset_adu` dichiarato | 1137, mediana del livello di `ccd.001` nelle colonne 0…2047 |
+| Campi dichiarati | binning 1×1, ADU, lineare, fase raw |
+
+`A` (`flat_additive_bound_adu`) per banda: limite per pixel della componente additiva non sottratta nei flat (ipotesi `additive_bounded` di C-02.b-flat §f.1, |β(p)| ≤ A per ogni pixel p). Algoritmo: d(p) = |media dei tre dark-flat della stessa esposizione in p − offset dichiarato|, sui pixel della regione dati (colonne 0…2047, tutte le righe) in cui nessuno dei tre campioni è saturo (≥ 65535). `A` = max_p d(p), valore esatto (razionale: la media di tre interi). È una stima conservativa da 3 frame: il massimo osservato su quei frame, non un limite dimostrato per ogni altro frame. Informazione, non limite: quantile 99,9 % (rango più vicino: il ⌈0,999 N⌉-esimo valore ordinato) e frazione dei pixel con d oltre il quantile.
+
+Comando: `python3 -S tools/datasets/pub_lfc_01_additive_bound.py` dalla radice del repository (lettura dei file FITS allineata alle card da 80 byte, dimensioni da NAXIS1/NAXIS2, BZERO e BSCALE letti e controllati; circa 110 s).
+
+| Banda | Dark-flat | Pixel | `A` (ADU) | Quantile 99,9 % (ADU) | Frazione oltre il quantile |
+|---|---|---|---|---|---|
+| g | `darks/ccd.017–019` (70 s) | 8 454 143 | 6956/3 = 2318,666667 | 625 | 1,000e-3 (8454 pixel) |
+| i | `darks/ccd.023–025` (7 s) | 8 454 143 | 8390/3 = 2796,666667 | 284 | 9,712e-4 (8211 pixel) |
+
+Offset misurato dallo stesso comando: 1137. Il quantile è circa un quarto del massimo in g e un decimo in i: il massimo è determinato dalla coda dei pixel con la componente più alta (si ipotizzano pixel caldi, non verificato qui). Su 8 454 144 pixel della regione, uno è saturo in almeno un dark-flat in ciascuna banda ed è escluso dal calcolo di `A`; nei master del flat il pixel saturo è invalido (`saturated`), come asserisce il test.
