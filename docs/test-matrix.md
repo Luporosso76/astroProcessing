@@ -14,7 +14,7 @@ Stato: **seed pianificato. Le righe `PIANIFICATO` non sono state eseguite; i tes
 
 | Test | Requisito o gate | Dataset / fixture | Metodo | Metrica preregistrata | Tolleranza | Evidenza prevista | Stato |
 |---|---|---|---|---|---|---|---|
-| T-FBK-01 | NFR-FBK-01, NC-21; M2 core, M3, M4, M5 | `FIX-FAULT-01` guasti sintetici: backend assente, decoder che fallisce, GPU che si stacca | Iniezione del guasto; traccia delle chiamate ai backend; exit code; provenance dell'arresto | Zero invocazioni del percorso sostitutivo; nessun output pubblicato; errore non nullo | Binaria: sostituzione assente o presente | `docs/evidence/` | PARZIALE: parte M2 ESEGUITA (decoder che fallisce, budget insufficiente, store corrotto o guasto in commit: `CalibJob.T_FBK_01_*`, `docs/evidence/M2-e.md`); M3, M4, M5 PIANIFICATO |
+| T-FBK-01 | NFR-FBK-01, NC-21; M2 core, M3, M4, M5 | `FIX-FAULT-01` guasti sintetici: backend assente, decoder che fallisce, GPU che si stacca | Iniezione del guasto; traccia delle chiamate ai backend; exit code; provenance dell'arresto | Zero invocazioni del percorso sostitutivo; nessun output pubblicato; errore non nullo | Binaria: sostituzione assente o presente | `docs/evidence/` | PARZIALE: parte M2 ESEGUITA (decoder che fallisce, budget insufficiente, store corrotto o guasto in commit: `CalibJob.T_FBK_01_*`, `docs/evidence/M2-e.md`); parte M3.a ESEGUITA (`DngRoute.T_U13_01_*`, `Pack.T_M3A_PACK_02_*`); parte M3.b verde (T-M3B-C02-15, T-M3B-FLAT-06, T-M3A-CAL-09 parte master: frame modificato, decoder, `support_incomplete`, nessun percorso alternativo); M4, M5 PIANIFICATO |
 | M2 slice calibrazione | Gate M2; F-CAL-01/02 | `FIX-SYN-FITS-01` FITS sintetico con dark e flat; ground truth; PUB-LFC-01 reale | Calibrazione `L - D`, flat `Q`, maschere, varianza, report | Errore numerico, varianza propagata, doppia sottrazione assente | Derivate prima della misura (zero per i dyadic, `gamma_6 |C|`, `gamma_36 Var(C)`, Wilson-Hilferty; vedi `docs/evidence/M2-e.md`) | `docs/evidence/M2-e.md` | ESEGUITO, PASS (T-M2E-01…32; T-M2E-26 e il flat vignettato registrati come limite) |
 | T-CAL-08 | M3.c; F-CAL-02.b, F-CAL-03.b, F-CAL-04, F-CAL-06.b | `FIX-SYN-CAL-08`: otto combinazioni di master, incluso dark-flat e casi mancanti | Matrice delle ricette, omissioni pianificate, prerequisito perso | Correzioni applicate, omissioni dichiarate, stop sul prerequisito mancante | Da derivare per combinazione | `docs/evidence/` | PIANIFICATO — non eseguito |
 | T-REG-02 | M3.f; F-REG-02 | `FIX-SYN-WARP-01` trasformazioni note; `PUB-REG-01` pubblico licenziato | Registrazione, residui, ambiguità | Errore di trasformazione, residuo, casi ambigui non pubblicati | Da derivare dalla trasformazione nota | `docs/evidence/` | PIANIFICATO — non eseguito |
@@ -156,7 +156,7 @@ Definiti in `docs/contracts/ADR-03-pixel-maschere.md` §b.10 (01–12) e §b.17 
 | T-M3A-TYP-05 | F-CAL-08; ADR-03.b §b.3 (keyword `ASTRD*`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-06 | ADR-17; ADR-03.b §b.4 (`variance_scope`) | ADR-03.b | M3.d | PIANIFICATO — non eseguito |
 | T-M3A-TYP-07 | F-REG-03, §8.6.2; ADR-03.b §b.5 (coverage) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
-| T-M3A-TYP-08 | ADR-03.b §b.6 (bit `support_incomplete`) | ADR-03.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3A-TYP-08 | ADR-03.b §b.6 (bit `support_incomplete`) | ADR-03.b | M3.b | verde (B6; anticipato da M3.d): `Image.T_M3A_TYP_08_*` (`test_image.cpp`), `Fits.T_M3A_TYP_08_*` (`test_fits.cpp`), `CalibJob.T_M3A_TYP_08_*` (`test_calibration_job.cpp`) |
 | T-M3A-TYP-09 | C-11, F-POST-08.a.1; ADR-03.b §b.7 (tipi distinti) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-10 | C-11, §7.14; ADR-03.b §b.7 (`mask_info`) | ADR-03.b | M3.j | PIANIFICATO — non eseguito |
 | T-M3A-TYP-11 | NFR-SEC-01; ADR-03.b §b.8 (limiti con `COVERAGE`) | ADR-03.b | M3.g | PIANIFICATO — non eseguito |
@@ -180,7 +180,7 @@ Definiti in `docs/contracts/ADR-16-stati-master.md` §b.13, con tolleranze e cri
 | T-M3A-CAL-04 | F-CAL-02.b, D-16; ADR-16.b §b.10 | ADR-16.b, D-16 | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-CAL-05 | G-STOP, P-LOST, NC-21; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
 | T-M3A-CAL-06 | G-STOP, P-FLAT-UNKNOWN, G-OFFSET, P-OFFSET; ADR-16.b §b.9 | ADR-16.b | M3.c | verde (U7) |
-| T-M3A-CAL-07 | G-CAL, F-IO-04; ADR-16.b §b.7 (master da RAW) | ADR-16.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3A-CAL-07 | G-CAL, F-IO-04; ADR-16.b §b.7 (master da RAW) | ADR-16.b | M3.b | verde (B15a): `MasterB15a.T_M3A_CAL_07_*` (`test_master_b15a.cpp`: stato del decoder nel nodo e nei frame del master da RAW) |
 | T-M3A-CAL-08 | G-CAL, G-OFFSET; ADR-16.b §b.7 (compatibilità del decoder) | ADR-16.b | M3.a | verde (U6) |
 | T-M3A-CAL-09 | P-LOST; ADR-16.b §b.7, §b.8 | ADR-16.b | M3.a (light), M3.b (master) | verde, parte M3.a (U8b) e parte master (B16, job RAW) |
 | T-M3A-CAL-10 | G-STOP, resume; ADR-16.b §b.8 | ADR-16.b | M3.c | PIANIFICATO — non eseguito |
@@ -236,44 +236,47 @@ Definiti in `docs/contracts/ADR-17-varianza.md` §b.12, con tolleranze, soglie M
 
 ## M3.entry: ID di lavoro di C-02.b
 
-Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli statistici e criteri fissati prima di ogni misura. T-M3B-C02-06 e 07 sono caratterizzazioni senza soglia, a sostegno dei limiti dichiarati. Nessuno è eseguito: le righe sono piani, non prove.
+Definiti in `docs/contracts/C-02-master.md` §b.12, con tolleranze, livelli statistici e criteri fissati prima di ogni misura. T-M3B-C02-06 e 07 sono caratterizzazioni senza soglia, a sostegno dei limiti dichiarati. Stato per riga: «verde» = test presenti nel codice e passati nelle verifiche d'unità dei record `docs/evidence/M3b-B*.md`; il run completo unico del gate (`docs/evidence/M3-b.md`) è l'unico PASS di gate.
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3B-C02-01 | F-CAL-01.b; C-02.b §b.1, §b.6, regola I di ADR-17.b §b.10 (valori dei metodi) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-02 | F-CAL-01.b; C-02.b §b.1 (`sigma_clip`, appartenenza all'insieme rifiutato, Samuelson) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-03 | F-CAL-01.b; C-02.b §b.6 (piano della media pesata) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-04 | F-CAL-01.b; C-02.b §b.6 (piano `gaussian_reference` di mediana e winsorized) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-05 | F-CAL-01.b; C-02.b §b.6 (accuratezza di `κ`) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-06 | F-CAL-01.b; C-02.b §b.6, ADR-17.b §b.1 (selezione congelata, caratterizzazione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-07 | F-CAL-01.b; C-02.b §b.3 (quantizzazione della mediana, caratterizzazione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-08 | F-CAL-01.b, F-IO-03; C-02.b §b.2 (analisi, gruppi, frame incompatibile escluso prima della scelta) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-09 | F-CAL-01.b; C-02.b §b.2, §b.4 (proposta secondo `n`, domini) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-10 | F-CAL-01.b; C-02.b §b.8 (master riproducibili bit-esatti dal progetto) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-11 | F-CAL-01.b; C-02.b §b.7 (report di frame usati e scartati, rumore, artefatti, stato) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-12 | F-CAL-01.b; C-02.b §b.13 punto 1, ADR-03 R1 (codici di fase e linearità) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-13 | F-CAL-01.b; C-02.b §b.6 (`single`, modello di rumore) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-14 | F-CAL-01.b; C-02.b §b.6 (flat CFA per canale) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | verde, parte B16 (frame modificato e decoder sul percorso del job RAW, `support_incomplete` sul percorso del job FITS); resto pianificato |
+| T-M3B-C02-01 | F-CAL-01.b; C-02.b §b.1, §b.6, regola I di ADR-17.b §b.10 (valori dei metodi) | C-02.b | M3.b | verde (B5, B6): `MasterB5.T_M3B_C02_01_*` (`test_master_b5.cpp`: casi dyadic, pareggi `−0`/`+0`), `MasterB6.T_M3B_C02_01_*` (`test_master_b6.cpp`, parte sigma) |
+| T-M3B-C02-02 | F-CAL-01.b; C-02.b §b.1 (`sigma_clip`, appartenenza all'insieme rifiutato, Samuelson) | C-02.b | M3.b | verde (B6): `MasterB6.T_M3B_C02_02_*` (`test_master_b6.cpp`: appartenenza esatta, casi inerti) |
+| T-M3B-C02-03 | F-CAL-01.b; C-02.b §b.6 (piano della media pesata) | C-02.b | M3.b | verde (B3, B5): `MasterB3.T_M3B_C02_03_*` (domini), `MasterB5.T_M3B_C02_03_*` e ctest `T-M3B-C02-03.weighted_mean_W1`, `T-M3B-C02-03.weighted_mean_W2` (slow, protocollo `M3b-protocollo.md`) |
+| T-M3B-C02-04 | F-CAL-01.b; C-02.b §b.6 (piano `gaussian_reference` di mediana e winsorized) | C-02.b | M3.b | verde (B5): `MasterB5.T_M3B_C02_04_*` e ctest `T-M3B-C02-04.{n3,n4,n9_median,n9_winsorized_g1,n9_winsorized_g2,n9_winsorized_g4,n10,n101}` (slow, controllo di coerenza) |
+| T-M3B-C02-05 | F-CAL-01.b; C-02.b §b.6 (accuratezza di `κ`) | C-02.b | M3.b | verde (B4): `MasterKappa*.T_M3B_C02_05_*` (`test_master_kappa.cpp`, oracle `kappa_oracle.hpp`) e ctest `T-M3B-C02-05.kappa_all_cells` (slow) |
+| T-M3B-C02-06 | F-CAL-01.b; C-02.b §b.6, ADR-17.b §b.1 (selezione congelata, caratterizzazione) | C-02.b | M3.b | verde (B6), caratterizzazione senza soglia: `MasterB6.T_M3B_C02_06_*` e ctest `T-M3B-C02-06.<cella>` (slow, seriali); stime da registrare nel record del gate (`docs/evidence/M3-b.md`) |
+| T-M3B-C02-07 | F-CAL-01.b; C-02.b §b.3 (quantizzazione della mediana, caratterizzazione) | C-02.b | M3.b | verde (B5), caratterizzazione senza soglia: `MasterB5.T_M3B_C02_07_*` (`test_master_b5.cpp`) |
+| T-M3B-C02-08 | F-CAL-01.b, F-IO-03; C-02.b §b.2 (analisi, gruppi, frame incompatibile escluso prima della scelta) | C-02.b | M3.b | verde (B12, B13, B14, B15, B15a, B16): `MasterB12.T_M3B_C02_08_*` (ogni motivo di esclusione), `MasterB13.T_M3B_C02_08_*` (gruppi, un campo alla volta), `MasterB14.T_M3B_C02_08_*` (preflight dei nodi proposti), `MasterB15a.T_M3B_C02_08_*` (preflight RAW), `MasterB15.T_M3B_C02_08_*`, `MasterB16.T_M3B_C02_08_*` |
+| T-M3B-C02-09 | F-CAL-01.b; C-02.b §b.2, §b.4 (proposta secondo `n`, domini) | C-02.b | M3.b | verde (B3, B14): `MasterB3.T_M3B_C02_09_*` (domini e stop), `MasterB14.T_M3B_C02_09_*` (proposta secondo `n` e ruolo) |
+| T-M3B-C02-10 | F-CAL-01.b; C-02.b §b.8 (master riproducibili bit-esatti dal progetto) | C-02.b | M3.b | verde (B10, B11, B14, B16): `MasterB10.T_M3B_C02_10_*` (metodi), `MasterB11.T_M3B_C02_10_*` (report), `MasterB14.T_M3B_C02_10_*` (candidati permutati), `MasterB16.T_M3B_C02_10_*` (riapertura del progetto e nodo nello store) |
+| T-M3B-C02-11 | F-CAL-01.b; C-02.b §b.7 (report di frame usati e scartati, rumore, artefatti, stato) | C-02.b | M3.b | verde (B11, B14): `MasterB11.T_M3B_C02_11_*` (report del master), `MasterB14.T_M3B_C02_11_*` (sezione «Analisi» dal parametro `analysis`) |
+| T-M3B-C02-12 | F-CAL-01.b; C-02.b §b.13 punto 1, ADR-03 R1 (codici di fase e linearità) | C-02.b | M3.b | verde (B3, B12): `MasterB3.T_M3B_C02_12_*`, `MasterB12.T_M3B_C02_12_*` (parte analisi) |
+| T-M3B-C02-13 | F-CAL-01.b; C-02.b §b.6 (`single`, modello di rumore) | C-02.b | M3.b | verde (B3, B5): `MasterB3.T_M3B_C02_13_*`, `MasterB5.T_M3B_C02_13_*` (`single`, modello di rumore) |
+| T-M3B-C02-14 | F-CAL-01.b; C-02.b §b.6 (flat CFA per canale) | C-02.b | M3.b | verde (B7, B13): `MasterB7.T_M3B_C02_14_*` (livello fuori tolleranza per canale, mono invariato), `MasterB13.T_M3B_C02_14_*` |
+| T-M3B-C02-15 | T-FBK-01, NC-21; C-02.b §b.2, §b.10 (guasti dopo la selezione) | C-02.b | M3.b | verde (B3, B4, B5, B6, B11, B12, B16): `Master{B3,B5,B11,B12}.T_M3B_C02_15_*` e `MasterKappa.T_M3B_C02_15_*` (codici di stop propri di ogni unità, contatore del `fault_injector`), `MasterB6.T_M3B_C02_15_*` e `MasterB16.T_M3B_C02_15_*` (frame modificato prima del job e dopo la lettura completa su RAW; `support_incomplete` senza cambio di metodo, job FITS). Il guasto «stato del decoder diverso» sul percorso del job è provato da `MasterB16.T_M3A_CAL_09_*` (nessun test porta il nome C02-15) |
 | T-M3B-C02-16 | F-CAL-01.b, NFR-TEST-02; C-02.b §b.9 (PUB-LFC-01) | C-02.b | M3.b | ESEGUITO: ctest `T-M3B-C02-16.analysis_{bias,dark,dark_flat,flat}` e `T-M3B-C02-16.masters_{bias,dark,dark_flat,flat}` (slow, seriali), `test_master_b17`; gruppi, esclusioni, statistiche e proposta contro l'oracle dagli header e dai campioni; master proposti in f64 contro la regola I su 8 586 240 pixel. Parametri nel record `docs/datasets/PUB-LFC-01.md`; il dato non produce esclusioni (zero asserite: la prova dei motivi è nei test di B12). Limiti: N = 3 per ruolo (7 per i bias), mono, nessun test su n grande |
-| T-M3B-DSC-01 | F-CAL-01.b; C-02.b §b.7, §b.13 punto 3; C-02.b-flat §f.7 (descrittore, enum e chiave del nodo per ogni metodo, `frame_normalization`, `analysis`, versione dell'algoritmo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-DEC-01 | ADR-06 R2.r, L10; ADR-08.b §2.8 (modo con prenotazione del chiamante: `raw_decode_needed_bytes` dall'header uguale alla prenotazione del modo pool, decodifica bit a bit uguale con forniti = needed, forniti = needed − 1 → `budget`, `sched.job_exceeds_budget` prima di ogni allocazione, pool e forniti insieme → `invalid_input`, `held_bytes` senza pool → `invalid_input` `raw.decode_context`, `raw_decode_needed_bytes` con `max_pixels` sotto `w·h` → `limit_exceeded` `raw.max_pixels`) | ADR-08.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-DSC-01 | F-CAL-01.b; C-02.b §b.7, §b.13 punto 3; C-02.b-flat §f.7 (descrittore, enum e chiave del nodo per ogni metodo, `frame_normalization`, `analysis`, versione dell'algoritmo) | C-02.b | M3.b | verde (B3): `MasterB3.T_M3B_DSC_01_*` (`test_master_b3.cpp`) |
+| T-M3B-DEC-01 | ADR-06 R2.r, L10; ADR-08.b §2.8 (modo con prenotazione del chiamante: `raw_decode_needed_bytes` dall'header uguale alla prenotazione del modo pool, decodifica bit a bit uguale con forniti = needed, forniti = needed − 1 → `budget`, `sched.job_exceeds_budget` prima di ogni allocazione, pool e forniti insieme → `invalid_input`, `held_bytes` senza pool → `invalid_input` `raw.decode_context`, `raw_decode_needed_bytes` con `max_pixels` sotto `w·h` → `limit_exceeded` `raw.max_pixels`) | ADR-08.b | M3.b | verde (B15a): `RawDecodeB15a.T_M3B_DEC_01_*` (`test_raw_decode_b15a.cpp`) |
 | T-M3B-JOB-01 | F-CAL-01.b; C-02.b §b.2 (job `master.combine` FITS e RAW, registro dei tipi di job L1, istanze minime con tre frame per variante nella suite di conformità T-M3BASE) | C-02.b | M3.b | verde, parte B16; conformità T-M3BASE per ogni voce e variante |
+| T-M3B-MEM-01 | F-CAL-01.b; C-02.b §b.11, §b.13 punto 5; C-02.b-flat §f.13 punto 11; ADR-06 R2.r (modello di memoria del master: piano non rappresentabile, minimo − 1 → stop prima di ogni prenotazione) | C-02.b | M3.b | verde (B3b, B7, B10): `Resources.T_M3B_MEM_01_*` (`test_resources.cpp`, anche piano RAW con spill), `MasterB7.T_M3B_MEM_01_*` (job CFA), `MasterB10.T_M3B_MEM_01_*` (ogni metodo e `median_ratio`) |
+| T-M3B-ANA-01 | F-CAL-01.b; C-02.b §b.2, §b.4 (funzione di proposta L3: gruppi e nodi proposti uguali all'oracolo scritto a mano, indipendenti dall'ordine dei candidati) | C-02.b | M3.b | verde (B14): `MasterB14.T_M3B_ANA_01_*` (`test_master_b14.cpp`); un terzo test con lo stesso prefisso è in `MasterB16` (`test_master_b16.cpp`) |
+| T-M3B-CFA-01 | F-CAL-01.b; C-02.b §b.2 «Canali CFA», §b.6 «Flat»; ADR-16.b §b.7 (master CFA per canale da DNG sintetici: `frame_decoder_states`, livelli per canale, G1 e G2 separati, nero non sottratto) | C-02.b | M3.b | verde (B15): `MasterB15.T_M3B_CFA_01_*` (`test_master_b15.cpp`) |
 
 ## M3.entry: ID di lavoro di C-02.b-flat
 
-Definiti in `docs/contracts/C-02-master.md` §f.12, con classi, livelli statistici e criteri fissati prima di ogni misura. T-M3B-FLAT-05 è una caratterizzazione senza soglia, a sostegno di un limite dichiarato. Nessuno è eseguito: le righe sono piani, non prove.
+Definiti in `docs/contracts/C-02-master.md` §f.12, con classi, livelli statistici e criteri fissati prima di ogni misura. T-M3B-FLAT-05 è una caratterizzazione senza soglia, a sostegno di un limite dichiarato. Stato per riga come nella tabella di C-02.b: l'unico PASS di gate è il run completo di `docs/evidence/M3-b.md`.
 
 | ID | Requisito o gate | Contratto | Unità | Stato |
 |---|---|---|---|---|
-| T-M3B-FLAT-01 | F-CAL-01.b; C-02.b-flat §f.1, §f.6, regola I di ADR-17.b §b.10 (valori con `median_ratio`) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-02 | F-CAL-01.b; C-02.b-flat §f.1 (fattore globale senza rumore, ADR-09.b §b.6) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-03 | F-CAL-01.b; C-02.b-flat §f.6 (piano e valori di `mean` + `median_ratio`, controllo di coerenza) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-04 | F-CAL-01.b; C-02.b-flat §f.1 (valore atteso dei metodi robusti normalizzati, controllo di coerenza) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-05 | F-CAL-01.b; C-02.b-flat §f.6, ADR-17.b §b.1 (piano robusto eteroschedastico, caratterizzazione) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-06 | F-CAL-01.b, NC-21; C-02.b-flat §f.2, §f.10 (domini e stop) | C-02.b | M3.b | verde, parte B16 (stop di ricetta, spill e RAW con FITS sul percorso del job, contatore del `fault_injector`); resto pianificato |
-| T-M3B-FLAT-07 | F-CAL-01.b; C-02.b-flat §f.7 (descrittore, capability, report) | C-02.b | M3.b | PIANIFICATO — non eseguito |
-| T-M3B-FLAT-08 | F-CAL-01.b; C-02.b-flat §f.8 (determinismo) | C-02.b | M3.b | PIANIFICATO — non eseguito |
+| T-M3B-FLAT-01 | F-CAL-01.b; C-02.b-flat §f.1, §f.6, regola I di ADR-17.b §b.10 (valori con `median_ratio`) | C-02.b | M3.b | verde (B8, B9): `MasterB8.T_M3B_FLAT_01_*` (costanti dyadic), `MasterB9.T_M3B_FLAT_01_*` (valori) |
+| T-M3B-FLAT-02 | F-CAL-01.b; C-02.b-flat §f.1 (fattore globale senza rumore, ADR-09.b §b.6) | C-02.b | M3.b | verde (B9): `MasterB9.T_M3B_FLAT_02_*` (fattore globale senza rumore, (a) e (b)) |
+| T-M3B-FLAT-03 | F-CAL-01.b; C-02.b-flat §f.6 (piano e valori di `mean` + `median_ratio`, controllo di coerenza) | C-02.b | M3.b | verde (B9): ctest `T-M3B-FLAT-03` (`MasterB9Slow.T_M3B_FLAT_03_*`, slow, controllo di coerenza) |
+| T-M3B-FLAT-04 | F-CAL-01.b; C-02.b-flat §f.1 (valore atteso dei metodi robusti normalizzati, controllo di coerenza) | C-02.b | M3.b | verde (B9): `MasterB9.T_M3B_FLAT_04_*` e ctest `T-M3B-FLAT-04.{n3,n9,n11,n31}` (slow, controllo di coerenza) |
+| T-M3B-FLAT-05 | F-CAL-01.b; C-02.b-flat §f.6, ADR-17.b §b.1 (piano robusto eteroschedastico, caratterizzazione) | C-02.b | M3.b | verde (B9), caratterizzazione senza soglia: `MasterB9.T_M3B_FLAT_05_*` e ctest `T-M3B-FLAT-05.{n3,n9,n31}` (slow) |
+| T-M3B-FLAT-06 | F-CAL-01.b, NC-21; C-02.b-flat §f.2, §f.10 (domini e stop) | C-02.b | M3.b | verde (B3, B8, B9, B16): `MasterB3.T_M3B_FLAT_06_*` (parametri), `MasterB8.T_M3B_FLAT_06_*` (stop della tabella di §f.2, preflight), `MasterB9.T_M3B_FLAT_06_*` (confini ammessi), `MasterB16.T_M3B_FLAT_06_*` (stop di ricetta, spill e RAW con FITS sul percorso del job, contatore del `fault_injector`) |
+| T-M3B-FLAT-07 | F-CAL-01.b; C-02.b-flat §f.7 (descrittore, capability, report) | C-02.b | M3.b | verde (B11, B14): `MasterB11.T_M3B_FLAT_07_*` (descrittore, `measure`, report), `MasterB14.T_M3B_FLAT_07_*` (parte analisi) |
+| T-M3B-FLAT-08 | F-CAL-01.b; C-02.b-flat §f.8 (determinismo) | C-02.b | M3.b | verde (B10, B11, B14, B16): `MasterB10.T_M3B_FLAT_08_*` (valori), `MasterB11.T_M3B_FLAT_08_*` (report), `MasterB14.T_M3B_FLAT_08_*` (candidati permutati), `MasterB16.T_M3B_FLAT_08_*` (riapertura del progetto e nodo nello store) |
 | T-M3B-FLAT-09 | F-CAL-01.b, NFR-TEST-02; C-02.b-flat §f.9 (PUB-LFC-01) | C-02.b | M3.b | ESEGUITO: ctest `T-M3B-FLAT-09.band_{g,i}` (slow, seriali), `test_master_b17`; livelli, `r_f`, `m_H`, `rho`, master, piano e diagnostiche di `A` (massimo per pixel dei dark-flat, 6956/3 ADU in g e 8390/3 in i, dal record del dato) entro la regola I. Limiti: N = 3, un solo filtro per flat, nessun CFA |
 
 ## M3.entry: ID di lavoro di ADR-09.b e D-09.b

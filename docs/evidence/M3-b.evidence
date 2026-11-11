@@ -1,0 +1,9 @@
+# Sorgente del blocco generato di M3-b.md (tools/evidence.py): gate M3.b
+file docs/test-matrix.md
+file tests/trace/M3b.tsv
+file tools/trace.py
+file plans/M3b.md
+junit dev-full tmp/dev-full-junit.xml
+junit release tmp/release-junit.xml
+trace M3.b tests/trace/M3b.tsv build/dev tmp/dev-full-junit.xml
+trace M3.b tests/trace/M3b.tsv build/release tmp/release-junit.xml
