@@ -50,7 +50,7 @@ check_start_dir() {
       return 2
     fi
   else
-    err="$(LC_ALL=C git -C "$1" rev-parse --show-toplevel 2>&1 >/dev/null)" || true
+    err="$(LC_ALL=C git -C "$1" rev-parse --show-toplevel 2>&1 >/dev/null)" && err=""
     case "$err" in
       *"not a git repository"*) ;;
       *) echo "git rev-parse fallito in $1: $err" >&2; return 2 ;;
@@ -64,7 +64,7 @@ resolve_worktree() {
   case "$p" in /*) ;; *) echo "--worktree richiede un percorso assoluto: '$p'" >&2; return 2 ;; esac
   [ -d "$p" ] || { echo "--worktree: cartella assente: $p" >&2; return 2; }
   if ! top="$(LC_ALL=C git -C "$p" rev-parse --show-toplevel 2>/dev/null)"; then
-    err="$(LC_ALL=C git -C "$p" rev-parse --show-toplevel 2>&1 >/dev/null)" || true
+    err="$(LC_ALL=C git -C "$p" rev-parse --show-toplevel 2>&1 >/dev/null)" && err=""
     case "$err" in
       *"not a git repository"*) echo "--worktree: non è un repository git: $p" >&2 ;;
       *) echo "--worktree: git rev-parse fallito in $p: $err" >&2 ;;
