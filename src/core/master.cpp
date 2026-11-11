@@ -517,6 +517,9 @@ struct master_plan {
   double sat = 0, offset = 0, eps = 0;
   std::array<double, 4> level_mean{};  // m̄_c, solo flat con `none`
   std::array<double, 4> level_harmonic{};  // m_H,c, solo flat con `median_ratio`
+  // Flat con `median_ratio` (C-02.b-flat §f.1): i metodi si applicano agli y_f; r_(f,c) all'indice c · n + f.
+  bool normalized = false;
+  std::vector<double> scales;
   std::uint8_t cfa_x = 0, cfa_y = 0;
   bool per_channel = false;
   std::array<const char*, 4> labels = {"all", "", "", ""};
@@ -1009,9 +1012,16 @@ void finish_preflight(master_plan& p) {
   p.h = ref.geometry.height;
   p.offset = ref.metadata.offset_adu->value;
   const bool ratio = p.flat && *p.recipe.flat_norm == flat_normalization::median_ratio;
-  if (ratio) flat_scale_constants(p);
+  if (ratio) {
+    flat_scale_constants(p);
+    p.normalized = true;
+    p.scales.resize(p.channel_count() * p.n);
+    for (std::size_t c = 0; c < p.channel_count(); ++c) {
+      for (std::size_t k = 0; k < p.n; ++k) p.scales[c * p.n + k] = p.frames[k].scale[c];
+    }
+  }
   // m̄_c serve alla tolleranza dei livelli, che con `median_ratio` non esiste (C-02.b-flat §f.2), e ai campi dei
-  // livelli nel report; con `median_ratio` quei campi si decidono in B9/B11.
+  // livelli nel report, che con `median_ratio` valgono null.
   if (p.flat && !ratio) {
     // m̄_c in ordine canonico; poi la tolleranza per frame canonico e, nel frame, per canale: la prima violazione.
     const std::size_t channels = p.channel_count();
@@ -1037,12 +1047,6 @@ void finish_preflight(master_plan& p) {
       }
     }
   }
-  // `median_ratio` ammesso ma non ancora calcolato: combinare gli x_f senza normalizzarli darebbe un master sbagliato.
-  // Stop dopo il preflight, prima dei blocchi e di ogni artefatto (M3b-lacune, «Decisioni successive (B8)»).
-  if (ratio) {
-    stop(error_category::unsupported, "master.method_not_computable", "flat_normalization median_ratio non ancora calcolata",
-         {{"flat_normalization", "median_ratio"}});
-  }
   if (!p.has_sat) p.warnings.push_back("saturation_not_evaluated");
   if (*p.recipe.temp_policy == temperature_policy::not_applicable_declared && p.n > 1) {
     p.warnings.push_back("temperature_not_compared");
@@ -1060,8 +1064,9 @@ void finish_preflight(master_plan& p) {
   std::vector<const image*> frame_headers;
   for (const frame_state& f : p.frames) frame_headers.push_back(&f.header);
   // C-02.b §b.7: con `sigma_clip` il piano a selezione congelata è la riga a pesi congelati di ADR-17.b §b.1.
+  // C-02.b-flat §f.7: con `median_ratio` le scale sono pesi stimati dai dati, per ogni metodo.
   std::vector<measure_limit> own;
-  if (p.method == method_kind::sigma_clip) own.push_back(measure_limit::variance_fixed_weight_approximation);
+  if (p.method == method_kind::sigma_clip || ratio) own.push_back(measure_limit::variance_fixed_weight_approximation);
   p.out.measure = merge_measure(frame_headers, own);
   p.out.variance = variance_plane{aligned_buffer(p.out.samples.size())};
   const std::size_t px = static_cast<std::size_t>(p.w) * p.h;
@@ -1074,7 +1079,8 @@ void finish_preflight(master_plan& p) {
 
 // ---------------------------------------------------------------- combinazione per pixel (C-02.a §6, §6.3, §7)
 
-// Elemento dell'ordinamento per pixel (C-02.b §b.8): valore e indice canonico del frame.
+// Campione di un pixel nel buffer del task: valore (x_f, o y_f con `median_ratio`) e indice canonico del frame. Il
+// buffer è nell'ordine canonico; solo `median` e `winsorized` lo ordinano (C-02.b §b.8), dopo il piano.
 struct sort_slot {
   double value;
   std::uint32_t frame;
@@ -1086,15 +1092,15 @@ struct pixel_value {
   bool ok = true;
 };
 
-// s² di C-02.a §6 sugli n campioni nell'ordine canonico: Σ x, / n, (x − x̄)², somma, / (n − 1).
-double sample_variance(const double* const* vals, std::size_t j, std::size_t n, bool& ok) {
-  double s = vals[0][j];
-  for (std::size_t f = 1; f < n; ++f) s += vals[f][j];
-  const double mean = s / static_cast<double>(n);
+// s² di C-02.a §6 sugli n campioni nell'ordine canonico: Σ x, / n, (x − x̄)², somma, / (n − 1); `mean` è x̄.
+double sample_variance(const sort_slot* y, std::size_t n, bool& ok, double& mean) {
+  double s = y[0].value;
+  for (std::size_t f = 1; f < n; ++f) s += y[f].value;
+  mean = s / static_cast<double>(n);
   ok = ok && std::isfinite(s) && div_ok(s, mean);
   double ss = 0;
   for (std::size_t f = 0; ok && f < n; ++f) {
-    const double d = vals[f][j] - mean;
+    const double d = y[f].value - mean;
     const double sq = d * d;
     ok = std::isfinite(d) && mul_ok(d, d, sq);
     if (!ok) break;
@@ -1109,6 +1115,16 @@ double sample_variance(const double* const* vals, std::size_t j, std::size_t n, 
   const double s2 = ss / static_cast<double>(n - 1);
   ok = ok && div_ok(ss, s2);
   return s2;
+}
+
+// `mean` sugli y_f di `median_ratio` (C-02.a §6, C-02.b-flat §f.6): la sequenza del kernel di `mean`, M = x̄ e
+// V = s² / n. Con `none` `mean` usa il kernel del percorso (combine_rows).
+pixel_value mean_value(const sort_slot* y, std::size_t n) {
+  pixel_value out;
+  const double s2 = sample_variance(y, n, out.ok, out.m);
+  out.v = s2 / static_cast<double>(n);
+  out.ok = out.ok && div_ok(s2, out.v);
+  return out;
 }
 
 // `single`: x_1 − offset_adu, max(·, 0), / conversion_gain_e_per_adu, read_noise_adu², somma (C-02.b §b.6). I
@@ -1128,18 +1144,18 @@ pixel_value single_value(const master_recipe& r, double x) {
 
 // `weighted_mean`: M = (Σ w_f · x_f) / W, V = Σ c_f · ((x_f − M) · (x_f − M)), somme nell'ordine canonico. I c_f sono
 // > 0 (weight_constants), quindi V è una somma di termini non negativi e add_ok vale.
-pixel_value weighted_value(const master_plan& p, const double* const* vals, std::size_t j) {
+pixel_value weighted_value(const master_plan& p, const sort_slot* y) {
   pixel_value out;
   double acc = 0;
   for (std::size_t f = 0; f < p.n; ++f) {
-    const double wx = p.weights[f] * vals[f][j];
-    out.ok = out.ok && mul_ok(p.weights[f], vals[f][j], wx);
+    const double wx = p.weights[f] * y[f].value;
+    out.ok = out.ok && mul_ok(p.weights[f], y[f].value, wx);
     acc = f == 0 ? wx : acc + wx;
   }
   out.m = acc / p.weight_sum;
   out.ok = out.ok && std::isfinite(acc) && div_ok(acc, out.m);
   for (std::size_t f = 0; out.ok && f < p.n; ++f) {
-    const double d = vals[f][j] - out.m;
+    const double d = y[f].value - out.m;
     const double q = d * d;
     const double t = p.residual_coeffs[f] * q;
     out.ok = std::isfinite(d) && mul_ok(d, d, q) && mul_ok(p.residual_coeffs[f], q, t);
@@ -1155,10 +1171,13 @@ pixel_value weighted_value(const master_plan& p, const double* const* vals, std:
 }
 
 // `median` e `winsorized`: z ordinati su (valore, indice canonico); a parità di valore, compreso −0 == +0, prima il
-// frame canonico minore. Mediana pari: (z_k + z_(k+1)) / 2. Winsorized: Σ v_i per i crescente, poi / n. Piano κ · s².
-pixel_value robust_value(const master_plan& p, const double* const* vals, std::size_t j, sort_slot* z, std::size_t g) {
+// frame canonico minore. Mediana pari: (z_k + z_(k+1)) / 2. Winsorized: Σ v_i per i crescente, poi / n. Piano κ · s²,
+// con s² nell'ordine canonico, prima dell'ordinamento di `z`.
+pixel_value robust_value(const master_plan& p, sort_slot* z, std::size_t g) {
   const std::size_t n = p.n;
-  for (std::size_t f = 0; f < n; ++f) z[f] = {vals[f][j], static_cast<std::uint32_t>(f)};
+  bool s2_ok = true;
+  double unused_mean = 0;
+  const double s2 = sample_variance(z, n, s2_ok, unused_mean);
   std::sort(z, z + n, [](const sort_slot& a, const sort_slot& b) {
     if (a.value < b.value) return true;
     if (b.value < a.value) return false;
@@ -1179,10 +1198,9 @@ pixel_value robust_value(const master_plan& p, const double* const* vals, std::s
     out.m = s / static_cast<double>(n);
     out.ok = std::isfinite(s) && div_ok(s, out.m);
   }
-  const double s2 = sample_variance(vals, j, n, out.ok);
   const double kappa = p.kappa->value;
   out.v = kappa * s2;
-  out.ok = out.ok && mul_ok(kappa, s2, out.v);
+  out.ok = out.ok && s2_ok && mul_ok(kappa, s2, out.v);
   return out;
 }
 
@@ -1197,7 +1215,7 @@ struct clip_outcome {
   bool incomplete = false;
 };
 
-clip_outcome clip_value(const master_plan& p, const double* const* vals, std::size_t j, std::uint8_t* kept) {
+clip_outcome clip_value(const master_plan& p, const sort_slot* y, std::uint8_t* kept) {
   const std::size_t n = p.n;
   const double kl = *p.recipe.clip_kappa_low, kh = *p.recipe.clip_kappa_high;
   // clip_max_iter non ha un massimo (C-02.b §b.1): ogni iterazione che non chiude toglie almeno un campione, quindi
@@ -1214,7 +1232,7 @@ clip_outcome clip_value(const master_plan& p, const double* const* vals, std::si
     bool first = true;
     for (std::size_t f = 0; f < n; ++f) {
       if (kept[f] == 0) continue;
-      sum = first ? vals[f][j] : sum + vals[f][j];
+      sum = first ? y[f].value : sum + y[f].value;
       first = false;
     }
     pv.m = sum / static_cast<double>(m);
@@ -1223,7 +1241,7 @@ clip_outcome clip_value(const master_plan& p, const double* const* vals, std::si
     first = true;
     for (std::size_t f = 0; pv.ok && f < n; ++f) {
       if (kept[f] == 0) continue;
-      const double d = vals[f][j] - pv.m;
+      const double d = y[f].value - pv.m;
       const double q = d * d;
       pv.ok = std::isfinite(d) && mul_ok(d, d, q);
       if (!pv.ok) break;
@@ -1249,7 +1267,7 @@ clip_outcome clip_value(const master_plan& p, const double* const* vals, std::si
     std::size_t rejected = 0;
     for (std::size_t f = 0; f < n; ++f) {
       if (kept[f] == 0) continue;
-      const double x = vals[f][j];
+      const double x = y[f].value;
       if (x - pv.m > th || pv.m - x > tl) {
         kept[f] = 2;
         ++rejected;
@@ -1283,8 +1301,9 @@ struct task_scratch {
 };
 
 // Conversione al sample_type del master (C-02.a §6.3). Con uscita f64 è un'identità: un valore subnormale non vi
-// diventa subnormale, e arriva qui solo come campione d'ingresso scelto senza operazione (`single`, mediana dispari),
-// perché ogni prodotto, quoziente e somma di termini non negativi è già controllato; resta valido. Con uscita f32 vale
+// diventa subnormale, e arriva qui solo come campione scelto senza operazione (`single`, mediana dispari; con
+// `median_ratio` un y_f, somma con segno valida per C-02.b-flat §f.6), perché ogni prodotto, quoziente e somma di
+// termini non negativi è già controllato; resta valido. Con uscita f32 vale
 // convert_finite: un valore non nullo che diventa zero o subnormale non è rappresentabile.
 template <class T>
 bool to_output(double v, T& out) {
@@ -1296,10 +1315,13 @@ bool to_output(double v, T& out) {
   }
 }
 
-// Banda dei metodi di C-02.b diversi da `mean`: maschere come C-02.a §7, accumulo f64 e un solo arrotondamento al
-// sample_type (to_output). Lo stesso codice per i due percorsi di ADR-07: ordinamento e selezione per pixel
-// sono operazioni IEEE identiche, quindi bit-identiche fra i percorsi. Il flat ammette qui solo `single` (§b.2): il
-// suo level_bias_estimate non è definito con n = 1 (§b.7, `single_frame`) e resta NaN.
+// Banda dei metodi di C-02.b diversi da `mean`, e di ogni metodo del flat con `median_ratio`: maschere come C-02.a §7
+// sugli x_f, accumulo f64 e un solo arrotondamento al sample_type (to_output). Lo stesso codice per i due percorsi di
+// ADR-07: ordinamento e selezione per pixel sono operazioni IEEE identiche, quindi bit-identiche fra i percorsi.
+// Con `median_ratio` (C-02.b-flat §f.6) il buffer del task riceve y_f = offset_adu + r_(f,c) · (x_f − offset_adu),
+// nessun frame normalizzato si memorizza; r_f · d_f con d_f non nullo che dà zero, un subnormale o un non finito, e
+// ogni y_f non finito, rendono il pixel result_nonfinite. Il level_bias_estimate del flat non si calcola qui (`single`:
+// non definito con n = 1; `median_ratio`: motivo `normalized`) e resta NaN.
 template <class T>
 void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
                  const std::uint16_t* const* bits, const task_scratch& scratch) {
@@ -1321,20 +1343,37 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
       }
       if (saturated) m = static_cast<std::uint16_t>(m | invalid_reason::saturated);
       if (m == 0) {
-        pixel_value pv;
-        std::uint16_t failure = invalid_reason::result_nonfinite;
-        switch (p.method) {
-          case method_kind::single: pv = single_value(p.recipe, vals[0][j]); break;
-          case method_kind::weighted_mean: pv = weighted_value(p, vals, j); break;
-          case method_kind::median:
-          case method_kind::winsorized: pv = robust_value(p, vals, j, scratch.sort, g); break;
-          case method_kind::sigma_clip: {
-            const clip_outcome co = clip_value(p, vals, j, scratch.kept);
-            pv = co.pv;
-            if (co.incomplete) failure = invalid_reason::support_incomplete;
-            break;
+        sort_slot* z = scratch.sort;
+        bool samples_ok = true;
+        if (p.normalized) {
+          const double* scale = p.scales.data() + p.channel_of(c, y0 + r) * p.n;
+          for (std::size_t f = 0; f < p.n; ++f) {
+            const double d = vals[f][j] - p.offset;
+            const double t = scale[f] * d;
+            const double y = p.offset + t;
+            samples_ok = samples_ok && std::isfinite(d) && mul_ok(scale[f], d, t) && std::isfinite(y);
+            z[f] = {y, static_cast<std::uint32_t>(f)};
           }
-          case method_kind::mean: ASTRO_ASSERT(false); break;
+        } else {
+          for (std::size_t f = 0; f < p.n; ++f) z[f] = {vals[f][j], static_cast<std::uint32_t>(f)};
+        }
+        pixel_value pv;
+        pv.ok = false;
+        std::uint16_t failure = invalid_reason::result_nonfinite;
+        if (samples_ok) {
+          switch (p.method) {
+            case method_kind::single: pv = single_value(p.recipe, z[0].value); break;
+            case method_kind::mean: pv = mean_value(z, p.n); break;
+            case method_kind::weighted_mean: pv = weighted_value(p, z); break;
+            case method_kind::median:
+            case method_kind::winsorized: pv = robust_value(p, z, g); break;
+            case method_kind::sigma_clip: {
+              const clip_outcome co = clip_value(p, z, scratch.kept);
+              pv = co.pv;
+              if (co.incomplete) failure = invalid_reason::support_incomplete;
+              break;
+            }
+          }
         }
         // rejected_samples (M3b-lacune, «Correzioni della review di B6 (giro 1)»): gli R di un pixel si contano,
         // compreso l'ultimo che lo porta a support_incomplete, solo dopo l'esito finale: valore valido, conversione al
@@ -1371,11 +1410,11 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
 }
 
 // `vals[f]` e `bits[f]`: righe [y0, y0 + rows) del frame canonico f; `scratch`: buffer del task, n elementi ciascuno.
-// `mean` usa il kernel del percorso risolto nel preflight (ADR-07); ogni banda è l'avvio di un task per il controllo
-// dell'ambiente FP. Righe disgiunte: thread-safe.
+// `mean` senza normalizzazione usa il kernel del percorso risolto nel preflight (ADR-07); ogni banda è l'avvio di un
+// task per il controllo dell'ambiente FP. Righe disgiunte: thread-safe.
 void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const double* const* vals,
                   const std::uint16_t* const* bits, const task_scratch& scratch) {
-  if (p.method != method_kind::mean) {
+  if (p.method != method_kind::mean || p.normalized) {
     begin_kernel_task();
     if (p.out.type == sample_type::f32) method_band<float>(p, y0, rows, vals, bits, scratch);
     else method_band<double>(p, y0, rows, vals, bits, scratch);
@@ -1439,13 +1478,13 @@ json frame_report(const master_plan& p, const frame_state& f) {
       json e = json::object();
       e.set("label", json::string(p.labels[c]));
       e.set("level", json::number(f.level[c]));
-      e.set("rel_dev", json::number(f.level[c] / p.level_mean[c] - 1));
+      e.set("rel_dev", p.normalized ? json::null() : json::number(f.level[c] / p.level_mean[c] - 1));
       levels.push(std::move(e));
     }
     o.set("flat_levels", std::move(levels));
   } else if (p.flat) {
     o.set("flat_level", json::number(f.level[0]));
-    o.set("flat_level_rel_dev", json::number(f.level[0] / p.level_mean[0] - 1));
+    o.set("flat_level_rel_dev", p.normalized ? json::null() : json::number(f.level[0] / p.level_mean[0] - 1));
   }
   const image& im = f.header;
   json fields = json::object();
@@ -1530,24 +1569,27 @@ json channel_report(const master_plan& p) {
                                                       : p.out.variance_data<double>()[i];
       planes[c].push_back(v);
       if (!p.flat) continue;
+      nonpositive[c] += p.nonpositive[i];
+      if (p.normalized) continue;
       lbe[c].push_back(p.lbe[i]);
       if (std::isnan(p.ratio[i])) ++ratio_null[c];
       else ratio[c].push_back(p.ratio[i]);
-      nonpositive[c] += p.nonpositive[i];
     }
   }
   json list = json::array();
   for (std::size_t c = 0; c < channels; ++c) {
     json o = json::object();
     o.set("label", json::string(p.labels[c]));
-    if (p.flat && p.per_channel) o.set("flat_level_mean", json::number(p.level_mean[c]));
+    // Con `median_ratio` m̄_c non si calcola (C-02.b-flat §f.2): i campi della media dei livelli valgono null.
+    if (p.flat && p.per_channel) o.set("flat_level_mean", p.normalized ? json::null() : json::number(p.level_mean[c]));
     o.set("valid_pixels", json::uinteger(valid[c]));
     o.set("variance_plane_median", median_or_null(planes[c]));
-    if (p.flat && p.method == method_kind::single) {
-      // C-02.b §b.7: con un solo frame la stima non è definita (nessuna divisione per n − 1).
+    if (p.flat && (p.method == method_kind::single || p.normalized)) {
+      // C-02.b §b.7: con un solo frame la stima non è definita (nessuna divisione per n − 1). C-02.b-flat §f.13 punto 3:
+      // con `median_ratio` è null con motivo `normalized`.
       json lb = json::object();
       for (const char* k : {"median", "max", "ratio_median", "ratio_max", "level_bias_ratio_null"}) lb.set(k, json::null());
-      lb.set("null_reason", json::string("single_frame"));
+      lb.set("null_reason", json::string(p.normalized ? "normalized" : "single_frame"));
       o.set("level_bias_estimate", std::move(lb));
       o.set("pixels_nonpositive_signal", json::uinteger(nonpositive[c]));
     } else if (p.flat) {
@@ -1577,7 +1619,9 @@ json build_report(master_plan& p) {
   report.set("rejection", json::string("none"));
   report.set("reference_frame", json::string(p.frames[0].spec->digest.sha256));
   report.set("compatibility", p.compat);
-  if (p.flat && !p.per_channel) report.set("flat_level_mean", json::number(p.level_mean[0]));
+  if (p.flat && !p.per_channel) {
+    report.set("flat_level_mean", p.normalized ? json::null() : json::number(p.level_mean[0]));
+  }
   report.set("master_metadata", p.master_metadata);
   report.set("metadata_not_common", p.not_common);
   // Piano e coefficiente di variazione per metodo (C-02.b §b.6, §b.7): sqrt(2/(n − 1)) per `mean`, `median` e

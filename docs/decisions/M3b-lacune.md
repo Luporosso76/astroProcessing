@@ -561,3 +561,25 @@ FAIL con due MED, tutti di prova (`.omc/artifacts/ask/review-M3b-B8-round1-claud
 - **`master.method_not_computable` è temporaneo**: non sta nei cataloghi di §f.10 e §b.10; B9 lo toglie insieme al test `T_M3B_FLAT_06_admitted_median_ratio_stops_with_method_not_computable_until_b9`.
 - Test: controllo 3 non applicato a `mean` e `weighted_mean` (rapporto oltre 4 ammesso); un test per costante del controllo 2; `A = -0.0` ammesso; commenti corretti.
 - **Review giro 2: PASS** (`.omc/artifacts/ask/review-M3b-B8-round2-claude-20261110-2355.md`). I tre LOW (commenti su `m̄_c` e sul contesto di `master.flat_low_signal`, decisione sopra) corretti dal coordinatore.
+
+## Decisioni successive (B9)
+
+- **Campi dei livelli nel report con `median_ratio`**: `flat_level_rel_dev` (mono), `flat_levels[].rel_dev` (CFA), `flat_level_mean` (mono) e `channels[c].flat_level_mean` (CFA) valgono JSON `null`, coerente con B8 (`m̄_c` non si calcola con `median_ratio`); `flat_level` e `flat_levels[].level` restano `m_(f,c)`. Nomi provvisori fino a B11.
+- **FLAT-05**: B9 verifica la capability `variance.fixed_weight_approximation` per ogni metodo con `median_ratio`; l'ipotesi `gaussian_reference_heteroscedastic` e il suo avviso nel report sono di B11 (FLAT-07).
+- **Oracle di B9**: per FLAT-02(b) con `sigma_clip` si usa il limite su ogni sottoinsieme tenuto (la selezione dipende solo dall'arrotondamento); nei casi diadici la tolleranza 0 presuppone costanti f64 uguali ai razionali esatti, e il test lo verifica prima di confrontare.
+- **Stop temporaneo tolto**: `master.method_not_computable` sparisce; il test `T_M3B_FLAT_06_admitted_median_ratio_stops_with_method_not_computable_until_b9` è sostituito da `T_M3B_FLAT_06_admitted_median_ratio_is_combined_in_memory_and_in_the_job`.
+- **`level_bias_estimate` con `median_ratio`**: `null` con motivo `normalized` (C-02.b-flat §f.13 punto 3); `pixels_nonpositive_signal` resta. Nomi del report provvisori fino a B11.
+- **Valori normalizzati**: `y_f = offset + r_f (x_f − offset)` nel buffer per pixel già esistente del task (`sort_slot`), quindi il modello di memoria non cambia; `mean` con `median_ratio` passa dal percorso per pixel (`method_band`), `mean` con `none` resta sui kernel scalar/avx2. Pixel `result_nonfinite` se `x − offset` non è finito, se il prodotto è zero, subnormale o non finito con `x ≠ offset`, o se `y` non è finito.
+
+### Correzioni della review di B9 (giro 1)
+
+FAIL con un MED di prova (`.omc/artifacts/ask/review-M3b-B9-round1-claude-20261111-0133.md`). Decisioni:
+
+- **`pixels_nonpositive_signal` con `median_ratio`**: si verifica il valore esatto per canale, non solo il tipo.
+- **Copertura di FLAT-01 non dyadic**: conteggio per regione, sempre stampato; nella regione di misura nessun pixel saltato (o un numero dichiarato nel test con la ragione). La premessa dei casi dyadic (costanti f64 uguali ai razionali esatti) si asserisce per canale.
+- **`sigma_clip` con `y_f` uguali in aritmetica esatta**: l'oracle ammette anche `support_incomplete` come esito previsto, perché una selezione decisa solo dall'arrotondamento può scendere sotto `clip_min_kept`.
+- **Uscita f32 con `median_ratio`**: almeno un caso dyadic e uno non dyadico, tolleranza della regola I più mezzo ulp f32. Ramo «prodotto zero con `x ≠ offset`» testato se un campione subnormale è ammesso in ingresso, altrimenti il test dice perché non si costruisce.
+- **Registrazione delle stime di FLAT-03/04/05** (stime, errore Monte Carlo, limiti del protocollo §1): nei record di evidenza del gate di M3.b, dai run slow del gate; i test le stampano sullo stdout di ctest.
+- **Versione dell'algoritmo**: B11 completa il report di `median_ratio` (avviso `flat_norm_scales_estimated`, ipotesi, provenance delle costanti, C-02.b-flat §f.7 e §f.10) e porta `master_algorithm_version` a 4, così gli artefatti `median_ratio` prodotti fra B9 e B11 diventano `stale`.
+- Commenti: vincoli al posto delle questioni aperte e della storia delle unità; documentazione di `level_bias_estimate` con il caso `median_ratio` (corretta dal coordinatore).
+- **Review giro 2: PASS** (`.omc/artifacts/ask/review-M3b-B9-round2-claude-20261111-0159.md`). Corretto dal coordinatore un commento storico. Restano LOW di prova per B10, che riesegue questi test: esiti `support_incomplete` ammessi da contare a parte e stampare; `EXPECT_GT(checked_in[1], 0)` nei due test non dyadic; controllo tautologico della somma dei contatori da sostituire; con `sigma_clip` indeciso il limite inferiore di `pixels_nonpositive_signal` può valere 0.

@@ -233,6 +233,33 @@ target_compile_definitions(test_master_b8 PRIVATE
   ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
   ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_master_b8 PROPERTIES LABELS fast)
+# B9 di M3.b: `median_ratio`, parte 2. T-M3B-FLAT-06 (confini ammessi con la combinazione eseguita, prodotto subnormale),
+# T-M3B-FLAT-01, 02, maschere sugli x_f e capability: `fast`. T-M3B-FLAT-03, 04 e 05 (protocollo
+# docs/evidence/M3b-protocollo.md §3.4-3.6): suite *Slow, un test ctest per test o per n; esecuzione seriale:
+# `ctest -L slow`.
+add_executable(test_master_b9 test_master_b9.cpp)
+target_link_libraries(test_master_b9 PRIVATE astrocore GTest::gtest_main SQLite::SQLite3)
+target_include_directories(test_master_b9 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b9 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b9 TEST_FILTER "-*Slow.*" PROPERTIES LABELS fast)
+foreach(b9_slow
+    "T-M3B-FLAT-03:MasterB9Slow.T_M3B_FLAT_03_*"
+    "T-M3B-FLAT-04.n3:MasterB9Slow.T_M3B_FLAT_04_n3_*"
+    "T-M3B-FLAT-04.n9:MasterB9Slow.T_M3B_FLAT_04_n9_*"
+    "T-M3B-FLAT-04.n11:MasterB9Slow.T_M3B_FLAT_04_n11_*"
+    "T-M3B-FLAT-04.n31:MasterB9Slow.T_M3B_FLAT_04_n31_*"
+    "T-M3B-FLAT-05.n3:MasterB9Slow.T_M3B_FLAT_05_n3_*"
+    "T-M3B-FLAT-05.n9:MasterB9Slow.T_M3B_FLAT_05_n9_*"
+    "T-M3B-FLAT-05.n31:MasterB9Slow.T_M3B_FLAT_05_n31_*")
+  string(REPLACE ":" ";" b9_pair "${b9_slow}")
+  list(GET b9_pair 0 b9_name)
+  list(GET b9_pair 1 b9_filter)
+  add_test(NAME ${b9_name} COMMAND test_master_b9 --gtest_filter=${b9_filter})
+  set_tests_properties(${b9_name} PROPERTIES LABELS slow RUN_SERIAL TRUE TIMEOUT 1800
+    FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+endforeach()
 
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
@@ -442,6 +469,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b7.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b12.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b8.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b9.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir
@@ -498,6 +526,10 @@ set_tests_properties(T-M2R5-01.avx2.test_master_b7 PROPERTIES LABELS fast TIMEOU
 # `median_ratio`, parte 1 (B8) sul secondo percorso.
 add_test(NAME T-M2R5-01.avx2.test_master_b8 COMMAND test_master_b8)
 set_tests_properties(T-M2R5-01.avx2.test_master_b8 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
+  FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
+# `median_ratio`, parte 2 (B9) sul secondo percorso: solo le suite fast.
+add_test(NAME T-M2R5-01.avx2.test_master_b9 COMMAND test_master_b9 --gtest_filter=-*Slow.*)
+set_tests_properties(T-M2R5-01.avx2.test_master_b9 PROPERTIES LABELS fast TIMEOUT 1800 ENVIRONMENT ASTRO_TEST_SIMD=avx2
   FAIL_REGULAR_EXPRESSION "\\] 0 tests from 0 test suites ran")
 
 # T-M2R5-05 e T-M2R5-07 (parte binaria): istruzioni vietate nei kernel, crtfastmath e fast-math nella build.

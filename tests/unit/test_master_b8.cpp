@@ -5,8 +5,8 @@
 // dominio; `sigma_clip` con soglie diverse; `max m` al successore f64 di `4 min m`; budget al predecessore f64 e
 // confronto esatto; `flat_min_signal_adu` e livello subnormali; nessun calcolo e nessun lavoro sullo store negli stop
 // del job), T-M3B-FLAT-01 parte costanti (m_H e ρ dyadic).
-// Fuori da questo file: i casi ammessi al confine (rapporto uguale a 4, A · ρ = budget · m_H con la combinazione
-// eseguita) e i valori della combinazione sono di B9.
+// I casi ammessi producono il master: qui si verifica solo che la combinazione sia eseguita (nessuno stop,
+// pixel validi, artefatto nel job); i valori ai confini e della combinazione sono in test_master_b9.cpp.
 //
 // Oracle scritti qui, nessun valore atteso dal prodotto. Ogni frame ha un solo livello per canale (tutti i pixel del
 // canale a offset + livello), quindi m_(f,c) è il livello scritto; costanti in f64 secondo §f.1:
@@ -22,8 +22,7 @@
 // - `master.flat_scale_nonfinite`: `costante` ∈ {1/m_f, r_f, somma, m_H}; per 1/m_f e r_f anche `frame`, `m_f`; per
 //   somma e m_H anche `valore`; `canale` per un flat CFA;
 // - `master.flat_low_signal`: il contesto di `.a` (frame, m_f, minimo; solo frame se nessun pixel è valido) più `canale` per un flat CFA;
-// - `master.param.<nome>`: il contesto esistente (parametro, motivo);
-// - `master.method_not_computable` (temporaneo, B9 lo toglie): {flat_normalization: median_ratio}.
+// - `master.param.<nome>`: il contesto esistente (parametro, motivo).
 #include <gtest/gtest.h>
 
 #include <array>
@@ -242,7 +241,7 @@ void expect_budget_stop(const stop_error& e, double a, double rho, double m_h, d
 // ================================================================ T-M3B-FLAT-06: tabella di §f.2, colonna median_ratio
 
 // §f.2, §f.13 punti 1 e 5: con `median_ratio` sono ammessi `mean`, `weighted_mean`, `median`, `winsorized` e
-// `mean` + `sigma_clip` con soglie uguali; la validazione e il nodo non si fermano (i valori sono di B9).
+// `mean` + `sigma_clip` con soglie uguali; la validazione e il nodo non si fermano (i valori in test_master_b9.cpp).
 TEST(MasterB8, T_M3B_FLAT_06_median_ratio_admits_every_method_of_the_f2_table_in_validation_and_node) {
   const group g = level_flat({1024, 1024, 1024, 1024});
   for (const kind k : kAllMethods) {
@@ -444,7 +443,7 @@ TEST(MasterB8, T_M3B_FLAT_06_level_ratio_beyond_four_in_one_cfa_channel_stops_wi
 // Controllo 4: A · ρ ≤ budget · m_H confrontati in modo esatto. Livelli (1, 3, 3/2, 3/2), n = 4:
 //   Σ 1/m (8/3 in aritmetica esatta) vale 0x1.5555555555555p+1 = 8/3 − 1/(3 · 2⁵¹) in ogni ordine delle dodici
 //   permutazioni (somma f64 da sinistra), e m_H = fl(4 / Σ) = 3/2 esatto; r = (3/2, 1/2, 1, 1); ρ = 1/2.
-// Con A = 3/2: A · ρ = 3/4 = budget · m_H per budget = 1/2 (ammesso, B9). Budget = pred(1/2) = 1/2 − 2⁻⁵⁴:
+// Con A = 3/2: A · ρ = 3/4 = budget · m_H per budget = 1/2 (ammesso). Budget = pred(1/2) = 1/2 − 2⁻⁵⁴:
 // budget · m_H = 3/4 − 3 · 2⁻⁵⁵ < 3/4 → stop, con A, ρ, m_H e budget nel contesto.
 TEST(MasterB8, T_M3B_FLAT_06_budget_at_the_f64_predecessor_stops_every_method_but_mean) {
   const double budget = std::nextafter(0.5, 0.0);
@@ -675,75 +674,76 @@ TEST(MasterB8, T_M3B_FLAT_06_preflight_stops_in_the_job_run_no_task_and_do_no_ex
   }
 }
 
-// ================================================================ B8: nessun master con `median_ratio` prima di B9
+// ================================================================ i casi ammessi producono il master
 
-// Decisione del coordinatore (B8, punto 6): una ricetta `median_ratio` che supera validazione e preflight non produce un
-// master in B8, perché combinare senza normalizzare darebbe un risultato sbagliato. Dopo il preflight, prima dei blocchi
-// e di ogni artefatto: `unsupported`, `master.method_not_computable`, contesto esatto {flat_normalization: median_ratio}.
-// B9 sostituisce questo stop col calcolo degli y_f (C-02.b-flat §f.1) e toglie il test.
-void expect_not_computable(const stop_error& e) {
-  EXPECT_EQ(e.category(), error_category::unsupported) << e.what();
-  EXPECT_EQ(e.code(), "master.method_not_computable") << e.what();
-  EXPECT_EQ(ctx_keys(e), (std::set<std::string>{"flat_normalization"})) << e.what();
-  EXPECT_EQ(ctx(e, "flat_normalization"), std::optional<std::string>("median_ratio"));
+// Combinazione eseguita in memoria: nessuno stop, ogni pixel valido salvo quelli indicati.
+void expect_combined(const master_recipe& r, const group& g, const std::set<std::size_t>& invalid = {}) {
+  std::optional<master_result> res;
+  try {
+    res = combine_master(r, images_of(g));
+  } catch (const stop_error& e) {
+    FAIL() << "stop " << e.code() << " — " << e.what();
+  }
+  for (std::size_t i = 0; i < std::size_t{g.w} * g.h; ++i) {
+    if (invalid.count(i)) continue;
+    EXPECT_EQ(res->output.invalid.bits[i], 0) << "pixel " << i;
+  }
 }
 
-// Livelli uguali (1024 in ogni frame): ogni controllo di §f.2 passa per ogni metodo ammesso; in memoria nessun risultato,
-// nel job nessun artefatto e nessun lavoro sullo store oltre uno stop del preflight di riferimento sugli stessi frame.
-TEST(MasterB8, T_M3B_FLAT_06_admitted_median_ratio_stops_with_method_not_computable_until_b9) {
-  const fs::path dir = fresh_dir("b8-not-computable");
+// C-02.b-flat §f.1, §f.6: una ricetta `median_ratio` che supera validazione e preflight produce il master. Livelli
+// uguali (1024 in ogni frame): 1/1024, la somma, m_H = 1024 e r = 1 sono esatti, y_f = x_f; master offset + 1024 e
+// piano 0 esatti per ogni metodo; nel job l'artefatto è pubblicato.
+TEST(MasterB8, T_M3B_FLAT_06_admitted_median_ratio_is_combined_in_memory_and_in_the_job) {
+  const fs::path dir = fresh_dir("b8-admitted");
   const group g = level_flat({1024, 1024, 1024, 1024});
   master_recipe none = recipe_of(g, 0.25);
   write_frames(g, none, dir, "f");
-  master_recipe low = none;
-  low.flat_min_signal_adu = 1e9;
-  const job_probe base = probe_job(dir / "store-base", low);
-  ASSERT_FALSE(base.setup_error.has_value()) << *base.setup_error;
-  ASSERT_EQ(base.code, std::optional<std::string>("master.flat_low_signal"));
   for (const kind k : kAllMethods) {
     SCOPED_TRACE(name_of(k));
     master_recipe r = ratio_recipe(g, k);
     for (std::size_t f = 0; f < r.frames.size(); ++f) r.frames[f].path = none.frames[f].path;
     {
       SCOPED_TRACE("combine_master");
-      const std::optional<stop_error> e = stop_of(r, g);
-      ASSERT_TRUE(e.has_value()) << "master prodotto senza normalizzazione";
-      expect_not_computable(*e);
+      std::optional<master_result> res;
+      try {
+        res = combine_master(r, images_of(g));
+      } catch (const stop_error& e) {
+        FAIL() << "stop " << e.code() << " — " << e.what();
+      }
+      for (std::size_t i = 0; i < std::size_t{g.w} * g.h; ++i) {
+        EXPECT_EQ(res->output.invalid.bits[i], 0) << i;
+        EXPECT_EQ(sample(res->output, i), 10.0 + 1024.0) << i;
+        EXPECT_EQ(plane(res->output, i), 0.0) << i;
+      }
     }
     {
       SCOPED_TRACE("job");
       const job_probe p = probe_job(dir / (std::string("store-") + std::to_string(static_cast<int>(k))), r);
       ASSERT_FALSE(p.setup_error.has_value()) << "nodo non creabile: " << *p.setup_error;
-      ASSERT_TRUE(p.stop.has_value()) << "job completato senza normalizzazione";
-      expect_not_computable(*p.stop);
-      EXPECT_FALSE(p.primary);
-      EXPECT_EQ(p.faults, base.faults);
+      EXPECT_FALSE(p.stop.has_value()) << (p.stop ? p.stop->code() + " — " + p.stop->what() : "");
+      EXPECT_TRUE(p.frames_read);
+      EXPECT_TRUE(p.primary);
     }
   }
 }
 
-// Confini ammessi di §f.2 visti in B8 attraverso lo stop `master.method_not_computable` (un caso respinto darebbe il
-// codice del controllo). B9 sostituisce questo stop col calcolo e porta qui i valori della combinazione.
-// - Controllo 4 con uguaglianza esatta: livelli (1, 3, 3/2, 3/2) → m_H = 3/2, ρ = 1/2 (test del predecessore); A = 3/2,
-//   budget = 1/2: A · ρ = 3/4 = budget · m_H in aritmetica esatta, ammesso (la regola è `≤`).
-// - Controllo 3 con uguaglianza esatta: livelli (1024, 2048, 4096), max m = 4 min m, ammesso; A = 0.
-TEST(MasterB8, T_M3B_FLAT_06_exact_budget_and_ratio_boundaries_are_admitted_and_reach_method_not_computable) {
+// Confini ammessi di §f.2 con la combinazione eseguita (i valori sono in test_master_b9.cpp):
+// - controllo 4 con uguaglianza esatta: livelli (1, 3, 3/2, 3/2) → m_H = 3/2, ρ = 1/2 (test del predecessore); A = 3/2,
+//   budget = 1/2: A · ρ = 3/4 = budget · m_H in aritmetica esatta, ammesso (la regola è `≤`);
+// - controllo 3 con uguaglianza esatta: livelli (1024, 2048, 4096), max m = 4 min m, ammesso; A = 0.
+TEST(MasterB8, T_M3B_FLAT_06_exact_budget_and_ratio_boundaries_are_admitted_and_combined) {
   {
     const group g = level_flat({1, 3, 1.5, 1.5}, 512);
     for (const kind k : kBudgetMethods) {
       SCOPED_TRACE(std::string("budget uguale, ") + name_of(k));
-      const std::optional<stop_error> e = stop_of(ratio_recipe(g, k, 1.5, 0.5), g);
-      ASSERT_TRUE(e.has_value()) << "master prodotto senza normalizzazione";
-      expect_not_computable(*e);
+      expect_combined(ratio_recipe(g, k, 1.5, 0.5), g);
     }
   }
   {
     const group g = level_flat({1024, 2048, 4096});
     for (const kind k : kRatioMethods) {
       SCOPED_TRACE(std::string("rapporto 4, ") + name_of(k));
-      const std::optional<stop_error> e = stop_of(ratio_recipe(g, k, 0.0), g);
-      ASSERT_TRUE(e.has_value()) << "master prodotto senza normalizzazione";
-      expect_not_computable(*e);
+      expect_combined(ratio_recipe(g, k, 0.0), g);
     }
   }
 }
@@ -787,14 +787,12 @@ TEST(MasterB8, T_M3B_FLAT_01_harmonic_mean_sums_the_reciprocals_in_canonical_ord
 // ================================================================ correzioni della review di B8 (giro 1)
 
 // Controllo 3 solo per mediana, winsorized e `sigma_clip`: con `mean` e `weighted_mean` il rapporto succ(4) è ammesso
-// (A = 0, controllo 4 soddisfatto) e il caso arriva allo stop temporaneo `master.method_not_computable` (B9: calcolo).
+// (A = 0, controllo 4 soddisfatto) e la combinazione è eseguita.
 TEST(MasterB8, T_M3B_FLAT_06_ratio_above_four_is_not_checked_for_mean_and_weighted_mean) {
   const group g = level_flat({1024, 2048, std::nextafter(4096.0, 8192.0)});
   for (const kind k : {kind::mean, kind::weighted}) {
     SCOPED_TRACE(name_of(k));
-    const std::optional<stop_error> e = stop_of(ratio_recipe(g, k, 0.0), g);
-    ASSERT_TRUE(e.has_value()) << "master prodotto senza normalizzazione";
-    expect_not_computable(*e);
+    expect_combined(ratio_recipe(g, k, 0.0), g);
   }
 }
 
@@ -861,15 +859,21 @@ TEST(MasterB8, T_M3B_FLAT_06_each_scale_constant_of_control_2_stops_with_its_own
 
 // m̄_c serve solo alla tolleranza di `none`: con `median_ratio` non si calcola. Cinque frame a 4e307: la somma dei livelli
 // (2e308) non è finita, ma 1/m = 2.5e-308 è normale, Σ, m_H ≈ 4e307 e r ≈ 1 sono finiti e normali → il caso è ammesso
-// e arriva allo stop temporaneo `master.method_not_computable` (B9: calcolo), non a `master.report_nonfinite`.
+// e la combinazione è eseguita, senza `master.report_nonfinite`. La somma dei cinque y_f ≈ 4e307 della media non è
+// finita (C-02.a §6.3): ogni pixel è `result_nonfinite`.
 TEST(MasterB8, T_M3B_FLAT_06_huge_admitted_levels_do_not_stop_on_the_level_mean_with_median_ratio) {
   const double m = 4e307;
   ASSERT_TRUE(std::isinf(m + m + m + m + m));
   ASSERT_GE(1 / m, std::numeric_limits<double>::min());
   const group g = level_flat({m, m, m, m, m}, 0.0);
-  const std::optional<stop_error> e = stop_of(ratio_recipe(g, kind::mean, 0.0), g);
-  ASSERT_TRUE(e.has_value()) << "master prodotto senza normalizzazione";
-  expect_not_computable(*e);
+  std::optional<master_result> res;
+  try {
+    res = combine_master(ratio_recipe(g, kind::mean, 0.0), images_of(g));
+  } catch (const stop_error& e) {
+    FAIL() << "stop " << e.code() << " — " << e.what();
+  }
+  for (std::size_t i = 0; i < std::size_t{g.w} * g.h; ++i)
+    EXPECT_EQ(res->output.invalid.bits[i], invalid_reason::result_nonfinite) << i;
 }
 
 }  // namespace

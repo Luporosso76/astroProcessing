@@ -77,7 +77,8 @@ struct master_result {
   std::string report_text;
   std::vector<std::string> warnings;
   // Solo flat: level_bias_estimate per pixel in f64 (NaN sui pixel invalidi), la stima del §6.2 su M osservato; con
-  // `single` non è definita (C-02.b §b.7) ed è NaN ovunque.
+  // `single` non è definita (C-02.b §b.7) e con `median_ratio` non si calcola (motivo `normalized`, C-02.b-flat §f.13
+  // punto 3): in entrambi i casi è NaN ovunque.
   std::vector<double> level_bias_estimate;
 };
 
