@@ -207,6 +207,8 @@ Test: T-M3B-C02-10 (parte metodi: master, piano e maschera), T-M3B-FLAT-08 (part
 
 ### B11. Report del master — ~400 righe
 
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B11-round1` FAIL con 6 MED, `round2` PASS, LOW residui chiusi in B15; revisore Opus; test e codice da agenti Opus distinti; mutazioni 8/8 + 4/4). Albero `13325e1`: suite fast 1650 verde in 5 shard, slow 38/38 (esclusi i fuzz del decoder), build release pulita.
+
 ID: C-02.b §b.7 («Report del master»: rumore, artefatti, stato, ipotesi, statistiche di `.a` per metodo), §b.10 (avvisi); C-02.b-flat §f.7.
 
 Fa: `variance_plane_median`; `residual_mean_adu` e `residual_rms_adu` per frame e canale (somma per riga in ordine di colonna, poi righe in ordine crescente); conteggi per frame e per bit; costanti `κ`, `a_f`, `c_f`, `m_(f,c)`, `r_(f,c)`, `ρ_c`, `norm_level_bias_bound`; `variance_cv_gaussian_homoscedastic` o `null` con motivo; `level_bias_estimate` `null` con motivo `normalized`; campo `frame_normalization` nel report (il campo del descrittore è in B3); ipotesi non verificate e avvisi. `norm_level_bias_bound` è una costante per canale, con mediana e massimo del suo rapporto col piano sui pixel validi; la riduzione a due livelli vale solo per `residual_mean_adu` e `residual_rms_adu`; con `median_ratio` `flat_level_rel_tol` assente e l'esito dei controlli come in B8.
