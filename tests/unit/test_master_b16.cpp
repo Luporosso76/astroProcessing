@@ -604,7 +604,8 @@ TEST(MasterB16, T_M3B_JOB_01_raw_variant_with_different_saturation_thresholds_be
     EXPECT_EQ(ex.category(), error_category::invalid_input) << ex.what();
     EXPECT_EQ(ex.code(), "job_types.saturation_adu") << ex.what();
     EXPECT_EQ(context_of(ex, "ruolo"), std::optional<std::string>("frame1")) << ex.what();
-    EXPECT_EQ(context_of(ex, "valore"), std::optional<std::string>(std::to_string(kWhite - 1))) << ex.what();
+    EXPECT_EQ(context_of(ex, "valore"), std::optional<std::string>("3999")) << ex.what();
+    EXPECT_EQ(context_of(ex, "riferimento"), std::optional<std::string>("4000")) << ex.what();
   }
 }
 
@@ -704,14 +705,17 @@ TEST(MasterB16, T_M3A_CAL_09_job_frame_with_black_and_identity_both_different_re
   std::string other(64, 'a');
   if (r.frames[2].decoder->identity.libraw_tarball_sha256 == other) other.assign(64, 'b');
   r.frames[2].decoder->identity.libraw_tarball_sha256 = other;
+  const resource_config rc = raw_resources(dir / "scratch", 64 * kMiB);
+  const int baseline = baseline_faults(dir / "store-baseline", r, rc);
   project p = make_project(dir / "store", r);
-  const run_info run = run_job(p, r, raw_resources(dir / "scratch", 64 * kMiB));
+  const run_info run = run_job(p, r, rc);
   ASSERT_TRUE(run.stop.has_value());
   EXPECT_EQ(run.stop->code(), "master.decoder_state_changed") << run.stop->what();
   EXPECT_EQ(context_of(*run.stop, "predicate"), std::optional<std::string>("P-LOST")) << run.stop->what();
   EXPECT_EQ(context_of(*run.stop, "campo"), std::optional<std::string>("decoder_identity.libraw_tarball_sha256"))
       << run.stop->what();
   EXPECT_EQ(context_of(*run.stop, "frame"), std::optional<std::string>(canonical_name(r, 2))) << run.stop->what();
+  EXPECT_EQ(run.faults, baseline) << "nessun altro nodo né lavoro sullo store oltre lo stop di riferimento";
 }
 
 // ================================================================ T-M3B-C02-15 sul percorso del job
@@ -1272,11 +1276,14 @@ TEST(MasterB16, T_M3B_B16_thermal_check_after_the_bias_job_runs_is_computed_from
   const fs::path dir = fresh_dir("b16-thermal-within");
   const thermal_flow t = make_thermal_flow(dir);
   const proposed_bias pb = propose_bias(t);
-  ASSERT_TRUE(analyze_thermal_group(t, proposed_slot_candidates(pb.proposal), 64.0).analysis->flat_thermal_pending_master);
+  const group_proposal pending = analyze_thermal_group(t, proposed_slot_candidates(pb.proposal), 64.0);
+  ASSERT_TRUE(pending.analysis.has_value());
+  ASSERT_TRUE(pending.analysis->flat_thermal_pending_master);
   project p = make_project(dir / "store", pb.recipe);
   ASSERT_EQ(p.node.key(), pb.proposal.groups[0].node_key) << "il nodo eseguito è quello proposto";
   const run_info run = run_job(p, pb.recipe, resource_config{});
   ASSERT_FALSE(run.stop.has_value()) << run.stop->what();
+  ASSERT_EQ(p.store->read_slot("master").state, freshness::current) << "il master eseguito è lo slot corrente";
   const group_proposal g = analyze_thermal_group(t, {executed_slot_candidate(p)}, 64.0);
   ASSERT_EQ(g.outcome, group_outcome::ready);
   ASSERT_TRUE(g.analysis.has_value());
@@ -1298,6 +1305,7 @@ TEST(MasterB16, T_M3B_B16_thermal_check_after_the_bias_job_runs_out_of_budget_ex
   project p = make_project(dir / "store", pb.recipe);
   const run_info run = run_job(p, pb.recipe, resource_config{});
   ASSERT_FALSE(run.stop.has_value()) << run.stop->what();
+  ASSERT_EQ(p.store->read_slot("master").state, freshness::current) << "il master eseguito è lo slot corrente";
   const group_proposal g = analyze_thermal_group(t, {executed_slot_candidate(p)}, 256.0);
   ASSERT_TRUE(g.analysis.has_value());
   EXPECT_FALSE(g.analysis->flat_thermal_pending_master);

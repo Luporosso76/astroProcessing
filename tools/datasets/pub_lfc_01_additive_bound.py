@@ -60,7 +60,10 @@ def load(root, rel):
     while True:
         if pos + 80 > len(blob):
             sys.exit("header senza END: " + path)
-        card = blob[pos:pos + 80].decode("ascii")
+        try:
+            card = blob[pos:pos + 80].decode("ascii")
+        except UnicodeDecodeError as e:
+            sys.exit("header non ASCII in " + path + ": " + str(e))
         pos += 80
         if card[:8].strip() == "END":
             break

@@ -7,6 +7,8 @@
 #include "astro/raw_import_job.hpp"
 #include "astro/thumbnail_cache.hpp"
 
+#include "calibration_internal.hpp"
+
 namespace astro {
 
 namespace {
@@ -198,7 +200,9 @@ minimal_job make_master_raw(const job_type_inputs& inputs, const std::string& va
     }
     if (r.saturation_adu && *r.saturation_adu != decoded.metadata.saturation_adu->value) {
       throw stop_error(error_category::invalid_input, "job_types.saturation_adu", "soglia di saturazione diversa fra i frame",
-                       {{"ruolo", role}, {"valore", std::to_string(decoded.metadata.saturation_adu->value)}});
+                       {{"ruolo", role},
+                        {"valore", calib_detail::num_text(decoded.metadata.saturation_adu->value)},
+                        {"riferimento", calib_detail::num_text(*r.saturation_adu)}});
     }
     r.saturation_adu = decoded.metadata.saturation_adu->value;
     r.frames.push_back(std::move(f));
