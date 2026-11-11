@@ -180,6 +180,8 @@ Test: T-M3B-C02-14 (livello fuori tolleranza in un solo canale con livello globa
 
 ### B8. `median_ratio`, parte 1: parametri, costanti, preflight — ~350 righe
 
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B8-round1` FAIL con 2 MED di prova, `round2` PASS; revisore Opus; test e codice da agenti distinti; mutazioni 15/15). La chiave del nodo cambia per ogni master (parametri nuovi nei parametri del nodo). Albero `7e34936`: suite fast 1452 verde in 4 shard, release 1491/1491 (fast e slow).
+
 ID: C-02.b-flat §f.1 (regola), §f.2 (tabella dei metodi, parametri, controlli 1-4), §f.10, §f.13 punti 1-2, 4-5, 8.
 
 Fa: `m_H,c`, `r_(f,c)` nell'ordine canonico; parametri `flat_additive_bound_adu`, `flat_norm_rel_budget`, `flat_level_rel_tol` (presenza e divieti per metodo); controlli: `master.flat_low_signal`, `master.flat_scale_nonfinite`, `max m ≤ 4 min m` esatto per mediana, winsorized, sigma_clip (`master.variance_domain`), `A · ρ_c ≤ budget · m_H,c` esatto (`master.flat_norm_budget`); `sigma_clip` sul flat solo con soglie uguali. `median_ratio` diventa ammesso in `validate_master_recipe` (oggi fuori dominio con `master.variance_domain`, C-02.b-flat §f.13 punto 1): le attese di `test_master.cpp` e T-M2R2-05 su questo caso si aggiornano qui. Con `median_ratio` `flat_level_rel_tol` è vietato (C-02.b-flat §f.2 e §f.13 punto 2) e il controllo di `finish_preflight` sul livello (`master.variance_domain` con `none`) non si applica; nessun parametro opzionale e nessun avviso dedicato oltre `flat_norm_scales_estimated`, per decisione di L11 (`docs/decisions/M3b-lacune.md`).
