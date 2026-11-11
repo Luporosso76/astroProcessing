@@ -257,6 +257,8 @@ Test: T-M3A-CAL-07, T-M3B-DEC-01 (modo del chiamante, ADR-08.b §2.8), T-M3B-C02
 
 ### B15. Master da RAW, parte 2: CFA per canale — ~200 righe
 
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B15-round1` FAIL con 2 MED, `round2` PASS, LOW residui nell'artefatto del giro 2 e limite del gancio sul lettore preso da B16; revisore Opus; test e codice da agenti distinti; mutazioni del giro di correzioni in «Decisioni successive (B15)»). Verificata con B17 sull'albero `d715e42` (vedi B17).
+
 Dopo B7 e B15a; prima di B16.
 
 ID: C-02.b §b.2 («Canali CFA»), §b.6 «Flat», ADR-16.b §b.7.
@@ -274,6 +276,8 @@ Fa: registro dei tipi di job: seconda voce `master.combine` per i frame RAW e va
 Test: T-M3B-JOB-01 (conformità), T-M3A-CAL-09 (parte master), T-M3B-C02-15 (frame modificato, decoder, `support_incomplete` sul percorso del job), T-M3B-FLAT-06 (nessun nodo né calcolo negli stop, contatore del `fault_injector`), T-M3B-C02-10 e T-M3B-FLAT-08 (parte riapertura del progetto e ricostruzione del nodo nello store).
 
 ### B17. Dato reale e riesecuzioni — ~200 righe
+
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B17-round1` FAIL con 2 MED, `round2` PASS, LOW residui nell'artefatto del giro 2; revisore Opus; test da agente distinto, misura di `A` con `tools/datasets/pub_lfc_01_additive_bound.py`). Verifica integrata con B15 sull'albero `d715e42`: suite fast 1680/1680 in 6 shard, slow 48/48 (esclusi i fuzz del decoder T-M3A-RAW-10, decoder non toccato), build release pulita (warning solo in `third_party/`).
 
 ID: C-02.b §b.9 (R, PUB-LFC-01); NFR-TEST-02.
 Test: T-M3B-C02-16, T-M3B-FLAT-09; riesecuzione T-M2R2-01…09, T-M3A-CAL-07, T-M2F-02 (nessuna syscall di rete sul percorso).

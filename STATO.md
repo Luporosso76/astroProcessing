@@ -10,10 +10,11 @@
 | B0 decisioni ed emendamenti, B1 protocollo (SHA `83e30030…`), B2 fixture `syn_cal.hpp` | CHIUSE |
 | B3 tipi e domini (`e66a112`), B4 κ (`38c7cf1`), B3b pianificatore (`855d634`), B15a decoder e preflight RAW (`4ff7f4b`) | CHIUSE, review PASS |
 | B5 metodi base (`483b671`), B6 `mean` + `sigma_clip` (`b10be73`), B7 livelli del flat per canale CFA (`4431098`), B12 analisi: esclusioni (`68e7793`), B8 (`7e34936`), B9 (`fb16781`), B13 (`db98d12`), B14 (`64fdf8d`), B10 (`d75552f`), B11 report (`13325e1`) | CHIUSE, review PASS (B14 per arbitraggio); release 1561/1561 su B13; fast 1650 e slow 38/38 su B11 |
-| B15 CFA da RAW (`m3b-b15`), B16 job generale (`m3b-b16`, test `48d1937`), B17 dato reale (`m3b-b17`) | B15 correzioni del giro 1; B16 test scritti, codice dopo B15; B17 correzioni del giro 1 |
+| B15 CFA da RAW (`ba6b0e8`), B17 dato reale (`d715e42`) | CHIUSE, review PASS (giro 2); fast 1680/1680 e slow 48/48 su `d715e42` |
+| B16 job generale (`m3b-b16` sopra B15) | B16 codice fatto (fast 1770/1770, mutazioni 7/7), review giro 1 FAIL (4 MED, 12 LOW), correzioni in corso |
 
 ## Prossimo passo
-0. Fino a quattro unità insieme se non toccano gli stessi file (utente, 10/11 21:45). B15 giro 2 e verifica finale (con fuzz RAW: tocca il lettore RAW); B16 codice sopra B15; B17 giro 2; poi gate M3.b. Suite fast in 6 shard (5/5 arrivava a 581 s).
+0. Fino a quattro unità insieme se non toccano gli stessi file (utente, 10/11 21:45). B16: correzioni del giro 1 → review giro 2 (Opus) → rebase su `d715e42`, verifica (fast, slow: master.cpp toccato) → ff, push; poi gate M3.b (review del gate con Fable, utente 11/11). Suite fast in 6 shard (5/5 arrivava a 581 s).
 1. Metodo per unità: test rossi → codice (agente diverso) → shard verdi + mutazioni → review (Argon; senza quota: Agent code-reviewer opus) → rebase, verifica dell'albero unito (slow compresi se il codice del master cambia), ff, push.
 2. Blocchi evidence dei record che citano `master.cpp` e C-02: da rigenerare al prossimo run completo (codice cambiato dopo l'ultimo junit completo).
 ## Debiti degli strumenti
