@@ -10,9 +10,34 @@
 #include "astro/error.hpp"
 #include "astro/fits.hpp"
 #include "astro/operations.hpp"
+#include "astro/raw_decode.hpp"
 #include "calibration_internal.hpp"
+#include "master_analysis_internal.hpp"
+
+#include <libraw/libraw_const.h>
 
 namespace astro {
+
+namespace master_detail {
+
+bool raw_decode_error_is_file_outcome(const stop_error& e) {
+  const std::string& code = e.code();
+  if (e.category() == error_category::cancelled || e.category() == error_category::io || code.compare(0, 4, "raw.") != 0) {
+    return false;
+  }
+  if (code == "raw.decode_context" || code == "raw.libraw_error") return false;
+  if (code != "raw.too_big") return true;
+  const auto value_of = [&e](std::string_view key) -> const std::string* {
+    for (const auto& [k, v] : e.context())
+      if (k == key) return &v;
+    return nullptr;
+  };
+  if (const std::string* refused = value_of("rifiuto")) return *refused == "tetto";
+  if (const std::string* rc = value_of("valore")) return *rc == std::to_string(LIBRAW_TOO_BIG);
+  return false;
+}
+
+}  // namespace master_detail
 
 namespace {
 
@@ -45,9 +70,11 @@ double value_at(const image& im, std::size_t i) {
   return im.type == sample_type::f32 ? static_cast<double>(im.data<float>()[i]) : im.data<double>()[i];
 }
 
-// Statistiche sull'intera immagine: campioni validi (bit di invalidità a zero) con `>= saturation_adu`; totale = tutti i
-// pixel; m_(f,c) = mediana dei campioni validi del canale meno `request.offset_adu`, canali nell'ordine dei siti.
-// I campioni non finiti hanno il bit di invalidità: lo marca `decode_fits`, il lettore non li ricontrolla.
+// Statistiche sull'intera immagine decodificata (FITS o RAW): campioni validi (bit di invalidità a zero) con
+// `>= saturation_adu`; totale = tutti i pixel; m_(f,c) = mediana dei campioni validi del canale meno `request.offset_adu`,
+// canali nell'ordine dei siti del motivo. I campioni non finiti hanno il bit di invalidità: lo marca `decode_fits`; il
+// decoder RAW produce solo valori interi finiti (f32 = uint16), col nero dichiarato e non sottratto. Il lettore non li
+// ricontrolla.
 master_frame_stats stats_of(const image& im, const master_stats_request& request) {
   master_frame_stats out;
   const std::uint32_t w = im.geometry.width;
@@ -366,13 +393,45 @@ master_frame_stats read_master_frame_stats(const std::string& path, const conten
       if (cancel.requested()) throw_cancelled();
     });
     require_input_digest(found, digest, path);
+    fits_detail::check_unchanged(input);
     return decode_failed(e);
   }
+  // I byte del file stanno fuori dal pool fino alla decodifica: limite della lettura verificata della base comune.
   const std::vector<std::uint8_t> bytes = read_verified_input(input, path, digest, pool.budget_bytes(), &*plan);
   try {
     return stats_of(decode_fits(bytes, pool.budget_bytes()), request);
   } catch (const stop_error& e) {
     if (!is_decode_error(e)) throw;
+    return decode_failed(e);
+  }
+}
+
+master_frame_stats read_master_frame_stats(const std::string& path, const content_digest& digest, const input_format& format,
+                                           const master_stats_request& request, memory_pool& pool, const cancel_token& cancel) {
+  if (&format == &fits_input_format()) return read_master_frame_stats(path, digest, request, pool, cancel);
+  ASTRO_ASSERT(&format == &raw_input_format());
+  if (cancel.requested()) throw_cancelled();
+  const fits_input input = open_input(path, format);
+  // Nessun header si interpreta prima del digest (OB-11): il buffer verificato è l'unico che arriva al decoder.
+  const std::vector<std::uint8_t> bytes = read_verified_input(input, path, digest, pool.budget_bytes(), nullptr);
+  if (cancel.requested()) throw_cancelled();
+  try {
+    const std::uint64_t needed = raw_decode_needed_bytes(bytes);
+    // `bytes.size()` <= budget: la lettura verificata si è già fermata oltre il budget.
+    if (needed > pool.budget_bytes() - bytes.size()) {
+      throw stop_error(error_category::budget, "sched.job_exceeds_budget", "budget sotto il file più la prenotazione del decoder",
+                       {{"prenotazione_decoder", std::to_string(needed)}, {"file", std::to_string(bytes.size())},
+                        {"budget", std::to_string(pool.budget_bytes())}});
+    }
+    // File e prenotazione del decoder nel pool per tutta la decodifica. Fra la lettura verificata (entro il budget) e
+    // questa prenotazione i byte del file stanno fuori dal pool: limite della lettura verificata della base comune.
+    const reservation memory = pool.reserve(bytes.size() + needed, "master.analysis.raw_decode", &cancel);
+    raw_decode_context ctx;
+    ctx.cancel = &cancel;
+    ctx.caller_reserved_bytes = needed;
+    return stats_of(decode_raw_buffer(bytes, {}, ctx), request);
+  } catch (const stop_error& e) {
+    if (!master_detail::raw_decode_error_is_file_outcome(e)) throw;
     return decode_failed(e);
   }
 }

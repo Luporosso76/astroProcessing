@@ -977,6 +977,30 @@ TEST(MasterB11, T_M3B_FLAT_07_flat_with_none_has_the_exact_assumptions_of_a_mono
   }
 }
 
+// LOW del giro 2 di B11, chiuso in B15: ogni metodo di `kAll` sul flat con `none`. C-02.b §b.2 e C-02.b-flat §f.2: con
+// `none` il flat ammette solo `single` e `mean`, con le ipotesi esatte di `.a`; ogni altro metodo si ferma con
+// unsupported `master.variance_domain`, quindi non ha un report di cui confrontare le ipotesi.
+TEST(MasterB11, T_M3B_FLAT_07_flat_with_none_has_the_exact_assumptions_for_every_admitted_method_and_stops_for_the_others) {
+  for (const bool cfa : {false, true}) {
+    for (const kind k : kAll) {
+      SCOPED_TRACE(std::string(name_of(k)) + (cfa ? " cfa" : " mono"));
+      const bool admitted = k == kind::single || k == kind::mean;
+      const std::size_t n = k == kind::single ? 1 : 3;
+      const group g = level_flat(k == kind::single ? std::vector<double>{256} : std::vector<double>{256, 512, 512}, 10, 8,
+                                 cfa ? 8 : 4, cfa);
+      master_recipe r = recipe_of(g, 0.9);
+      apply(k, r);
+      if (!admitted) {
+        EXPECT_STOP(combine_master(r, images_of(g)), error_category::unsupported, "master.variance_domain");
+        continue;
+      }
+      const std::optional<master_result> res = combine_or_fail(r, images_of(g), name_of(k));
+      if (!res) continue;
+      expect_assumptions(res->report, expected_assumptions(master_role::flat, false, k, cfa, n));
+    }
+  }
+}
+
 TEST(MasterB11, T_M3B_FLAT_07_flat_with_none_has_no_scale_constants_nor_normalization_warning) {
   for (const kind k : {kind::mean, kind::single}) {
     SCOPED_TRACE(name_of(k));
@@ -1533,7 +1557,20 @@ TEST(MasterB11, T_M3B_C02_11_malformed_analysis_stops_before_any_read_in_memory_
       {"proposal_absent_reason_numero", with_group_member(a, "proposal_absent_reason", json::uinteger(0))},
       {"alternatives_assente", with_group_member(a, "alternatives", std::nullopt)},
       {"alternatives_oggetto", with_group_member(a, "alternatives", json::object())},
+      // Casi di forma controllati da `make_plan` dal giro 1 di B11 (LOW del giro 2, chiusi in B15).
+      {"role_assente", with_member(a, "role", std::nullopt)},
+      {"role_numero", with_member(a, "role", json::uinteger(1))},
+      {"candidates_assente", with_member(a, "candidates", std::nullopt)},
+      {"group_testo", with_member(a, "group", json::string("gruppo"))},
   };
+  {
+    const json* group = a.find("group");
+    ASSERT_NE(group, nullptr);
+    const json* proposal = group->find("proposal");
+    ASSERT_TRUE(proposal != nullptr && proposal->type() == json::kind::object) << "premessa: proposta `median` presente";
+    cases.push_back({"proposal_combine_assente", with_group_member(a, "proposal", with_member(*proposal, "combine", std::nullopt))});
+    cases.push_back({"proposal_rejection_assente", with_group_member(a, "proposal", with_member(*proposal, "rejection", std::nullopt))});
+  }
   const fs::path dir = fresh_dir("b11-analysis-shape");
   for (const bad_case& bc : cases) {
     SCOPED_TRACE(bc.name);
@@ -1548,6 +1585,15 @@ TEST(MasterB11, T_M3B_C02_11_malformed_analysis_stops_before_any_read_in_memory_
     EXPECT_FALSE(jp.frames_read) << "stop prima di ogni lettura";
     EXPECT_FALSE(jp.primary);
     EXPECT_FALSE(jp.report);
+  }
+  {
+    // `group.members` presente ma non elenco: `validate_master_recipe` confronta i membri quando il campo esiste
+    // (decisione B11), quindi lo stop, con lo stesso codice, arriva già alla creazione del nodo, prima di ogni lettura.
+    SCOPED_TRACE("members_oggetto");
+    master_recipe r = proposed;
+    r.analysis = with_group_member(a, "members", json::object());
+    EXPECT_STOP(make_master_node(r), error_category::invalid_input, "master.param.analysis");
+    EXPECT_STOP(combine_master(r, images_for(c, r)), error_category::invalid_input, "master.param.analysis");
   }
   {
     SCOPED_TRACE("controllo: analisi della proposta");
@@ -1644,6 +1690,19 @@ TEST(MasterB11, T_M3B_C02_15_subnormal_normalization_diagnostics_stop_with_repor
     SCOPED_TRACE(nc.name);
     const master_recipe r = ratio_recipe(nc.g, kind::mean, nc.a);
     EXPECT_STOP(combine_master(r, images_of(nc.g)), error_category::numeric, "master.report_nonfinite");
+    if (nc.name == "ratio") {
+      // Statistica per pixel (decisione B11, LOW del giro 2): il contesto porta `x`, `y` del pixel col picco del piano,
+      // indice 5 della fixture 8 × 4, cioè x = 5, y = 0.
+      std::map<std::string, std::string> ctx;
+      try {
+        (void)combine_master(r, images_of(nc.g));
+      } catch (const stop_error& e) {
+        for (const auto& [k, v] : e.context()) ctx[k] = v;
+      }
+      EXPECT_EQ(ctx["statistica"], "bound_ratio");
+      EXPECT_EQ(ctx["x"], "5");
+      EXPECT_EQ(ctx["y"], "0");
+    }
     const job_probe stop = probe_job(dir / nc.name, nc.g, r);
     ASSERT_FALSE(stop.setup_error.has_value()) << *stop.setup_error;
     EXPECT_EQ(stop.code, std::optional<std::string>("master.report_nonfinite"));
@@ -1653,6 +1712,66 @@ TEST(MasterB11, T_M3B_C02_15_subnormal_normalization_diagnostics_stop_with_repor
     EXPECT_FALSE(stop.report);
     EXPECT_EQ(stop.faults, base.faults) << "nessun lavoro sullo store oltre lo stop di riferimento";
   }
+}
+
+// LOW del giro 2 di B11, chiuso in B15: `master.report_nonfinite` attraverso `check_value` = (A · ρ) / m_H (C-02.b-flat
+// §f.7, regola §6.3 di C-02.a). Flat mono 8 × 4, `median` (n = 3) + `median_ratio`, livelli (2^520, 2^521, 2^521)
+// (l'offset 10 sparisce nell'arrotondamento: ulp(2^520) = 2^468), A = 2^-505, budget 1/2:
+// - m_H = 3 / (2^-520 + 2 · 2^-521) = 3 · 2^519; r = (3/2, 3/4, 3/4); ρ = 1/2;
+// - controlli di §f.2: max m = 2 min m ≤ 4 min m; ρ A = 2^-506 ≤ budget · m_H;
+// - bound = κ_med(3) · A² · Var_f(r) con A² = 2^-1010, Var_f(r) = (1/4 + 1/16 + 1/16) / 2 = 3/16: normale (≈ 2^-1013.6);
+// - campioni normalizzati uguali (livelli proporzionali, nessun rumore): piano 0, rapporti nulli, non uno stop;
+// - check_value: A · ρ = 2^-506 normale, poi / (3 · 2^519) = 2^-1025 / 3, subnormale → stop sul quoziente.
+TEST(MasterB11, T_M3B_C02_15_subnormal_check_value_stops_with_report_nonfinite_on_the_check_value) {
+  const group g = level_flat({std::ldexp(1.0, 520), std::ldexp(1.0, 521), std::ldexp(1.0, 521)}, 10, 8, 4, false);
+  const master_recipe r = ratio_recipe(g, kind::median, std::ldexp(1.0, -505), 0.5);
+  std::optional<stop_error> e;
+  try {
+    (void)combine_master(r, images_of(g));
+  } catch (const stop_error& s) {
+    e = s;
+  }
+  ASSERT_TRUE(e.has_value()) << "check_value subnormale: stop atteso";
+  EXPECT_EQ(e->category(), error_category::numeric) << e->what();
+  EXPECT_EQ(e->code(), "master.report_nonfinite") << e->what();
+  std::map<std::string, std::string> ctx;
+  for (const auto& [k, v] : e->context()) ctx[k] = v;
+  EXPECT_EQ(ctx["statistica"], "check_value") << e->what();
+  EXPECT_EQ(ctx["operazione"], "quoziente") << e->what();
+  EXPECT_EQ(ctx.count("x"), 0u) << "statistica del canale, non di un pixel";
+  const master_recipe control = ratio_recipe(g, kind::median, std::ldexp(1.0, -400), 0.5);
+  EXPECT_NO_THROW((void)combine_master(control, images_of(g))) << "controllo: A = 2^-400, check_value = 2^-920 / 3 normale";
+}
+
+// `level_ratio` = max m / min m in overflow con `mean` + `median_ratio`, che non
+// ha il controllo 3 di §f.2 (max m ≤ 4 min m, solo per i metodi robusti). Flat mono 8 × 4, offset 0, n = 5, livelli
+// (2^-523, 2^501 × 4), `flat_min_signal_adu` = 2^-600:
+// - Σ 1/m = 2^523 + 4 · 2^-501 = 2^523 in f64, m_H = 5 · 2^-523; r = (5, 5 · 2^-1024 × 4), 5 · 2^-1024 normale;
+// - campioni normalizzati r · x = 5 · 2^-523 in ogni frame: piano 0, rapporti nulli; bound di `mean` normale (A = 32);
+// - level_ratio = 2^501 / 2^-523 = 2^1024, oltre il massimo f64 → stop sul quoziente (regola §6.3 di C-02.a).
+TEST(MasterB11, T_M3B_C02_15_level_ratio_overflow_with_mean_and_median_ratio_stops_with_report_nonfinite) {
+  const double lo = std::ldexp(1.0, -523), hi = std::ldexp(1.0, 501);
+  const group g = level_flat({lo, hi, hi, hi, hi}, 0, 8, 4, false);
+  master_recipe r = ratio_recipe(g, kind::mean);
+  r.flat_min_signal_adu = std::ldexp(1.0, -600);
+  std::optional<stop_error> e;
+  try {
+    (void)combine_master(r, images_of(g));
+  } catch (const stop_error& s) {
+    e = s;
+  }
+  ASSERT_TRUE(e.has_value()) << "level_ratio in overflow: stop atteso";
+  EXPECT_EQ(e->category(), error_category::numeric) << e->what();
+  EXPECT_EQ(e->code(), "master.report_nonfinite") << e->what();
+  std::map<std::string, std::string> ctx;
+  for (const auto& [k, v] : e->context()) ctx[k] = v;
+  EXPECT_EQ(ctx["statistica"], "level_ratio") << e->what();
+  EXPECT_EQ(ctx["operazione"], "quoziente") << e->what();
+  EXPECT_EQ(ctx.count("x"), 0u) << "statistica del canale, non di un pixel";
+  const group control = level_flat({std::ldexp(1.0, -520), hi, hi, hi, hi}, 0, 8, 4, false);
+  master_recipe rc = ratio_recipe(control, kind::mean);
+  rc.flat_min_signal_adu = std::ldexp(1.0, -600);
+  EXPECT_NO_THROW((void)combine_master(rc, images_of(control))) << "controllo: level_ratio = 2^1021, finito";
 }
 
 }  // namespace

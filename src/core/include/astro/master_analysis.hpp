@@ -11,6 +11,7 @@
 #include "astro/cpu_dispatch.hpp"
 #include "astro/fault_injector.hpp"
 #include "astro/hash.hpp"
+#include "astro/input_format.hpp"
 #include "astro/json.hpp"
 #include "astro/master.hpp"
 #include "astro/memory_pool.hpp"
@@ -65,6 +66,18 @@ struct master_stats_request {
 // propagano come stop.
 master_frame_stats read_master_frame_stats(const std::string& path, const content_digest& digest, const master_stats_request& request,
                                            memory_pool& pool, const cancel_token& cancel);
+
+// Lettore con il formato d'apertura dell'input: con `fits_input_format()` è il lettore FITS qui sopra. Con
+// `raw_input_format()`: apertura nel formato RAW, lettura intera verificata (OB-11) prima di ogni decodifica, poi
+// prenotazione nel pool del file più `raw_decode_needed_bytes` e decodifica nel modo con prenotazione del chiamante
+// (ADR-08.b §2.8); nero del decoder non sottratto (C-01.b §1), livelli per sito del motivo con `request.offset_adu`. Uno
+// stop della decodifica diventa `decode_failure` solo se è un limite o un difetto proprio del file
+// (`master_detail::raw_decode_error_is_file_outcome`: compresi `raw.not_cfa`, `raw.data_error`, `raw.max_pixels`);
+// annullamento, memoria negata dal sistema e `raw.libraw_error` restano stop. Integrità OB-11 (`input.*`), apertura e
+// lettura, budget (`sched.job_exceeds_budget` se file e prenotazione del decoder superano il budget) e annullamento si
+// propagano come stop.
+master_frame_stats read_master_frame_stats(const std::string& path, const content_digest& digest, const input_format& format,
+                                           const master_stats_request& request, memory_pool& pool, const cancel_token& cancel);
 
 struct master_analysis_frame {
   std::uint64_t input_id = 0;

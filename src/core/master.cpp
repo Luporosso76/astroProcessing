@@ -580,7 +580,9 @@ struct master_plan {
   std::size_t n = 0;
   std::uint32_t w = 0, h = 0;
   bool flat = false, has_sat = false;
-  double sat = 0, offset = 0, eps = 0;
+  double sat = 0, eps = 0;
+  // Letto solo dal flat (livelli normalizzati, pixel non positivi, kernel del flat); assente nel dark non `single` da RAW.
+  std::optional<double> offset;
   std::array<double, 4> level_mean{};  // m̄_c, solo flat con `none`
   std::array<double, 4> level_harmonic{};  // m_H,c, solo flat con `median_ratio`
   // Flat con `median_ratio` (C-02.b-flat §f.1): i metodi si applicano agli y_f; r_(f,c) all'indice c · n + f.
@@ -821,7 +823,14 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
   }
   (void)need(im.metadata.camera, name, "camera");
   (void)need(im.metadata.gain, name, "gain");
-  const double offset = need(im.metadata.offset_adu, name, "offset_adu");
+  // RAW (C-02.b §b.2 «RAW», L9): `offset_adu` è solo quello della ricetta, mai un metadato del frame; il nero del decoder
+  // non si sottrae. Con dark non `single` da RAW non c'è: nessun calcolo del dark lo usa.
+  const bool raw = fs.spec->decoder.has_value();
+  if (raw && im.metadata.offset_adu) {
+    stop(error_category::invalid_input, "master.param.offset_adu", "offset_adu nei metadati di un frame RAW: vale quello della ricetta",
+         {{"frame", name}, {"valore", num_text(im.metadata.offset_adu->value)}});
+  }
+  const std::optional<double> offset = raw ? r.offset_adu : std::optional<double>(need(im.metadata.offset_adu, name, "offset_adu"));
   (void)need(im.metadata.exposure_s, name, "exposure_s");
   if (*r.temp_policy == temperature_policy::compare) (void)need(im.metadata.temperature_c, name, "temperature_c");
   if (p.flat) (void)need(im.metadata.filter, name, "filter");
@@ -858,6 +867,7 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
       mismatch(p.frames[0].name + "-" + name, "cfa", cfa_text(p.frames[0].header.cfa), cfa_text(im.cfa), "esatta");
     }
     // m_(f,c) per canale (C-02.b §b.6): mediana dei campioni validi del canale, nessuna somma.
+    ASTRO_ASSERT(offset.has_value());  // flat da RAW senza `offset_adu`: fermato da validate_params
     const std::size_t channels = p.channel_count();
     std::array<std::vector<double>, 4> z;
     for (std::size_t c = 0; c < channels; ++c) z[c].reserve(px / channels + 1);
@@ -865,7 +875,7 @@ void inspect_frame(master_plan& p, std::size_t k, image& im) {
     for (std::uint32_t y = 0; y < im.geometry.height; ++y) {
       for (std::uint32_t x = 0; x < w; ++x) {
         const std::size_t i = static_cast<std::size_t>(y) * w + x;
-        if (im.invalid.bits[i] == 0) z[p.channel_of(x, y)].push_back(value_at(im, i) - offset);
+        if (im.invalid.bits[i] == 0) z[p.channel_of(x, y)].push_back(value_at(im, i) - *offset);
       }
     }
     for (std::size_t c = 0; c < channels; ++c) {
@@ -916,7 +926,15 @@ void compare_with_reference(master_plan& p, std::size_t k) {
   const frame_metadata &ma = a.metadata, &mb = b.metadata;
   if (ma.camera->value != mb.camera->value) mismatch(pair, "camera", ma.camera->value, mb.camera->value, "esatta");
   p.compat.push(record_of(pair, "camera", json::string(ma.camera->value), json::string(mb.camera->value), "exact", json::null()));
+  const bool raw = p.frames[0].spec->decoder.has_value();
   for (const auto& [field, fa, fb] : {std::tuple{"gain", &ma.gain, &mb.gain}, std::tuple{"offset_adu", &ma.offset_adu, &mb.offset_adu}}) {
+    // RAW: `offset_adu` è unico per il nodo e non si confronta fra frame; il confronto dell'offset è quello del nero
+    // (C-02.b §b.2 «RAW», ADR-16.b §b.7).
+    if (raw && std::string_view(field) == "offset_adu") {
+      ASTRO_ASSERT(!fa->has_value() && !fb->has_value());  // offset_adu nei metadati di un frame RAW: fermato in inspect_frame
+      continue;
+    }
+    ASTRO_ASSERT(fa->has_value() && fb->has_value());  // richiesti in inspect_frame
     const double x = (*fa)->value, y = (*fb)->value;
     if (x != y) mismatch(pair, field, num_text(x), num_text(y), "esatta");
     p.compat.push(record_of(pair, field, json::number(x), json::number(y), "exact", json::null()));
@@ -995,7 +1013,18 @@ frame_metadata master_metadata_of(master_plan& p) {
   field(&frame_metadata::exposure_s, "exposure_s", d);
   field(&frame_metadata::gain, "gain", d);
   field(&frame_metadata::conversion_gain_e_per_adu, "conversion_gain_e_per_adu", d);
-  field(&frame_metadata::offset_adu, "offset_adu", d);
+  if (p.frames[0].spec->decoder) {
+    // RAW: `offset_adu` dichiarato nella ricetta, origine `declared` (C-02.b §b.7); assente se la ricetta non lo porta.
+    if (p.recipe.offset_adu) {
+      m.offset_adu = metadata_value<double>{*p.recipe.offset_adu, {metadata_origin::declared, {}}};
+      json e = json::object();
+      e.set("value", json::number(*p.recipe.offset_adu));
+      e.set("source", json::string("declared"));
+      p.master_metadata.set("offset_adu", std::move(e));
+    }
+  } else {
+    field(&frame_metadata::offset_adu, "offset_adu", d);
+  }
   field(&frame_metadata::temperature_c, "temperature_c", d);
   field(&frame_metadata::filter, "filter", s);
   field(&frame_metadata::camera, "camera", s);
@@ -1087,7 +1116,10 @@ void finish_preflight(master_plan& p) {
   const image& ref = p.frames[0].header;
   p.w = ref.geometry.width;
   p.h = ref.geometry.height;
-  p.offset = ref.metadata.offset_adu->value;
+  // RAW: `offset_adu` della ricetta; un dark non `single` da RAW non lo ha e l'offset serve solo al flat.
+  if (!p.frames[0].spec->decoder) p.offset = ref.metadata.offset_adu->value;
+  else p.offset = p.recipe.offset_adu;
+  ASTRO_ASSERT(!p.flat || p.offset.has_value());  // flat da RAW senza `offset_adu`: fermato da validate_params
   const bool ratio = p.flat && *p.recipe.flat_norm == flat_normalization::median_ratio;
   if (ratio) {
     flat_scale_constants(p);
@@ -1440,9 +1472,9 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
         if (p.normalized) {
           const double* scale = p.scales.data() + p.channel_of(c, y0 + r) * p.n;
           for (std::size_t f = 0; f < p.n; ++f) {
-            const double d = vals[f][j] - p.offset;
+            const double d = vals[f][j] - *p.offset;
             const double t = scale[f] * d;
-            const double y = p.offset + t;
+            const double y = *p.offset + t;
             samples_ok = samples_ok && std::isfinite(d) && mul_ok(scale[f], d, t) && std::isfinite(y);
             z[f] = {y, static_cast<std::uint32_t>(f)};
           }
@@ -1483,7 +1515,7 @@ void method_band(master_plan& p, std::uint32_t y0, std::uint32_t rows, const dou
           out[i] = ms;
           outv[i] = vs;
           p.out.invalid.bits[i] = 0;
-          if (p.flat) p.nonpositive[i] = pv.m - p.offset <= 0 ? 1 : 0;
+          if (p.flat) p.nonpositive[i] = pv.m - *p.offset <= 0 ? 1 : 0;
           if (clip) count_rejected();
           continue;
         }
@@ -1528,9 +1560,9 @@ void residual_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const d
         if (p.out.invalid.bits[i] != 0) continue;
         double v = vals[f][static_cast<std::size_t>(r) * p.w + x];
         if (p.normalized) {
-          const double d = v - p.offset;
+          const double d = v - *p.offset;
           const double t = p.scales[p.channel_of(x, y) * p.n + f] * d;
-          v = p.offset + t;
+          v = *p.offset + t;
         }
         const double e = v - value_at(p.out, i);
         const std::size_t rc = p.per_channel ? (x + p.cfa_x) & 1u : 0;
@@ -1572,7 +1604,7 @@ void combine_rows(master_plan& p, std::uint32_t y0, std::uint32_t rows, const do
   b.outv = p.out.variance->samples.data();
   b.mask = p.out.invalid.bits.data();
   b.flat = p.flat;
-  b.offset = p.offset;
+  if (p.flat) b.offset = *p.offset;
   b.eps = p.eps;
   b.lbe = p.lbe.data();
   b.ratio = p.ratio.data();
@@ -1702,16 +1734,21 @@ json max_or_null(const std::vector<double>& v) {
 // Operazioni delle diagnostiche della normalizzazione con la regola di rappresentabilità di C-02.a §6.3, come le
 // statistiche di `.a` (mul_ok, div_ok, add_ok): un prodotto o quoziente di operandi non nulli che dà zero o un subnormale,
 // una somma di termini non negativi non normale e ogni risultato non finito fermano con `master.report_nonfinite`, coi
-// valori nel contesto. Un operando nullo dà 0, valido (per esempio A = 0).
+// valori nel contesto. Un operando nullo dà 0, valido (per esempio A = 0). Una statistica per pixel porta nel contesto
+// anche `x`, `y` del pixel.
 struct norm_report_ops {
   const master_plan& p;
   std::size_t c;
   const char* statistic;
+  std::optional<std::pair<std::uint32_t, std::uint32_t>> pixel = std::nullopt;
   [[noreturn]] void fail(const char* op, double x, double y, double r) const {
-    report_nonfinite("diagnostica della normalizzazione del flat non rappresentabile",
-                     p.flat_context({{"statistica", statistic}, {"operazione", op}, {"primo", num_text(x)},
-                                     {"secondo", num_text(y)}, {"risultato", num_text(r)}},
-                                    c));
+    stop_error::context_list context = {{"statistica", statistic}, {"operazione", op}, {"primo", num_text(x)},
+                                        {"secondo", num_text(y)}, {"risultato", num_text(r)}};
+    if (pixel) {
+      context.emplace_back("x", std::to_string(pixel->first));
+      context.emplace_back("y", std::to_string(pixel->second));
+    }
+    report_nonfinite("diagnostica della normalizzazione del flat non rappresentabile", p.flat_context(std::move(context), c));
   }
   double mul(double x, double y) const {
     const double r = x * y;
@@ -1825,7 +1862,7 @@ json channel_report(const master_plan& p) {
           ++ratio_null[c];
           continue;
         }
-        ratio[c].push_back(norm_report_ops{p, c, "bound_ratio"}.div(bound[c], v));
+        ratio[c].push_back(norm_report_ops{p, c, "bound_ratio", std::pair{x, y}}.div(bound[c], v));
         continue;
       }
       lbe[c].push_back(p.lbe[i]);
@@ -2227,6 +2264,46 @@ void validate_raw_frames(const master_recipe& r, const std::vector<std::size_t>&
   }
 }
 
+// Primo membro di contenuto di `decoder_state` diverso fra `a` e `b`, nell'ordine dell'uguaglianza del tipo; nullptr se
+// uguali. `source` è provenienza e non si confronta.
+const char* decoder_state_member_difference(const decoder_state& a, const decoder_state& b) {
+  if (a == b) return nullptr;
+  if (a.raw_width != b.raw_width) return "raw_width";
+  if (a.raw_height != b.raw_height) return "raw_height";
+  if (a.window != b.window) return "window";
+  if (a.black != b.black) return "black";
+  if (a.cfa_color_index != b.cfa_color_index) return "cfa_color_index";
+  if (a.black_per_color != b.black_per_color) return "black_per_color";
+  if (a.black_pattern_rows != b.black_pattern_rows) return "black_pattern_rows";
+  if (a.black_pattern_cols != b.black_pattern_cols) return "black_pattern_cols";
+  if (a.black_pattern != b.black_pattern) return "black_pattern";
+  if (a.white != b.white) return "white";
+  if (a.data_maximum != b.data_maximum) return "data_maximum";
+  if (a.linear_max != b.linear_max) return "linear_max";
+  if (a.linearization != b.linearization) return "linearization";
+  if (a.curve_sha256 != b.curve_sha256) return "curve_sha256";
+  if (a.process_warnings != b.process_warnings) return "process_warnings";
+  if (a.raw_inset_crops != b.raw_inset_crops) return "raw_inset_crops";
+  if (a.flip != b.flip) return "flip";
+  if (a.route != b.route) return "route";
+  if (a.dng != b.dng) return "dng";
+  ASTRO_ASSERT(false);  // ogni membro confrontato dall'uguaglianza ha qui il suo nome
+  return nullptr;
+}
+
+// ADR-16.b §b.7: lo stato del decoder dei campioni è quello di `frame_decoder_states` della ricetta, controllato prima di
+// ogni altro controllo del frame. Un'immagine senza stato per un frame RAW, o con stato per un frame FITS, ha lo stato
+// cambiato (`campo` = decoder_state).
+void require_decoded_state(const master_plan& p, std::size_t k, const image& im) {
+  const master_frame_spec& spec = *p.frames[k].spec;
+  const char* field = nullptr;
+  if (spec.decoder.has_value() != im.decoder_state.has_value()) field = "decoder_state";
+  else if (spec.decoder) field = decoder_state_member_difference(spec.decoder->state, *im.decoder_state);
+  if (field == nullptr) return;
+  stop(error_category::integrity, "master.decoder_state_changed", "stato del decoder dei campioni diverso da quello della ricetta",
+       {{"frame", p.frames[k].name}, {"campo", field}});
+}
+
 [[noreturn]] void bad_node_states(const std::string& why, stop_error::context_list extra = {}) {
   extra.insert(extra.begin(), {{"campo", "frame_decoder_states"}, {"motivo", why}});
   stop(error_category::invalid_input, "master.decoder_state_param", "frame_decoder_states del nodo non valido",
@@ -2364,6 +2441,7 @@ master_result combine_master(const master_recipe& recipe, std::vector<image> fra
     stop(error_category::invalid_input, "master.param.frames", "serve un'immagine per ogni frame della ricetta",
          {{"immagini", std::to_string(frames.size())}, {"frame", std::to_string(recipe.frames.size())}});
   }
+  for (std::size_t k = 0; k < p.n; ++k) require_decoded_state(p, k, frames[p.order[k]]);
   for (std::size_t k = 0; k < p.n; ++k) {
     inspect_frame(p, k, frames[p.order[k]]);
     compare_with_reference(p, k);
