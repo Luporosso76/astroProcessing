@@ -112,6 +112,9 @@ struct slot_candidate {
   master_descriptor descriptor;
   input_observation observation;
   std::function<image()> load_samples = nullptr;  // come `batch_input::load_samples`
+  // Solo il candidato (c) di CL-06, nodo proposto non eseguito (`proposed_slot_candidates`): digest dei frame del nodo in
+  // ordine canonico. La presenza lo marca; `load_samples` assente, osservazione del frame di riferimento.
+  std::optional<std::vector<content_digest>> proposed_frames = std::nullopt;
 };
 
 // Ruolo -> chiave del candidato (digest esadecimale o chiave del nodo).

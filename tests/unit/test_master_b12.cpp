@@ -670,11 +670,11 @@ TEST(MasterB12, T_M3B_C02_08_L4_parameters_not_required_by_the_role_do_not_give_
   EXPECT_TRUE(screen_with(master_role::flat, false, q).missing_params.empty()) << "per i FITS l'offset è un metadato di frame";
 }
 
-TEST(MasterB12, T_M3B_C02_08_L4_temperature_abs_tol_is_not_required_when_the_policy_is_not_applicable_declared) {
+TEST(MasterB12, T_M3B_C02_08_L4_temperature_abs_tol_is_required_also_when_the_policy_is_not_applicable_declared) {
   master_analysis_params p = full_params();
   p.temp_policy = temperature_policy::not_applicable_declared;
   p.temperature_abs_tol_c.reset();
-  EXPECT_TRUE(screen_with(master_role::dark, false, p).missing_params.empty());
+  expect_params_missing(screen_with(master_role::dark, false, p), {"temperature_abs_tol_c"});
 }
 
 TEST(MasterB12, T_M3B_C02_08_L4_saturated_fraction_max_is_required_only_with_saturation_adu) {

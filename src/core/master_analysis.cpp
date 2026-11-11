@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
 #include <string_view>
 
 #include "astro/calibration_analysis.hpp"
@@ -16,6 +17,8 @@ namespace astro {
 namespace {
 
 using calib_detail::channel_labels;
+using calib_detail::combine_name;
+using calib_detail::rejection_name;
 using calib_detail::imagetyp_role;
 using calib_detail::layout_name;
 using calib_detail::median_of;
@@ -105,7 +108,7 @@ std::vector<std::string> missing_params_of(master_role role, bool any_raw, const
     if (!present) missing.push_back(name);
   };
   need(p.exposure_rel_tol.has_value(), "exposure_rel_tol");
-  if (!p.temp_policy || *p.temp_policy == temperature_policy::compare) need(p.temperature_abs_tol_c.has_value(), "temperature_abs_tol_c");
+  need(p.temperature_abs_tol_c.has_value(), "temperature_abs_tol_c");
   need(p.temp_policy.has_value(), "temperature_policy");
   if (p.saturation_adu) need(p.saturated_fraction_max.has_value(), "saturated_fraction_max");
   if (role == master_role::flat) {
@@ -230,6 +233,8 @@ void check_param_domains(master_role role, bool any_raw, const master_analysis_p
     check_finite(*p.saturation_adu, "saturation_adu");
     check_finite(*p.saturated_fraction_max, "saturated_fraction_max");
     if (!(*p.saturated_fraction_max >= 0 && *p.saturated_fraction_max <= 1)) bad_param("saturated_fraction_max", "deve stare in [0, 1]");
+  } else if (p.saturated_fraction_max) {
+    bad_param("saturated_fraction_max", "dichiarato senza saturation_adu");
   }
   check_finite(*p.exposure_rel_tol, "exposure_rel_tol");
   if (*p.exposure_rel_tol < 0) bad_param("exposure_rel_tol", "deve essere >= 0");
@@ -424,6 +429,194 @@ master_screening screen_master_frames(master_role role, const std::vector<master
     }
   }
   out.groups = form_groups(role, usable, params);
+  return out;
+}
+
+namespace {
+
+// Metodo di §b.4 per un gruppo di `n` frame; assente con il motivo in `absence`.
+struct method_choice {
+  std::optional<master_proposed_method> method;
+  std::string absence;
+};
+
+method_choice choose_method(const master_proposal_request& rq, const master_group& g) {
+  const std::size_t n = g.members.size();
+  if (g.status == master_group_status::flat_level) return {std::nullopt, "flat_level"};
+  if (n == 1) {
+    if (!rq.conversion_gain_e_per_adu || !rq.read_noise_adu || !rq.params.offset_adu) return {std::nullopt, "noise_model_not_declared"};
+    return {master_proposed_method{combine_method::single, master_rejection::none}, ""};
+  }
+  const bool median = rq.role != master_role::flat && n >= 3 && n <= 1024;
+  return {master_proposed_method{median ? combine_method::median : combine_method::mean, master_rejection::none}, ""};
+}
+
+json digest_array(const std::vector<content_digest>& digests) {
+  json a = json::array();
+  for (const content_digest& d : digests) a.push(json::string(d.sha256));
+  return a;
+}
+
+json method_json(const std::optional<master_proposed_method>& m) {
+  if (!m) return json::null();
+  return object_of({{"combine", json::string(combine_name(m->combine))}, {"rejection", json::string(rejection_name(m->rejection))}});
+}
+
+// Stato e identità del decoder dall'osservazione (assenti per un FITS); `spec.decoder` presente e diverso: stop.
+std::optional<frame_decoder_state> observed_decoder(const master_proposal_frame& f) {
+  const image& im = f.analysis.observation.observed_image();
+  const std::optional<frame_decoder_state> observed =
+      im.decoder_state ? std::optional<frame_decoder_state>(frame_decoder_state{*im.decoder_state, *f.analysis.observation.identity()})
+                       : std::nullopt;
+  if (f.spec.decoder && f.spec.decoder != observed) {
+    throw stop_error(error_category::invalid_input, "master.proposal.decoder_state",
+                     "stato del decoder della specifica diverso da quello dell'osservazione", {{"frame", f.analysis.digest.sha256}});
+  }
+  return observed;
+}
+
+master_recipe recipe_of(const master_proposal_request& rq, const proposed_master& pm,
+                        const std::map<std::uint64_t, const master_proposal_frame*>& by_id) {
+  master_recipe r;
+  r.role = rq.role;
+  for (const std::uint64_t id : pm.group.members) {
+    const master_proposal_frame& f = *by_id.at(id);
+    master_frame_spec s = f.spec;
+    s.decoder = observed_decoder(f);
+    r.frames.push_back(std::move(s));
+  }
+  const bool raw = is_raw(by_id.at(pm.group.reference)->analysis);
+  r.combine = pm.method->combine;
+  r.rejection = pm.method->rejection;
+  if (rq.role == master_role::flat) {
+    r.flat_norm = flat_normalization::none;
+    r.flat_level_rel_tol = rq.params.flat_level_rel_tol;
+    r.flat_min_signal_adu = rq.params.flat_min_signal_adu;
+  }
+  r.saturation_adu = rq.params.saturation_adu;
+  r.saturated_fraction_max = rq.params.saturated_fraction_max;
+  r.exposure_rel_tol = rq.params.exposure_rel_tol;
+  r.temperature_abs_tol_c = rq.params.temperature_abs_tol_c;
+  r.temp_policy = rq.params.temp_policy;
+  r.simd = rq.simd;
+  if (r.combine == combine_method::single) {
+    r.offset_adu = rq.params.offset_adu;
+    r.conversion_gain_e_per_adu = rq.conversion_gain_e_per_adu;
+    r.read_noise_adu = rq.read_noise_adu;
+  } else if (raw && rq.role == master_role::flat) {
+    r.offset_adu = rq.params.offset_adu;
+  }
+  if (raw) r.decoder_black_abs_tol_adu = rq.params.decoder_black_abs_tol_adu;
+  return r;
+}
+
+}  // namespace
+
+master_proposal propose_masters(const master_proposal_request& request, const fault_injector& fault) {
+  std::map<std::uint64_t, const master_proposal_frame*> by_id;
+  std::vector<master_analysis_frame> analysis_frames;
+  for (const master_proposal_frame& f : request.frames) {
+    if (!(f.spec.digest == f.analysis.digest)) {
+      throw stop_error(error_category::invalid_input, "master.proposal.frame_digest", "specifica del frame con digest diverso dall'analisi",
+                       {{"frame", f.analysis.digest.sha256}, {"specifica", f.spec.digest.sha256}});
+    }
+    (void)observed_decoder(f);
+    if (!by_id.emplace(f.analysis.input_id, &f).second) {
+      throw stop_error(error_category::invalid_input, "master.proposal.input_id", "input_id ripetuto nella richiesta",
+                       {{"input_id", std::to_string(f.analysis.input_id)}});
+    }
+    analysis_frames.push_back(f.analysis);
+  }
+  master_proposal out;
+  out.role = request.role;
+  out.screening = screen_master_frames(request.role, analysis_frames, request.params, fault);
+
+  json params_missing = json::array();
+  for (const std::string& name : out.screening.missing_params) params_missing.push(json::string(name));
+
+  // Candidati in ordine canonico: utilizzabili col digest del riferimento del loro gruppo, esclusi con motivo e valori.
+  std::map<std::uint64_t, std::uint64_t> group_of;
+  for (const master_group& g : out.screening.groups) {
+    for (const std::uint64_t id : g.members) group_of.emplace(id, g.reference);
+  }
+  std::map<std::uint64_t, const master_exclusion*> excluded_of;
+  for (const master_exclusion& e : out.screening.excluded) excluded_of.emplace(e.input_id, &e);
+  std::vector<const master_analysis_frame*> canonical;
+  for (const master_analysis_frame& f : analysis_frames) canonical.push_back(&f);
+  std::sort(canonical.begin(), canonical.end(), canonical_before);
+  json candidates = json::array();
+  if (out.screening.missing_params.empty()) {
+    for (const master_analysis_frame* f : canonical) {
+      if (const auto ex = excluded_of.find(f->input_id); ex != excluded_of.end()) {
+        // `primo` di `duplicate_digest` è un input_id: il documento identifica i frame solo dal digest.
+        const json values = ex->second->reason == "duplicate_digest" ? json::object() : ex->second->values;
+        candidates.push(object_of({{"digest", json::string(f->digest.sha256)},
+                                   {"status", json::string("excluded")},
+                                   {"reason", json::string(ex->second->reason)},
+                                   {"values", values}}));
+      } else {
+        candidates.push(object_of({{"digest", json::string(f->digest.sha256)},
+                                   {"status", json::string("used")},
+                                   {"group", json::string(by_id.at(group_of.at(f->input_id))->analysis.digest.sha256)}}));
+      }
+    }
+  }
+
+  json groups_doc = json::array();
+  for (const master_group& g : out.screening.groups) {
+    proposed_master pm;
+    pm.group = g;
+    const master_proposal_frame& ref = *by_id.at(g.reference);
+    pm.reference_observation = ref.analysis.observation;
+    for (const std::uint64_t id : g.members) pm.frames.push_back(by_id.at(id)->analysis.digest);
+    method_choice choice = choose_method(request, g);
+    pm.method = choice.method;
+    pm.absence = std::move(choice.absence);
+    if (pm.absence == "flat_level") pm.alternatives = {"median_ratio"};
+
+    json group_doc = object_of({{"reference", json::string(ref.analysis.digest.sha256)},
+                                {"members", digest_array(pm.frames)},
+                                {"status", json::string(g.status == master_group_status::flat_level ? "flat_level" : "ok")},
+                                {"proposal", method_json(pm.method)},
+                                {"proposal_absent_reason", pm.method ? json::null() : json::string(pm.absence)}});
+    json alternatives = json::array();
+    for (const std::string& a : pm.alternatives) alternatives.push(json::string(a));
+    group_doc.set("alternatives", alternatives);
+    if (pm.method) {
+      pm.analysis = object_of({{"role", json::string(role_name(request.role))}, {"candidates", candidates}, {"group", group_doc}});
+      master_recipe recipe = recipe_of(request, pm, by_id);
+      recipe.analysis = pm.analysis;
+      validate_master_recipe(recipe);
+      pm.node = make_master_node(recipe);
+      pm.node_key = pm.node->key();
+      pm.recipe = std::move(recipe);
+    } else {
+      pm.analysis = json::null();
+    }
+    group_doc.set("node_key", pm.node ? json::string(pm.node_key) : json::null());
+    groups_doc.push(std::move(group_doc));
+    out.groups.push_back(std::move(pm));
+  }
+  out.document = object_of({{"format", json::string("astro.master_proposal.v1")},
+                            {"role", json::string(role_name(request.role))},
+                            {"params_missing", params_missing},
+                            {"candidates", candidates},
+                            {"groups", groups_doc}});
+  return out;
+}
+
+std::vector<slot_candidate> proposed_slot_candidates(const master_proposal& proposal) {
+  std::vector<slot_candidate> out;
+  for (const proposed_master& g : proposal.groups) {
+    if (!g.node) continue;
+    slot_candidate c;
+    c.node_key = g.node_key;
+    c.role = proposal.role;
+    c.descriptor = master_descriptor_from_node(*g.node);
+    c.observation = g.reference_observation;
+    c.proposed_frames = g.frames;
+    out.push_back(std::move(c));
+  }
   return out;
 }
 

@@ -269,6 +269,13 @@ target_link_libraries(test_master_b13 PRIVATE astrocore GTest::gtest_main)
 target_include_directories(test_master_b13 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
 gtest_discover_tests(test_master_b13 PROPERTIES LABELS fast)
 
+# B14 di M3.b: proposta a priori, nodi proposti, aggancio a `analyze_batch`. T-M3B-C02-09 (proposta), T-M3B-C02-08 (resto),
+# T-M3B-C02-11 (sorgente della sezione Analisi: parametro `analysis`), T-M3B-FLAT-07 (parte analisi), T-M3B-C02-10 e T-M3B-FLAT-08 (candidati permutati), T-M3B-ANA-01: `fast`.
+add_executable(test_master_b14 test_master_b14.cpp)
+target_link_libraries(test_master_b14 PRIVATE astrocore GTest::gtest_main)
+target_include_directories(test_master_b14 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+gtest_discover_tests(test_master_b14 PROPERTIES LABELS fast)
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -479,6 +486,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b8.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b9.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b13.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b14.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir

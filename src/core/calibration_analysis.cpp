@@ -675,7 +675,7 @@ bool chain_admissible(const calibration_analysis& a, Chain c) {
     if (!usable_in(a, r, to_string(c))) return false;
   }
   if constexpr (std::is_same_v<Chain, flat_chain>) {
-    if (c == flat_chain::bias && !a.flat_thermal_within_budget) return false;
+    if (c == flat_chain::bias && !a.flat_thermal_within_budget && !a.flat_thermal_pending_master) return false;
   }
   return true;
 }
@@ -956,14 +956,19 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
 
   // Controllo termico di `flat.bias`, solo con le dichiarazioni e con flat `raw` e bias ammessi nella coppia F–B.
   bool thermal_within = false;
+  bool thermal_pending = false;
   if (decl.flat_thermal_bound_adu && flat.c && !flat.own && !flat.light_pair && flat.c->descriptor.flat == flat_state::raw &&
       bias.c && !bias.own && !bias.flat_pair) {
-    probe("calib.analysis.samples");
-    const image flat_samples = flat.c->load_samples ? flat.c->load_samples() : image();
-    const image bias_samples = bias.c->load_samples ? bias.c->load_samples() : image();
-    thermal_within = flat_bias_within_budget(flat.c->load_samples ? flat_samples : flat.c->img,
-                                             bias.c->load_samples ? bias_samples : bias.c->img, decl);
-    if (!thermal_within) flat.thermal = "flat_thermal_budget";
+    if (flat.c->pending_master || bias.c->pending_master) {
+      thermal_pending = true;
+    } else {
+      probe("calib.analysis.samples");
+      const image flat_samples = flat.c->load_samples ? flat.c->load_samples() : image();
+      const image bias_samples = bias.c->load_samples ? bias.c->load_samples() : image();
+      thermal_within = flat_bias_within_budget(flat.c->load_samples ? flat_samples : flat.c->img,
+                                               bias.c->load_samples ? bias_samples : bias.c->img, decl);
+      if (!thermal_within) flat.thermal = "flat_thermal_budget";
+    }
   }
 
   calibration_analysis out;
@@ -984,6 +989,7 @@ calibration_analysis analyze_calibration(const calibration_analysis_input& in, c
   }
   out.warnings = std::move(warnings);
   out.flat_thermal_within_budget = thermal_within;
+  out.flat_thermal_pending_master = thermal_pending;
   out.light_has_decoder_state = light_raw;
   out.declarations = decl;
   complete_analysis(out, dark_flat, flat);
@@ -1057,7 +1063,7 @@ void require_chain(const calibration_analysis& a, Chain chain) {
     if (v->status == candidate_status::excluded) not_admissible(*v->reason, name, role);
   }
   if constexpr (std::is_same_v<Chain, flat_chain>) {
-    if (chain == flat_chain::bias && !a.flat_thermal_within_budget)
+    if (chain == flat_chain::bias && !a.flat_thermal_within_budget && !a.flat_thermal_pending_master)
       not_admissible("flat_thermal_not_declared", name, "flat");
   }
 }
@@ -1162,9 +1168,15 @@ std::string first_identity_difference(const decoder_identity& a, const decoder_i
   return {};
 }
 
+[[noreturn]] void proposed_node_changed(const std::string& node_key, const char* field) {
+  stop(error_category::integrity, "calib.proposed_node_changed", "i frame del nodo proposto non sono quelli della selezione",
+       {{"node_key", node_key}, {"field", field}});
+}
+
 }  // namespace
 
-void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed) {
+void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed,
+                      const std::vector<observed_proposed_node>& nodes) {
   for (const selected_decoder_input& frozen : selection.raw_inputs) {
     const auto now = std::find_if(observed.begin(), observed.end(),
                                   [&frozen](const selected_decoder_input& o) { return o.name == frozen.name; });
@@ -1173,6 +1185,13 @@ void verify_selection(const calibration_selection& selection, const std::vector<
     if (std::string field = first_identity_difference(frozen.identity, now->identity); !field.empty()) {
       decoder_changed(field, frozen.name);
     }
+  }
+  for (const selected_candidate& c : selection.candidates) {
+    if (!c.proposed_frames) continue;
+    ASTRO_ASSERT(c.node_key.has_value());
+    const auto now = std::find_if(nodes.begin(), nodes.end(), [&c](const observed_proposed_node& n) { return n.node_key == *c.node_key; });
+    if (now == nodes.end()) proposed_node_changed(*c.node_key, "observation");
+    if (now->frames != *c.proposed_frames) proposed_node_changed(*c.node_key, "frames");
   }
 }
 

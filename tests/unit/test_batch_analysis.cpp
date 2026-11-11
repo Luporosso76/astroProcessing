@@ -63,6 +63,17 @@
 // (`incompatible.<campo>`, `metadata_missing.<campo>`, ...); campi diversi sono codici diversi, i valori no. Scelta dei
 // test, non scritta nel contratto.
 //
+//
+// B14 (M3.b), candidato (c) di CL-06 (nodo `master.combine` proposto da `propose_masters`, test_master_b14.cpp). API attesa
+// (punti aperti, decide il coordinatore):
+//     struct slot_candidate { ...; std::optional<std::vector<content_digest>> proposed_frames; };
+//         // la presenza marca il candidato (c): digest dei frame del nodo, ordine canonico; `load_samples` assente
+//     struct selected_candidate { ...; std::optional<std::vector<content_digest>> proposed_frames; };  // da select_recipe
+//     struct calibration_analysis { ...; bool flat_thermal_pending_master = false; };
+//         // vero se il controllo termico `flat.bias` è valutabile (dichiarazioni termiche presenti, flat `raw`) ma F o B
+//         // è un candidato (c): non si calcola né si leggono campioni; la catena `flat.bias` resta ammissibile
+//         // (nessuna esclusione). Esito dichiarato `thermal_check_pending_master`, mai omesso in silenzio.
+//
 // Oracle scritti a mano dal contratto: tabella di CL-10, esiti di CL-07/CL-08 e righe 1, 10, 13 di ADR-16.b §b.6
 // (le stesse della tabella a mano di U7). Nessun valore atteso viene dal prodotto.
 #include <gtest/gtest.h>
@@ -91,6 +102,7 @@
 #include "astro/image.hpp"
 #include "astro/json.hpp"
 #include "astro/master.hpp"
+#include "astro/master_analysis.hpp"
 #include "astro/memory_pool.hpp"
 #include "astro/raw_decode.hpp"
 #include "astro/scheduler.hpp"
@@ -2622,5 +2634,314 @@ TEST(BatchAnalysis, T_M3A_04f_master_slot_whose_node_is_missing_stops_with_slot_
   }
 }
 
+// ---------------------------------------------------------------- B14: candidato (c) (nodo proposto)
+
+master_analysis_params b14_master_params() {
+  master_analysis_params p;
+  p.exposure_rel_tol = 0.01;
+  p.temperature_abs_tol_c = 1.0;
+  p.temp_policy = temperature_policy::compare;
+  p.flat_min_signal_adu = 100.0;
+  p.flat_level_rel_tol = 0.25;
+  return p;
+}
+
+// Proposta dei master di un ruolo da tre frame identici a `img` (digest '7', '8', '9'), senza descrittore: quelli che
+// `analyze_batch` elenca in `frame_pending_master`.
+master_proposal b14_proposal(master_role role, const image& img, double flat_level = 500.0) {
+  master_proposal_request rq;
+  rq.role = role;
+  rq.params = b14_master_params();
+  rq.simd = simd_request::scalar;
+  std::uint64_t id = 20;
+  for (const char tag : {'7', '8', '9'}) {
+    master_proposal_frame f;
+    f.analysis.input_id = id++;
+    f.analysis.digest = digest_with(tag);
+    f.analysis.observation = make_observation(img, declarations());
+    if (role == master_role::flat) {
+      master_frame_stats st;
+      st.pixel_count = kW * kH;
+      st.levels = {flat_level};
+      f.analysis.stats = st;
+    }
+    f.spec.digest = f.analysis.digest;
+    rq.frames.push_back(std::move(f));
+  }
+  return propose_masters(rq);
+}
+
+std::vector<batch_input> b14_pending_inputs(master_role role, const image& img) {
+  std::vector<batch_input> in;
+  std::uint64_t id = 20;
+  for (const char tag : {'7', '8', '9'}) in.push_back(make_input(id++, tag, role_name(role), img));
+  return in;
+}
+
+TEST(BatchAnalysis, T_M3B_B14_proposed_node_enters_as_the_only_usable_candidate_of_its_role_by_its_node_key) {
+  const baseline b;
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  ASSERT_EQ(proposal.groups.size(), 1u);
+  const std::string node_key = proposal.groups[0].node_key;
+  ASSERT_FALSE(node_key.empty());
+  std::vector<batch_input> in = inputs_of(b);
+  in.erase(in.begin() + 2);  // il dark esterno non c'è: restano i tre frame in sospeso
+  for (batch_input& i : b14_pending_inputs(master_role::dark, b.dark)) in.push_back(std::move(i));
+  const batch_proposal p = analyze(in, request(), proposed_slot_candidates(proposal));
+  const group_proposal g = only_group(p);
+  ASSERT_EQ(g.outcome, group_outcome::ready);
+  const candidate_report& c = must_report(g, master_role::dark);
+  EXPECT_EQ(c.key, node_key);
+  EXPECT_EQ(c.status, candidate_status::usable);
+  EXPECT_EQ(c.reason, "");
+  const role_choice& ch = must_choice(g, master_role::dark);
+  EXPECT_EQ(ch.kind, choice_kind::only_compatible);
+  EXPECT_EQ(ch.eligible, std::vector<std::string>{node_key});
+  EXPECT_EQ(ch.chosen, std::optional<std::string>(node_key));
+}
+
+TEST(BatchAnalysis, T_M3B_B14_frame_pending_master_still_lists_the_frames_when_proposed_candidates_are_passed) {
+  const baseline b;
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  std::vector<batch_input> in = inputs_of(b);
+  in.erase(in.begin() + 2);
+  for (batch_input& i : b14_pending_inputs(master_role::dark, b.dark)) in.push_back(std::move(i));
+  const batch_proposal without = analyze(in);
+  const batch_proposal with = analyze(in, request(), proposed_slot_candidates(proposal));
+  const std::vector<std::string> want = {std::string(64, '7'), std::string(64, '8'), std::string(64, '9')};
+  ASSERT_EQ(without.frame_pending_master.count(master_role::dark), 1u);
+  EXPECT_EQ(without.frame_pending_master.at(master_role::dark), want);
+  ASSERT_EQ(with.frame_pending_master.count(master_role::dark), 1u);
+  EXPECT_EQ(with.frame_pending_master.at(master_role::dark), want) << "`astro.batch_proposal.v1` e l'elenco dei frame non cambiano";
+}
+
+TEST(BatchAnalysis, T_M3B_B14_proposed_node_and_external_master_of_the_same_role_require_a_choice_listing_both_keys) {
+  const baseline b;
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  const std::string node_key = proposal.groups[0].node_key;
+  const group_proposal g = only_group(analyze(inputs_of(b), request(), proposed_slot_candidates(proposal)));
+  EXPECT_EQ(g.outcome, group_outcome::candidate_choice_required);
+  std::vector<std::string> want = {std::string(64, 'd'), node_key};
+  std::sort(want.begin(), want.end());
+  EXPECT_EQ(must_choice(g, master_role::dark).eligible, want);
+}
+
+TEST(BatchAnalysis, T_M3B_B14_choice_by_node_key_selects_the_proposed_node) {
+  const baseline b;
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  const std::string node_key = proposal.groups[0].node_key;
+  const group_proposal g = only_group(analyze(inputs_of(b), request({{master_role::dark, node_key}}), proposed_slot_candidates(proposal)));
+  ASSERT_EQ(g.outcome, group_outcome::ready);
+  EXPECT_EQ(must_choice(g, master_role::dark).chosen, std::optional<std::string>(node_key));
+}
+
+TEST(BatchAnalysis, T_M3B_B14_select_recipe_freezes_the_node_key_and_the_frames_of_the_proposed_candidate) {
+  const baseline b;
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  const std::string node_key = proposal.groups[0].node_key;
+  const group_proposal g = only_group(analyze(inputs_of(b), request({{master_role::dark, node_key}}), proposed_slot_candidates(proposal)));
+  ASSERT_EQ(g.outcome, group_outcome::ready);
+  bool used = false;
+  for (const chain_recipe& r : g.recipes) {
+    if (!uses_role(master_role::dark, r.light, r.flat)) continue;
+    const calibration_selection sel = select_recipe(g, r);
+    for (const selected_candidate& c : sel.candidates) {
+      if (c.role != master_role::dark) continue;
+      used = true;
+      EXPECT_EQ(c.node_key, std::optional<std::string>(node_key));
+      EXPECT_FALSE(c.input.has_value());
+      ASSERT_TRUE(c.proposed_frames.has_value());
+      EXPECT_EQ(*c.proposed_frames, proposal.groups[0].frames);
+    }
+  }
+  EXPECT_TRUE(used) << "controllo positivo: una ricetta usa il dark proposto";
+}
+
+TEST(BatchAnalysis, T_M3B_B14_select_recipe_leaves_proposed_frames_empty_for_external_and_slot_candidates) {
+  const baseline b;
+  const group_proposal g = only_group(analyze(inputs_of(b)));
+  ASSERT_FALSE(g.recipes.empty());
+  for (const chain_recipe& r : g.recipes) {
+    const calibration_selection sel = select_recipe(g, r);
+    for (const selected_candidate& c : sel.candidates) EXPECT_FALSE(c.proposed_frames.has_value()) << role_name(c.role);
+  }
+}
+
+// Controllo termico `flat.bias` con F o B candidato (c): non si esegue, nessun campione letto, esito dichiarato.
+struct b14_thermal_run {
+  group_proposal group;
+  std::string document;  // astro.batch_proposal.v1
+  int probes = 0;
+};
+
+b14_thermal_run b14_analyze_thermal(bool proposed_flat, bool proposed_bias) {
+  b14_thermal_run out;
+  baseline b;
+  fill(b.flat, 1124.0);
+  fill(b.bias, 100.0);
+  std::vector<batch_input> in = inputs_of(b);
+  in.erase(in.begin() + 3);  // niente dark-flat
+  in.erase(in.begin() + 2);  // niente dark
+  std::vector<slot_candidate> slots;
+  const auto replace_role = [&](const char* role, master_role r, const image& img, double level) {
+    in.erase(std::remove_if(in.begin(), in.end(), [role](const batch_input& i) { return i.role == role; }), in.end());
+    for (batch_input& i : b14_pending_inputs(r, img)) in.push_back(std::move(i));
+    for (slot_candidate& c : proposed_slot_candidates(b14_proposal(r, img, level))) slots.push_back(std::move(c));
+  };
+  if (proposed_flat) replace_role("flat", master_role::flat, b.flat, 1124.0);
+  if (proposed_bias) replace_role("bias", master_role::bias, b.bias, 0.0);
+  batch_analysis_request req = request();
+  req.params.flat_thermal_bound_adu = 64.0;
+  req.params.flat_thermal_rel_budget = 0.25;
+  const fault_injector counter = [&out](std::string_view point) {
+    if (point == "calib.analysis.samples") ++out.probes;
+    return 0;
+  };
+  const batch_proposal proposal = analyze_batch(in, slots, req, counter);
+  out.group = only_group(proposal);
+  out.document = proposal.canonical();
+  return out;
+}
+
+bool b14_has_flat_bias_recipe(const group_proposal& g) {
+  return std::any_of(g.recipes.begin(), g.recipes.end(), [](const chain_recipe& r) { return r.flat == F::bias; });
+}
+
+TEST(BatchAnalysis, T_M3B_B14_thermal_check_with_a_proposed_bias_is_declared_pending_and_reads_no_samples) {
+  const b14_thermal_run r = b14_analyze_thermal(false, true);
+  ASSERT_EQ(r.group.outcome, group_outcome::ready);
+  ASSERT_TRUE(r.group.analysis.has_value());
+  EXPECT_TRUE(r.group.analysis->flat_thermal_pending_master);
+  EXPECT_FALSE(r.group.analysis->flat_thermal_within_budget) << "non calcolato";
+  EXPECT_EQ(r.probes, 0);
+  EXPECT_TRUE(b14_has_flat_bias_recipe(r.group)) << "la catena flat.bias non è esclusa dalla proposta";
+}
+
+TEST(BatchAnalysis, T_M3B_B14_thermal_check_with_a_proposed_flat_is_declared_pending_and_reads_no_samples) {
+  const b14_thermal_run r = b14_analyze_thermal(true, false);
+  ASSERT_EQ(r.group.outcome, group_outcome::ready);
+  ASSERT_TRUE(r.group.analysis.has_value());
+  EXPECT_TRUE(r.group.analysis->flat_thermal_pending_master);
+  EXPECT_EQ(r.probes, 0);
+  EXPECT_TRUE(b14_has_flat_bias_recipe(r.group));
+}
+
+TEST(BatchAnalysis, T_M3B_B14_thermal_check_with_both_proposed_is_declared_pending) {
+  const b14_thermal_run r = b14_analyze_thermal(true, true);
+  ASSERT_TRUE(r.group.analysis.has_value());
+  EXPECT_TRUE(r.group.analysis->flat_thermal_pending_master);
+  EXPECT_EQ(r.probes, 0);
+}
+
+TEST(BatchAnalysis, T_M3B_B14_thermal_check_with_external_flat_and_bias_is_computed_and_not_pending) {
+  const b14_thermal_run r = b14_analyze_thermal(false, false);
+  ASSERT_TRUE(r.group.analysis.has_value());
+  EXPECT_FALSE(r.group.analysis->flat_thermal_pending_master);
+  EXPECT_EQ(r.probes, 1);
+}
+
+TEST(BatchAnalysis, T_M3B_B14_proposed_dark_does_not_make_the_flat_bias_thermal_check_pending) {
+  baseline b;
+  fill(b.flat, 1124.0);
+  fill(b.bias, 100.0);
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  std::vector<batch_input> in = inputs_of(b);
+  in.erase(in.begin() + 3);
+  in.erase(in.begin() + 2);
+  batch_analysis_request req = request();
+  req.params.flat_thermal_bound_adu = 64.0;
+  req.params.flat_thermal_rel_budget = 0.25;
+  int probes = 0;
+  const fault_injector counter = [&probes](std::string_view point) {
+    if (point == "calib.analysis.samples") ++probes;
+    return 0;
+  };
+  const group_proposal g = only_group(analyze_batch(in, proposed_slot_candidates(proposal), req, counter));
+  ASSERT_TRUE(g.analysis.has_value());
+  EXPECT_FALSE(g.analysis->flat_thermal_pending_master);
+  EXPECT_EQ(probes, 1) << "il controllo di flat e bias esterni si esegue";
+}
+
+// Valore di `groups[0].analysis.flat_thermal_pending_master` (accanto a `flat_thermal_within_budget`); assente = nullopt.
+std::optional<bool> b14_pending_key(const std::string& document) {
+  const json doc = parse_json(document);
+  const json* groups = doc.find("groups");
+  if (groups == nullptr || groups->items().empty()) throw std::runtime_error("nessun gruppo nel documento");
+  const json* analysis = groups->items()[0].find("analysis");
+  if (analysis == nullptr || analysis->type() != json::kind::object) throw std::runtime_error("analisi assente");
+  if (analysis->find("flat_thermal_within_budget") == nullptr) throw std::runtime_error("flat_thermal_within_budget assente");
+  const json* v = analysis->find("flat_thermal_pending_master");
+  if (v == nullptr) return std::nullopt;
+  return v->as_bool();
+}
+
+TEST(BatchAnalysis, T_M3B_B14_document_declares_flat_thermal_pending_master_true_with_a_proposed_flat_or_bias) {
+  for (const auto& [flat, bias] : std::vector<std::pair<bool, bool>>{{false, true}, {true, false}, {true, true}}) {
+    SCOPED_TRACE(std::to_string(flat) + std::to_string(bias));
+    EXPECT_EQ(b14_pending_key(b14_analyze_thermal(flat, bias).document), std::optional<bool>(true));
+  }
+}
+
+TEST(BatchAnalysis, T_M3B_B14_document_has_no_flat_thermal_pending_master_key_without_a_pending_check) {
+  EXPECT_EQ(b14_pending_key(b14_analyze_thermal(false, false).document), std::nullopt);
+  EXPECT_EQ(b14_pending_key(analyze(inputs_of(baseline())).canonical()), std::nullopt);
+}
+
+TEST(BatchAnalysis, T_M3B_B14_select_recipe_on_flat_bias_with_a_proposed_bias_succeeds_and_freezes_the_proposed_frames) {
+  const b14_thermal_run r = b14_analyze_thermal(false, true);
+  ASSERT_EQ(r.group.outcome, group_outcome::ready);
+  bool used = false;
+  for (const chain_recipe& rec : r.group.recipes) {
+    if (rec.flat != F::bias) continue;
+    const calibration_selection sel = select_recipe(r.group, rec);
+    for (const selected_candidate& c : sel.candidates) {
+      if (c.role != master_role::bias) continue;
+      used = true;
+      EXPECT_FALSE(c.input.has_value());
+      ASSERT_TRUE(c.proposed_frames.has_value());
+      EXPECT_EQ(*c.proposed_frames, (std::vector<content_digest>{digest_with('7'), digest_with('8'), digest_with('9')}));
+    }
+  }
+  EXPECT_TRUE(used) << "controllo positivo: una ricetta flat.bias usa il bias proposto";
+}
+
+TEST(BatchAnalysis, T_M3B_B14_two_candidates_with_the_same_node_key_in_the_same_role_stop_whatever_the_order) {
+  const baseline b;
+  const master_proposal proposal = b14_proposal(master_role::dark, b.dark);
+  const std::vector<slot_candidate> once = proposed_slot_candidates(proposal);
+  ASSERT_EQ(once.size(), 1u);
+  slot_candidate plain = once[0];
+  plain.proposed_frames.reset();  // lo stesso nodo già eseguito, come slot
+  const std::vector<std::vector<slot_candidate>> variants = {{once[0], once[0]}, {once[0], plain}, {plain, once[0]}};
+  for (const std::vector<slot_candidate>& slots : variants) {
+    try {
+      (void)analyze(inputs_of(b), request(), slots);
+      ADD_FAILURE() << "candidati duplicati: stop atteso";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::invalid_input) << e.what();
+      EXPECT_EQ(e.code(), "classify.duplicate_candidate") << e.what();
+      const std::map<std::string, std::string> ctx(e.context().begin(), e.context().end());
+      EXPECT_EQ(ctx.size(), 2u);
+      EXPECT_EQ(ctx.count("ruolo"), 1u);
+      EXPECT_EQ(ctx.count("node_key"), 1u);
+      if (ctx.count("ruolo") != 0) {
+        EXPECT_EQ(ctx.at("ruolo"), "dark");
+      }
+      if (ctx.count("node_key") != 0) {
+        EXPECT_EQ(ctx.at("node_key"), proposal.groups[0].node_key);
+      }
+    }
+  }
+}
+
+TEST(BatchAnalysis, T_M3B_B14_same_node_key_in_different_roles_is_not_a_duplicate) {
+  const baseline b;
+  slot_candidate dark = proposed_slot_candidates(b14_proposal(master_role::dark, b.dark))[0];
+  slot_candidate other = dark;
+  other.role = master_role::bias;
+  other.descriptor = bias_desc();
+  other.observation = make_observation(b.bias, declarations());
+  EXPECT_NO_THROW((void)analyze(inputs_of(b), request(), {dark, other}));
+}
 
 }  // namespace

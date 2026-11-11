@@ -19,6 +19,19 @@
 //     input_observation make_observation(const image&, const std::string& declarations_canonical);  // operator==
 //     batch_proposal analyze_batch(const sqlite_dag_store&, const candidate_choices&, memory_pool&, const cancel_token&, ...);
 //
+// B14 (M3.b), candidato (c) di CL-06: nodo `master.combine` proposto dall'analisi di C-02.b. API attesa (punti aperti,
+// decide il coordinatore):
+//   struct selected_candidate { ...; std::optional<std::vector<content_digest>> proposed_frames; };
+//       // solo per il candidato (c): i digest dei frame del nodo scelti, in ordine canonico (CL-11)
+//   struct observed_proposed_node { std::string node_key; std::vector<content_digest> frames; };
+//       // i frame che il nodo contiene ora (dopo l'esecuzione del master), in ordine canonico
+//   void verify_selection(const calibration_selection&, const std::vector<selected_decoder_input>& observed,
+//                         const std::vector<observed_proposed_node>& nodes = {});
+//       // per ogni candidato con `proposed_frames`: il nodo osservato con la stessa `node_key` ha esattamente quei frame,
+//       // nello stesso ordine; altrimenti integrity `calib.proposed_node_changed`, contesto `node_key` e `field`
+//       // (`frames`, oppure `observation` se il nodo non è osservato). Non esclude, non sostituisce, non modifica nulla.
+//       // Un candidato senza `proposed_frames` (input o slot) non richiede osservazione del nodo.
+//
 // T-M3A-06b: il job del test è composto da `run_branches` sullo store SQLite (`branch_files_job`), come il job del test di
 // G-PACK: non è un tipo di job del prodotto. Legge l'input dal confine di OB-11 (`require_input_digest`), decodifica il
 // DNG con il decoder del prodotto (`decode_raw_buffer`) e chiama `verify_selection`. Il cambio dello stato del decoder alla
@@ -749,6 +762,108 @@ TEST(VerifySelection, T_M3A_11_black_pattern_inconsistent_with_its_dimensions_st
   }
   auto store = sqlite_dag_store::open(p.project, open_intent::read_only);
   EXPECT_STOP(analyze_batch(*store, {}, pool, never()), error_category::integrity, "batch.report_malformed");
+}
+
+// ---------------------------------------------------------------- B14: candidato (c) (nodo proposto)
+
+content_digest frame_digest(char c) { return content_digest{std::string(64, c), 2880}; }
+
+calibration_selection selection_with_proposed_dark(const std::vector<content_digest>& frames, const std::string& node_key = std::string(64, 'n')) {
+  calibration_selection s = selection_of({});
+  selected_candidate c;
+  c.role = master_role::dark;
+  c.node_key = node_key;
+  c.proposed_frames = frames;
+  s.candidates.push_back(c);
+  return s;
+}
+
+::testing::AssertionResult proposed_stops_with(const calibration_selection& sel, const std::vector<observed_proposed_node>& nodes,
+                                               const std::string& field) {
+  try {
+    verify_selection(sel, {}, nodes);
+  } catch (const stop_error& e) {
+    if (e.category() != error_category::integrity || e.code() != "calib.proposed_node_changed") {
+      return ::testing::AssertionFailure() << "stop diverso: " << e.what();
+    }
+    std::map<std::string, std::string> ctx(e.context().begin(), e.context().end());
+    if (ctx["field"] != field) return ::testing::AssertionFailure() << "campo " << ctx["field"] << " invece di " << field;
+    if (ctx["node_key"] != std::string(64, 'n')) return ::testing::AssertionFailure() << "node_key " << ctx["node_key"];
+    return ::testing::AssertionSuccess();
+  }
+  return ::testing::AssertionFailure() << "nessuno stop";
+}
+
+TEST(VerifySelection, T_M3B_B14_proposed_candidate_whose_node_holds_exactly_the_chosen_frames_is_accepted) {
+  const std::vector<content_digest> frames = {frame_digest('1'), frame_digest('2'), frame_digest('3')};
+  EXPECT_NO_THROW(verify_selection(selection_with_proposed_dark(frames), {}, {observed_proposed_node{std::string(64, 'n'), frames}}));
+}
+
+TEST(VerifySelection, T_M3B_B14_proposed_candidate_whose_node_frame_set_differs_from_the_chosen_one_stops) {
+  const std::vector<content_digest> chosen = {frame_digest('1'), frame_digest('2'), frame_digest('3')};
+  const std::vector<std::pair<const char*, std::vector<content_digest>>> changed = {
+      {"un frame sostituito", {frame_digest('1'), frame_digest('2'), frame_digest('4')}},
+      {"un frame in meno", {frame_digest('1'), frame_digest('2')}},
+      {"un frame in più", {frame_digest('1'), frame_digest('2'), frame_digest('3'), frame_digest('4')}},
+      {"ordine diverso", {frame_digest('2'), frame_digest('1'), frame_digest('3')}},
+      {"nodo vuoto", {}},
+  };
+  for (const auto& [name, frames] : changed) {
+    SCOPED_TRACE(name);
+    EXPECT_TRUE(proposed_stops_with(selection_with_proposed_dark(chosen), {observed_proposed_node{std::string(64, 'n'), frames}}, "frames"));
+  }
+}
+
+TEST(VerifySelection, T_M3B_B14_proposed_candidate_whose_node_is_not_observed_is_a_lost_prerequisite) {
+  const std::vector<content_digest> chosen = {frame_digest('1'), frame_digest('2')};
+  EXPECT_TRUE(proposed_stops_with(selection_with_proposed_dark(chosen), {}, "observation"));
+  EXPECT_TRUE(proposed_stops_with(selection_with_proposed_dark(chosen), {observed_proposed_node{std::string(64, 'x'), chosen}}, "observation"))
+      << "un nodo con un'altra chiave non è l'osservazione di questo";
+}
+
+TEST(VerifySelection, T_M3B_B14_slot_candidate_without_proposed_frames_needs_no_node_observation) {
+  calibration_selection s = selection_of({});
+  selected_candidate c;
+  c.role = master_role::dark;
+  c.node_key = std::string(64, 'n');
+  s.candidates.push_back(c);
+  EXPECT_NO_THROW(verify_selection(s, {}, {}));
+}
+
+TEST(VerifySelection, T_M3B_B14_input_candidate_needs_no_node_observation) {
+  calibration_selection s = selection_of({});
+  selected_candidate c;
+  c.role = master_role::dark;
+  c.input = frame_digest('d');
+  s.candidates.push_back(c);
+  EXPECT_NO_THROW(verify_selection(s, {}, {}));
+}
+
+TEST(VerifySelection, T_M3B_B14_decoder_state_stop_precedes_the_proposed_node_check) {
+  const std::vector<content_digest> chosen = {frame_digest('1')};
+  calibration_selection s = selection_with_proposed_dark(chosen);
+  s.raw_inputs.push_back(input_of("light.dng"));
+  decoder_state changed = base_state();
+  changed.black = 600;
+  EXPECT_TRUE(stops_with(s, {input_of("light.dng", changed)}, "black", "light.dng.decoder_state"));
+}
+
+TEST(VerifySelection, T_M3B_B14_two_proposed_candidates_are_each_checked_against_their_own_node) {
+  const std::vector<content_digest> dark_frames = {frame_digest('1'), frame_digest('2')};
+  const std::vector<content_digest> flat_frames = {frame_digest('5'), frame_digest('6')};
+  calibration_selection s = selection_of({});
+  selected_candidate dark;
+  dark.role = master_role::dark;
+  dark.node_key = std::string(64, 'n');
+  dark.proposed_frames = dark_frames;
+  selected_candidate flat;
+  flat.role = master_role::flat;
+  flat.node_key = std::string(64, 'm');
+  flat.proposed_frames = flat_frames;
+  s.candidates = {dark, flat};
+  EXPECT_NO_THROW(verify_selection(s, {}, {observed_proposed_node{std::string(64, 'm'), flat_frames}, observed_proposed_node{std::string(64, 'n'), dark_frames}}));
+  EXPECT_THROW(verify_selection(s, {}, {observed_proposed_node{std::string(64, 'n'), flat_frames}, observed_proposed_node{std::string(64, 'm'), dark_frames}}),
+               stop_error);
 }
 
 }  // namespace

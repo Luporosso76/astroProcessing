@@ -8,10 +8,13 @@
 #include "astro/batch_classification.hpp"
 #include "astro/calibration.hpp"
 #include "astro/cancel.hpp"
+#include "astro/cpu_dispatch.hpp"
 #include "astro/fault_injector.hpp"
 #include "astro/hash.hpp"
 #include "astro/json.hpp"
+#include "astro/master.hpp"
 #include "astro/memory_pool.hpp"
+#include "astro/node.hpp"
 #include "astro/sqlite_dag_store.hpp"
 
 namespace astro {
@@ -111,5 +114,63 @@ struct master_screening {
 // numeric master.report_nonfinite.
 master_screening screen_master_frames(master_role role, const std::vector<master_analysis_frame>& frames,
                                       const master_analysis_params& params, const fault_injector& fault = {});
+
+// ---------------------------------------------------------------- proposta a priori (C-02.b §b.4)
+
+// Frame della richiesta: ingresso dell'analisi e specifica per il nodo (`spec.digest == analysis.digest`). Le dichiarazioni
+// della specifica sono le stesse usate per l'osservazione: non si confrontano. Lo stato e l'identità del decoder di un RAW
+// vengono dall'osservazione; un `spec.decoder` presente e diverso, di qualunque frame della richiesta, è invalid_input master.proposal.decoder_state.
+struct master_proposal_frame {
+  master_analysis_frame analysis;
+  master_frame_spec spec;
+};
+
+struct master_proposal_request {
+  master_role role = master_role::dark;
+  std::vector<master_proposal_frame> frames;  // ordine qualunque
+  master_analysis_params params;
+  // Modello di rumore dichiarato (con `params.offset_adu`): condiziona la proposta `single` di un gruppo da un frame.
+  std::optional<double> conversion_gain_e_per_adu, read_noise_adu;
+  std::optional<simd_request> simd;  // ADR-07: nessun default; entra nella ricetta del nodo
+};
+
+struct master_proposed_method {
+  combine_method combine = combine_method::mean;
+  master_rejection rejection = master_rejection::none;
+};
+
+struct proposed_master {
+  master_group group;
+  std::optional<master_proposed_method> method;  // assente: nessuna proposta
+  std::string absence;                           // "" con la proposta; "noise_model_not_declared" oppure "flat_level"
+  std::vector<std::string> alternatives;         // {"median_ratio"} con "flat_level"
+  std::optional<master_recipe> recipe;           // solo con la proposta
+  std::optional<node_spec> node;                 // solo con la proposta: make_master_node(*recipe)
+  std::string node_key;                          // vuota senza proposta
+  json analysis;                                 // parametro `analysis` del nodo (L8); null senza proposta
+  std::vector<content_digest> frames;            // membri, ordine canonico
+  input_observation reference_observation;       // osservazione del frame di riferimento
+};
+
+struct master_proposal {
+  master_role role = master_role::dark;
+  master_screening screening;
+  std::vector<proposed_master> groups;  // stesso ordine di `screening.groups`
+  json document;                        // `astro.master_proposal.v1`
+  std::string canonical() const { return canonical_json(document); }
+};
+
+// Funzione pura degli ingressi, indipendente dall'ordine dei frame e dagli `input_id`. Analisi di `screen_master_frames`
+// (stessi stop); `params_missing`: nessun gruppo. Tabella di §b.4: n = 1 `single` solo con `conversion_gain_e_per_adu`,
+// `read_noise_adu` e `params.offset_adu` dichiarati, altrimenti nessuna proposta (`noise_model_not_declared`); flat con
+// stato `flat_level` senza proposta (`flat_level`) e `median_ratio` come alternativa; n = 2 `mean`; n = 3…1024 `median`
+// (`mean` per il flat); n > 1024 `mean`; rejection sempre `none`. Il nodo di ogni proposta passa `validate_master_recipe`
+// (stop di dominio: invalid_input master.param.<nome> / var.param.<nome>; il dominio di `conversion_gain_e_per_adu` e
+// `read_noise_adu` si valida solo quando serve un gruppo `single`, e uno stop ferma l'intera proposta); i frame di un altro gruppo o esclusi non
+// entrano mai fra i suoi ingressi. `output_type` è il default della ricetta.
+master_proposal propose_masters(const master_proposal_request& request, const fault_injector& fault = {});
+
+// Candidati (c) di F-IO-03 CL-06 per `analyze_batch`: un `slot_candidate` per gruppo con nodo proposto, senza `load_samples`.
+std::vector<slot_candidate> proposed_slot_candidates(const master_proposal& proposal);
 
 }  // namespace astro

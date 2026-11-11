@@ -95,6 +95,9 @@ struct analysis_candidate {
   // questa funzione (dopo la sonda `calib.analysis.samples`) per ottenere l'immagine completa. Assente: `img` ha già i
   // campioni. Si chiama solo per il flat e il bias di una catena `flat.bias` effettivamente valutata.
   std::function<image()> load_samples = nullptr;
+  // Master di un nodo proposto e non ancora eseguito (F-IO-03 CL-06 c): l'immagine è l'osservazione del frame di
+  // riferimento, senza campioni del master. Il controllo termico di `flat.bias` che lo coinvolge non si calcola.
+  bool pending_master = false;
 };
 
 // Dichiarazioni del progetto lette dall'analisi. Nessun default: un valore richiesto assente o fuori dominio ferma
@@ -224,6 +227,9 @@ struct calibration_analysis {
   // Controllo termico di `flat.bias` calcolato e superato (§b.5); falso se non calcolato (dichiarazioni assenti, flat
   // non `raw`, flat escluso per sé o nella coppia L–F, bias escluso per sé o nella coppia F–B) o se esclude la catena.
   bool flat_thermal_within_budget = false;
+  // Controllo termico di `flat.bias` valutabile ma non calcolato perché flat o bias è un master proposto non eseguito
+  // (esito `thermal_check_pending_master`). Esclude `flat_thermal_within_budget`; la catena resta ammissibile.
+  bool flat_thermal_pending_master = false;
   bool light_has_decoder_state = false;
   calibration_declarations declarations;     // dichiarazioni lette dall'analisi
   std::vector<admissible_pair> admissible;   // ordine di tabella: catena del light, poi del flat, poi `partial`
@@ -282,6 +288,8 @@ struct selected_candidate {
   master_role role = master_role::dark;
   std::optional<content_digest> input;
   std::optional<std::string> node_key;
+  // Solo il candidato di un nodo proposto (CL-06 c): digest dei frame del nodo, in ordine canonico. La presenza lo marca.
+  std::optional<std::vector<content_digest>> proposed_frames = std::nullopt;
 };
 
 // Selezione congelata (CL-11), tutti i campi: ricetta e parametri; light del gruppo (digest e dimensione, per digest) e
@@ -300,6 +308,17 @@ struct calibration_selection {
 // integrity calib.decoder_state_changed con `field` (membro dello stato, `decoder_identity.<membro>`, oppure
 // `observation` se l'ingresso non ha osservazione), `predicate` = P-LOST e `prerequisite` = `<name>.decoder_state`. Nessuna
 // altra uscita: né ricetta, né candidato, né selezione modificata.
-void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed);
+//
+// Nodo proposto osservato dopo l'esecuzione del master: i frame che contiene ora, in ordine canonico.
+struct observed_proposed_node {
+  std::string node_key;
+  std::vector<content_digest> frames;
+};
+
+// Poi, per ogni candidato con `proposed_frames`: il nodo osservato con la stessa `node_key` deve avere esattamente quei
+// frame, nello stesso ordine; altrimenti integrity calib.proposed_node_changed con `node_key` e `field` (`frames`, oppure
+// `observation` se il nodo non è osservato). Non esclude né sostituisce nulla.
+void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed,
+                      const std::vector<observed_proposed_node>& nodes = {});
 
 }  // namespace astro

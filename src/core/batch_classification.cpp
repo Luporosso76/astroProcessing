@@ -541,6 +541,7 @@ struct candidate {
   std::string key;
   bool external = false;  // input registrato (chiave = digest); falso: master di uno slot (chiave = chiave del nodo)
   analysis_candidate ac;
+  std::optional<std::vector<content_digest>> proposed_frames;  // solo un nodo proposto (CL-06 c)
   std::optional<std::vector<decoder_state>> states;  // da `frame_decoder_states`
 };
 
@@ -852,6 +853,7 @@ std::vector<selected_candidate> chosen_candidates(const selection_result& sel) {
     c.role = rr.choice.role;
     if (rr.chosen->external) c.input = rr.chosen->ac.digest;
     else c.node_key = rr.chosen->key;
+    c.proposed_frames = rr.chosen->proposed_frames;
     out.push_back(std::move(c));
   }
   return out;
@@ -963,6 +965,7 @@ json analysis_json(const calibration_analysis& a) {
   predicates.set("flat_available", a.predicates.flat_available ? json::string(flat_state_text(*a.predicates.flat_available)) : json::null());
   o.set("predicates", std::move(predicates));
   o.set("flat_thermal_within_budget", json::boolean(a.flat_thermal_within_budget));
+  if (a.flat_thermal_pending_master) o.set("flat_thermal_pending_master", json::boolean(true));
   o.set("light_has_decoder_state", json::boolean(a.light_has_decoder_state));
   json admissible = json::array();
   for (const admissible_pair& p : a.admissible) {
@@ -1132,8 +1135,19 @@ batch_proposal analyze_batch(const std::vector<batch_input>& inputs, const std::
                                        e.rep->load_samples));
   }
   for (const slot_candidate& s : slots) {
-    ctx.candidates.push_back(make_candidate(s.role, s.node_key, content_digest{s.node_key, 0}, s.descriptor, s.observation, false,
-                                     s.load_samples));
+    candidate c = make_candidate(s.role, s.node_key, content_digest{s.node_key, 0}, s.descriptor, s.observation, false, s.load_samples);
+    c.proposed_frames = s.proposed_frames;
+    c.ac.pending_master = s.proposed_frames.has_value();
+    ctx.candidates.push_back(std::move(c));
+  }
+  {
+    std::set<std::pair<int, std::string>> seen;
+    for (const candidate& c : ctx.candidates) {
+      if (!seen.emplace(static_cast<int>(c.role), c.key).second) {
+        throw stop_error(error_category::invalid_input, "classify.duplicate_candidate", "due candidati con la stessa chiave nello stesso ruolo",
+                         {{"ruolo", role_text(c.role)}, {"node_key", c.key}});
+      }
+    }
   }
   std::sort(ctx.candidates.begin(), ctx.candidates.end(), [](const candidate& a, const candidate& b) {
     return std::pair(static_cast<int>(a.role), a.key) < std::pair(static_cast<int>(b.role), b.key);
