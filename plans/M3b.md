@@ -189,12 +189,16 @@ Test: T-M3B-FLAT-06 (parte stop: caselle della tabella di §f.2 con `median_rati
 
 ### B9. `median_ratio`, parte 2: valori e piano — ~300 righe
 
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B9-round1` FAIL con 1 MED di prova, `round2` PASS; revisore Opus; test e codice da agenti distinti; mutazioni 11/11). Albero `db98d12` (con B13): suite fast 1514 verde in 4 shard, release 1561/1561 (fast e slow).
+
 ID: C-02.b-flat §f.1 (fatti 1-4), §f.6, §f.7 (maschere).
 
 Fa: `y_f = offset_adu + r_f (x_f − offset_adu)` fuso nel ciclo per pixel; metodi di B5 e B6 sugli `y_f`; piano che stima `Var(M | r)`; invalidità e saturazione sugli `x_f`; capability `variance.fixed_weight_approximation` per ogni metodo con `median_ratio`.
 Test: T-M3B-FLAT-06 (parte confini ammessi: rapporto uguale a 4 e `A · ρ_c = budget · m_H,c` con la combinazione eseguita; prodotto `r_f (x_f − offset_adu)` subnormale → `master.result_nonfinite`), T-M3B-FLAT-01, 02 (fattore globale senza rumore: (a) `mean`, β qualunque, rapporto fino a 16; (b) ogni metodo con β ≡ 0, rapporto fino a 4), 03, 04, 05 (caratterizzazione, nessuna soglia).
 
 ### B10. Blocchi, worker, determinismo, memoria — ~250 righe
+
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B10-round1` PASS con LOW corretti, `round2` PASS; solo test, prodotto invariato; mutazioni 5/5). Albero `d75552f`: suite fast 1613 verde in 4 shard, slow 38/38 (esclusi i fuzz del decoder, non toccato).
 
 ID: C-02.b §b.8, §b.11; C-02.b-flat §f.8, §f.11; estensione ADR-06 R2.r di B0.
 
@@ -220,12 +224,16 @@ Test: T-M3B-C02-08 (ogni motivo da solo, compresi FITS e RAW come ingressi puri:
 
 ### B13. Analisi: gruppi e livelli del flat — ~400 righe
 
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B13-round1` FAIL con 1 MED di prova, `round2` PASS; revisore Opus; test e codice da agenti distinti; mutazioni 12/12). Albero `db98d12`: suite fast 1514 verde in 4 shard, release 1561/1561.
+
 ID: C-02.b §b.2 punti 2-3; ADR-16.b §b.7 (campi strutturali, nero effettivo).
 
 Fa: chiave esatta (larghezza, altezza, binning, CFA con offset, camera, gain, filtro solo flat, `roi_x`, `roi_y`, `readout_mode`, `row_order`, presenza dello stato del decoder, `offset_adu` per FITS, campi strutturali per RAW); gruppi per tolleranza con riferimento a digest minimo (esposizione, temperatura, nero effettivo in interi a 64 bit); stato `flat_level` per gruppo con `m_(f,c)` nel report; ogni gruppo è un nodo distinto.
 Test: T-M3B-C02-08 (un campo alla volta; RAW con nero alla tolleranza e a tolleranza + 1; RAW e FITS insieme; permutazioni dell'elenco; gruppi disgiunti).
 
 ### B14. Proposta a priori, nodi proposti, aggancio a `analyze_batch` — ~300 righe
+
+Stato: **CHIUSA** l'11 novembre 2026 (review `M3b-B14-round1` FAIL con 8 MED, `round2` FAIL con 1 MED sul piano: arbitraggio del coordinatore, piano corretto; test e codice da agenti Sonnet distinti; mutazioni 14/14). Tocca `astro.batch_proposal.v1` con una chiave aggiuntiva solo in attesa (deroga motivata). Albero `d75552f`: suite fast 1613 verde in 4 shard, slow 38/38 (esclusi i fuzz del decoder).
 
 Dipende da B13, da B4 e B5 (κ e piano nel preflight di `median`, `single`) e da B15a (nodo e preflight dei gruppi RAW).
 

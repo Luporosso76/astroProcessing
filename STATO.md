@@ -9,12 +9,12 @@
 |---|---|
 | B0 decisioni ed emendamenti, B1 protocollo (SHA `83e30030…`), B2 fixture `syn_cal.hpp` | CHIUSE |
 | B3 tipi e domini (`e66a112`), B4 κ (`38c7cf1`), B3b pianificatore (`855d634`), B15a decoder e preflight RAW (`4ff7f4b`) | CHIUSE, review PASS |
-| B5 metodi base (`483b671`), B6 `mean` + `sigma_clip` (`b10be73`), B7 livelli del flat per canale CFA (`4431098`), B12 analisi: esclusioni (`68e7793`), B8 `median_ratio` parte 1 (`7e34936`) | CHIUSE, review PASS; protocollo v3 SHA `e21760c7…`; release 1491/1491 su B8 |
-| B9 `median_ratio` parte 2, B13 gruppi: review PASS, ramo `m3b-b13` (B9+B13); B10 e B14 in corso (worktree `m3b-b10`, `m3b-b14`) | verifica unica di B9+B13 con slow, poi merge |
-| B11, B15, B16, B17 | da fare, ordine in `plans/M3b.md` §5 |
+| B5 metodi base (`483b671`), B6 `mean` + `sigma_clip` (`b10be73`), B7 livelli del flat per canale CFA (`4431098`), B12 analisi: esclusioni (`68e7793`), B8 (`7e34936`), B9 (`fb16781`), B13 (`db98d12`), B14 (`64fdf8d`), B10 (`d75552f`) | CHIUSE, review PASS (B14 per arbitraggio); release 1561/1561 su B13; fast 1613 e slow 38/38 su B10 |
+| B11 report del master | in corso (worktree `m3b-b11`, base `d75552f`) |
+| B15, B16, B17 | da fare, ordine in `plans/M3b.md` §5 |
 
 ## Prossimo passo
-0. Fino a quattro unità insieme se non toccano gli stessi file (utente, 10/11 21:45). Poi B11 (dopo B10), B15 (lettore RAW e `master.cpp`: dopo B10 e B14). Suite fast in 4 shard (3 sfiorano i 600 s col PC carico).
+0. Fino a quattro unità insieme se non toccano gli stessi file (utente, 10/11 21:45). Poi B15 (lettore RAW e `master.cpp`: dopo B11), B16 (dopo B15), B17 e gate. Suite fast in 4 shard (3 sfiorano i 600 s col PC carico).
 1. Metodo per unità: test rossi → codice (agente diverso) → shard verdi + mutazioni → review (Argon; senza quota: Agent code-reviewer opus) → rebase, verifica dell'albero unito (slow compresi se il codice del master cambia), ff, push.
 2. Blocchi evidence dei record che citano `master.cpp` e C-02: da rigenerare al prossimo run completo (codice cambiato dopo l'ultimo junit completo).
 ## Debiti degli strumenti
