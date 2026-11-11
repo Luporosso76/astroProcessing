@@ -31,7 +31,7 @@ Un passo saltato si dichiara. Le regole con uno strumento che le impone valgono 
 4. Un test o una soglia non si allentano per far tornare il verde (`AGENTS.md`, «Fallback»).
 
 ## 4. Revisione separata
-1. Solo con `tools/review.sh <unità>-roundN`: Gemini 4 Argon (High) via `agy`; uscita 4 (assente, rifiuto, crediti finiti) → `--reviewer claude` (Opus, contesto separato). Argon solo per le review del ciclo, mai per pareri al volo. L'autore non approva sé stesso. Worktree: `--worktree` (`AGENTS.md`).
+1. Solo con `tools/review.sh <unità>-roundN`: Gemini 4 Argon (High) via `agy`; revisori, uscita 4 e `--worktree`: `AGENTS.md`, «Delega e review». L'autore non approva sé stesso.
 2. Tetto: 2 giri per unità e per gate, imposto dallo strumento (al terzo, uscita 3: arbitra il coordinatore). Si numera da 1 per ogni unità o gate rifatto.
 3. Un solo giro di correzioni, dentro l'unità: correzioni minime ai soli rilievi, nessuna riscrittura. Un rilievo ordinario non apre un'unità nuova; si apre solo se serve una vera riprogettazione, e lo si dice all'utente.
 4. Giro 1 con il prompt fisso dello strumento (elenco completo, nessun tetto di righe); giro 2 solo sul delta.

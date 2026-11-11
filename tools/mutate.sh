@@ -20,11 +20,25 @@ mkdir -p "$TMPDIR"
 # se è superato lo stesso, mutate_classify.py riconosce il troncamento e dà errore.
 ctest_limit_args=(--test-output-size-failed 67108864 --test-output-size-passed 67108864)
 
+# classify <junit> <attesi> <script>: stampa l'esito del classificatore e ne ritorna l'uscita. Le uscite 0 e 1 valgono solo
+# se l'output contiene la riga «junit:» che il classificatore stampa dopo l'avvio: un avvio fallito (import, interprete) esce
+# con 1 senza quella riga e non deve diventare «mutazione sopravvissuta».
+classify() {
+  local out crc=0
+  out="$(python3 -S "$3" "$1" "$2" 2>&1)" || crc=$?
+  printf '%s\n' "$out"
+  if [ "$crc" -le 1 ] && ! grep -q '^junit: ' <<< "$out"; then
+    echo "INFRASTRUTTURA: il classificatore è uscito con $crc senza la riga 'junit:' (avvio fallito)"
+    return 2
+  fi
+  return "$crc"
+}
+
 if [ "${1:-}" = "--selftest" ]; then
   [ "$#" -eq 1 ] || { echo "uso: tools/mutate.sh --selftest (senza altri argomenti)" >&2; exit 2; }
   d="$(mktemp -d "$root/tmp/mutate-selftest.XXXXXX")"
   ok=0
-  trap '[ "$ok" -eq 1 ] && rm -rf -- "$d" || echo "cartella del selftest conservata per diagnosi: $d" >&2' EXIT
+  trap 'if [ "$ok" -eq 1 ]; then rm -rf -- "$d" || { echo "rimozione della cartella del selftest fallita: $d" >&2; exit 2; }; else echo "cartella del selftest conservata per diagnosi: $d" >&2; fi' EXIT
   mkdir -p "$d/proj"
   cat > "$d/proj/CMakeLists.txt" <<'EOF'
 cmake_minimum_required(VERSION 3.20)
@@ -34,11 +48,13 @@ add_test(NAME long_fail COMMAND sh -c "i=0; while [ $i -lt 20000 ]; do echo riga
 add_test(NAME early_fail COMMAND sh -c "echo '[  FAILED  ] Suite.Caso'; i=0; while [ $i -lt 20000 ]; do echo riga-di-riempimento-$i; i=$((i+1)); done; exit 1")
 add_test(NAME plain_fail COMMAND sh -c "echo 'timeout simulato senza marcatore'; exit 1")
 add_test(NAME pass COMMAND sh -c "echo ok")
+add_test(NAME tool_error COMMAND sh -c "echo 'CHECK-RESULT: tool-error'; exit 1")
+add_test(NAME defect COMMAND sh -c "echo 'CHECK-RESULT: defect'; exit 1")
 EOF
   st_fail() { echo "mutate selftest fallito: $1" >&2; [ ! -f "$d/out.txt" ] || cat "$d/out.txt" >&2; exit 2; }
   (cd "$d/proj" && cmake -S . -B ../b >/dev/null) || st_fail "configurazione del progetto di prova"
-  run() { # <regex> <n> <default|limite>: ctest nel progetto di prova e classificazione del junit
-    rm -f -- "$d/j.xml"
+  run() { # <regex> <n> <default|limit> [script]: ctest nel progetto di prova e classificazione del junit
+    rm -f -- "$d/j.xml" "$d/out.txt"
     local cr=0
     if [ "$3" = default ]; then
       (cd "$d/b" && ctest -R "$1" --output-junit "$d/j.xml" >/dev/null 2>&1) || cr=$?
@@ -46,7 +62,7 @@ EOF
       (cd "$d/b" && ctest -R "$1" --output-junit "$d/j.xml" "${ctest_limit_args[@]}" >/dev/null 2>&1) || cr=$?
     fi
     [ -s "$d/j.xml" ] || st_fail "junit assente per '$1' (ctest uscita $cr)"
-    rc=0; python3 -S "$root/tools/mutate_classify.py" "$d/j.xml" "$2" >"$d/out.txt" 2>&1 || rc=$?
+    rc=0; classify "$d/j.xml" "$2" "${4:-$root/tools/mutate_classify.py}" >"$d/out.txt" 2>&1 || rc=$?
   }
   expect() { # <uscita> <descrizione> [testo atteso nella diagnosi]
     [ "$rc" -eq "$1" ] || st_fail "$2 (uscita $rc, atteso $1)"
@@ -59,6 +75,12 @@ EOF
   run '^plain_fail$' 1 limit;    expect 2 "fallimento senza marcatore resta errore d'infrastruttura" "senza marcatore"
   run '^pass$' 1 limit;          expect 1 "test passato resta non rilevato"
   run '^(pass|long_fail)$' 2 limit; expect 0 "un solo fallito su due basta a rilevare"
+  run '^(pass|plain_fail)$' 2 limit; expect 2 "nessun marcatore su un fallito su due resta errore" "senza marcatore"
+  run '^(long_fail|plain_fail)$' 2 limit; expect 2 "un fallito marcato e uno senza marcatore resta errore" "senza marcatore"
+  run '^tool_error$' 1 limit;    expect 2 "tool-error è errore dello strumento" "tool-error"
+  run '^defect$' 1 limit;        expect 0 "CHECK-RESULT: defect è rilevato"
+  printf 'import modulo_inesistente_per_il_selftest\n' > "$d/stub.py"
+  run '^pass$' 1 limit "$d/stub.py"; expect 2 "avvio fallito del classificatore non è sopravvivenza" "avvio fallito"
   ok=1
   echo "mutate selftest: ok"
   exit 0
@@ -148,7 +170,7 @@ status=0
 ctest --preset release -R "$regex" --output-junit "$junit" "${ctest_limit_args[@]}" >> "$log" 2>&1 || status=$?
 [ -s "$junit" ] || { echo "junit di ctest assente: errore dell'infrastruttura (uscita $status)" | tee -a "$log" >&2; exit 2; }
 verdict=0
-python3 -S "$root/tools/mutate_classify.py" "$junit" "$count" >> "$log" || verdict=$?
+classify "$junit" "$count" "$root/tools/mutate_classify.py" >> "$log" || verdict=$?
 rm -f -- "$junit"
 if [ "$verdict" -eq 0 ]; then
   echo "RILEVATA: la mutazione fa fallire almeno un test fra i $count selezionati (ctest uscita $status)" | tee -a "$log"

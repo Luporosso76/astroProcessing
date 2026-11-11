@@ -6,6 +6,8 @@ Uscita: 0 almeno un test selezionato fallito per asserzione (marcatore gtest o C
         1 nessun test fallito (mutazione sopravvissuta);
         2 errore d'infrastruttura (junit illeggibile, casi diversi dagli attesi, test non eseguiti, fallimento senza
           marcatore, CHECK-RESULT: tool-error, output troncato da ctest, argomenti errati, qualunque eccezione).
+Contratto con mutate.sh: la riga «junit: » stampata dopo la lettura del junit è obbligatoria; senza di essa mutate.sh
+tratta le uscite 0 e 1 come avvio fallito (errore dello strumento).
 Vincolo: ctest 4.2.3 scrive nel junit «[This part of the test output was removed since it exceeds the threshold of N
 bytes.]» quando tronca; il rilevamento di quella stringa va riverificato se cambia la versione di ctest
 (tools/mutate.sh --selftest ne prova la presenza).

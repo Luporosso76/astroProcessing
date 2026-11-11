@@ -3,8 +3,9 @@
 # Revisore (AGENTS.md, "Delega e review"): `argon` (default) è Gemini 4 Argon (High) via `agy` in modalità plan e sandbox;
 # `claude` è Claude Opus headless sui crediti API del progetto (tools/agent-api.sh, indipendente dal login), contesto
 # separato dall'autore; a credito finito (uscita 4 di agent-api.sh) la stessa review gira sull'abbonamento, e il log lo dice. Se Argon
-# non risponde (assente da `agy models`, rifiuto, crediti finiti) lo strumento esce con 4 e la review si rilancia
+# non risponde (assente da `agy models`, `agy models` fallito, rifiuto, crediti finiti) lo strumento esce con 4 e la review si rilancia
 # esplicitamente con `--reviewer claude`: nessun cambio automatico di revisore.
+# Il file di fatti, se relativo, è relativo alla cartella da cui si lancia lo strumento.
 # Il prompt è il template fisso più il file di fatti dell'unità (ID, contratto, log): niente giudizi dell'autore.
 # Il log del revisore va in tmp/review-<slug>-<revisore>.log; a video solo il percorso dell'artefatto e il verdetto.
 # Il revisore legge e basta: se durante la review cambia lo stato di git (file tracciati o nuovi), uscita 2.
@@ -23,7 +24,8 @@
 # Criterio: FAIL se c'è almeno un rilievo BLOCCANTE o MED, PASS solo con LOW o senza rilievi; un verdetto che
 # contraddice i rilievi (PASS con BLOCCANTE/MED, FAIL con soli LOW) è incoerente (uscita 2).
 # Uscita: 0 PASS, 1 FAIL, 2 errore del revisore, artefatto incoerente o argomenti non validi, 3 limite di giri raggiunto,
-# 4 Argon non disponibile (rilanciare con --reviewer claude).
+# 4 Argon non disponibile (`agy models` fallito per timeout, login o altro, Argon assente dall'elenco, rifiuto, crediti
+# finiti: rilanciare con --reviewer claude).
 set -euo pipefail
 
 start_pwd="$PWD"
@@ -34,28 +36,41 @@ rootp="$(pwd -P)"
 # is_repo_worktree <radice>: vero se è una radice elencata da `git worktree list` di questo repository.
 is_repo_worktree() {
   local wl
-  wl="$(git -C "$root" worktree list --porcelain)"
+  wl="$(git -C "$root" worktree list --porcelain)" || { echo "git worktree list fallito in $root" >&2; exit 2; }
   case $'\n'"$wl"$'\n' in *$'\n'"worktree $1"$'\n'*) return 0 ;; esac
   return 1
 }
 
 # check_start_dir <cartella>: ritorna 2 se la cartella sta in un worktree di questo repository diverso dal checkout dello script.
 check_start_dir() {
-  local top
-  if top="$(git -C "$1" rev-parse --show-toplevel 2>&1)"; then
+  local top err
+  if top="$(LC_ALL=C git -C "$1" rev-parse --show-toplevel 2>/dev/null)"; then
     if [ "$top" != "$rootp" ] && is_repo_worktree "$top"; then
       echo "lanciato dal worktree $top ma lo script è di $rootp: senza --worktree la review riguarderebbe il checkout dello script; usare --worktree $top" >&2
       return 2
     fi
+  else
+    err="$(LC_ALL=C git -C "$1" rev-parse --show-toplevel 2>&1 >/dev/null)" || true
+    case "$err" in
+      *"not a git repository"*) ;;
+      *) echo "git rev-parse fallito in $1: $err" >&2; return 2 ;;
+    esac
   fi
 }
 
 # resolve_worktree <percorso>: stampa la radice del worktree git (di questo repository) o ritorna 2 con diagnosi.
 resolve_worktree() {
-  local p="$1" top real
+  local p="$1" top real err
   case "$p" in /*) ;; *) echo "--worktree richiede un percorso assoluto: '$p'" >&2; return 2 ;; esac
   [ -d "$p" ] || { echo "--worktree: cartella assente: $p" >&2; return 2; }
-  top="$(git -C "$p" rev-parse --show-toplevel)" || { echo "--worktree: non è un repository git: $p" >&2; return 2; }
+  if ! top="$(LC_ALL=C git -C "$p" rev-parse --show-toplevel 2>/dev/null)"; then
+    err="$(LC_ALL=C git -C "$p" rev-parse --show-toplevel 2>&1 >/dev/null)" || true
+    case "$err" in
+      *"not a git repository"*) echo "--worktree: non è un repository git: $p" >&2 ;;
+      *) echo "--worktree: git rev-parse fallito in $p: $err" >&2 ;;
+    esac
+    return 2
+  fi
   real="$(cd "$p" && pwd -P)"
   [ "$top" = "$real" ] || { echo "--worktree: non è la radice di un worktree ($top): $p" >&2; return 2; }
   is_repo_worktree "$top" || { echo "--worktree: non è un worktree di questo repository: $p" >&2; return 2; }
@@ -103,7 +118,7 @@ count_lines() {
 judge() {
   local f="$1" last values blocking rc=0
   last="$(awk 'NF {l=$0} END {print l}' "$f")"
-  if ! printf '%s\n' "$last" | grep -qE '^Verdetto: (PASS|FAIL)'; then
+  if ! grep -qE '^Verdetto: (PASS|FAIL)' <<< "$last"; then
     echo "l'ultima riga non vuota deve iniziare con 'Verdetto: PASS|FAIL': $f" >&2
     return 2
   fi
@@ -136,6 +151,7 @@ verdict_exit() {
 if [ "${1:-}" = "--selftest" ]; then
   mkdir -p "$root/tmp"
   d="$(mktemp -d "$root/tmp/review-selftest.XXXXXX")"
+  trap 'rm -rf -- "$d"' EXIT
   expect() { # etichetta uscita-attesa file
     local rc=0
     verdict_exit "$3" >/dev/null 2>&1 || rc=$?
@@ -162,17 +178,19 @@ if [ "${1:-}" = "--selftest" ]; then
   leftover="$(git -C "$root" for-each-ref --format='%(refname:short)' 'refs/heads/review-selftest-wt-*')"
   [ -z "$leftover" ] || echo "attenzione: rami di selftest rimasti da corse precedenti: $(tr '\n' ' ' <<< "$leftover")" >&2
   cleanup_wt() {
-    local bad=0 w b
+    local bad=0 w b brc
     for w in "$wa" "$wb"; do
       if [ -d "$w" ]; then git -C "$root" worktree remove --force "$w" || bad=1; fi
     done
     for b in "$ba" "$bb"; do
-      if git -C "$root" rev-parse -q --verify "refs/heads/$b" > /dev/null; then git -C "$root" branch -q -D "$b" || bad=1; fi
+      brc=0; git -C "$root" rev-parse -q --verify "refs/heads/$b" > /dev/null || brc=$?
+      if [ "$brc" -eq 0 ]; then git -C "$root" branch -q -D "$b" || bad=1
+      elif [ "$brc" -ne 1 ]; then echo "git rev-parse fallito su refs/heads/$b (uscita $brc)" >&2; bad=1; fi
     done
     [ "$bad" -eq 0 ] || echo "pulizia del selftest incompleta: controllare 'git worktree list' e i rami review-selftest-wt-*" >&2
     return "$bad"
   }
-  trap cleanup_wt EXIT
+  trap 'cleanup_wt; rm -rf -- "$d"' EXIT
   git -C "$root" worktree add -q -b "$ba" "$wa" HEAD
   git -C "$root" worktree add -q -b "$bb" "$wb" HEAD
   git init -q "$foreign"
@@ -183,6 +201,9 @@ if [ "${1:-}" = "--selftest" ]; then
     [ "$rc" -eq "$2" ] || fail "$1 (uscita $rc, attesa $2): $out"
     case "$out" in *"$3"*) ;; *) fail "$1: diagnosi inattesa: $out" ;; esac
   }
+  rc=0; out="$(cd "$plain" && bash "$root/tools/review.sh" selftest-round1 nonesiste.md 2>&1)" || rc=$?
+  [ "$rc" -eq 2 ] && case "$out" in *"file extra assente: $plain/nonesiste.md"*) true ;; *) false ;; esac \
+    || fail "file di fatti relativo non risolto rispetto alla cartella di lancio (uscita $rc): $out"
   wt_expect "percorso relativo" 2 "percorso assoluto" "tmp/x"
   wt_expect "percorso inesistente" 2 "cartella assente" "$d/inesistente"
   wt_expect "cartella non repository" 2 "non è un repository git" "$plain"
@@ -213,6 +234,11 @@ if [ "${1:-}" = "--selftest" ]; then
   rc=0; (cd "$wa" && check_start_dir "$wa") > /dev/null 2>&1 || rc=$?
   [ "$rc" -eq 2 ] || fail "partenza da un altro worktree (uscita $rc, attesa 2)"
   check_start_dir "$root" || fail "partenza dal checkout dello script rifiutata"
+  mkdir -p "$d/badgit"; printf 'garbage\n' > "$d/badgit/.git"
+  rc=0; check_start_dir "$d/badgit" > /dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] || fail "errore di git diverso da 'non è un repository' ignorato (uscita $rc, attesa 2)"
+  wt_expect "errore di git diverso da 'non è un repository' in --worktree" 2 "rev-parse fallito" "$d/badgit"
+  GIT_CEILING_DIRECTORIES="$rootp/tmp" check_start_dir "$plain" || fail "cartella fuori da ogni repository rifiutata"
   cleanup_wt; trap - EXIT
   rm -rf -- "$d"
   echo "review selftest: ok"
@@ -249,7 +275,12 @@ if [ "$worktree_opt" -eq 0 ]; then check_start_dir "$start_pwd" || exit 2; fi
 argon_model="gemini-4-argon-high"
 if [ "$reviewer" = argon ]; then
   command -v agy >/dev/null || { echo "agy non trovato nel PATH" >&2; exit 2; }
-  models_out="$(timeout 120 agy models < /dev/null)" || models_out=""
+  mrc=0
+  models_out="$(timeout 120 agy models < /dev/null)" || mrc=$?
+  if [ "$mrc" -ne 0 ]; then
+    echo "'agy models' fallito (uscita $mrc$([ "$mrc" -ne 124 ] || echo ", timeout")): rilanciare con --reviewer claude" >&2
+    exit 4
+  fi
   if ! grep -q "^${argon_model}[[:space:]]" <<< "$models_out"; then
     echo "Argon ($argon_model) assente da 'agy models': rilanciare con --reviewer claude" >&2
     exit 4
@@ -295,7 +326,7 @@ fi
 
 watch=("$wt")
 [ "$wt" = "$rootp" ] || watch+=("$rootp")
-before="$(git_state "${watch[@]}")"
+before=(); for w in "${watch[@]}"; do st="$(git_state "$w")" || { echo "stato di git non leggibile in $w" >&2; exit 2; }; before+=("$st"); done
 prompt="${prompt}
 
 Sei in sola lettura: leggi file ed esegui solo comandi che non modificano nulla (git diff, git log, cat, grep). Scrivi la
@@ -316,13 +347,19 @@ else
     python3 -I -S -c 'import json, sys; sys.stdout.write(str(json.load(open(sys.argv[1], encoding="utf-8"))["result"]))' "$log.json" > "$out" || rc=$?
   fi
 fi
-[ "$(git_state "${watch[@]}")" = "$before" ] || { echo "lo stato di git è cambiato durante la review: il revisore non è in sola lettura (log: $log)" >&2; exit 2; }
+for i in "${!watch[@]}"; do
+  after="$(git_state "${watch[$i]}")" || { echo "stato di git non leggibile in ${watch[$i]}" >&2; exit 2; }
+  [ "$after" = "${before[$i]}" ] || {
+    echo "lo stato di git di ${watch[$i]} è cambiato durante la review (log: $log): il revisore non è in sola lettura, oppure qualcun altro ha modificato quella cartella nel frattempo" >&2
+    exit 2
+  }
+done
 if [ "$rc" -ne 0 ]; then
   if [ "$reviewer" = argon ]; then
-    echo "Argon ha fallito (uscita $rc; rifiuto, crediti o timeout): rilanciare con --reviewer claude; artefatto: $out, log: $log" >&2
+    echo "Argon ha fallito (uscita $rc$([ "$rc" -ne 124 ] || echo ", timeout"); rifiuto o crediti finiti): rilanciare con --reviewer claude; artefatto: $out, log: $log" >&2
     exit 4
   fi
-  echo "il revisore Claude ha fallito (uscita $rc o timeout); artefatto: $out, log: $log" >&2
+  echo "il revisore Claude ha fallito (uscita $rc$([ "$rc" -ne 124 ] || echo ", timeout")); artefatto: $out, log: $log" >&2
   exit 2
 fi
 [ -s "$out" ] || { echo "artefatto vuoto o assente: $out" >&2; exit 2; }
