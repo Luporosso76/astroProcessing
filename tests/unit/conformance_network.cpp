@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     for (std::size_t i = 0; i < types.size(); ++i) {
       for (std::size_t v = 0; v < types[i].variants.size(); ++v) {
         const std::string tag = std::to_string(i) + "_" + std::to_string(v);
-        const job_type_inputs in = conformance_fixture::write_inputs(types[i], dir / ("inputs" + tag));
+        const job_type_inputs in = conformance_fixture::write_inputs(types[i], dir / ("inputs" + tag), types[i].variants[v].name);
         const minimal_job job = types[i].make(in, types[i].variants[v].name, store->root());
         store->put_node(job.node);
         store->create_slot("t" + tag, job.node.key());

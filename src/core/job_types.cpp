@@ -3,6 +3,7 @@
 #include "astro/calibration.hpp"
 #include "astro/import_job.hpp"
 #include "astro/master.hpp"
+#include "astro/raw_decode.hpp"
 #include "astro/raw_import_job.hpp"
 #include "astro/thumbnail_cache.hpp"
 
@@ -142,9 +143,11 @@ minimal_job make_calibration(const job_type_inputs& inputs, const std::string& v
 }
 
 minimal_job make_master(const job_type_inputs& inputs, const std::string& variant, const std::filesystem::path&) {
-  require_single(master_operator_id, variant);
+  const bool flat = variant == "flat_media";
+  const bool median = variant == "dark_mediana";
+  if (!flat && !median && variant != "unica") unknown_variant(master_operator_id, variant);
   master_recipe r;
-  r.role = master_role::dark;
+  r.role = flat ? master_role::flat : master_role::dark;
   for (const char* role : {"frame0", "frame1", "frame2"}) {
     const job_type_input in = input_of(inputs, role);
     master_frame_spec f;
@@ -152,11 +155,61 @@ minimal_job make_master(const job_type_inputs& inputs, const std::string& varian
     f.digest = in.digest;
     r.frames.push_back(f);
   }
-  r.combine = combine_method::mean;
+  r.combine = median ? combine_method::median : combine_method::mean;
   r.rejection = master_rejection::none;
+  if (flat) {
+    r.flat_norm = flat_normalization::none;
+    r.flat_level_rel_tol = 0.01;
+    r.flat_min_signal_adu = 1.0;
+  }
   r.exposure_rel_tol = 1e-9;
   r.temperature_abs_tol_c = 0.5;
   r.temp_policy = temperature_policy::compare;
+  r.simd = simd_request::scalar;
+  return {make_master_node(r), [r](const job_type_env& env) {
+            master_job_options o;
+            o.resources = env.resources;
+            return run_master_job(env.store, env.slot_name, r, env.pool, o, env.cancel, env.budget);
+          }};
+}
+
+// Frame RAW: stato e identità del decoder sono quelli della decodifica degli input (la stessa osservazione che l'analisi
+// porta al nodo); il nero non si sottrae e `decoder_black_abs_tol_adu` è 0. La soglia di saturazione è richiesta in ogni
+// frame e uguale fra i frame. Il job passa dallo spill dichiarato.
+minimal_job make_master_raw(const job_type_inputs& inputs, const std::string& variant, const std::filesystem::path&) {
+  if (variant != "raw_dark_mediana") unknown_variant(master_operator_id, variant);
+  master_recipe r;
+  r.role = master_role::dark;
+  for (const char* role : {"frame0", "frame1", "frame2"}) {
+    const job_type_input in = input_of(inputs, role);
+    const fits_input opened = open_input(in.path, raw_input_format());
+    const std::vector<std::uint8_t> bytes = read_verified_input(opened, in.path, in.digest, opened.size_bytes(), nullptr);
+    const image decoded = decode_raw_buffer(bytes);
+    ASTRO_ASSERT(decoded.decoder_state.has_value());
+    master_frame_spec f;
+    f.path = in.path;
+    f.digest = in.digest;
+    f.declared_fields.binning_x = 1;
+    f.declared_fields.binning_y = 1;
+    f.decoder = frame_decoder_state{*decoded.decoder_state, current_decoder_identity()};
+    if (!decoded.metadata.saturation_adu) {
+      throw stop_error(error_category::invalid_input, "job_types.saturation_adu", "soglia di saturazione assente dal frame",
+                       {{"ruolo", role}});
+    }
+    if (r.saturation_adu && *r.saturation_adu != decoded.metadata.saturation_adu->value) {
+      throw stop_error(error_category::invalid_input, "job_types.saturation_adu", "soglia di saturazione diversa fra i frame",
+                       {{"ruolo", role}, {"valore", std::to_string(decoded.metadata.saturation_adu->value)}});
+    }
+    r.saturation_adu = decoded.metadata.saturation_adu->value;
+    r.frames.push_back(std::move(f));
+  }
+  r.combine = combine_method::median;
+  r.rejection = master_rejection::none;
+  r.saturated_fraction_max = 0.5;
+  r.exposure_rel_tol = 1e-9;
+  r.temperature_abs_tol_c = 0.5;
+  r.temp_policy = temperature_policy::not_applicable_declared;
+  r.decoder_black_abs_tol_adu = 0;
   r.simd = simd_request::scalar;
   return {make_master_node(r), [r](const job_type_env& env) {
             master_job_options o;
@@ -189,7 +242,13 @@ const std::vector<job_type_entry>& registered_job_types() {
        true,
        make_calibration},
       {master_operator_id, {"frame0", "frame1", "frame2"}, fits_roles({"frame0", "frame1", "frame2"}),
-       {{"unica", false, true}}, true, make_master},
+       {{"unica", false, true}, {"dark_mediana", false, true}, {"flat_media", false, true}}, true, make_master},
+      {master_operator_id,
+       {"frame0", "frame1", "frame2"},
+       {{"frame0", &raw_input_format()}, {"frame1", &raw_input_format()}, {"frame2", &raw_input_format()}},
+       {{"raw_dark_mediana", false, true}},
+       true,
+       make_master_raw},
   };
   return entries;
 }

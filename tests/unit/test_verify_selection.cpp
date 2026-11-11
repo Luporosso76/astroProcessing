@@ -866,4 +866,44 @@ TEST(VerifySelection, T_M3B_B14_two_proposed_candidates_are_each_checked_against
                stop_error);
 }
 
+// Controllo termico di `flat.bias` non calcolato con un master candidato (c): la selezione non gira senza nuova analisi.
+calibration_selection flat_bias_selection_with_proposed(master_role role, const std::vector<content_digest>& frames) {
+  calibration_selection s = selection_of({});
+  s.recipe.flat = flat_chain::bias;
+  selected_candidate c;
+  c.role = role;
+  c.node_key = std::string(64, 'n');
+  c.proposed_frames = frames;
+  s.candidates.push_back(c);
+  return s;
+}
+
+TEST(VerifySelection, T_M3B_B16_flat_bias_selection_with_a_proposed_bias_or_flat_stops_with_thermal_check_pending) {
+  const std::vector<content_digest> frames = {frame_digest('1'), frame_digest('2'), frame_digest('3')};
+  for (const master_role role : {master_role::bias, master_role::flat}) {
+    SCOPED_TRACE(role == master_role::bias ? "bias" : "flat");
+    const calibration_selection sel = flat_bias_selection_with_proposed(role, frames);
+    try {
+      verify_selection(sel, {}, {observed_proposed_node{std::string(64, 'n'), frames}});
+      ADD_FAILURE() << "nessuno stop";
+    } catch (const stop_error& e) {
+      EXPECT_EQ(e.category(), error_category::integrity) << e.what();
+      EXPECT_EQ(e.code(), "calib.thermal_check_pending") << e.what();
+      const std::map<std::string, std::string> ctx(e.context().begin(), e.context().end());
+      EXPECT_EQ(ctx.size(), 2u);
+      EXPECT_EQ(ctx.count("node_key") ? ctx.at("node_key") : "", std::string(64, 'n'));
+      EXPECT_EQ(ctx.count("role") ? ctx.at("role") : "", role == master_role::bias ? "bias" : "flat");
+    }
+  }
+}
+
+TEST(VerifySelection, T_M3B_B16_flat_bias_selection_with_a_proposed_dark_or_a_slot_bias_is_accepted) {
+  const std::vector<content_digest> frames = {frame_digest('1'), frame_digest('2'), frame_digest('3')};
+  calibration_selection dark = flat_bias_selection_with_proposed(master_role::dark, frames);
+  EXPECT_NO_THROW(verify_selection(dark, {}, {observed_proposed_node{std::string(64, 'n'), frames}}));
+  calibration_selection slot = flat_bias_selection_with_proposed(master_role::bias, frames);
+  slot.candidates[0].proposed_frames.reset();
+  EXPECT_NO_THROW(verify_selection(slot, {}));
+}
+
 }  // namespace

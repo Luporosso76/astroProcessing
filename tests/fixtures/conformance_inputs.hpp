@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -95,13 +96,34 @@ inline fx::bytes dng_frame(std::uint16_t variant = 0) {
   return fx::make_dng(s);
 }
 
-// Scrive in `dir` un file per ruolo e restituisce percorsi e digest. I ruoli con formato RAW ricevono un DNG.
-inline astro::job_type_inputs write_inputs(const astro::job_type_entry& entry, const fs::path& dir) {
+// Indice K di un ruolo `frame<K>`; nessuno per gli altri ruoli.
+inline std::optional<std::uint32_t> frame_index(const std::string& role) {
+  if (role.rfind("frame", 0) == 0 && role.size() == 6 && role[5] >= '0' && role[5] <= '9') {
+    return static_cast<std::uint32_t>(role[5] - '0');
+  }
+  return std::nullopt;
+}
+
+// Scrive in `dir` un file per ruolo e restituisce percorsi e digest. I ruoli con formato RAW ricevono un DNG; i ruoli
+// `frame<K>` RAW un DNG per indice (digest distinti: un master non ammette due frame uguali). Con `variant` che inizia
+// per `flat` i ruoli `frame<K>` FITS sono flat (esposizione 5 s, IMAGETYP «Flat Field»), perché un master di ruolo
+// flat ferma i frame di un altro ruolo (`calib.imagetyp_conflict`). Senza `variant` il comportamento è quello dei
+// chiamanti che non conoscono la variante.
+inline astro::job_type_inputs write_inputs(const astro::job_type_entry& entry, const fs::path& dir,
+                                           const std::string& variant = {}) {
   fs::create_directories(dir);
   astro::job_type_inputs inputs;
   for (const std::string& role : entry.input_roles) {
     const bool raw = raw_role(entry, role);
-    const fx::bytes b = raw ? dng_frame() : frame_for_role(role);
+    const std::optional<std::uint32_t> index = frame_index(role);
+    fx::bytes b;
+    if (raw) {
+      b = dng_frame(static_cast<std::uint16_t>(index.value_or(0)));
+    } else if (index && variant.rfind("flat", 0) == 0) {
+      b = frame(kind::flat, *index);
+    } else {
+      b = frame_for_role(role);
+    }
     const fs::path p = fs::absolute(dir / (role + (raw ? ".dng" : ".fits")));
     std::ofstream out(p, std::ios::binary | std::ios::trunc);
     out.write(reinterpret_cast<const char*>(b.data()), static_cast<std::streamsize>(b.size()));

@@ -288,7 +288,7 @@ struct type_case {
   type_case(const type_param& p, const std::string& tag = "")
       : entry(registered_job_types()[p.entry]), variant(entry.variants[p.variant]),
         dir(fresh(current_test() + tag)) {
-    inputs = cf::write_inputs(entry, dir / "inputs");
+    inputs = cf::write_inputs(entry, dir / "inputs", variant.name);
     fs::create_directories(dir / "scratch");
     store = sqlite_dag_store::create(dir / "store");
     job.emplace(entry.make(inputs, variant.name, store->root()));
@@ -788,10 +788,10 @@ TEST(ConformanceWorkflow, T_M3BASE_03_workflow_refusal_leaves_a_stop_record) {
   workflow wf{"conf", {workflow_step{slot, job.node, [&] { return job.run(e); }}}, nullptr};
   const fs::path db = c.store->root() / "project.db";
   {  // run_workflow con slot che punta a un altro nodo: il passo dichiara il nodo di una richiesta diversa
-    job_type_inputs other_inputs = cf::write_inputs(c.entry, c.dir / "other");
+    job_type_inputs other_inputs = cf::write_inputs(c.entry, c.dir / "other", c.variant.name);
     for (auto& [role, in] : other_inputs) {
       std::vector<std::uint8_t> b = read_bytes(in.path);
-      if (cf::raw_role(c.entry, role)) b = cf::dng_frame(1); else set_card(b, "FRAMENO", 7);
+      if (cf::raw_role(c.entry, role)) b = cf::dng_frame(static_cast<std::uint16_t>(1 + cf::frame_index(role).value_or(0))); else set_card(b, "FRAMENO", 7 + cf::frame_index(role).value_or(0));
       overwrite(in.path, b);
       in.digest = digest_of(b);
     }
@@ -1169,10 +1169,10 @@ TEST_P(Conformance, T_M3BASE_09_common_observations_in_the_provenance) {
 // `work` (BASE-confini, OB-10, «Si estingue»), quindi nessun `work` e nessuna apertura di input.
 TEST_P(Conformance, T_M3BASE_10_node_of_the_job_equals_the_request) {
   type_case c(GetParam());
-  job_type_inputs other = cf::write_inputs(c.entry, c.dir / "other");
+  job_type_inputs other = cf::write_inputs(c.entry, c.dir / "other", c.variant.name);
   for (auto& [role, in] : other) {
     std::vector<std::uint8_t> b = read_bytes(in.path);
-    if (cf::raw_role(c.entry, role)) b = cf::dng_frame(1); else set_card(b, "FRAMENO", 7);
+    if (cf::raw_role(c.entry, role)) b = cf::dng_frame(static_cast<std::uint16_t>(1 + cf::frame_index(role).value_or(0))); else set_card(b, "FRAMENO", 7 + cf::frame_index(role).value_or(0));
     overwrite(in.path, b);
     in.digest = digest_of(b);
   }
@@ -1472,7 +1472,7 @@ struct multi_workflow {
     fs::create_directories(dir / "scratch");
     const auto& types = registered_job_types();
     for (std::size_t i = 0; i < types.size(); ++i) {
-      const job_type_inputs in = cf::write_inputs(types[i], dir / ("inputs" + std::to_string(i)));
+      const job_type_inputs in = cf::write_inputs(types[i], dir / ("inputs" + std::to_string(i)), types[i].variants[0].name);
       jobs.push_back(types[i].make(in, types[i].variants[0].name, store->root()));
       slots.push_back("p" + std::to_string(i));
       store->put_node(jobs.back().node);

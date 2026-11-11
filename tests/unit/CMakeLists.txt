@@ -302,6 +302,18 @@ target_compile_definitions(test_master_b11 PRIVATE
   ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
 gtest_discover_tests(test_master_b11 PROPERTIES LABELS fast)
 
+# B16 di M3.b: job `master.combine` generale, anche da RAW. T-M3B-JOB-01 (registro e job minimo di ogni variante),
+# T-M3A-CAL-09 (parte master) e T-M3B-C02-15 sul percorso del job, T-M3B-FLAT-06 sul job, T-M3B-C02-10 e T-M3B-FLAT-08 (job
+# RAW, riapertura e ricostruzione del nodo, candidati permutati): `fast`. Il decoder RAW esige TZ=UTC0 dal main
+# (main_utc0.cpp, ADR-08.b §2.6).
+add_executable(test_master_b16 test_master_b16.cpp main_utc0.cpp)
+target_link_libraries(test_master_b16 PRIVATE astrocore GTest::gtest SQLite::SQLite3)
+target_include_directories(test_master_b16 PRIVATE ${PROJECT_SOURCE_DIR}/tests/fixtures ${PROJECT_SOURCE_DIR}/src/core)
+target_compile_definitions(test_master_b16 PRIVATE
+  ASTRO_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+  ASTRO_TEST_TMP="${CMAKE_BINARY_DIR}/test_tmp")
+gtest_discover_tests(test_master_b16 PROPERTIES LABELS fast)
+
 # T-M2R2-04 e T-M2E-21 sui master del prodotto: Monte Carlo con seed fisso. Lunghi: `ctest -L slow`.
 add_executable(test_master_stats test_master_stats.cpp)
 target_link_libraries(test_master_stats PRIVATE astrocore GTest::gtest_main)
@@ -515,6 +527,7 @@ add_test(NAME T-M2F-01.offline
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b14.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b15.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b10.dir
+    ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_master_b16.dir
 
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13a.dir
     ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test_dng_u13b.dir

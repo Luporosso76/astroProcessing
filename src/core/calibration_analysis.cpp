@@ -1173,6 +1173,13 @@ std::string first_identity_difference(const decoder_identity& a, const decoder_i
        {{"node_key", node_key}, {"field", field}});
 }
 
+// Il controllo termico di `flat.bias` con un master candidato (c) non eseguito è dichiarato, non calcolato: la selezione non
+// gira senza una nuova analisi sul master eseguito.
+[[noreturn]] void thermal_check_pending(const std::string& node_key, master_role role) {
+  stop(error_category::integrity, "calib.thermal_check_pending", "controllo termico flat.bias non calcolato: serve una nuova analisi",
+       {{"node_key", node_key}, {"role", calib_detail::role_name(role)}});
+}
+
 }  // namespace
 
 void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed,
@@ -1192,6 +1199,9 @@ void verify_selection(const calibration_selection& selection, const std::vector<
     const auto now = std::find_if(nodes.begin(), nodes.end(), [&c](const observed_proposed_node& n) { return n.node_key == *c.node_key; });
     if (now == nodes.end()) proposed_node_changed(*c.node_key, "observation");
     if (now->frames != *c.proposed_frames) proposed_node_changed(*c.node_key, "frames");
+    if (selection.recipe.flat == flat_chain::bias && (c.role == master_role::bias || c.role == master_role::flat)) {
+      thermal_check_pending(*c.node_key, c.role);
+    }
   }
 }
 

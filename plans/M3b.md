@@ -347,6 +347,8 @@ Criterio di uscita (`plans/M3.md`, riga di M3.b; C-02.b §b.9, C-02.b-flat §f.9
 7. `python3 -S tools/trace.py check` pulito per F-CAL-01, F-CAL-01.b e M3.b; protocollo `M3b-protocollo.md` committato prima del primo record di misura (T-M3-ADR09-01).
 8. Review PASS per ogni unità (tetto 2 giri); build pulita dev e release.
 
+Limiti dichiarati che il gate riporta nel record: dal lettore RAW delle statistiche non si provocano lo stop `raw.libraw_error` né il cancel durante la decodifica (nessun gancio verso il decoder); la classificazione è provata sulla funzione `raw_decode_error_is_file_outcome` (`docs/decisions/M3b-lacune.md`, «Decisioni successive (B16)»).
+
 Ogni dichiarazione di chiusura cita comando, commit, passati/totali, elenco dei non passati.
 
 ## 10. Evidenza

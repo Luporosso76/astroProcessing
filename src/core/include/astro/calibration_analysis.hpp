@@ -317,7 +317,9 @@ struct observed_proposed_node {
 
 // Poi, per ogni candidato con `proposed_frames`: il nodo osservato con la stessa `node_key` deve avere esattamente quei
 // frame, nello stesso ordine; altrimenti integrity calib.proposed_node_changed con `node_key` e `field` (`frames`, oppure
-// `observation` se il nodo non è osservato). Non esclude né sostituisce nulla.
+// `observation` se il nodo non è osservato). Con ricetta `flat.bias` e candidato bias o flat proposto: integrity
+// calib.thermal_check_pending (`node_key`, `role`), perché il controllo termico non è stato calcolato (nuova analisi sul master
+// eseguito). Non esclude né sostituisce nulla.
 void verify_selection(const calibration_selection& selection, const std::vector<selected_decoder_input>& observed,
                       const std::vector<observed_proposed_node>& nodes = {});
 

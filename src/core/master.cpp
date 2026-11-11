@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <sstream>
 #include <type_traits>
@@ -2301,7 +2302,7 @@ void require_decoded_state(const master_plan& p, std::size_t k, const image& im)
   else if (spec.decoder) field = decoder_state_member_difference(spec.decoder->state, *im.decoder_state);
   if (field == nullptr) return;
   stop(error_category::integrity, "master.decoder_state_changed", "stato del decoder dei campioni diverso da quello della ricetta",
-       {{"frame", p.frames[k].name}, {"campo", field}});
+       {{"frame", p.frames[k].name}, {"campo", field}, {"predicate", "P-LOST"}});
 }
 
 [[noreturn]] void bad_node_states(const std::string& why, stop_error::context_list extra = {}) {
@@ -2518,54 +2519,131 @@ calibration_input_spec product_master_input(const sqlite_dag_store& store, const
   return in;
 }
 
+namespace {
+
+// ADR-16.b §b.7: l'identità del decoder della nuova decodifica è quella di `frame_decoder_states` della ricetta; si
+// confronta prima dello stato, nell'ordine dei membri del record.
+void require_decoder_identity(const master_plan& p, std::size_t k) {
+  const decoder_identity& frozen = p.frames[k].spec->decoder->identity;
+  const decoder_identity now = current_decoder_identity();
+  const char* field = nullptr;
+  if (frozen.libraw_version != now.libraw_version) field = "decoder_identity.libraw_version";
+  else if (frozen.libraw_version_number != now.libraw_version_number) field = "decoder_identity.libraw_version_number";
+  else if (frozen.libraw_capabilities != now.libraw_capabilities) field = "decoder_identity.libraw_capabilities";
+  else if (frozen.libraw_tarball_sha256 != now.libraw_tarball_sha256) field = "decoder_identity.libraw_tarball_sha256";
+  if (field == nullptr) return;
+  stop(error_category::integrity, "master.decoder_state_changed", "identità del decoder diversa da quella della ricetta",
+       {{"frame", p.frames[k].name}, {"campo", field}, {"predicate", "P-LOST"}});
+}
+
+// Frame RAW nello spill: piano dei campioni f32 (S·4 byte) seguito dalla maschera uint16 (S·2 byte), righe in ordine.
+// Lettura di `rows` righe da `y0` come read_fits_rows: valori in f64 e bit di invalidità, `scratch` di almeno 4·rows·w byte.
+void read_spill_rows(const spill_file& file, std::uint64_t samples, std::uint32_t width, std::uint32_t y0, std::uint32_t rows,
+                     std::byte* scratch, double* values, std::uint16_t* bits) {
+  const std::size_t count = static_cast<std::size_t>(width) * rows;
+  const std::uint64_t first = std::uint64_t{y0} * width;
+  file.read(first * sizeof(float), {scratch, count * sizeof(float)});
+  for (std::size_t i = 0; i < count; ++i) {
+    float v;
+    std::memcpy(&v, scratch + i * sizeof(float), sizeof v);
+    values[i] = static_cast<double>(v);
+  }
+  file.read(samples * sizeof(float) + first * sizeof(std::uint16_t), {scratch, count * sizeof(std::uint16_t)});
+  std::memcpy(bits, scratch, count * sizeof(std::uint16_t));
+}
+
+}  // namespace
+
 job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name, const master_recipe& recipe,
                            memory_pool& pool, const master_job_options& options, const cancel_token& cancel,
                            const std::optional<budget_snapshot>& budget) {
   // Nodo della ricetta: lo costruisce e lo confronta con lo slot run_job_files, prima di `work`.
   std::optional<node_spec> requested;
   job_request request;
-  request.node = [&] { return requested.emplace(make_master_node(recipe)); };
+  request.node = [&]() -> node_spec {
+    const node_spec& node = requested.emplace(make_master_node(recipe));
+    // Frame RAW (C-02.b §b.2 «RAW», L10): senza spill dichiarato nessun percorso residente, stop prima di ogni lettura.
+    if (recipe.frames[0].decoder && !options.resources.scratch) {
+      stop(error_category::invalid_input, "master.raw_requires_spill", "i frame RAW richiedono lo spill dichiarato dal job",
+           {{"frame", frame_name(0)}, {"n", std::to_string(recipe.frames.size())}});
+    }
+    return node;
+  };
   request.mismatch_code = "master.node_mismatch";
   request.resources = &options.resources;
   const auto work = [&](const job_record&) -> job_files_result {
     master_plan p = make_plan(recipe, options.on_kappa);
     const node_spec& node = *requested;
-    // Apertura, fase e linearità dai soli header, piano dei file: nessun campione letto.
+    const bool raw_frames = p.frames[0].spec->decoder.has_value();
     std::vector<fits_input> inputs;
     std::vector<fits_plan> plans;
-    // Canali per riga del modello di memoria (Cr): dal motivo dell'header del frame canonico 0, lo stesso da cui il
-    // preflight decide `per_channel`; il preflight lo riconferma prima di ogni task.
-    bool header_cfa = false;
-    inputs.reserve(p.n);
-    for (std::size_t k = 0; k < p.n; ++k) {
-      const master_frame_spec& f = *p.frames[k].spec;
-      inputs.push_back(open_fits_input(f.path));
-      const header_peek peek = peek_header(inputs.back(), f.read_options);
-      if (k == 0) header_cfa = peek.cfa.has_value();
-      require_phase(p.frames[k].name, p.recipe.role, peek.phase);
-      require_linear(p.frames[k].name, p.recipe.role, merged_linearity(p.frames[k].name, peek.lin, f.declared_fields.lin));
-      plans.push_back(plan_fits(inputs.back()));
-      if (plans.back().planes != 1) {
-        stop(error_category::unsupported, "calib.plane_layout", "un master accetta solo frame mono e CFA",
-             {{"frame", p.frames[k].name}, {"planes", std::to_string(plans.back().planes)}});
-      }
-    }
     std::vector<fits_row_layout> layouts;
-    for (const fits_input& in : inputs) layouts.push_back(plan_fits_rows(in));
+    // Solo frame RAW: `needed` del decoder per frame, dal file verificato (ADR-06 R2.r, «Frame RAW tramite spill»).
+    std::vector<std::uint64_t> raw_needed;
+    // Canali per riga del modello di memoria (Cr): dal motivo dell'header del frame canonico 0, lo stesso da cui il
+    // preflight decide `per_channel`; il preflight lo riconferma prima di ogni task. Un frame RAW è sempre CFA.
+    bool header_cfa = raw_frames;
+    std::uint64_t frame_peak = 0;
+    std::uint64_t w = 0, h = 0;
+    inputs.reserve(p.n);
+    if (raw_frames) {
+      // Geometria dall'area visibile dello stato osservato dall'analisi: la decodifica ne riconferma lo stato (identico
+      // o stop) prima che un campione entri nello spill.
+      const decoder_window& window = p.frames[0].spec->decoder->state.window;
+      w = window.width;
+      h = window.height;
+      for (std::size_t k = 0; k < p.n; ++k) {
+        if (cancel.requested()) {
+          stop(error_category::cancelled, "sched.cancelled", "annullamento richiesto");
+        }
+        const master_frame_spec& f = *p.frames[k].spec;
+        inputs.push_back(open_input(f.path, raw_input_format()));
+        try {
+          const std::vector<std::uint8_t> bytes =
+              read_verified_input(inputs.back(), f.path, f.digest, pool.budget_bytes(), nullptr);
+          raw_needed.push_back(raw_decode_needed_bytes(bytes));
+          std::uint64_t peak = 0;
+          if (__builtin_add_overflow(std::uint64_t{bytes.size()}, raw_needed.back(), &peak)) {
+            stop(error_category::budget, "sched.job_exceeds_budget", "picco di decodifica non rappresentabile",
+                 {{"file", std::to_string(bytes.size())}, {"prenotazione_decoder", std::to_string(raw_needed.back())}});
+          }
+          frame_peak = std::max(frame_peak, peak);
+        } catch (stop_error& e) {
+          e.add_context("frame", p.frames[k].name);
+          throw;
+        }
+      }
+    } else {
+      // Apertura, fase e linearità dai soli header, piano dei file: nessun campione letto.
+      for (std::size_t k = 0; k < p.n; ++k) {
+        const master_frame_spec& f = *p.frames[k].spec;
+        inputs.push_back(open_fits_input(f.path));
+        const header_peek peek = peek_header(inputs.back(), f.read_options);
+        if (k == 0) header_cfa = peek.cfa.has_value();
+        require_phase(p.frames[k].name, p.recipe.role, peek.phase);
+        require_linear(p.frames[k].name, p.recipe.role, merged_linearity(p.frames[k].name, peek.lin, f.declared_fields.lin));
+        plans.push_back(plan_fits(inputs.back()));
+        if (plans.back().planes != 1) {
+          stop(error_category::unsupported, "calib.plane_layout", "un master accetta solo frame mono e CFA",
+               {{"frame", p.frames[k].name}, {"planes", std::to_string(plans.back().planes)}});
+        }
+      }
+      for (const fits_input& in : inputs) layouts.push_back(plan_fits_rows(in));
+      for (const fits_plan& fp : plans) frame_peak = std::max(frame_peak, fp.peak_bytes);
+      w = plans[0].width;
+      h = plans[0].height;
+    }
 
     // Piano del job (ADR-06, estensione R2.r): un frame letto per intero alla volta, uscita, statistiche, codifica;
     // per task i blocchi di righe di tutti i frame, mai la pila. Il pianificatore ferma un piano oltre il budget o non
     // rappresentabile prima di ogni prenotazione.
-    std::uint64_t frame_peak = 0;
-    for (const fits_plan& fp : plans) frame_peak = std::max(frame_peak, fp.peak_bytes);
-    const std::uint64_t w = plans[0].width, h = plans[0].height;
     const resource_config& config = options.resources;
     const std::size_t cpus = config.cpu_set ? config.cpu_set->size() : cpu_count();
-    planner_input in{pool.budget_bytes(), cpus, plans[0].width, plans[0].height, sample_size(recipe.output_type),
-                     frame_peak, output_header_bound};
+    planner_input in{pool.budget_bytes(), cpus, static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h),
+                     sample_size(recipe.output_type), frame_peak, output_header_bound};
     in.frame_count = p.n;
     in.master_row_channels = header_cfa ? 2 : 1;
-    in.master_raw_frames = false;
+    in.master_raw_frames = raw_frames;
     const resource_plan chosen = plan_resources(in, config);
     job_plan plan;
     plan.shared_bytes = chosen.shared_bytes;
@@ -2573,12 +2651,15 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
     plan.worker_count = chosen.worker_count;
     plan.queue_capacity = chosen.task_queue_capacity;
     plan.tile_rows = chosen.tile_rows;
+    plan.spill = chosen.spill;
     const std::uint64_t rows = chosen.tile_rows;
     const std::uint64_t tasks = chosen.task_count;
     const std::optional<std::uint64_t> tile_bytes = master_task_bytes(p.n, rows, w);
     ASTRO_ASSERT(tile_bytes.has_value());
 
     json observed = json::array();
+    // Solo frame RAW: file dello spill di ogni frame canonico, scritti in `prepare` e letti dai task.
+    std::vector<const spill_file*> spill_frames;
     std::vector<stored_file> files;
     std::vector<std::string> warnings;
     std::optional<master_result> result;
@@ -2610,7 +2691,11 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         ctx.check_cancel();
         double* v = vals + f * rows * w;
         std::uint16_t* b = bits + f * rows * w;
-        read_fits_rows(inputs[f], layouts[f], y0, cnt, raw, v, b);
+        if (raw_frames) {
+          read_spill_rows(*spill_frames[f], w * h, static_cast<std::uint32_t>(w), y0, cnt, raw, v, b);
+        } else {
+          read_fits_rows(inputs[f], layouts[f], y0, cnt, raw, v, b);
+        }
         vp[f] = v;
         bp[f] = b;
       }
@@ -2625,15 +2710,38 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
         const master_frame_spec& f = *p.frames[k].spec;
         image im;
         try {
-          im = decode_fits(read_verified_input(inputs[k], f.path, f.digest, budget_bytes, &plans[k]), budget_bytes,
-                           f.read_options);
+          if (raw_frames) {
+            // Lettura verificata (OB-11) e decodifica nella memoria già prenotata dal job: il buffer del file sta nel
+            // picco `P` e `needed` è la prenotazione del chiamante (ADR-08.b §2.8).
+            const std::vector<std::uint8_t> bytes = read_verified_input(inputs[k], f.path, f.digest, budget_bytes, nullptr);
+            raw_decode_context ctx;
+            ctx.cancel = &cancel;
+            ctx.caller_reserved_bytes = raw_needed[k];
+            im = decode_raw_buffer(bytes, {}, ctx);
+          } else {
+            im = decode_fits(read_verified_input(inputs[k], f.path, f.digest, budget_bytes, &plans[k]), budget_bytes,
+                             f.read_options);
+          }
         } catch (stop_error& e) {
           e.add_context("frame", p.frames[k].name);
           throw;
         }
+        if (raw_frames) {
+          require_decoder_identity(p, k);
+          require_decoded_state(p, k, im);
+        }
         inspect_frame(p, k, im);
         compare_with_reference(p, k);
         compare_optional_fields(p, k);
+        if (raw_frames) {
+          // Invariante: lo stato confrontato include l'area visibile, quindi la geometria è quella del piano.
+          ASTRO_ASSERT(im.type == sample_type::f32 && im.geometry.width == w && im.geometry.height == h);
+          const std::uint64_t samples = w * h;
+          spill_file& file = jc.spill->create_shared_file();
+          file.write(0, std::as_bytes(std::span<const float>(im.data<float>(), samples)));
+          file.write(samples * sizeof(float), std::as_bytes(std::span<const std::uint16_t>(im.invalid.bits.data(), samples)));
+          spill_frames.push_back(&file);
+        }
       }
       finish_preflight(p);
       // Invariante: peek e decode leggono gli stessi byte con le stesse read_options e la stessa interpretazione
@@ -2649,7 +2757,8 @@ job_outcome run_master_job(sqlite_dag_store& store, const std::string& slot_name
       for (std::size_t k = 0; k < p.n; ++k) {
         try {
           jc.check_cancel();
-          reverify_input(p.frames[k].spec->path, fits_input_format(), &inputs[k], p.frames[k].spec->digest,
+          reverify_input(p.frames[k].spec->path, raw_frames ? raw_input_format() : fits_input_format(), &inputs[k],
+                         p.frames[k].spec->digest,
                          {chunk.data(), chunk.size()}, [&jc] { jc.check_cancel(); });
         } catch (stop_error& e) {
           e.add_context("frame", p.frames[k].name);
